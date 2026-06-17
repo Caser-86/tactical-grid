@@ -1,0 +1,413 @@
+{
+  "skills": {
+    "asslt_dash_strike": {
+      "name": "冲刺突袭", "job": "assault", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "移动+3格后近战攻击，命中+20%",
+      "effect": "dash_and_attack",
+      "range": 3
+    },
+    "asslt_breach": {
+      "name": "踹门", "job": "assault", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 2,
+      "description": "破坏相邻掩体，造成范围伤害30",
+      "effect": "destroy_cover_aoe_30"
+    },
+    "asslt_adrenaline": {
+      "name": "肾上腺素", "job": "assault", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 3,
+      "description": "自身+1AP，持续1回合",
+      "effect": "self_add_ap_1"
+    },
+    "asslt_blink": {
+      "name": "闪现突进", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 0, "unlock_level": 5, "max_uses": 1,
+      "description": "传送到视野内任意可达格",
+      "effect": "teleport"
+    },
+    "asslt_storm_dash": {
+      "name": "风暴冲刺", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 7,
+      "description": "移动+5格，路径上敌人受20伤害",
+      "effect": "dash_damage_path"
+    },
+    "asslt_melee_master": {
+      "name": "近战大师", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "近战+15%暴击",
+      "effect": "passive_melee_crit_15"
+    },
+    "asslt_move_shoot": {
+      "name": "移动射击", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 4,
+      "description": "移动后攻击不扣命中",
+      "effect": "passive_no_move_penalty"
+    },
+    "asslt_ghost_step": {
+      "name": "神出鬼没", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 8,
+      "description": "移动后+20%闪避",
+      "effect": "passive_dodge_after_move"
+    },
+    "asslt_bloodlust": {
+      "name": "嗜血", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 6,
+      "description": "击杀恢复20HP",
+      "effect": "passive_heal_on_kill"
+    },
+    "asslt_executioner": {
+      "name": "处决", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 9,
+      "description": "HP<30%敌人必死",
+      "effect": "passive_execute_low_hp"
+    },
+    "asslt_chain_slash": {
+      "name": "连环斩", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 6,
+      "description": "连续近战2次",
+      "effect": "double_melee_attack"
+    },
+    "asslt_iron_will": {
+      "name": "钢铁意志", "job": "assault", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 4,
+      "description": "免疫恐惧",
+      "effect": "passive_immune_fear"
+    },
+    "snip_precise": {
+      "name": "精准射击", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 1, "unlock_level": 1,
+      "description": "命中+30，暴击+20%，需架设1回合",
+      "effect": "aimed_shot"
+    },
+    "snip_highground": {
+      "name": "高地优势", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 2,
+      "description": "高地射击无视半掩体",
+      "effect": "highground_ignore_cover"
+    },
+    "snip_overwatch": {
+      "name": "监视射击", "job": "sniper", "type": "reaction",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 3,
+      "description": "设定区域，敌人进入自动射击",
+      "effect": "overwatch"
+    },
+    "snip_death_mark": {
+      "name": "死亡标记", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 4,
+      "description": "标记敌人，全队对其命中+15，2回合",
+      "effect": "mark_target"
+    },
+    "snip_piercing": {
+      "name": "穿甲弹", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 5,
+      "description": "无视50%护甲，消耗穿甲弹",
+      "effect": "armor_piercing"
+    },
+    "snip_reaper": {
+      "name": "死神", "job": "sniper", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 6,
+      "description": "暴击伤害+0.5×",
+      "effect": "passive_crit_damage_plus"
+    },
+    "snip_long_range": {
+      "name": "远程精通", "job": "sniper", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 3,
+      "description": "射程≥6时命中+10",
+      "effect": "passive_long_range_bonus"
+    },
+    "snip_silent_shot": {
+      "name": "无声射击", "job": "sniper", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 7,
+      "description": "攻击不暴露位置，需消音器",
+      "effect": "silent_attack"
+    },
+    "snip_double_tap": {
+      "name": "双发射击", "job": "sniper", "type": "active",
+      "ap_cost": 2, "cooldown": 2, "unlock_level": 8,
+      "description": "连射2次，第二次命中-10",
+      "effect": "double_shot"
+    },
+    "snip_assassinate": {
+      "name": "暗杀", "job": "sniper", "type": "active",
+      "ap_cost": 2, "cooldown": 0, "unlock_level": 9, "max_uses": 1,
+      "description": "必中+必暴击，对孤立目标伤害×2",
+      "effect": "guaranteed_crit_isolated_double"
+    },
+    "snip_spotter": {
+      "name": "观察手", "job": "sniper", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 5,
+      "description": "视野内敌人全队可见",
+      "effect": "passive_share_vision"
+    },
+    "snip_suppressing_fire": {
+      "name": "压制射击", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 6,
+      "description": "目标被压制，-30%命中",
+      "effect": "suppress_target"
+    },
+    "heavy_suppress": {
+      "name": "压制射击", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 1, "unlock_level": 1,
+      "description": "区域内敌人被压制",
+      "effect": "suppress_area"
+    },
+    "heavy_grenade": {
+      "name": "榴弹轰炸", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "范围伤害+破坏掩体",
+      "effect": "aoe_3x3_destroy_cover"
+    },
+    "heavy_taunt": {
+      "name": "嘲讽", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "吸引敌人攻击自己",
+      "effect": "taunt"
+    },
+    "heavy_barrage": {
+      "name": "弹幕覆盖", "job": "heavy", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 1,
+      "description": "3×3持续压制2回合",
+      "effect": "sustained_suppress"
+    },
+    "heavy_bulwark": {
+      "name": "不动如山", "job": "heavy", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "HP>50%不被击退",
+      "effect": "passive_no_knockback"
+    },
+    "heavy_wall_breaker": {
+      "name": "破墙者", "job": "heavy", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "对可破坏物伤害×2",
+      "effect": "passive_double_damage_destructible"
+    },
+    "heavy_iron_fortress": {
+      "name": "钢铁堡垒", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 1,
+      "description": "减伤50%，持续1回合",
+      "effect": "damage_reduction_50"
+    },
+    "heavy_self_repair": {
+      "name": "自我修复", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 1,
+      "description": "恢复40HP",
+      "effect": "self_heal_40"
+    },
+    "heavy_cleave": {
+      "name": "横扫", "job": "heavy", "type": "active",
+      "ap_cost": 2, "cooldown": 2, "unlock_level": 1,
+      "description": "前方3格范围伤害",
+      "effect": "frontal_cleave"
+    },
+    "heavy_rage": {
+      "name": "狂暴", "job": "heavy", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "HP<30%时攻击+50%",
+      "effect": "passive_enrage_low_hp"
+    },
+    "heavy_protect": {
+      "name": "保护", "job": "heavy", "type": "reaction",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 1,
+      "description": "相邻友军受伤代替承受",
+      "effect": "protect_ally"
+    },
+    "heavy_ground_slam": {
+      "name": "地裂", "job": "heavy", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 1,
+      "description": "相邻全体50伤害+击退",
+      "effect": "aoe_adjacent_knockback"
+    },
+    "medic_heal": {
+      "name": "急救", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 1,
+      "description": "恢复40HP，消耗急救包",
+      "effect": "heal_40"
+    },
+    "medic_revive": {
+      "name": "复活", "job": "medic", "type": "active",
+      "ap_cost": 2, "cooldown": 0, "unlock_level": 1,
+      "description": "复活倒地友军至30%HP",
+      "effect": "revive_30"
+    },
+    "medic_adrenaline_shot": {
+      "name": "肾上腺素注射", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "目标+1AP，持续1回合",
+      "effect": "target_add_ap"
+    },
+    "medic_area_heal": {
+      "name": "区域治疗", "job": "medic", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 1,
+      "description": "3×3范围恢复20HP",
+      "effect": "aoe_heal_20"
+    },
+    "medic_field_doctor": {
+      "name": "战场医生", "job": "medic", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "治疗效果+20%",
+      "effect": "passive_heal_bonus"
+    },
+    "medic_emergency_shield": {
+      "name": "紧急护盾", "job": "medic", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "被治疗目标获得10屏障",
+      "effect": "passive_shield_on_heal"
+    },
+    "medic_cure": {
+      "name": "净化", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 1, "unlock_level": 1,
+      "description": "移除目标所有负面状态",
+      "effect": "remove_debuffs"
+    },
+    "medic_stim_pack": {
+      "name": "兴奋剂", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "目标+2移动点，1回合",
+      "effect": "target_add_move"
+    },
+    "medic_barrier_blast": {
+      "name": "屏障爆发", "job": "medic", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 1,
+      "description": "全队获得30屏障",
+      "effect": "team_barrier_30"
+    },
+    "medic_triage": {
+      "name": "分诊", "job": "medic", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "每回合自动治疗相邻最低HP友军15HP",
+      "effect": "passive_auto_heal"
+    },
+    "medic_pain_block": {
+      "name": "止痛", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "目标2回合内不会倒地",
+      "effect": "prevent_death"
+    },
+    "medic_mass_cure": {
+      "name": "群体净化", "job": "medic", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 1,
+      "description": "3×3范围移除负面状态",
+      "effect": "aoe_remove_debuffs"
+    },
+    "scout_stealth": {
+      "name": "潜行", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 1,
+      "description": "隐形1回合",
+      "effect": "invisible_1"
+    },
+    "scout_scan": {
+      "name": "侦察扫描", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "揭示5×5内所有敌人意图",
+      "effect": "reveal_enemies"
+    },
+    "scout_mark": {
+      "name": "标记目标", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 1, "unlock_level": 1,
+      "description": "标记敌人，全队对其命中+15",
+      "effect": "mark_target"
+    },
+    "scout_trap": {
+      "name": "布置陷阱", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 1,
+      "description": "放置地雷/铁丝网",
+      "effect": "place_trap"
+    },
+    "scout_light_footed": {
+      "name": "轻盈", "job": "scout", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "森林/沙地不额外消耗移动点",
+      "effect": "passive_no_terrain_penalty"
+    },
+    "scout_early_warning": {
+      "name": "预警", "job": "scout", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "敌人进入视野时+1闪避",
+      "effect": "passive_dodge_on_spot"
+    },
+    "scout_silent_kill": {
+      "name": "静默击杀", "job": "scout", "type": "active",
+      "ap_cost": 2, "cooldown": 0, "unlock_level": 1, "max_uses": 1,
+      "description": "背刺必死(HP<50%的敌人)",
+      "effect": "execute_below_50"
+    },
+    "scout_recon_drone": {
+      "name": "侦察无人机", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 1,
+      "description": "召唤临时无人机揭示区域",
+      "effect": "summon_drone"
+    },
+    "scout_sabotage": {
+      "name": "破坏", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 1,
+      "description": "破坏敌人掩体/机关",
+      "effect": "sabotage"
+    },
+    "scout_decoy": {
+      "name": "诱饵", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 1,
+      "description": "放置诱饵吸引敌人",
+      "effect": "place_decoy"
+    },
+    "scout_double_agent": {
+      "name": "双面间谍", "job": "scout", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 1,
+      "description": "被标记的敌人攻击有20%打偏",
+      "effect": "passive_marked_miss"
+    },
+    "scout_shadow_step": {
+      "name": "影步", "job": "scout", "type": "active",
+      "ap_cost": 2, "cooldown": 2, "unlock_level": 1,
+      "description": "与视野内友军互换位置",
+      "effect": "swap_with_ally"
+    },
+    "gen_overwatch": {
+      "name": "警戒", "job": "all", "type": "reaction",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
+      "description": "设定锥形区域，敌人进入自动射击",
+      "effect": "overwatch"
+    },
+    "gen_hunker_down": {
+      "name": "蹲伏", "job": "all", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
+      "description": "本回合掩体效果翻倍",
+      "effect": "double_cover"
+    },
+    "gen_reposition": {
+      "name": "重新定位", "job": "all", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
+      "description": "撤退到上一回合位置",
+      "effect": "return_to_prev"
+    },
+    "gen_second_wind": {
+      "name": "回光返照", "job": "all", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 3, "max_uses": 1,
+      "description": "每局1次，致命伤免死至1HP",
+      "effect": "passive_cheat_death"
+    },
+    "gen_toughness": {
+      "name": "坚韧", "job": "all", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 3,
+      "description": "HP+20",
+      "effect": "passive_hp_plus_20"
+    },
+    "gen_eagle_eye": {
+      "name": "鹰眼", "job": "all", "type": "passive",
+      "ap_cost": 0, "cooldown": 0, "unlock_level": 5,
+      "description": "视野+1",
+      "effect": "passive_vision_plus_1"
+    },
+    "gen_sprint": {
+      "name": "冲刺", "job": "all", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
+      "description": "移动点+2",
+      "effect": "add_move_2"
+    },
+    "gen_interact": {
+      "name": "交互", "job": "all", "type": "active",
+      "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
+      "description": "与相邻交互点互动",
+      "effect": "interact"
+    }
+  }
+}

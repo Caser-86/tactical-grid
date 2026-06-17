@@ -1,0 +1,138 @@
+{
+  "bosses": {
+    "data_sentinel": {
+      "name": "数据哨兵", "chapter": 1,
+      "hp": 300, "armor": 15, "shield": 50,
+      "move": 3, "vision": 8, "ap": 3,
+      "weakness": "emp_double_damage",
+      "phases": [
+        {
+          "name": "阶段1", "hp_threshold": 0.6,
+          "weapons": ["laser_array_2_8", "missile_pod_3_7_aoe"],
+          "abilities": ["summon_drone_every_3"],
+          "behavior": "ranged_pressure"
+        },
+        {
+          "name": "阶段2", "hp_threshold": 0.0,
+          "weapons": ["laser_array_2_10", "missile_barrage_aoe"],
+          "abilities": ["summon_drone_every_2", "shield_regen_20"],
+          "enrage": "attack_plus_50"
+        }
+      ],
+      "rewards": { "credit": 1000, "intel": 50, "loot": "epic_weapon" }
+    },
+    "heavy_judge": {
+      "name": "重装审判者", "chapter": 2,
+      "hp": 500, "armor": 30, "shield": 100,
+      "move": 3, "vision": 7, "ap": 3,
+      "weakness": "back_hit_critical",
+      "phases": [
+        {
+          "name": "阶段1", "hp_threshold": 0.7,
+          "weapons": ["minigun_2_8_suppress", "rocket_4_8_aoe"],
+          "abilities": ["taunt", "suppress_area"]
+        },
+        {
+          "name": "阶段2", "hp_threshold": 0.3,
+          "weapons": ["minigun_rapid_2_8_double", "rocket_barrage_3"],
+          "abilities": ["summon_heavy_gunner", "heal_self_30"]
+        },
+        {
+          "name": "阶段3", "hp_threshold": 0.0,
+          "weapons": ["rage_slam_adjacent_80_aoe"],
+          "abilities": ["enrage_plus_1_ap", "destroy_adjacent_cover"],
+          "enrage": "move_plus_2"
+        }
+      ],
+      "rewards": { "credit": 1500, "intel": 80, "loot": "legendary_armor" }
+    },
+    "shadow_mercenary": {
+      "name": "影子佣兵", "chapter": 3,
+      "hp": 400, "armor": 10,
+      "move": 6, "vision": 7, "ap": 3,
+      "weakness": "clone_detectable_per_7",
+      "phases": [
+        {
+          "name": "阶段1", "hp_threshold": 0.7,
+          "weapons": ["silenced_rifle_2_8", "energy_blade_1"],
+          "abilities": ["stealth_every_3", "summon_clone_1"],
+          "behavior": "guerrilla"
+        },
+        {
+          "name": "阶段2", "hp_threshold": 0.3,
+          "weapons": ["silenced_rifle_2_8", "triple_blade_1_combo"],
+          "abilities": ["stealth_every_2", "summon_clone_2", "place_trap"],
+          "enrage": "clone_death_attack_plus_10"
+        },
+        {
+          "name": "阶段3", "hp_threshold": 0.0,
+          "weapons": ["shadow_blade_1_guaranteed"],
+          "abilities": ["permanent_stealth", "teleport_every_turn", "clone_explode_60"],
+          "enrage": "move_plus_1"
+        }
+      ],
+      "counter": "scout_scan_reveals_3_turns",
+      "rewards": { "credit": 2000, "intel": 100, "loot": "legendary_weapon_shadow_blade" }
+    },
+    "matrix_general": {
+      "name": "矩阵将军", "chapter": 4,
+      "hp": 600, "armor": 25, "shield": 150,
+      "move": 4, "vision": 8, "ap": 3,
+      "phases": [
+        {
+          "name": "阶段1", "hp_threshold": 0.66,
+          "weapons": ["plasma_cannon_3_10", "summon_troops"],
+          "abilities": ["summon_reinforcement_every_3", "shield_regen_30"]
+        },
+        {
+          "name": "阶段2", "hp_threshold": 0.33,
+          "weapons": ["plasma_cannon_3_12", "orbital_strike_aoe"],
+          "abilities": ["summon_elite_every_2", "terrain_shift"]
+        },
+        {
+          "name": "阶段3", "hp_threshold": 0.0,
+          "weapons": ["plasma_barrage_all", "melee_slam_100"],
+          "abilities": ["enrage_plus_1_ap", "repair_cover"],
+          "enrage": "attack_plus_50"
+        }
+      ],
+      "rewards": { "credit": 3000, "intel": 150, "loot": "legendary_full_set" }
+    },
+    "architect": {
+      "name": "架构师", "chapter": 5,
+      "hp": 800, "armor": 20, "shield": 200,
+      "move": 4, "vision": 10, "ap": 4,
+      "weakness": "emp_double_damage",
+      "phases": [
+        {
+          "name": "秩序", "hp_threshold": 0.66,
+          "weapons": ["energy_beam_3_12_pierce", "data_pulse_aoe_30"],
+          "abilities": ["summon_collider_every_2", "rewind_time_2_per_battle", "rebuild_cover"],
+          "arena": "standard_square",
+          "counter": "emp_deals_double_damage"
+        },
+        {
+          "name": "混沌", "hp_threshold": 0.33,
+          "weapons": ["chaos_burst_2_10_aoe", "gravity_slam_adjacent_80"],
+          "abilities": ["terrain_shift_every_3", "weather_control", "split_2", "mind_control_1_per_battle"],
+          "arena": "dynamic_changing",
+          "counter": "split_form_lower_hp_each"
+        },
+        {
+          "name": "终焉", "hp_threshold": 0.0,
+          "weapons": ["final_beam_100_1_turn_charge"],
+          "abilities": ["invulnerable_during_charge", "enrage_plus_1_ap", "floor_collapse_2_per_turn"],
+          "arena": "shrinking",
+          "counter": "destroy_2_cores_to_interrupt",
+          "mechanic": "dps_check"
+        }
+      ],
+      "endings": {
+        "A": { "condition": "all_survive + choice", "result": "destroy_architect_human_rebuild" },
+        "B": { "condition": "saved_rogue_ai + choice", "result": "merge_human_ai_coexist" },
+        "C": { "condition": "key_npc_dead", "result": "fail_matrix_continues" }
+      },
+      "rewards": { "credit": 5000, "intel": 200, "loot": "legendary_full_set" }
+    }
+  }
+}

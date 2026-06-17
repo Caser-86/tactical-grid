@@ -1,0 +1,178 @@
+{
+  "items": {
+    "med_kit": {
+      "name": "急救包",
+      "type": "consumable",
+      "effect": { "heal": 40 },
+      "ap_cost": 1,
+      "weight": 1,
+      "rarity": "common",
+      "stack": 3,
+      "description": "恢复40点生命值"
+    },
+    "advanced_med_kit": {
+      "name": "高级急救包",
+      "type": "consumable",
+      "effect": { "heal": 70, "remove_status": "bleed" },
+      "ap_cost": 1,
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 3,
+      "description": "恢复70点生命值并止血"
+    },
+    "adrenaline_shot": {
+      "name": "肾上腺素针",
+      "type": "consumable",
+      "effect": { "add_status": { "adrenaline": 1 } },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "rare",
+      "stack": 2,
+      "description": "获得1点额外行动点，持续1回合"
+    },
+    "painkiller": {
+      "name": "止痛药",
+      "type": "consumable",
+      "effect": { "remove_all_debuffs": true },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "common",
+      "stack": 3,
+      "description": "移除所有负面状态"
+    },
+    "energy_drink": {
+      "name": "能量饮料",
+      "type": "consumable",
+      "effect": { "add_status": { "charge": 1 } },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "common",
+      "stack": 3,
+      "description": "额外2点移动点，持续1回合"
+    },
+    "shield_generator": {
+      "name": "护盾发生器",
+      "type": "consumable",
+      "effect": { "add_status": { "barrier_50": 2 } },
+      "ap_cost": 1,
+      "weight": 1,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "获得50点屏障，持续2回合"
+    },
+    "revival_needle": {
+      "name": "复活针",
+      "type": "consumable",
+      "effect": { "revive": true, "hp_percent": 0.3 },
+      "ap_cost": 2,
+      "weight": 1,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "复活倒地友军至30%生命值"
+    },
+    "cloak_invisibility": {
+      "name": "隐身斗篷",
+      "type": "consumable",
+      "effect": { "add_status": { "invisible": 1 } },
+      "ap_cost": 1,
+      "weight": 1,
+      "rarity": "legendary",
+      "stack": 1,
+      "description": "隐形1回合"
+    },
+    "grenade": {
+      "name": "手雷",
+      "type": "throwable",
+      "effect": { "damage": [40, 60], "area": "3x3", "destroy_cover": true },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 1,
+      "rarity": "common",
+      "stack": 2,
+      "description": "范围伤害40-60，破坏掩体"
+    },
+    "flashbang": {
+      "name": "闪光弹",
+      "type": "throwable",
+      "effect": { "add_status": { "blind": 2 }, "area": "5x5" },
+      "ap_cost": 1,
+      "range": [1, 6],
+      "weight": 0.5,
+      "rarity": "common",
+      "stack": 2,
+      "description": "5x5范围致盲2回合"
+    },
+    "smoke_grenade": {
+      "name": "烟雾弹",
+      "type": "throwable",
+      "effect": { "create_smoke": true, "area": "3x3", "duration": 3 },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 0.5,
+      "rarity": "common",
+      "stack": 2,
+      "description": "生成软遮蔽烟雾3回合"
+    },
+    "molotov": {
+      "name": "燃烧瓶",
+      "type": "throwable",
+      "effect": { "create_fire": true, "area": "3x3", "duration": 2 },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 1,
+      "rarity": "common",
+      "stack": 2,
+      "description": "生成燃烧地面2回合"
+    },
+    "emp_grenade": {
+      "name": "EMP手雷",
+      "type": "throwable",
+      "effect": { "damage_mech": 80, "disable_skills": 2, "area": "3x3" },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "对机械单位80伤害，禁用技能2回合"
+    },
+    "heal_mist": {
+      "name": "治疗雾",
+      "type": "throwable",
+      "effect": { "heal_per_turn": 15, "area": "3x3", "duration": 3 },
+      "ap_cost": 1,
+      "range": [1, 4],
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "友军每回合恢复15HP，3回合"
+    },
+    "mine": {
+      "name": "地雷",
+      "type": "trap",
+      "effect": { "damage": 60, "knockback": true },
+      "detect_per": 6,
+      "weight": 1,
+      "rarity": "common",
+      "stack": 2,
+      "description": "踩踏触发60伤害+击退"
+    },
+    "wire_trap": {
+      "name": "铁丝网",
+      "type": "trap",
+      "effect": { "add_status": { "slow": 2 }, "add_status_bleed": true },
+      "detect_per": 5,
+      "weight": 1,
+      "rarity": "common",
+      "stack": 2,
+      "description": "踩踏减速2回合+出血"
+    }
+  },
+  "ammo": {
+    "standard": { "name": "标准弹", "base_carry": 30, "effect": "" },
+    "armor_piercing": { "name": "穿甲弹", "base_carry": 20, "effect": "ignore_50_armor" },
+    "incendiary": { "name": "燃烧弹", "base_carry": 15, "effect": "burn_status" },
+    "poison": { "name": "毒气弹", "base_carry": 15, "effect": "poison_status" },
+    "electric": { "name": "电击弹", "base_carry": 15, "effect": "water_spread" },
+    "hollow_point": { "name": "空尖弹", "base_carry": 20, "effect": "damage_plus_20_armor_minus_10" }
+  }
+}

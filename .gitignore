@@ -1,0 +1,68 @@
+# ============================================================
+# Tactical Grid - Git 忽略规则
+# ============================================================
+
+# --- Godot ---
+.godot/
+*.import
+*.uid
+*.translation
+export/
+*.pck
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Build / Dist ---
+dist/
+build/
+*.tsbuildinfo
+
+# --- 环境变量 ---
+.env
+.env.local
+.env.*.local
+
+# --- 数据库 ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Temp ---
+tmp/
+temp/
+*.tmp
+*.bak
+.cache/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# --- Test Coverage ---
+coverage/
+.nyc_output/

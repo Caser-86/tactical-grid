@@ -1,0 +1,184 @@
+{
+  "enemies": {
+    "drone_scout": {
+      "name": "侦查无人机",
+      "hp": 30, "armor": 0, "move": 6, "vision": 7, "ap": 2,
+      "weapon": "laser_light",
+      "range": [1, 4], "damage": [10, 18],
+      "special": ["flying", "ignore_terrain"],
+      "chapter": 1,
+      "ai_weights": { "patrol": 0.4, "approach": 0.3, "attack": 0.3 }
+    },
+    "drone_assault": {
+      "name": "攻击无人机",
+      "hp": 45, "armor": 3, "move": 5, "vision": 6, "ap": 2,
+      "weapon": "dual_laser",
+      "range": [1, 5], "damage": [15, 25],
+      "special": ["flying", "double_shot"],
+      "chapter": 2,
+      "ai_weights": { "attack": 0.5, "approach": 0.3, "flank": 0.2 }
+    },
+    "drone_bomber": {
+      "name": "轰炸无人机",
+      "hp": 40, "armor": 2, "move": 4, "vision": 5, "ap": 2,
+      "weapon": "bomb",
+      "range": [2, 6], "damage": [30, 40],
+      "special": ["flying", "self_destruct_60"],
+      "chapter": 3,
+      "ai_weights": { "approach": 0.6, "self_destruct": 0.4 }
+    },
+    "sentry_basic": {
+      "name": "基础哨兵",
+      "hp": 60, "armor": 5, "move": 4, "vision": 6, "ap": 2,
+      "weapon": "rifle",
+      "range": [2, 6], "damage": [18, 28],
+      "special": [],
+      "chapter": 1,
+      "ai_weights": { "guard_point": 0.5, "attack": 0.3, "take_cover": 0.2 }
+    },
+    "sentry_elite": {
+      "name": "精英哨兵",
+      "hp": 90, "armor": 8, "move": 4, "vision": 7, "ap": 2,
+      "weapon": "precision_rifle",
+      "range": [3, 8], "damage": [25, 40],
+      "special": ["mark_target"],
+      "chapter": 2,
+      "ai_weights": { "guard_point": 0.4, "attack": 0.4, "take_cover": 0.2 }
+    },
+    "sentry_sniper": {
+      "name": "狙击哨兵",
+      "hp": 70, "armor": 5, "move": 3, "vision": 9, "ap": 2,
+      "weapon": "sniper_rifle",
+      "range": [4, 10], "damage": [35, 55],
+      "special": ["highland_bonus_x2"],
+      "chapter": 2,
+      "ai_weights": { "seek_highground": 0.4, "attack": 0.4, "reposition": 0.2 }
+    },
+    "shield_bot": {
+      "name": "护盾机器人",
+      "hp": 80, "armor": 15, "move": 3, "vision": 5, "ap": 2,
+      "weapon": "smg",
+      "range": [1, 4], "damage": [12, 20],
+      "special": ["shield_50", "taunt"],
+      "chapter": 1,
+      "ai_weights": { "block_chokepoint": 0.4, "approach": 0.3, "protect_allies": 0.3 }
+    },
+    "heavy_gunner": {
+      "name": "重装机枪手",
+      "hp": 120, "armor": 12, "move": 3, "vision": 5, "ap": 2,
+      "weapon": "mg",
+      "range": [2, 6], "damage": [20, 35],
+      "special": ["suppressing_fire"],
+      "chapter": 2,
+      "ai_weights": { "suppress": 0.4, "attack": 0.3, "take_cover": 0.3 }
+    },
+    "rocket_trooper": {
+      "name": "火箭兵",
+      "hp": 80, "armor": 8, "move": 3, "vision": 6, "ap": 2,
+      "weapon": "rocket_launcher",
+      "range": [3, 7], "damage": [35, 55],
+      "special": ["aoe_3x3", "destroy_cover"],
+      "chapter": 3,
+      "ai_weights": { "attack": 0.5, "approach": 0.3, "take_cover": 0.2 }
+    },
+    "stealth_assassin": {
+      "name": "隐形刺客",
+      "hp": 60, "armor": 3, "move": 6, "vision": 6, "ap": 2,
+      "weapon": "energy_blade",
+      "range": [1, 1], "damage": [40, 60],
+      "special": ["stealth", "backstab_x2"],
+      "chapter": 3,
+      "ai_weights": { "flank": 0.5, "attack_medic": 0.3, "retreat": 0.2 }
+    },
+    "flame_trooper": {
+      "name": "喷火兵",
+      "hp": 100, "armor": 10, "move": 3, "vision": 4, "ap": 2,
+      "weapon": "flamethrower",
+      "range": [1, 3], "damage": [25, 40],
+      "special": ["burn_ground", "ignore_half_cover"],
+      "chapter": 3,
+      "ai_weights": { "approach": 0.6, "attack": 0.4 }
+    },
+    "poison_spitter": {
+      "name": "毒液射手",
+      "hp": 50, "armor": 0, "move": 5, "vision": 6, "ap": 2,
+      "weapon": "poison_gun",
+      "range": [2, 6], "damage": [10, 20],
+      "special": ["poison_4_turns"],
+      "chapter": 3,
+      "ai_weights": { "attack": 0.5, "approach": 0.3, "retreat": 0.2 }
+    },
+    "shield_maestro": {
+      "name": "护盾大师",
+      "hp": 60, "armor": 5, "move": 4, "vision": 5, "ap": 2,
+      "weapon": "pistol",
+      "range": [2, 5], "damage": [12, 20],
+      "special": ["ally_barrier_40"],
+      "chapter": 4,
+      "ai_weights": { "protect_allies": 0.5, "attack": 0.3, "take_cover": 0.2 }
+    },
+    "combat_medic": {
+      "name": "敌方医疗",
+      "hp": 50, "armor": 3, "move": 5, "vision": 5, "ap": 2,
+      "weapon": "pistol",
+      "range": [2, 5], "damage": [10, 18],
+      "special": ["heal_ally_40"],
+      "chapter": 4,
+      "ai_weights": { "heal_critical": 0.5, "heal_damaged": 0.3, "attack": 0.2 }
+    },
+    "jammer": {
+      "name": "干扰者",
+      "hp": 40, "armor": 2, "move": 5, "vision": 7, "ap": 2,
+      "weapon": "none",
+      "range": [0, 0], "damage": [0, 0],
+      "special": ["disable_skills_2_turns"],
+      "chapter": 4,
+      "ai_weights": { "approach": 0.5, "jam": 0.5 }
+    },
+    "sniper_elite": {
+      "name": "精英狙击",
+      "hp": 60, "armor": 5, "move": 3, "vision": 10, "ap": 2,
+      "weapon": "heavy_sniper",
+      "range": [5, 12], "damage": [45, 70],
+      "special": ["pierce_armor", "guaranteed_hit_once"],
+      "chapter": 4,
+      "ai_weights": { "seek_highground": 0.5, "attack": 0.5 }
+    },
+    "assault_mech": {
+      "name": "突击机甲",
+      "hp": 150, "armor": 20, "move": 4, "vision": 6, "ap": 3,
+      "weapon": "dual_cannon",
+      "range": [2, 6], "damage": [25, 40],
+      "special": ["double_shot", "ignore_half_cover"],
+      "chapter": 4,
+      "ai_weights": { "approach": 0.4, "attack": 0.4, "suppress": 0.2 }
+    },
+    "siege_mech": {
+      "name": "攻城机甲",
+      "hp": 200, "armor": 25, "move": 2, "vision": 5, "ap": 2,
+      "weapon": "siege_cannon",
+      "range": [4, 8], "damage": [40, 60],
+      "special": ["aoe_3x3", "destroy_all_cover"],
+      "chapter": 5,
+      "ai_weights": { "attack": 0.6, "approach": 0.4 }
+    },
+    "stealth_drone": {
+      "name": "隐形无人机",
+      "hp": 40, "armor": 0, "move": 7, "vision": 8, "ap": 2,
+      "weapon": "laser",
+      "range": [1, 4], "damage": [15, 25],
+      "special": ["stealth", "flying", "hard_to_detect"],
+      "chapter": 5,
+      "ai_weights": { "flank": 0.5, "attack": 0.5 }
+    },
+    "matrix_collider": {
+      "name": "矩阵聚合体",
+      "hp": 80, "armor": 10, "move": 4, "vision": 6, "ap": 2,
+      "weapon": "energy_bolt",
+      "range": [2, 6], "damage": [20, 35],
+      "special": ["split_on_death_2"],
+      "chapter": 5,
+      "ai_weights": { "approach": 0.5, "attack": 0.5 }
+    }
+  }
+}

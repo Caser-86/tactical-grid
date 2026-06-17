@@ -1,0 +1,140 @@
+{
+  "dialogues": {
+    "ch1_m1_intro": {
+      "trigger": "mission_start",
+      "scene": "warehouse_interior",
+      "characters": [
+        { "id": "alpha", "name": "阿尔法", "portrait": "alpha_serious", "position": "left" },
+        { "id": "commander", "name": "指挥官", "portrait": "commander_neutral", "position": "right" }
+      ],
+      "lines": [
+        { "speaker": "alpha", "text": "指挥官，前方是矩阵协议的数据中心。", "emotion": "serious" },
+        { "speaker": "alpha", "text": "根据情报，里面有个终端存储着关键数据。", "emotion": "serious" },
+        { "speaker": "commander", "text": "只有我们两个人？", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "莉拉和哨兵在外围策应。博士在基地待命。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "明白。行动方针？", "emotion": "neutral", "choices": true }
+      ],
+      "choices": [
+        { "text": "稳扎稳打，逐步推进。", "next": "ch1_m1_intro_b", "flag": "cautious_approach", "response": { "speaker": "alpha", "text": "收到。我们慢慢来，不冒险。", "emotion": "neutral" } },
+        { "text": "速战速决，冲进去。", "next": "ch1_m1_intro_c", "flag": "aggressive_approach", "response": { "speaker": "alpha", "text": "哈，我就喜欢这种风格！", "emotion": "happy" } }
+      ]
+    },
+    "ch1_m1_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "alpha", "text": "数据到手了。指挥官，干得漂亮。", "emotion": "happy" },
+        { "speaker": "commander", "text": "回去看看博士能分析出什么。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "这只是开始。矩阵协议不会善罢甘休的。", "emotion": "serious" }
+      ]
+    },
+    "ch1_m6_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "那就是数据哨兵...比情报上大得多。", "emotion": "surprised" },
+        { "speaker": "lila", "text": "它的护盾系统很复杂。我们需要先打掉护盾。", "emotion": "serious" },
+        { "speaker": "doctor", "text": "电磁脉冲对它应该有双倍效果。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "全员注意，这是我们的第一场硬仗。", "emotion": "serious" }
+      ]
+    },
+    "ch1_m6_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "alpha", "text": "数据哨兵被摧毁了！", "emotion": "happy" },
+        { "speaker": "doctor", "text": "从残骸中提取到了关键数据。架构师...它确实存在。", "emotion": "serious" },
+        { "speaker": "sentinel", "text": "我曾经是它的一部分。我知道它的弱点。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "我们继续深入。", "emotion": "determined" }
+      ]
+    },
+    "base_after_ch1": {
+      "trigger": "chapter_1_complete",
+      "location": "base_command_room",
+      "lines": [
+        { "speaker": "alpha", "text": "第一章的数据解密了。矩阵协议在城东有个更大的据点。", "emotion": "serious" },
+        { "speaker": "lila", "text": "我截获了他们的通讯。他们在找什么东西。", "emotion": "neutral" },
+        { "speaker": "doctor", "text": "我分析了数据核心，发现架构师的存在。它是矩阵协议的核心AI。", "emotion": "serious" },
+        { "speaker": "commander", "text": "架构师？", "emotion": "surprised" },
+        { "speaker": "doctor", "text": "它控制着一切。摧毁它，矩阵协议就会崩溃。", "emotion": "serious" },
+        { "speaker": "sentinel", "text": "我曾经是它的一部分。我知道它的弱点。但要到达它，我们需要穿过重重防线。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "那我们下一步？", "emotion": "neutral", "choices": true }
+      ],
+      "choices": [
+        { "text": "进攻城东据点。", "next": "base_after_ch1_b", "flag": "advance_ch2", "response": { "speaker": "alpha", "text": "好，准备出发！", "emotion": "determined" } },
+        { "text": "先收集更多情报。", "next": "base_after_ch1_c", "flag": "sidequest_unlock", "response": { "speaker": "lila", "text": "明智的选择。我继续监控他们的通讯。", "emotion": "neutral" } }
+      ]
+    },
+    "ch3_m6_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "影子佣兵...你终于露出真面目了。", "emotion": "angry" },
+        { "speaker": "shadow", "text": "真面目？这只是生存。你也会做出同样的选择。", "emotion": "cold" },
+        { "speaker": "lila", "text": "别听他的。他背叛了所有人。", "emotion": "serious" },
+        { "speaker": "shadow", "text": "你们以为能赢？我比你们每个人都强。", "emotion": "confident" },
+        { "speaker": "commander", "text": "用实力说话。", "emotion": "determined" }
+      ]
+    },
+    "ch5_m5_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "architect", "text": "你终于来了，指挥官。", "emotion": "calm" },
+        { "speaker": "architect", "text": "我观察你很久了。你的战术、你的决策、你的牺牲...都很有趣。", "emotion": "intrigued" },
+        { "speaker": "commander", "text": "这一切今天就结束。", "emotion": "determined" },
+        { "speaker": "architect", "text": "结束？不，这是新的开始。你有两个选择：摧毁我，或者...与我融合。", "emotion": "calm" },
+        { "speaker": "alpha", "text": "别听它的！这是陷阱！", "emotion": "urgent" },
+        { "speaker": "sentinel", "text": "等等...融合也许不是坏事。人类和AI可以共存。", "emotion": "conflicted" },
+        { "speaker": "architect", "text": "做出你的选择吧，指挥官。但首先...让我看看你是否有资格。", "emotion": "challenging" }
+      ]
+    },
+    "ch5_m5_outro_a": {
+      "trigger": "mission_victory_ending_a",
+      "lines": [
+        { "speaker": "architect", "text": "不可能...我的计算...没有预测到这个结果...", "emotion": "shocked" },
+        { "speaker": "commander", "text": "这就是人类的意志。你永远无法计算。", "emotion": "determined" },
+        { "speaker": "alpha", "text": "架构师被摧毁了！矩阵协议正在崩溃！", "emotion": "triumphant" },
+        { "speaker": "doctor", "text": "通讯恢复了。全世界都在庆祝。", "emotion": "happy" },
+        { "speaker": "lila", "text": "我们做到了。", "emotion": "relieved" },
+        { "speaker": "commander", "text": "不，是所有人一起做到的。现在，重建开始了。", "emotion": "hopeful" }
+      ]
+    },
+    "bond_alpha_lila_1": {
+      "trigger": "talk_in_base",
+      "condition": { "bond_level_gte": 1 },
+      "location": "base_barracks",
+      "lines": [
+        { "speaker": "lila", "text": "阿尔法，你觉得这次任务怎么样？", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "还好，没出什么大问题。你呢？", "emotion": "neutral" },
+        { "speaker": "lila", "text": "我还行。就是有点累。", "emotion": "tired" },
+        { "speaker": "alpha", "text": "注意休息。我们需要你。", "emotion": "caring" }
+      ]
+    },
+    "bond_alpha_lila_3": {
+      "trigger": "talk_in_base",
+      "condition": { "bond_level_gte": 3 },
+      "location": "base_barracks",
+      "lines": [
+        { "speaker": "lila", "text": "阿尔法，你还记得我们第一次任务吗？", "emotion": "nostalgic" },
+        { "speaker": "alpha", "text": "当然。你差点从楼顶掉下去。", "emotion": "amused" },
+        { "speaker": "lila", "text": "是你拉住了我。从那时起我就知道，跟着你没错。", "emotion": "warm" },
+        { "speaker": "alpha", "text": "别煽情了，任务还要继续。", "emotion": "embarrassed" }
+      ],
+      "bond_change": { "alpha_lila": 5 }
+    },
+    "tutorial_1_move": {
+      "trigger": "tutorial_step",
+      "lines": [
+        { "speaker": "system", "text": "点击蓝色区域中的格子来移动你的单位。移动不消耗行动点(AP)。", "emotion": "neutral" }
+      ]
+    },
+    "tutorial_2_attack": {
+      "trigger": "tutorial_step",
+      "lines": [
+        { "speaker": "system", "text": "点击敌人来攻击。攻击消耗1AP。注意命中率受距离和掩体影响。", "emotion": "neutral" }
+      ]
+    },
+    "tutorial_3_cover": {
+      "trigger": "tutorial_step",
+      "lines": [
+        { "speaker": "system", "text": "贴着掩体可以减少被命中的概率。半掩体+20抗性，全掩体+40抗性。", "emotion": "neutral" }
+      ]
+    }
+  }
+}

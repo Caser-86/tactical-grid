@@ -1,0 +1,183 @@
+## 音频管理器（单例）
+## 管理所有 BGM 和音效的播放
+extends Node
+
+var bgm_player: AudioStreamPlayer
+var sfx_player: AudioStreamPlayer
+var ambient_player: AudioStreamPlayer
+
+var bgm_volume: float = 0.7
+var sfx_volume: float = 0.8
+var ambient_volume: float = 0.5
+
+var current_bgm: String = ""
+var audio_cache: Dictionary = {}
+
+func _ready() -> void:
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.name = "BGMPlayer"
+	add_child(bgm_player)
+
+	sfx_player = AudioStreamPlayer.new()
+	sfx_player.name = "SFXPlayer"
+	add_child(sfx_player)
+
+	ambient_player = AudioStreamPlayer.new()
+	ambient_player.name = "AmbientPlayer"
+	add_child(ambient_player)
+
+	_load_settings()
+
+func _load_settings() -> void:
+	var file = FileAccess.open("user://settings.json", FileAccess.READ)
+	if file:
+		var settings = JSON.parse_string(file.get_as_text()) or {}
+		bgm_volume = settings.get("bgm_volume", 70) / 100.0
+		sfx_volume = settings.get("sfx_volume", 80) / 100.0
+		file.close()
+
+	_apply_volumes()
+
+func _apply_volumes() -> void:
+	bgm_player.volume_db = linear_to_db(bgm_volume)
+	sfx_player.volume_db = linear_to_db(sfx_volume)
+	ambient_player.volume_db = linear_to_db(ambient_volume)
+
+## 播放 BGM
+func play_bgm(bgm_id: String) -> void:
+	if bgm_id == current_bgm:
+		return
+	current_bgm = bgm_id
+
+	var stream = _load_audio("bgm", bgm_id)
+	if stream:
+		bgm_player.stream = stream
+		bgm_player.play()
+
+## 停止 BGM
+func stop_bgm() -> void:
+	bgm_player.stop()
+	current_bgm = ""
+
+## 播放音效
+func play_sfx(sfx_id: String) -> void:
+	var stream = _load_audio("sfx", sfx_id)
+	if stream:
+		sfx_player.stream = stream
+		sfx_player.play()
+
+## 播放环境音
+func play_ambient(ambient_id: String) -> void:
+	var stream = _load_audio("ambient", ambient_id)
+	if stream:
+		ambient_player.stream = stream
+		ambient_player.play()
+
+## 停止环境音
+func stop_ambient() -> void:
+	ambient_player.stop()
+
+## 加载音频文件
+func _load_audio(category: String, audio_id: String) -> AudioStream:
+	var cache_key = category + "_" + audio_id
+	if audio_cache.has(cache_key):
+		return audio_cache[cache_key]
+
+	var path = "res://assets/audio/" + category + "/" + audio_id + ".ogg"
+	if not FileAccess.file_exists(path):
+		path = "res://assets/audio/" + category + "/" + audio_id + ".wav"
+		if not FileAccess.file_exists(path):
+			return null
+
+	var stream = load(path)
+	if stream:
+		audio_cache[cache_key] = stream
+	return stream
+
+## 设置音量
+func set_bgm_volume(volume: float) -> void:
+	bgm_volume = clamp(volume, 0.0, 1.0)
+	bgm_player.volume_db = linear_to_db(bgm_volume)
+
+func set_sfx_volume(volume: float) -> void:
+	sfx_volume = clamp(volume, 0.0, 1.0)
+	sfx_player.volume_db = linear_to_db(sfx_volume)
+
+## === 战斗音效快捷方法 ===
+
+func sfx_ui_click() -> void:
+	play_sfx("sfx_ui_click")
+
+func sfx_ui_hover() -> void:
+	play_sfx("sfx_ui_hover")
+
+func sfx_select_unit() -> void:
+	play_sfx("sfx_select_unit")
+
+func sfx_move() -> void:
+	play_sfx("sfx_unit_land")
+
+func sfx_attack(weapon_type: String = "pistol") -> void:
+	play_sfx("sfx_combat_" + weapon_type)
+
+func sfx_hit() -> void:
+	play_sfx("sfx_hit_flesh")
+
+func sfx_critical() -> void:
+	play_sfx("sfx_critical_hit")
+
+func sfx_unit_down() -> void:
+	play_sfx("sfx_unit_down")
+
+func sfx_explosion() -> void:
+	play_sfx("sfx_explosion")
+
+func sfx_cover_destroy() -> void:
+	play_sfx("sfx_cover_destroy")
+
+func sfx_skill() -> void:
+	play_sfx("sfx_skill_cast")
+
+func sfx_heal() -> void:
+	play_sfx("sfx_heal_effect")
+
+func sfx_overwatch() -> void:
+	play_sfx("sfx_overwatch_trigger")
+
+func sfx_turn_start(player: bool) -> void:
+	if player:
+		play_sfx("sfx_turn_player_start")
+	else:
+		play_sfx("sfx_turn_enemy_start")
+
+func sfx_victory() -> void:
+	play_sfx("sfx_mission_victory")
+
+func sfx_defeat() -> void:
+	play_sfx("sfx_mission_defeat")
+
+func sfx_level_up() -> void:
+	play_sfx("sfx_level_up")
+
+func sfx_item_pickup() -> void:
+	play_sfx("sfx_item_pickup")
+
+## === BGM 快捷方法 ===
+
+func bgm_menu() -> void:
+	play_bgm("bgm_menu")
+
+func bgm_battle(size: String = "small") -> void:
+	play_bgm("bgm_battle_" + size)
+
+func bgm_boss() -> void:
+	play_bgm("bgm_boss")
+
+func bgm_base() -> void:
+	play_bgm("bgm_base")
+
+func bgm_victory() -> void:
+	play_bgm("bgm_victory")
+
+func bgm_defeat() -> void:
+	play_bgm("bgm_defeat")

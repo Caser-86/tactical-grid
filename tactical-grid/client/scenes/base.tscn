@@ -1,0 +1,111 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/base_controller.gd" id="1"]
+
+[node name="Base" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.07, 0.09, 1)
+
+[node name="TopBar" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 50.0
+
+[node name="TitleLabel" type="Label" parent="TopBar"]
+layout_mode = 1
+offset_left = 10.0
+offset_top = 12.0
+offset_right = 300.0
+offset_bottom = 40.0
+text = "回声基地 - 指挥室"
+font_size = 20
+
+[node name="ChapterLabel" type="Label" parent="TopBar"]
+layout_mode = 1
+offset_left = 320.0
+offset_top = 12.0
+offset_right = 500.0
+offset_bottom = 40.0
+text = "第一章 觉醒"
+
+[node name="CreditLabel" type="Label" parent="TopBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 12.0
+offset_right = -10.0
+offset_bottom = 40.0
+text = "💰 0"
+horizontal_alignment = 2
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 50.0
+offset_bottom = -50.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Center"]
+layout_mode = 2
+custom_minimum_size = Vector2(400, 500)
+
+[node name="MissionList" type="VBoxContainer" parent="Center/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BottomBar" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -50.0
+
+[node name="HBox" type="HBoxContainer" parent="BottomBar"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -20.0
+offset_right = 250.0
+offset_bottom = 20.0
+alignment = 1
+
+[node name="BarracksBtn" type="Button" parent="BottomBar/HBox"]
+layout_mode = 2
+text = "兵营"
+custom_minimum_size = Vector2(100, 40)
+
+[node name="ArmoryBtn" type="Button" parent="BottomBar/HBox"]
+layout_mode = 2
+text = "军械库"
+custom_minimum_size = Vector2(100, 40)
+
+[node name="ShopBtn" type="Button" parent="BottomBar/HBox"]
+layout_mode = 2
+text = "商店"
+custom_minimum_size = Vector2(100, 40)
+
+[node name="BackBtn" type="Button" parent="BottomBar/HBox"]
+layout_mode = 2
+text = "主菜单"
+custom_minimum_size = Vector2(100, 40)
+
+[attached_script]
+script = ExtResource("1")

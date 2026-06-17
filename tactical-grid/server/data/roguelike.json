@@ -1,0 +1,120 @@
+{
+  "roguelike": {
+    "name": "深渊远征",
+    "description": "主线通关后的核心重玩模式，每次体验完全不同",
+    "max_floors": 10,
+    "duration_per_run": "1-3小时",
+
+    "node_types": {
+      "normal_battle": { "probability": 0.35, "name": "普通战斗" },
+      "elite_battle": { "probability": 0.15, "name": "精英战斗" },
+      "shop": { "probability": 0.15, "name": "商店" },
+      "event": { "probability": 0.15, "name": "随机事件" },
+      "rest": { "probability": 0.10, "name": "休息" },
+      "treasure": { "probability": 0.05, "name": "宝藏" },
+      "mystery": { "probability": 0.03, "name": "神秘" },
+      "boss": { "probability": 0.02, "name": "Boss" }
+    },
+
+    "floor_scaling": {
+      "1-3": { "enemy_level": "1-5", "special": "基础" },
+      "4-6": { "enemy_level": "5-10", "special": "+1种地形" },
+      "7-9": { "enemy_level": "10-15", "special": "+天气" },
+      "10": { "enemy_level": "15+", "special": "最终Boss" }
+    },
+
+    "upgrade_pool": {
+      "stat_boosts": [
+        { "id": "hp_plus_10", "name": "+10最大HP(全体)", "rarity": "common" },
+        { "id": "move_plus_1", "name": "+1移动点(全体)", "rarity": "rare" },
+        { "id": "hit_plus_5", "name": "+5%命中(全体)", "rarity": "common" },
+        { "id": "crit_plus_5", "name": "+5%暴击(全体)", "rarity": "common" },
+        { "id": "dodge_plus_5", "name": "+5%闪避(全体)", "rarity": "uncommon" }
+      ],
+      "ap_boosts": [
+        { "id": "ap_plus_1", "name": "+1AP上限(全体)", "rarity": "legendary" },
+        { "id": "free_move", "name": "每回合1次移动不消耗移动点", "rarity": "epic" },
+        { "id": "move_after_attack", "name": "攻击后可移动1格", "rarity": "epic" }
+      ],
+      "combat_boosts": [
+        { "id": "crit_damage_plus", "name": "暴击伤害+0.5×", "rarity": "rare" },
+        { "id": "damage_vs_wounded", "name": "对受伤敌人+20%伤害", "rarity": "rare" },
+        { "id": "heal_on_kill", "name": "击杀恢复15HP", "rarity": "uncommon" },
+        { "id": "first_turn_ap", "name": "首回合+1AP", "rarity": "epic" },
+        { "id": "overwatch_extra", "name": "警戒射击次数+1", "rarity": "rare" }
+      ],
+      "economy": [
+        { "id": "credit_plus_50", "name": "击杀获得+50%信用点", "rarity": "uncommon" },
+        { "id": "free_medkit", "name": "每关开始获得1个急救包", "rarity": "rare" },
+        { "id": "shop_discount", "name": "商店折扣30%", "rarity": "rare" }
+      ],
+      "special": [
+        { "id": "learn_skill", "name": "选择1个角色学习任意技能", "rarity": "epic" },
+        { "id": "team_affix", "name": "全体获得1个通用词条", "rarity": "epic" },
+        { "id": "free_revive", "name": "复活1个倒地角色(不消耗物品)", "rarity": "epic" },
+        { "id": "choose_weather", "name": "下关天气由你选择", "rarity": "rare" }
+      ],
+      "cursed": [
+        { "id": "berserk_curse", "name": "+30%伤害，但每回合-3HP(全体)", "rarity": "cursed" },
+        { "id": "fast_curse", "name": "+2 AP，但移动点-3(全体)", "rarity": "cursed" },
+        { "id": "glass_cannon", "name": "+50%暴击，但命中率-15%", "rarity": "cursed" }
+      ]
+    },
+
+    "rewards": {
+      "floor_1_3": { "credit": 200, "per_floor": true },
+      "floor_4_6": { "credit": 400, "rare_equipment": true, "per_floor": true },
+      "floor_7_9": { "credit": 600, "epic_equipment": true, "per_floor": true },
+      "floor_10": { "intel": 50, "legendary_equipment": true, "exclusive_skin": true },
+      "failure": { "credit": "50% of earned", "note": "不亏本，鼓励尝试" }
+    },
+
+    "events": [
+      {
+        "id": "shrine", "name": "神秘祭坛",
+        "description": "你发现了一个古老的祭坛，上面闪烁着奇怪的光芒。",
+        "choices": [
+          { "text": "祈祷(获得随机强化)", "effect": "random_upgrade" },
+          { "text": "献祭HP(获得强力强化)", "effect": "lose_20_hp_get_epic_upgrade" },
+          { "text": "离开", "effect": "nothing" }
+        ]
+      },
+      {
+        "id": "merchant", "name": "神秘商人",
+        "description": "一个戴着面具的商人向你招手。",
+        "choices": [
+          { "text": "购买(消耗信用点)", "effect": "open_shop" },
+          { "text": "抢劫(战斗)", "effect": "fight_merchant" },
+          { "text": "离开", "effect": "nothing" }
+        ]
+      },
+      {
+        "id": "trap", "name": "陷阱",
+        "description": "走廊中布满了陷阱。",
+        "choices": [
+          { "text": "小心通过(50%受伤)", "effect": "chance_50_injury" },
+          { "text": "强行突破(必定受伤但获得宝藏)", "effect": "guaranteed_injury_get_loot" },
+          { "text": "绕路(消耗时间)", "effect": "detour" }
+        ]
+      },
+      {
+        "id": "survivor", "name": "幸存者",
+        "description": "你发现了一个受伤的幸存者。",
+        "choices": [
+          { "text": "救助(消耗急救包，获得情报)", "effect": "heal_get_intel" },
+          { "text": "无视", "effect": "nothing" },
+          { "text": "掠夺(获得物品，-士气)", "effect": "loot_lose_morale" }
+        ]
+      },
+      {
+        "id": "crossroads", "name": "十字路口",
+        "description": "前方有三条路。",
+        "choices": [
+          { "text": "左路(战斗)", "effect": "battle_node" },
+          { "text": "中路(商店)", "effect": "shop_node" },
+          { "text": "右路(宝藏)", "effect": "treasure_node" }
+        ]
+      }
+    ]
+  }
+}
