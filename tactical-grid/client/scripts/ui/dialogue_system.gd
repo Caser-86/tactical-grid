@@ -1,5 +1,3 @@
-## 剧情对话系统
-## 管理剧情对话的显示和玩家选择
 extends Control
 class_name DialogueSystem
 
@@ -23,21 +21,18 @@ var current_choices: Array = []
 func _ready() -> void:
 	hide()
 	continue_hint.visible = false
+	portrait_left.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait_right.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_typing:
+			_show_full_text()
+		elif choices_container.get_child_count() == 0:
+			_next_line()
 
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if is_typing:
-				# 跳过打字动画
-				_show_full_text()
-			elif choices_container.get_child_count() == 0:
-				# 继续下一句
-				_next_line()
-
-## 开始对话
 func start_dialogue(dialogue_id: String) -> void:
 	dialogue_data = _load_dialogue(dialogue_id)
 	if dialogue_data.is_empty():
@@ -49,29 +44,22 @@ func start_dialogue(dialogue_id: String) -> void:
 	show()
 	_show_line(current_lines[current_index])
 
-## 显示一行对话
 func _show_line(line: Dictionary) -> void:
-	# 清除选项
 	for child in choices_container.get_children():
 		child.queue_free()
 
-	# 设置角色名
 	name_label.text = line.get("speaker", "???")
-
-	# 设置文字（打字机效果）
 	text_label.text = ""
 	is_typing = true
 	continue_hint.visible = false
 	_type_text(line.get("text", ""))
 
-	# 设置头像
-	# TODO: 根据 speaker 加载对应立绘
+	var speaker = line.get("speaker", "")
+	_load_portrait(speaker, line.get("portrait_side", "left"))
 
-	# 如果有选项
 	if line.get("choices", false):
 		_show_choices()
 
-## 打字机效果
 func _type_text(text: String) -> void:
 	for i in range(text.length()):
 		if not is_typing:
@@ -79,18 +67,15 @@ func _type_text(text: String) -> void:
 			break
 		text_label.text = text.substr(0, i + 1)
 		await get_tree().create_timer(type_speed).timeout
-
 	is_typing = false
 	continue_hint.visible = true
 
-## 跳过打字
 func _show_full_text() -> void:
 	is_typing = false
 	if current_index < current_lines.size():
 		text_label.text = current_lines[current_index].get("text", "")
 	continue_hint.visible = true
 
-## 下一行
 func _next_line() -> void:
 	current_index += 1
 	if current_index >= current_lines.size():
@@ -98,11 +83,9 @@ func _next_line() -> void:
 	else:
 		_show_line(current_lines[current_index])
 
-## 显示选项
 func _show_choices() -> void:
 	var choices = dialogue_data.get("choices", [])
 	current_choices = choices
-
 	for i in range(choices.size()):
 		var choice = choices[i]
 		var button = Button.new()
@@ -110,19 +93,14 @@ func _show_choices() -> void:
 		button.custom_minimum_size = Vector2(400, 40)
 		button.pressed.connect(_on_choice_selected.bind(i))
 		choices_container.add_child(button)
-
 	continue_hint.visible = false
 
-## 选项被选择
 func _on_choice_selected(index: int) -> void:
 	var choice = current_choices[index]
-
-	# 触发 flag
 	if choice.has("flag"):
 		choice_made.emit(choice.flag)
 		GameManager.save_data.campaign_progress.story_flags[choice.flag] = true
 
-	# 显示回应
 	if choice.has("response"):
 		current_lines = [choice.response]
 		current_index = 0
@@ -130,14 +108,20 @@ func _on_choice_selected(index: int) -> void:
 	else:
 		_end_dialogue()
 
-## 结束对话
 func _end_dialogue() -> void:
 	hide()
 	dialogue_finished.emit()
 
-## 加载对话数据
+func _load_portrait(speaker: String, side: String = "left") -> void:
+	var target_portrait = portrait_left if side == "left" else portrait_right
+	var other_portrait = portrait_right if side == "left" else portrait_left
+	other_portrait.visible = false
+
+	var texture = ArtAssets.get_portrait_for_speaker(speaker)
+	target_portrait.texture = texture
+	target_portrait.visible = texture != null
+
 func _load_dialogue(dialogue_id: String) -> Dictionary:
-	# 从本地数据加载
 	var file = FileAccess.open("res://data/dialogues.json", FileAccess.READ)
 	if not file:
 		return {}

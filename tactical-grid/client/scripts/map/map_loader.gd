@@ -68,10 +68,18 @@ static func is_passable(map_data: Dictionary, x: int, y: int) -> bool:
 
 ## 获取玩家出生点
 static func get_player_spawns(map_data: Dictionary) -> Array:
+	# 支持两种格式
+	var spawns = map_data.get("spawns", {})
+	if spawns.has("player"):
+		return spawns.player
 	return map_data.get("objects", []).filter(func(o): return o.type == "spawn_player")
 
 ## 获取敌人出生点
 static func get_enemy_spawns(map_data: Dictionary) -> Array:
+	# 支持两种格式
+	var spawns = map_data.get("spawns", {})
+	if spawns.has("enemies"):
+		return spawns.enemies
 	return map_data.get("objects", []).filter(func(o): return o.type == "spawn_enemy")
 
 ## 获取所有交互点

@@ -6,16 +6,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { execute, queryAll } from '../models/database';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { success } from '../utils/response';
+import { validateBody } from '../middleware/validate';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { telemetrySchema } from '../utils/validation';
 
 export const telemetryRoutes = Router();
 
 // 上报遥测事件
-telemetryRoutes.post('/', authMiddleware, (req: AuthRequest, res) => {
+telemetryRoutes.post('/', authMiddleware, validateBody(telemetrySchema), asyncHandler(async (req: AuthRequest, res) => {
   const { events } = req.body;
-
-  if (!events || !Array.isArray(events)) {
-    return success(res, { received: 0 });
-  }
 
   let received = 0;
   for (const event of events) {
@@ -32,10 +31,10 @@ telemetryRoutes.post('/', authMiddleware, (req: AuthRequest, res) => {
   }
 
   return success(res, { received });
-});
+}));
 
 // 获取平衡报告
-telemetryRoutes.get('/balance-report', authMiddleware, (_req: AuthRequest, res) => {
+telemetryRoutes.get('/balance-report', authMiddleware, asyncHandler(async (_req: AuthRequest, res) => {
   const winRateData = queryAll(
     `SELECT level_id,
      COUNT(CASE WHEN result = 'victory' THEN 1 END) as wins,
@@ -58,4 +57,4 @@ telemetryRoutes.get('/balance-report', authMiddleware, (_req: AuthRequest, res) 
     })),
     avg_turns: avgTurnsData,
   });
-});
+}));

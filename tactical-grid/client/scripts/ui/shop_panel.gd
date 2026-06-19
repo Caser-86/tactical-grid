@@ -1,4 +1,3 @@
-## 商店面板
 extends Control
 class_name ShopPanel
 
@@ -15,9 +14,13 @@ func _ready() -> void:
 	close_button.pressed.connect(hide)
 
 func open_shop(shop_type: String = "general") -> void:
-	# 从 API 获取商店数据
-	# TODO: 实现 API 调用
-	_generate_test_items()
+	match shop_type:
+		"weapons":
+			_generate_weapon_shop()
+		"items":
+			_generate_item_shop()
+		_:
+			_generate_test_items()
 	_display_items()
 	show()
 
@@ -26,7 +29,6 @@ func _generate_test_items() -> void:
 	var weapons = GameData.weapon_data.get("weapons", {})
 	var items = GameData.item_data.get("items", {})
 
-	# 添加武器
 	for weapon_id in weapons:
 		var weapon = weapons[weapon_id]
 		shop_items.append({
@@ -38,7 +40,6 @@ func _generate_test_items() -> void:
 			"data": weapon,
 		})
 
-	# 添加物品
 	for item_id in items:
 		var item = items[item_id]
 		shop_items.append({
@@ -63,33 +64,29 @@ func _display_items() -> void:
 	for child in items_container.get_children():
 		child.queue_free()
 
-	credit_label.text = "💰 " + str(player_credit)
+	credit_label.text = "信用点 " + str(player_credit)
 
 	for item in shop_items:
 		var row = HBoxContainer.new()
 		row.custom_minimum_size = Vector2(600, 40)
 
-		# 名称
 		var name_label = Label.new()
 		name_label.text = item.name
 		name_label.custom_minimum_size = Vector2(200, 30)
 		name_label.modulate = GameTheme.get_rarity_color(item.rarity)
 		row.add_child(name_label)
 
-		# 稀有度
 		var rarity_label = Label.new()
 		rarity_label.text = "[" + item.rarity + "]"
 		rarity_label.custom_minimum_size = Vector2(80, 30)
 		rarity_label.modulate = GameTheme.get_rarity_color(item.rarity)
 		row.add_child(rarity_label)
 
-		# 价格
 		var price_label = Label.new()
-		price_label.text = "💰 " + str(item.price)
+		price_label.text = "信用点 " + str(item.price)
 		price_label.custom_minimum_size = Vector2(100, 30)
 		row.add_child(price_label)
 
-		# 购买按钮
 		var buy_button = Button.new()
 		buy_button.text = "购买"
 		buy_button.custom_minimum_size = Vector2(80, 30)
@@ -104,12 +101,16 @@ func _on_buy(item: Dictionary) -> void:
 		return
 
 	player_credit -= item.price
-	# TODO: 添加到背包
-	print("Purchased: ", item.name)
+	var inv = GameManager.save_data.get("inventory", [])
+	var existing = inv.filter(func(i): return i.get("id") == item.id)
+	if existing.size() > 0:
+		existing[0]["count"] = existing[0].get("count", 1) + 1
+	else:
+		inv.append({"id": item.id, "type": item.type, "count": 1})
+	GameManager.save_data["inventory"] = inv
 	_display_items()
 
 func _on_refresh() -> void:
-	# 刷新商店（消耗情报点）
 	_generate_test_items()
 	_display_items()
 
@@ -117,3 +118,42 @@ func set_credit(credit: int) -> void:
 	player_credit = credit
 	if is_inside_tree():
 		_display_items()
+
+func _generate_weapon_shop() -> void:
+	shop_items.clear()
+	var weapons = GameData.weapon_data.get("weapons", {})
+	var rare_weapons = GameData.weapon_data.get("rare_weapons", {})
+	for weapon_id in weapons:
+		var weapon = weapons[weapon_id]
+		shop_items.append({
+			"id": weapon_id,
+			"name": weapon.get("name", weapon_id),
+			"type": "equipment",
+			"rarity": weapon.get("rarity", "common"),
+			"price": _get_price(weapon.get("rarity", "common")),
+			"data": weapon,
+		})
+	for weapon_id in rare_weapons:
+		var weapon = rare_weapons[weapon_id]
+		shop_items.append({
+			"id": weapon_id,
+			"name": weapon.get("name", weapon_id),
+			"type": "equipment",
+			"rarity": weapon.get("rarity", "rare"),
+			"price": _get_price(weapon.get("rarity", "rare")),
+			"data": weapon,
+		})
+
+func _generate_item_shop() -> void:
+	shop_items.clear()
+	var items = GameData.item_data.get("items", {})
+	for item_id in items:
+		var item = items[item_id]
+		shop_items.append({
+			"id": item_id,
+			"name": item.get("name", item_id),
+			"type": "item",
+			"rarity": item.get("rarity", "common"),
+			"price": _get_price(item.get("rarity", "common")) / 2,
+			"data": item,
+		})

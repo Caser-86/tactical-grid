@@ -45,6 +45,8 @@ func _apply_volumes() -> void:
 
 ## 播放 BGM
 func play_bgm(bgm_id: String) -> void:
+	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
+		return
 	if bgm_id == current_bgm:
 		return
 	current_bgm = bgm_id
@@ -57,10 +59,14 @@ func play_bgm(bgm_id: String) -> void:
 ## 停止 BGM
 func stop_bgm() -> void:
 	bgm_player.stop()
+	bgm_player.stream = null
 	current_bgm = ""
+	audio_cache.clear()
 
 ## 播放音效
 func play_sfx(sfx_id: String) -> void:
+	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
+		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
 		sfx_player.stream = stream
@@ -68,6 +74,8 @@ func play_sfx(sfx_id: String) -> void:
 
 ## 播放环境音
 func play_ambient(ambient_id: String) -> void:
+	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
+		return
 	var stream = _load_audio("ambient", ambient_id)
 	if stream:
 		ambient_player.stream = stream
@@ -76,6 +84,15 @@ func play_ambient(ambient_id: String) -> void:
 ## 停止环境音
 func stop_ambient() -> void:
 	ambient_player.stop()
+	ambient_player.stream = null
+	audio_cache.clear()
+
+func _exit_tree() -> void:
+	stop_bgm()
+	sfx_player.stop()
+	sfx_player.stream = null
+	stop_ambient()
+	audio_cache.clear()
 
 ## 加载音频文件
 func _load_audio(category: String, audio_id: String) -> AudioStream:

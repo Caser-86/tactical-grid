@@ -23,7 +23,7 @@ var turn_number: int = 0
 var max_turns: int = 20  # 回合上限
 
 func start_battle() -> void:
-	turn_number = 1
+	turn_number = 0
 	set_phase(TurnPhase.PLAYER_START)
 
 func set_phase(phase: TurnPhase) -> void:
@@ -32,7 +32,7 @@ func set_phase(phase: TurnPhase) -> void:
 
 	match phase:
 		TurnPhase.PLAYER_START:
-			turn_number += 1 if turn_number > 0 else 0
+			turn_number += 1
 			player_turn_started.emit()
 			# 刷新所有玩家单位 AP
 			_refresh_player_units()

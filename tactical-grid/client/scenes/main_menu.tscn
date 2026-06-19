@@ -8,6 +8,7 @@ outline_size = 8
 outline_color = Color(0, 0, 0, 1)
 
 [node name="MainMenu" type="Control"]
+script = ExtResource("1")
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -15,12 +16,20 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="BackgroundArt" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.08, 0.09, 0.11, 1)
+mouse_filter = 2
+color = Color(0.05, 0.06, 0.08, 0.72)
 
 [node name="Title" type="Label" parent="."]
 layout_mode = 1
@@ -71,6 +80,11 @@ layout_mode = 2
 text = "新游戏"
 custom_minimum_size = Vector2(240, 50)
 
+[node name="QuickBattleButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "快速战斗"
+custom_minimum_size = Vector2(240, 50)
+
 [node name="SettingsButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
 text = "设置"
@@ -80,6 +94,3 @@ custom_minimum_size = Vector2(240, 50)
 layout_mode = 2
 text = "退出"
 custom_minimum_size = Vector2(240, 50)
-
-[attached_script]
-script = ExtResource("1")

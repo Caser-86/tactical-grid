@@ -4,7 +4,7 @@ extends Node
 class_name EnemyDirector
 
 var turn_count: int = 0
-var reinforcement_triggers: Array[Dictionary] = []
+var reinforcement_triggers: Array = []
 var pressure_level: float = 0.0  # 0-1，玩家优势度
 var player_losses_this_battle: int = 0
 var enemy_losses_this_battle: int = 0
@@ -66,11 +66,45 @@ func _check_condition(condition: String, turn: int) -> bool:
 
 ## 生成增援
 func _spawn_reinforcement(data: Dictionary) -> void:
-	# 通知游戏管理器生成增援
 	var units = data.get("units", [])
+	var map_data = GameManager.current_map_data
+	var width = map_data.get("size", {}).get("width", 10)
+	var height = map_data.get("size", {}).get("height", 8)
+
 	for unit_data in units:
-		# TODO: 实际生成敌人单位
-		print("Director: Spawning reinforcement: ", unit_data)
+		var enemy_type = unit_data.get("type", "sentry_basic")
+		var pos = unit_data.get("position", [0, 0])
+
+		# 如果位置是 [0,0]（默认），随机选取一个远离玩家的位置
+		var spawn_pos = Vector2i(pos[0], pos[1])
+		if spawn_pos == Vector2i(0, 0):
+			var rng = RandomNumberGenerator.new()
+			rng.randomize()
+			var best_pos = Vector2i(0, 0)
+			var best_dist = 0
+			for attempt in range(20):
+				var rx = rng.randi_range(0, width - 1)
+				var ry = rng.randi_range(0, height / 2)
+				if not MapLoader.is_passable(map_data, rx, ry):
+					continue
+				var min_dist = 999
+				for p in GameManager.player_units:
+					if p.is_alive:
+						var d = GridSystem.manhattan_distance(Vector2i(rx, ry), p.grid_pos)
+						min_dist = mini(min_dist, d)
+				if min_dist > best_dist:
+					best_dist = min_dist
+					best_pos = Vector2i(rx, ry)
+			spawn_pos = best_pos
+
+		# 创建敌人单位
+		var unit = GameData.create_enemy_unit(enemy_type)
+		unit.grid_pos = spawn_pos
+		GameManager.enemy_units.append(unit)
+
+		# 通知消息
+		var msg = data.get("message", "敌方增援已到达！")
+		print("Director: ", msg)
 
 ## 记录玩家损失
 func on_player_loss() -> void:

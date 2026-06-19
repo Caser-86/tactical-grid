@@ -6,11 +6,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, execute } from '../models/database';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { success, error } from '../utils/response';
+import { validateBody } from '../middleware/validate';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { saveUploadSchema } from '../utils/validation';
 
 export const saveRoutes = Router();
 
 // 获取存档列表
-saveRoutes.get('/', authMiddleware, (req: AuthRequest, res) => {
+saveRoutes.get('/', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const saves = queryAll(
     `SELECT id, save_type, chapter, mission, playtime, created_at, LENGTH(save_data) as size_bytes
      FROM saves WHERE user_id = ? ORDER BY created_at DESC`,
@@ -32,15 +35,11 @@ saveRoutes.get('/', authMiddleware, (req: AuthRequest, res) => {
     cloud_storage_used_mb: Math.round(totalSize / 1024 / 1024 * 10) / 10,
     cloud_storage_limit_mb: 100,
   });
-});
+}));
 
 // 上传存档
-saveRoutes.post('/', authMiddleware, (req: AuthRequest, res) => {
+saveRoutes.post('/', authMiddleware, validateBody(saveUploadSchema), asyncHandler(async (req: AuthRequest, res) => {
   const { save_type, save_data, save_hash, version, chapter, mission, playtime } = req.body;
-
-  if (!save_data) {
-    return error(res, 1001, 'save_data is required');
-  }
 
   const saveId = uuidv4();
 
@@ -54,10 +53,10 @@ saveRoutes.post('/', authMiddleware, (req: AuthRequest, res) => {
     save_id: saveId,
     timestamp: new Date().toISOString(),
   });
-});
+}));
 
 // 下载存档
-saveRoutes.get('/:save_id', authMiddleware, (req: AuthRequest, res) => {
+saveRoutes.get('/:save_id', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const { save_id } = req.params;
 
   const save = queryOne(
@@ -76,13 +75,12 @@ saveRoutes.get('/:save_id', authMiddleware, (req: AuthRequest, res) => {
     version: save.version,
     timestamp: save.created_at,
   });
-});
+}));
 
 // 删除存档
-saveRoutes.delete('/:save_id', authMiddleware, (req: AuthRequest, res) => {
+saveRoutes.delete('/:save_id', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const { save_id } = req.params;
 
-  // sql.js 不直接返回 changes，先查再删
   const save = queryOne('SELECT id FROM saves WHERE id = ? AND user_id = ?', [save_id, req.userId]);
   if (!save) {
     return error(res, 3001, 'Save not found', 404);
@@ -91,10 +89,10 @@ saveRoutes.delete('/:save_id', authMiddleware, (req: AuthRequest, res) => {
   execute('DELETE FROM saves WHERE id = ? AND user_id = ?', [save_id, req.userId]);
 
   return success(res, { deleted: true });
-});
+}));
 
 // 获取最新存档
-saveRoutes.get('/latest', authMiddleware, (req: AuthRequest, res) => {
+saveRoutes.get('/latest', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const save = queryOne(
     'SELECT * FROM saves WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
     [req.userId]
@@ -111,4 +109,4 @@ saveRoutes.get('/latest', authMiddleware, (req: AuthRequest, res) => {
     version: save.version,
     timestamp: save.created_at,
   });
-});
+}));

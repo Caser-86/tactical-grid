@@ -1,3 +1,11 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
 [application]
@@ -12,14 +20,16 @@ config/icon="res://icon.svg"
 
 GameManager="*res://scripts/game/game_manager.gd"
 GameData="*res://scripts/data/game_data.gd"
+ArtAssets="*res://scripts/data/art_assets.gd"
+BattleVisuals="*res://scripts/game/battle_visuals.gd"
 SaveManager="*res://scripts/network/save_manager.gd"
+AudioManager="*res://scripts/game/audio_manager.gd"
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [rendering]
 

@@ -21,7 +21,7 @@ static func chebyshev_distance(a: Vector2i, b: Vector2i) -> int:
 	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 ## 获取四邻接格子
-static func get_neighbors(pos: Vector2i) -> Array[Vector2i]:
+static func get_neighbors(pos: Vector2i) -> Array:
 	return [
 		Vector2i(pos.x + 1, pos.y),
 		Vector2i(pos.x - 1, pos.y),

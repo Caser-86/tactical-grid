@@ -1,5 +1,3 @@
-## 行动系统
-## 处理单位的移动、攻击、技能、物品、警戒等所有行动
 extends Node
 class_name ActionSystem
 
@@ -9,15 +7,18 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.randomize()
 
-## 执行移动
+func set_map_data(data: Dictionary) -> void:
+	map_data = data
+
 func execute_move(unit: Node, target: Vector2i) -> bool:
 	if not unit.can_move():
 		return false
 
-	# 检查目标格是否可达
 	var reachable = Pathfinding.get_reachable_cells(
-		unit.grid_pos, unit.move_points,
-		map_data.size.width, map_data.size.height,
+		unit.grid_pos,
+		unit.move_points,
+		map_data.size.width,
+		map_data.size.height,
 		_get_move_cost.bind(unit.job),
 		_is_blocked
 	)
@@ -25,196 +26,307 @@ func execute_move(unit: Node, target: Vector2i) -> bool:
 	if not reachable.has(target):
 		return false
 
-	# 计算路径
 	var path = Pathfinding.find_path(
-		unit.grid_pos, target,
-		map_data.size.width, map_data.size.height,
+		unit.grid_pos,
+		target,
+		map_data.size.width,
+		map_data.size.height,
 		_get_move_cost.bind(unit.job),
 		_is_blocked
 	)
-
-	if path.size() == 0:
+	if path.is_empty():
 		return false
 
-	# 消耗移动点
-	var cost = reachable[target]
-	unit.move_points -= cost
+	unit.move_points -= int(reachable[target])
 	unit.move_to(target)
-
 	return true
 
-## 执行攻击
-func execute_attack(attacker: Node, target: Node) -> Dictionary:
-	if not attacker.can_act():
+func execute_attack(
+	attacker: Node,
+	target: Node,
+	attack_hit_bonus: int = 0,
+	attack_crit_bonus: float = 0.0,
+	armor_multiplier: float = 1.0,
+	ignore_half_cover: bool = false,
+	damage_multiplier: float = 1.0,
+	force_silent: bool = false,
+	consume_ap: bool = true
+) -> Dictionary:
+	if not attacker.is_alive or attacker.has_status("stun"):
+		return {success = false, reason = "cannot_act"}
+	if consume_ap and not attacker.can_act():
 		return {success = false, reason = "cannot_act"}
 
 	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
 	if dist < attacker.weapon_range[0] or dist > attacker.weapon_range[1]:
 		return {success = false, reason = "out_of_range"}
 
-	# 检查视线
 	var has_los = VisionSystem.has_line_of_sight(
-		attacker.grid_pos, target.grid_pos,
-		map_data.size.width, map_data.size.height,
+		attacker.grid_pos,
+		target.grid_pos,
+		map_data.size.width,
+		map_data.size.height,
 		_is_vision_blocking
 	)
 	if not has_los:
 		return {success = false, reason = "no_line_of_sight"}
 
-	# 消耗 AP
-	if not attacker.spend_ap(1):
+	if consume_ap and not attacker.spend_ap(1):
 		return {success = false, reason = "no_ap"}
 
-	# 计算掩体
 	var cover = VisionSystem.calculate_cover(
-		target.grid_pos, attacker.grid_pos,
+		target.grid_pos,
+		attacker.grid_pos,
 		func(pos): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
 	)
 
-	# 结算攻击
+	var weapon_id = String(attacker.get("equipped_weapon"))
+	if weapon_id == "Null":
+		weapon_id = ""
+	var weapon = GameData.get_weapon(weapon_id)
+	var special = String(weapon.get("special", ""))
+	var effective_cover = cover
+	var effective_armor = target.armor
+	var weapon_hit_bonus = int(weapon.get("hit_modifier", 0))
+	var weapon_crit_bonus = 0.0
+	var effective_crit_multiplier = attacker.crit_multiplier
+	if special == "silent_ignore_armor" or special == "silent_ignores_half_armor":
+		effective_armor = 0
+	elif special == "armor_pierce_destroy_cover":
+		effective_armor = maxi(int(target.armor / 2), 0)
+		if effective_cover == "half":
+			effective_cover = "none"
+	elif special == "pierce_50_ignore_half_cover":
+		effective_armor = maxi(int(target.armor / 2), 0)
+		if effective_cover == "half":
+			effective_cover = "none"
+	elif special == "pierce_all_charge_1_turn":
+		effective_armor = 0
+	effective_armor = maxi(int(float(effective_armor) * armor_multiplier), 0)
+	if ignore_half_cover and effective_cover == "half":
+		effective_cover = "none"
+	if special in ["setup_bonus_30_hit", "setup_2_turns_guaranteed_hit_crit"] and (attacker.has_status("setup") or attacker.has_status("steady")):
+		weapon_hit_bonus += 30
+	if special == "move_and_shoot":
+		weapon_hit_bonus += 10
+	if special == "setup_2_turns_guaranteed_hit_crit" and (attacker.has_status("setup") or attacker.has_status("steady")):
+		weapon_hit_bonus += 25
+		weapon_crit_bonus += 0.35
+	if attacker.has_status("highground"):
+		weapon_hit_bonus += 15
+		weapon_crit_bonus += 0.10
+	if attacker.job == "assault" and dist <= 1:
+		weapon_hit_bonus += 15
+		weapon_crit_bonus += 0.15
+	if attacker.job == "sniper":
+		effective_crit_multiplier += 0.5
+		if dist >= attacker.weapon_optimal_range + 2:
+			weapon_hit_bonus += 10
+	if attacker.job == "assault" and float(target.current_hp) / float(max(target.max_hp, 1)) <= 0.3:
+		damage_multiplier *= 1.25
+	if attacker.job == "heavy" and float(attacker.current_hp) / float(max(attacker.max_hp, 1)) < 0.3:
+		damage_multiplier *= 1.5
+
 	var result = CombatFormulas.resolve_attack(
-		attacker.base_hit,
-		attacker.height, target.height,
-		cover, dist, attacker.weapon_optimal_range,
-		int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2),
-		target.armor,
-		attacker.crit_chance, attacker.crit_multiplier,
-		target.dodge, MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y),
+		attacker.base_hit + weapon_hit_bonus + attack_hit_bonus,
+		attacker.height,
+		target.height,
+		effective_cover,
+		dist,
+		attacker.weapon_optimal_range,
+		int(((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2) * damage_multiplier),
+		effective_armor,
+		attacker.crit_chance + weapon_crit_bonus + attack_crit_bonus,
+		effective_crit_multiplier,
+		target.dodge,
+		MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y),
 		rng
 	)
 
-	if result.hit:
-		target.take_damage(result.damage)
+	if result.get("hit", false):
+		target.take_damage(int(result.get("damage", 0)))
+		_apply_weapon_specials(attacker, target, result, weapon, special, dist)
+		if attacker.job == "assault" and not target.is_alive:
+			attacker.heal(20)
 
-		# 触发攻击者特殊效果
-		_process_attack_effects(attacker, target, result)
-
-	# 暴露位置（非消音武器）
-	# TODO: 检查武器是否有消音
+	if not weapon.get("silenced", false) and not force_silent and special not in ["silent", "silent_no_expose", "silent_ignore_armor", "silent_crit_plus_10", "silent_ignores_half_armor"]:
+		attacker.add_status("revealed", 1)
 
 	return {success = true, result = result}
 
-## 执行技能
 func execute_skill(caster: Node, skill_id: String, target_data: Dictionary) -> Dictionary:
 	var skill = _get_skill_data(skill_id)
 	if skill.is_empty():
 		return {success = false, reason = "skill_not_found"}
 
-	# 检查 AP
-	var ap_cost = skill.get("ap_cost", 1)
+	var ap_cost = int(skill.get("ap_cost", 1))
 	if caster.current_ap < ap_cost:
 		return {success = false, reason = "no_ap"}
 
-	# 检查冷却
-	if skill.has("cooldown_remaining") and skill.cooldown_remaining > 0:
+	if skill.get("cooldown_remaining", 0) > 0:
 		return {success = false, reason = "on_cooldown"}
 
-	caster.spend_ap(ap_cost)
+	if not caster.spend_ap(ap_cost):
+		return {success = false, reason = "no_ap"}
 
-	# 根据技能类型执行
-	var skill_type = skill.get("type", "active")
+	var result: Dictionary = {}
 	match skill_id:
-		# 突击兵技能
 		"asslt_dash_strike":
-			return _skill_dash_strike(caster, target_data)
+			result = _skill_dash_strike(caster, target_data)
 		"asslt_breach":
-			return _skill_breach(caster, target_data)
+			result = _skill_breach(caster, target_data)
+		"asslt_storm_dash":
+			result = _skill_storm_dash(caster, target_data)
+		"asslt_chain_slash":
+			result = _skill_chain_slash(caster, target_data)
 		"asslt_adrenaline":
-			return _skill_adrenaline(caster)
+			result = _skill_adrenaline(caster)
 		"asslt_blink":
-			return _skill_blink(caster, target_data)
-		# 狙击手技能
+			result = _skill_blink(caster, target_data)
 		"snip_precise":
-			return _skill_precise_shot(caster, target_data)
+			result = _skill_precise_shot(caster, target_data)
+		"snip_silent_shot":
+			result = _skill_silent_shot(caster, target_data)
+		"snip_double_tap":
+			result = _skill_double_tap(caster, target_data)
+		"snip_assassinate":
+			result = _skill_assassinate(caster, target_data)
+		"snip_piercing":
+			result = _skill_piercing(caster, target_data)
+		"snip_highground":
+			result = _skill_highground(caster)
+		"snip_suppressing_fire":
+			result = _skill_suppressing_fire(caster, target_data)
+		"scout_silent_kill":
+			result = _skill_silent_kill(caster, target_data)
 		"snip_overwatch":
-			return _skill_overwatch(caster, target_data)
+			result = _skill_overwatch(caster)
 		"snip_death_mark":
-			return _skill_death_mark(caster, target_data)
-		# 重装兵技能
+			result = _skill_death_mark(caster, target_data)
 		"heavy_suppress":
-			return _skill_suppress(caster, target_data)
+			result = _skill_suppress(caster, target_data)
 		"heavy_grenade":
-			return _skill_grenade(caster, target_data)
+			result = _skill_grenade(caster, target_data)
 		"heavy_taunt":
-			return _skill_taunt(caster)
-		# 医疗兵技能
+			result = _skill_taunt(caster)
+		"heavy_protect":
+			result = _skill_protect(caster, target_data)
+		"heavy_barrage":
+			result = _skill_barrage(caster, target_data)
+		"heavy_iron_fortress":
+			result = _skill_iron_fortress(caster)
+		"heavy_self_repair":
+			result = _skill_self_repair(caster)
+		"heavy_cleave":
+			result = _skill_cleave(caster, target_data)
+		"heavy_ground_slam":
+			result = _skill_ground_slam(caster, target_data)
 		"medic_heal":
-			return _skill_heal(caster, target_data)
+			result = _skill_heal(caster, target_data)
 		"medic_revive":
-			return _skill_revive(caster, target_data)
+			result = _skill_revive(caster, target_data)
 		"medic_adrenaline_shot":
-			return _skill_adrenaline_shot(caster, target_data)
+			result = _skill_adrenaline_shot(caster, target_data)
 		"medic_area_heal":
-			return _skill_area_heal(caster, target_data)
-		# 侦察兵技能
+			result = _skill_area_heal(caster, target_data)
+		"medic_cure":
+			result = _skill_cure(caster, target_data)
+		"medic_barrier_blast":
+			result = _skill_barrier_blast(caster)
+		"medic_pain_block":
+			result = _skill_pain_block(caster, target_data)
+		"medic_mass_cure":
+			result = _skill_mass_cure(caster, target_data)
+		"medic_stim_pack":
+			result = _skill_stim_pack(caster, target_data)
 		"scout_stealth":
-			return _skill_stealth(caster)
+			result = _skill_stealth(caster)
 		"scout_scan":
-			return _skill_scan(caster, target_data)
+			result = _skill_scan(caster, target_data)
 		"scout_mark":
-			return _skill_mark(caster, target_data)
+			result = _skill_mark(caster, target_data)
 		"scout_trap":
-			return _skill_trap(caster, target_data)
-		# 通用技能
+			result = _skill_trap(caster, target_data)
+		"scout_sabotage":
+			result = _skill_sabotage(caster, target_data)
+		"scout_recon_drone":
+			result = _skill_recon_drone(caster, target_data)
+		"scout_decoy":
+			result = _skill_decoy(caster, target_data)
+		"scout_shadow_step":
+			result = _skill_shadow_step(caster, target_data)
 		"gen_overwatch":
-			return _skill_overwatch(caster, target_data)
+			result = _skill_overwatch(caster)
 		"gen_hunker_down":
-			return _skill_hunker_down(caster)
+			result = _skill_hunker_down(caster)
 		"gen_sprint":
-			return _skill_sprint(caster)
+			result = _skill_sprint(caster)
+		"gen_reposition":
+			result = _skill_reposition(caster)
+		"gen_interact":
+			result = _skill_interact(caster, target_data)
 		_:
-			return {success = false, reason = "skill_not_implemented"}
+			result = {success = false, reason = "skill_not_implemented"}
 
-## 使用物品
-func use_item(unit: Node, item_id: String, target: Node = null) -> Dictionary:
+	if not result.get("success", false):
+		caster.current_ap = min(caster.current_ap + ap_cost, caster.max_ap)
+		caster.ap_changed.emit(caster, caster.current_ap)
+		return result
+	return result
+
+func use_item(unit: Node, item_id: String, target: Node = null, target_data: Dictionary = {}) -> Dictionary:
 	var item = GameData.get_item(item_id)
 	if item.is_empty():
 		return {success = false, reason = "item_not_found"}
 
-	# 检查 AP
-	var ap_cost = item.get("ap_cost", 1)
+	var ap_cost = int(item.get("ap_cost", 1))
 	if not unit.spend_ap(ap_cost):
 		return {success = false, reason = "no_ap"}
 
+	var item_type = String(item.get("type", ""))
 	var effect = item.get("effect", {})
 	var actual_target = target if target else unit
+	var result: Dictionary = {}
 
-	# 处理治疗效果
+	if item_type == "throwable":
+		var throw_pos = target_data.get("position", actual_target.grid_pos if actual_target else unit.grid_pos)
+		result = _use_throwable(unit, item, {"position": throw_pos})
+		if not result.get("success", false):
+			unit.current_ap = min(unit.current_ap + ap_cost, unit.max_ap)
+			unit.ap_changed.emit(unit, unit.current_ap)
+		return result
+
+	if item_type == "trap":
+		var trap_pos = target_data.get("position", unit.grid_pos)
+		var trap_result = _place_trap(unit, item, trap_pos)
+		if not trap_result.get("success", false):
+			unit.current_ap = min(unit.current_ap + ap_cost, unit.max_ap)
+			unit.ap_changed.emit(unit, unit.current_ap)
+		return trap_result
+
 	if effect.has("heal"):
-		actual_target.heal(effect.heal)
+		actual_target.heal(int(effect.get("heal", 0)))
 
-	# 处理移除状态
 	if effect.has("remove_status"):
-		actual_target.remove_status(effect.remove_status)
+		actual_target.remove_status(String(effect.get("remove_status", "")))
+
 	if effect.has("remove_all_debuffs"):
 		for status in actual_target.status_effects:
 			if status.id.begins_with("debuff_") or status.id in ["bleed", "burn", "poison", "stun", "suppress", "fear", "blind", "slow", "jammed", "rooted", "disarmed", "silenced"]:
 				actual_target.remove_status(status.id)
 
-	# 处理添加状态
 	if effect.has("add_status"):
 		for status_id in effect.add_status:
-			var duration = effect.add_status[status_id]
-			actual_target.add_status(status_id, duration)
+			actual_target.add_status(status_id, int(effect.add_status[status_id]))
 
-	# 处理复活
-	if effect.get("revive", false):
-		if actual_target.is_downed:
-			actual_target.is_alive = true
-			actual_target.is_downed = false
-			actual_target.current_hp = int(actual_target.max_hp * effect.get("hp_percent", 0.3))
+	if effect.get("revive", false) and actual_target.is_downed:
+		actual_target.is_alive = true
+		actual_target.is_downed = false
+		actual_target.current_hp = int(actual_target.max_hp * float(effect.get("hp_percent", 0.3)))
 
-	# 处理投掷物
-	if item.get("type") == "throwable":
-		return _use_throwable(unit, item, target_data)
+	result = {success = true, item = item_id, target = actual_target.unit_name}
+	return result
 
-	# 处理陷阱
-	if item.get("type") == "trap":
-		return _place_trap(unit, item)
-
-	return {success = true, item = item_id, target = actual_target.unit_name}
-
-## 进入警戒
 func enter_overwatch(unit: Node) -> bool:
 	if unit.current_ap < 1:
 		return false
@@ -222,70 +334,57 @@ func enter_overwatch(unit: Node) -> bool:
 	unit.add_status("overwatch", 1)
 	return true
 
-## 警戒触发检查
-func check_overwatch_trigger(moving_unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> Array[Dictionary]:
-	var triggers: Array[Dictionary] = []
+func check_overwatch_trigger(moving_unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> Array:
+	var triggers: Array = []
 	var all_units = GameManager.player_units + GameManager.enemy_units
-
 	for watcher in all_units:
 		if not watcher.is_alive or not watcher.has_status("overwatch"):
 			continue
 		if watcher.team == moving_unit.team:
 			continue
 
-		# 检查目标格是否在 watcher 的警戒范围内
 		var dist = GridSystem.manhattan_distance(watcher.grid_pos, to_pos)
 		if dist > watcher.weapon_range[1]:
 			continue
 
-		# 检查视线
 		var has_los = VisionSystem.has_line_of_sight(
-			watcher.grid_pos, to_pos,
-			map_data.size.width, map_data.size.height,
+			watcher.grid_pos,
+			to_pos,
+			map_data.size.width,
+			map_data.size.height,
 			_is_vision_blocking
 		)
 		if not has_los:
 			continue
 
-		# 执行警戒射击
-		var result = execute_attack(watcher, moving_unit)
-		if result.success:
+		var result = execute_attack(watcher, moving_unit, 0, 0.0, 1.0, false, 1.0, false, false)
+		if result.get("success", false):
 			triggers.append({
 				watcher = watcher,
 				target = moving_unit,
-				result = result.result
+				result = result.get("result", {})
 			})
-
-		# 警戒射击只触发一次
 		watcher.remove_status("overwatch")
-
 	return triggers
 
-## 结束单位行动
 func end_unit_action(unit: Node) -> void:
-	unit.move_points = 0  # 移动点归零
-	# AP 可以保留用于警戒
-
-## ===== 技能实现 =====
+	unit.move_points = 0
 
 func _skill_dash_strike(caster: Node, target_data: Dictionary) -> Dictionary:
 	var target_pos = target_data.get("position", Vector2i(-1, -1))
 	if target_pos.x < 0:
 		return {success = false}
 
-	# 移动到目标旁边
 	var adjacent = _find_adjacent_to(target_pos)
 	if adjacent.x < 0:
 		return {success = false}
 
 	caster.move_to(adjacent)
-
-	# 找到目标单位
 	var target = _get_unit_at(target_pos)
 	if target:
-		var result = execute_attack(caster, target)
-		if result.success:
-			result.result.hit_chance = minf(1.0, result.result.get("hit_chance", 0) + 0.2)
+		var result = execute_attack(caster, target, 0, 0.0, 1.0, false, 1.0, false, false)
+		if result.get("success", false):
+			return {success = true, moved_to = adjacent, attack = result.get("result", {})}
 	return {success = true, moved_to = adjacent}
 
 func _skill_breach(caster: Node, target_data: Dictionary) -> Dictionary:
@@ -293,19 +392,57 @@ func _skill_breach(caster: Node, target_data: Dictionary) -> Dictionary:
 	if target_pos.x < 0:
 		return {success = false}
 
-	# 破坏相邻掩体
 	var blocker = MapLoader.get_blocker_at(map_data, target_pos.x, target_pos.y)
-	if blocker == 6 or blocker == 7:  # wall or crate
-		map_data.layers.blocker[target_pos.y][target_pos.x] = 0
-		# 造成范围伤害
-		for dy in range(-1, 2):
-			for dx in range(-1, 2):
-				var pos = Vector2i(target_pos.x + dx, target_pos.y + dy)
-				var unit = _get_unit_at(pos)
-				if unit and unit.team != caster.team:
-					unit.take_damage(30)
-		return {success = true, destroyed = target_pos}
-	return {success = false, reason = "no_destructible"}
+	if blocker != 6 and blocker != 7:
+		return {success = false, reason = "no_destructible"}
+
+	map_data.layers.blocker[target_pos.y][target_pos.x] = 0
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var pos = Vector2i(target_pos.x + dx, target_pos.y + dy)
+			var unit = _get_unit_at(pos)
+			if unit and unit.team != caster.team:
+				unit.take_damage(30)
+	return {success = true, destroyed = target_pos}
+
+func _skill_storm_dash(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target_pos = target_data.get("position", Vector2i(-1, -1))
+	if target_pos.x < 0:
+		return {success = false, reason = "no_target"}
+
+	var path = Pathfinding.find_path(
+		caster.grid_pos,
+		target_pos,
+		map_data.size.width,
+		map_data.size.height,
+		_get_move_cost.bind(caster.job),
+		_is_blocked
+	)
+	if path.is_empty():
+		return {success = false, reason = "no_path"}
+
+	var max_steps = mini(path.size() - 1, 5)
+	var last_pos = caster.grid_pos
+	for i in range(1, max_steps + 1):
+		var step_pos = path[i]
+		var unit = _get_unit_at(step_pos)
+		if unit and unit.team != caster.team:
+			unit.take_damage(20)
+		last_pos = step_pos
+	caster.move_to(last_pos)
+	return {success = true, moved_to = last_pos, path_length = max_steps}
+
+func _skill_chain_slash(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	if GridSystem.manhattan_distance(caster.grid_pos, target.grid_pos) > 1:
+		return {success = false, reason = "out_of_range"}
+	var first = execute_attack(caster, target, 0, 0.0, 1.0, false, 1.0, false, false)
+	var second = {success = false}
+	if first.get("success", false) and target.is_alive:
+		second = execute_attack(caster, target, -5, 0.0, 1.0, false, 0.9, false, false)
+	return {success = true, first = first.get("result", {}), second = second.get("result", {})}
 
 func _skill_adrenaline(caster: Node) -> Dictionary:
 	caster.add_status("adrenaline", 1)
@@ -325,13 +462,69 @@ func _skill_precise_shot(caster: Node, target_data: Dictionary) -> Dictionary:
 	var target = target_data.get("target_unit")
 	if not target:
 		return {success = false}
-	var result = execute_attack(caster, target)
-	if result.success:
-		# 精准射击命中+30暴击+20%
-		pass
+	var result = execute_attack(caster, target, 0, 0.0, 1.0, false, 1.0, false, false)
+	if result.get("success", false):
+		return {success = true, result = result.get("result", {})}
 	return result
 
-func _skill_overwatch(caster: Node, target_data: Dictionary) -> Dictionary:
+func _skill_silent_shot(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	var result = execute_attack(caster, target, 0, 0.0, 1.0, false, 1.0, true, false)
+	return {success = true, result = result.get("result", {})}
+
+func _skill_double_tap(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	var first = execute_attack(caster, target, 0, 0.0, 1.0, false, 1.0, false, false)
+	var second = {success = false}
+	if first.get("success", false) and target.is_alive:
+		second = execute_attack(caster, target, -10, 0.0, 1.0, false, 0.85, false, false)
+	return {success = true, first = first.get("result", {}), second = second.get("result", {})}
+
+func _skill_assassinate(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	if not _is_isolated_target(target):
+		return {success = false, reason = "target_not_isolated"}
+	var result = execute_attack(caster, target, 20, 0.5, 0.5, true, 1.5, true, false)
+	return {success = true, result = result.get("result", {})}
+
+func _skill_piercing(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	var result = execute_attack(caster, target, 10, 0.0, 0.5, true, 1.0, false, false)
+	return {success = true, result = result.get("result", {})}
+
+func _skill_highground(caster: Node) -> Dictionary:
+	caster.add_status("highground", 1)
+	return {success = true, target = caster.unit_name}
+
+func _skill_suppressing_fire(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	var result = execute_attack(caster, target, -10, 0.0, 1.0, false, 0.85, false, false)
+	if result.get("success", false) and result.get("result", {}).get("hit", false):
+		target.add_status("suppress", 1)
+	return {success = true, result = result.get("result", {})}
+
+func _skill_silent_kill(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	if target.current_hp > int(target.max_hp * 0.5):
+		return {success = false, reason = "target_too_healthy"}
+	var result = execute_attack(caster, target, 25, 0.2, 1.2, true, 1.5, true, false)
+	if result.get("success", false) and not target.is_alive:
+		caster.heal(20)
+	return {success = true, result = result.get("result", {})}
+
+func _skill_overwatch(caster: Node) -> Dictionary:
 	enter_overwatch(caster)
 	return {success = true}
 
@@ -354,7 +547,6 @@ func _skill_grenade(caster: Node, target_data: Dictionary) -> Dictionary:
 	if target_pos.x < 0:
 		return {success = false}
 
-	# 3x3 范围伤害
 	var damage = 50
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
@@ -362,9 +554,7 @@ func _skill_grenade(caster: Node, target_data: Dictionary) -> Dictionary:
 			var unit = _get_unit_at(pos)
 			if unit and unit.team != caster.team:
 				unit.take_damage(damage)
-			# 破坏掩体
-			var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-			if blocker == 7:  # crate
+			if MapLoader.get_blocker_at(map_data, pos.x, pos.y) == 7:
 				map_data.layers.blocker[pos.y][pos.x] = 0
 
 	return {success = true, area = "3x3", center = target_pos}
@@ -373,10 +563,131 @@ func _skill_taunt(caster: Node) -> Dictionary:
 	caster.add_status("taunting", 1)
 	return {success = true}
 
+func _skill_protect(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	target.add_status("barrier", 2, {amount = 25})
+	caster.add_status("taunting", 1)
+	return {success = true, target = target.unit_name}
+
+func _skill_barrage(caster: Node, target_data: Dictionary) -> Dictionary:
+	var center = target_data.get("position", Vector2i(-1, -1))
+	if center.x < 0:
+		return {success = false, reason = "no_target"}
+	var hit_count := 0
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var pos = Vector2i(center.x + dx, center.y + dy)
+			var unit = _get_unit_at(pos)
+			if unit and unit.team != caster.team:
+				unit.take_damage(18)
+				unit.add_status("suppress", 2)
+				hit_count += 1
+	return {success = true, center = center, hit_count = hit_count}
+
+func _skill_iron_fortress(caster: Node) -> Dictionary:
+	caster.add_status("damage_reduction", 1, {amount = 50})
+	caster.add_status("steady", 1)
+	return {success = true, target = caster.unit_name}
+
+func _skill_self_repair(caster: Node) -> Dictionary:
+	caster.heal(40)
+	caster.add_status("barrier", 2, {amount = 10})
+	return {success = true, healed = 40, target = caster.unit_name}
+
+func _skill_cleave(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target_pos = target_data.get("position", Vector2i(-1, -1))
+	if target_pos.x < 0:
+		return {success = false, reason = "no_target"}
+	var direction = target_pos - caster.grid_pos
+	if direction == Vector2i.ZERO:
+		return {success = false, reason = "invalid_target"}
+	var step = Vector2i(signi(direction.x), signi(direction.y))
+	if step.x != 0 and step.y != 0:
+		if abs(direction.x) >= abs(direction.y):
+			step.y = 0
+		else:
+			step.x = 0
+	var hits := 0
+	var positions := []
+	for i in range(1, 4):
+		var pos = caster.grid_pos + Vector2i(step.x * i, step.y * i)
+		if not GridSystem.is_in_bounds(pos, map_data.size.width, map_data.size.height):
+			continue
+		positions.append(pos)
+		var unit = _get_unit_at(pos)
+		if unit and unit.team != caster.team:
+			unit.take_damage(30)
+			hits += 1
+	return {success = true, positions = positions, hit_count = hits}
+
+func _skill_ground_slam(caster: Node, target_data: Dictionary) -> Dictionary:
+	var impacted := 0
+	for neighbor in GridSystem.get_neighbors(caster.grid_pos):
+		var unit = _get_unit_at(neighbor)
+		if unit and unit.team != caster.team:
+			unit.take_damage(50)
+			if not unit.is_alive:
+				impacted += 1
+				continue
+			var dx = neighbor.x - caster.grid_pos.x
+			var dy = neighbor.y - caster.grid_pos.y
+			var knock_pos = Vector2i(
+				clampi(neighbor.x + signi(dx), 0, map_data.size.width - 1),
+				clampi(neighbor.y + signi(dy), 0, map_data.size.height - 1)
+			)
+			if MapLoader.is_passable(map_data, knock_pos.x, knock_pos.y) and not _get_unit_at(knock_pos):
+				unit.move_to(knock_pos)
+			impacted += 1
+	return {success = true, impacted = impacted}
+
+func _skill_cure(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	_remove_negative_statuses(target)
+	return {success = true, target = target.unit_name}
+
+func _skill_barrier_blast(caster: Node) -> Dictionary:
+	var allies := 0
+	var team_units = GameManager.player_units if caster.team == "player" else GameManager.enemy_units
+	for unit in team_units:
+		if unit.is_alive:
+			unit.add_status("barrier", 2, {amount = 30})
+			allies += 1
+	return {success = true, affected = allies}
+
+func _skill_pain_block(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	target.add_status("prevent_death", 2)
+	return {success = true, target = target.unit_name}
+
+func _skill_mass_cure(caster: Node, target_data: Dictionary) -> Dictionary:
+	var center = target_data.get("position", caster.grid_pos)
+	var affected := 0
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var pos = Vector2i(center.x + dx, center.y + dy)
+			var unit = _get_unit_at(pos)
+			if unit and unit.team == caster.team:
+				_remove_negative_statuses(unit)
+				affected += 1
+	return {success = true, affected = affected}
+
+func _skill_stim_pack(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target:
+		return {success = false, reason = "no_target"}
+	target.move_points += 2
+	target.add_status("charge", 1)
+	return {success = true, target = target.unit_name}
+
 func _skill_heal(caster: Node, target_data: Dictionary) -> Dictionary:
 	var target = target_data.get("target_unit", caster)
 	target.heal(40)
-	# 紧急护盾
 	target.add_status("barrier", 2, {amount = 10})
 	return {success = true, healed = 40, target = target.unit_name}
 
@@ -432,8 +743,85 @@ func _skill_mark(caster: Node, target_data: Dictionary) -> Dictionary:
 
 func _skill_trap(caster: Node, target_data: Dictionary) -> Dictionary:
 	var pos = target_data.get("position", caster.grid_pos)
-	# TODO: 在地图上放置陷阱对象
-	return {success = true, trap_pos = pos}
+	if not MapLoader.is_passable(map_data, pos.x, pos.y):
+		return {success = false, reason = "invalid_position"}
+
+	var trap_obj = {
+		"id": "trap_" + str(randi()),
+		"type": "trap",
+		"x": pos.x,
+		"y": pos.y,
+		"team": caster.team,
+		"damage": 30,
+		"trigger": "enemy_enter",
+	}
+	_append_map_object(trap_obj)
+	return {success = true, trap_pos = pos, trap = trap_obj}
+
+func _skill_sabotage(caster: Node, target_data: Dictionary) -> Dictionary:
+	var pos = target_data.get("position", Vector2i(-1, -1))
+	if pos.x < 0:
+		return {success = false, reason = "no_target"}
+	var damaged := 0
+	if MapLoader.get_blocker_at(map_data, pos.x, pos.y) in [6, 7]:
+		map_data.layers.blocker[pos.y][pos.x] = 0
+		damaged += 1
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var scan_pos = Vector2i(pos.x + dx, pos.y + dy)
+			var unit = _get_unit_at(scan_pos)
+			if unit and unit.team != caster.team:
+				unit.add_status("jammed", 2)
+				damaged += 1
+	return {success = true, position = pos, affected = damaged}
+
+func _skill_recon_drone(caster: Node, target_data: Dictionary) -> Dictionary:
+	var pos = target_data.get("position", caster.grid_pos)
+	if not MapLoader.is_passable(map_data, pos.x, pos.y):
+		return {success = false, reason = "invalid_position"}
+	var drone_obj = {
+		"id": "drone_" + str(randi()),
+		"type": "recon_drone",
+		"x": pos.x,
+		"y": pos.y,
+		"team": caster.team,
+		"radius": 3,
+		"duration": 3,
+		"name": "侦察无人机",
+	}
+	_append_map_object(drone_obj)
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			var scan_pos = Vector2i(pos.x + dx, pos.y + dy)
+			var unit = _get_unit_at(scan_pos)
+			if unit and unit.team != caster.team:
+				unit.add_status("revealed", 2)
+	return {success = true, position = pos, drone = drone_obj}
+
+func _skill_decoy(caster: Node, target_data: Dictionary) -> Dictionary:
+	var pos = target_data.get("position", caster.grid_pos)
+	if not MapLoader.is_passable(map_data, pos.x, pos.y):
+		return {success = false, reason = "invalid_position"}
+	var decoy_obj = {
+		"id": "decoy_" + str(randi()),
+		"type": "decoy",
+		"x": pos.x,
+		"y": pos.y,
+		"team": caster.team,
+		"duration": 3,
+		"name": "诱饵",
+	}
+	_append_map_object(decoy_obj)
+	return {success = true, position = pos, decoy = decoy_obj}
+
+func _skill_shadow_step(caster: Node, target_data: Dictionary) -> Dictionary:
+	var target = target_data.get("target_unit")
+	if not target or target.team != caster.team:
+		return {success = false, reason = "no_target"}
+	var caster_pos = caster.grid_pos
+	caster.move_to(target.grid_pos)
+	target.move_to(caster_pos)
+	return {success = true, swapped = [caster.unit_name, target.unit_name]}
 
 func _skill_hunker_down(caster: Node) -> Dictionary:
 	caster.add_status("hunker", 1)
@@ -444,7 +832,25 @@ func _skill_sprint(caster: Node) -> Dictionary:
 	caster.add_status("charge", 1)
 	return {success = true}
 
-## ===== 辅助函数 =====
+func _skill_reposition(caster: Node) -> Dictionary:
+	if caster.last_grid_pos == caster.grid_pos:
+		return {success = false, reason = "no_previous_position"}
+	if not MapLoader.is_passable(map_data, caster.last_grid_pos.x, caster.last_grid_pos.y):
+		return {success = false, reason = "blocked"}
+	var other = _get_unit_at(caster.last_grid_pos)
+	if other and other != caster:
+		return {success = false, reason = "occupied"}
+	caster.move_to(caster.last_grid_pos)
+	return {success = true, position = caster.grid_pos}
+
+func _skill_interact(caster: Node, target_data: Dictionary) -> Dictionary:
+	var pos = target_data.get("position", caster.grid_pos)
+	for obj in map_data.get("objects", []):
+		if int(obj.get("x", -1)) == pos.x and int(obj.get("y", -1)) == pos.y:
+			if obj.get("type", "") in ["terminal", "door", "chest", "console"]:
+				obj["activated"] = true
+				return {success = true, object = obj}
+	return {success = false, reason = "nothing_to_interact"}
 
 func _get_move_cost(pos: Vector2i, job: String) -> int:
 	return GameData.get_move_cost(job, MapLoader.get_terrain_at(map_data, pos.x, pos.y))
@@ -453,14 +859,12 @@ func _is_blocked(pos: Vector2i) -> bool:
 	return not MapLoader.is_passable(map_data, pos.x, pos.y)
 
 func _is_vision_blocking(pos: Vector2i) -> bool:
-	var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-	return blocker == 6  # wall blocks vision
+	return MapLoader.get_blocker_at(map_data, pos.x, pos.y) == 6
 
 func _get_skill_data(skill_id: String) -> Dictionary:
-	# TODO: 从技能数据文件加载
-	return {}
+	return GameData.get_skill(skill_id)
 
-func _get_unit_at(pos: Vector2i) -> Dictionary:
+func _get_unit_at(pos: Vector2i):
 	for unit in GameManager.player_units + GameManager.enemy_units:
 		if unit.is_alive and unit.grid_pos == pos:
 			return unit
@@ -468,29 +872,226 @@ func _get_unit_at(pos: Vector2i) -> Dictionary:
 
 func _find_adjacent_to(pos: Vector2i) -> Vector2i:
 	for neighbor in GridSystem.get_neighbors(pos):
-		if MapLoader.is_passable(map_data, neighbor.x, neighbor.y):
-			var unit = _get_unit_at(neighbor)
-			if not unit:
-				return neighbor
+		if MapLoader.is_passable(map_data, neighbor.x, neighbor.y) and not _get_unit_at(neighbor):
+			return neighbor
 	return Vector2i(-1, -1)
 
-func _process_attack_effects(attacker: Node, target: Node, result: Dictionary) -> void:
-	# 处理武器特殊效果
-	# TODO: 根据武器 special 字段处理
-	pass
+func _apply_weapon_specials(attacker: Node, target: Node, result: Dictionary, weapon: Dictionary, special: String, dist: int) -> void:
+	var weapon_id = String(attacker.get("equipped_weapon"))
+	if weapon_id == "Null":
+		weapon_id = ""
+	if special == "":
+		return
+
+	var damage = int(result.get("damage", 0))
+	match special:
+		"close_range_bonus_1.3x_at_2_tiles", "close_range_bonus_1.4x", "double_shot_close_range":
+			if dist <= 2 and damage != 0:
+				var bonus = int(round(abs(damage) * (0.3 if special == "close_range_bonus_1.3x_at_2_tiles" else 0.4)))
+				_apply_follow_up_damage(target, bonus if damage > 0 else -bonus)
+		"double_tap":
+			if damage != 0:
+				_apply_follow_up_damage(target, int(round(damage * 0.5)))
+		"triple_tap":
+			if damage != 0:
+				_apply_follow_up_damage(target, int(round(damage * 0.35)))
+				_apply_follow_up_damage(target, int(round(damage * 0.35)))
+		"dual_wield_double_strike_kill_refund_ap":
+			if damage != 0:
+				_apply_follow_up_damage(target, int(round(damage * 0.6)))
+			if not target.is_alive:
+				attacker.current_ap = min(attacker.current_ap + 1, attacker.max_ap + 1)
+		"setup_bonus_30_hit", "setup_2_turns_guaranteed_hit_crit":
+			if attacker.has_status("setup") or attacker.has_status("steady"):
+				target.add_status("marked", 1)
+				if special == "setup_2_turns_guaranteed_hit_crit":
+					target.add_status("exposed", 1)
+		"move_and_shoot":
+			attacker.add_status("mobile_fire", 1)
+		"bleed":
+			if rng.randf() < 0.3:
+				target.add_status("bleed", 2)
+		"burn":
+			if rng.randf() < 0.25:
+				target.add_status("burn", 2)
+		"aoe_3x3_destroy_cover":
+			_apply_area_damage(attacker, target.grid_pos, 1, int(round(abs(damage) * 0.7)), weapon, "destroy_cover")
+		"aoe_5x5_burn":
+			_apply_area_damage(attacker, target.grid_pos, 2, int(round(abs(damage) * 0.5)), weapon, "burn")
+		"burn_cone_3_tiles":
+			_apply_area_damage(attacker, target.grid_pos, 1, int(round(abs(damage) * 0.6)), weapon, "burn")
+		"stun":
+			if rng.randf() < 0.15:
+				target.add_status("stun", 1)
+		"suppress":
+			target.add_status("suppress", 1)
+		"armor_pierce":
+			target.armor = maxi(target.armor - 15, 0)
+		"poison_3_turns":
+			target.add_status("poison", 3)
+		"mark_target_3_turns":
+			target.add_status("marked", 3)
+		"silent_no_expose":
+			target.add_status("marked", 1)
+		"silent_crit_plus_10":
+			if result.get("critical", false):
+				attacker.current_ap = min(attacker.current_ap + 1, attacker.max_ap + 1)
+		"kill_heal_10_bleed_3":
+			if not target.is_alive:
+				attacker.heal(10)
+			elif rng.randf() < 0.35:
+				target.add_status("bleed", 3)
+		"suppressing_fire", "burst_5_suppress_range_1":
+			if dist <= 1 or special == "suppressing_fire":
+				target.add_status("suppress", 1)
+		"heal_40", "heal_50_remove_1_debuff", "damage_heals_adjacent_ally":
+			_apply_heal_weapon_effect(attacker, target, result, weapon, special)
+		"knockback":
+			if target.job == "heavy" and float(target.current_hp) / float(max(target.max_hp, 1)) > 0.5:
+				return
+			var dx = target.grid_pos.x - attacker.grid_pos.x
+			var dy = target.grid_pos.y - attacker.grid_pos.y
+			var new_pos = Vector2i(
+				clampi(target.grid_pos.x + signi(dx), 0, map_data.size.width - 1),
+				clampi(target.grid_pos.y + signi(dy), 0, map_data.size.height - 1)
+			)
+			if MapLoader.is_passable(map_data, new_pos.x, new_pos.y):
+				var occupied = GameManager.player_units + GameManager.enemy_units
+				var blocked = occupied.any(func(u): return u.is_alive and u.grid_pos == new_pos)
+				if not blocked:
+					target.move_to(new_pos)
+		"lifesteal":
+			if result.get("hit", false):
+				attacker.heal(int(result.get("damage", 0) * 0.2))
+		_:
+			return
+
+func _apply_follow_up_damage(target: Node, damage: int) -> void:
+	if damage == 0 or not target.is_alive:
+		return
+	target.take_damage(damage)
+
+func _apply_area_damage(attacker: Node, center: Vector2i, radius: int, damage: int, weapon: Dictionary, effect_type: String) -> void:
+	if radius < 1 or damage == 0:
+		return
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var pos = Vector2i(center.x + dx, center.y + dy)
+			if not GridSystem.is_in_bounds(pos, map_data.size.width, map_data.size.height):
+				continue
+			var unit = _get_unit_at(pos)
+			if unit and unit.team != attacker.team and unit.is_alive:
+				unit.take_damage(damage)
+				if effect_type == "burn":
+					unit.add_status("burn", 2)
+			if effect_type == "destroy_cover" and MapLoader.get_blocker_at(map_data, pos.x, pos.y) == 7:
+				map_data.layers.blocker[pos.y][pos.x] = 0
+
+func _apply_heal_weapon_effect(attacker: Node, target: Node, result: Dictionary, weapon: Dictionary, special: String) -> void:
+	if String(weapon.get("special", "")) == "heal_40":
+		target.heal(40)
+	elif String(weapon.get("special", "")) == "heal_50_remove_1_debuff":
+		target.heal(50)
+		for status in target.status_effects:
+			if status.id.begins_with("debuff_") or status.id in ["bleed", "burn", "poison", "stun", "suppress", "fear", "blind", "slow", "jammed", "rooted", "disarmed", "silenced"]:
+				target.remove_status(status.id)
+				break
+	elif String(weapon.get("special", "")) == "damage_heals_adjacent_ally":
+		var ally = _find_nearest_ally(attacker, target.grid_pos)
+		if ally:
+			var heal_amount = maxi(int(abs(int(result.get("damage", 0))) / 2), 10)
+			ally.heal(heal_amount)
+
+func _find_nearest_ally(unit: Node, center: Vector2i) -> Node:
+	var allies = GameManager.player_units if unit.team == "player" else GameManager.enemy_units
+	var best: Node = null
+	var best_dist := 9999
+	for ally in allies:
+		if not ally.is_alive:
+			continue
+		var dist = GridSystem.manhattan_distance(center, ally.grid_pos)
+		if dist < best_dist:
+			best_dist = dist
+			best = ally
+	return best
+
+func _is_isolated_target(target: Node) -> bool:
+	var allies = GameManager.player_units if target.team == "player" else GameManager.enemy_units
+	for ally in allies:
+		if ally == target or not ally.is_alive:
+			continue
+		if GridSystem.manhattan_distance(ally.grid_pos, target.grid_pos) <= 1:
+			return false
+	return true
+
+func _remove_negative_statuses(unit: Node) -> void:
+	var to_remove: Array[String] = []
+	for status in unit.status_effects:
+		if String(status.id).begins_with("debuff_") or status.id in ["bleed", "burn", "poison", "stun", "suppress", "fear", "blind", "slow", "jammed", "rooted", "disarmed", "silenced", "marked", "revealed"]:
+			to_remove.append(String(status.id))
+	for status_id in to_remove:
+		unit.remove_status(status_id)
 
 func _use_throwable(unit: Node, item: Dictionary, target_data: Dictionary) -> Dictionary:
 	var effect = item.get("effect", {})
-	var area = effect.get("area", "1x1")
+	var area = String(effect.get("area", "1x1"))
 	var damage = effect.get("damage", [0, 0])
+	var target_pos = target_data.get("position", unit.grid_pos)
 
-	# TODO: 在目标位置创建效果区域
-	return {success = true, item = item.name, area = area}
+	var radius = 1
+	match area:
+		"1x1":
+			radius = 0
+		"3x3":
+			radius = 1
+		"5x5":
+			radius = 2
 
-func _place_trap(unit: Node, item: Dictionary) -> Dictionary:
-	# TODO: 在单位位置放置陷阱
-	return {success = true, trap = item.name}
+	var hit_units: Array = []
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var pos = Vector2i(target_pos.x + dx, target_pos.y + dy)
+			var target_unit = _get_unit_at(pos)
+			if target_unit and target_unit.team != unit.team:
+				var dmg = int(damage[0])
+				if damage.size() >= 2:
+					dmg = rng.randi_range(int(damage[0]), int(damage[1]))
+				target_unit.take_damage(dmg)
+				hit_units.append(target_unit.unit_name)
 
-## 设置地图数据
-func set_map_data(data: Dictionary) -> void:
-	map_data = data
+			if MapLoader.get_blocker_at(map_data, pos.x, pos.y) == 7:
+				map_data.layers.blocker[pos.y][pos.x] = 0
+
+	if effect.has("add_status"):
+		for status_id in effect.add_status:
+			var duration = int(effect.add_status[status_id])
+			for unit_name in hit_units:
+				for u in GameManager.player_units + GameManager.enemy_units:
+					if u.unit_name == unit_name:
+						u.add_status(status_id, duration)
+
+	return {success = true, item = item.get("name", ""), area = area, hit = hit_units}
+
+func _place_trap(unit: Node, item: Dictionary, pos: Vector2i = Vector2i(-1, -1)) -> Dictionary:
+	if pos.x < 0:
+		pos = unit.grid_pos
+
+	var effect = item.get("effect", {})
+	var trap_obj = {
+		"id": "trap_" + str(randi()),
+		"type": "trap",
+		"x": pos.x,
+		"y": pos.y,
+		"team": unit.team,
+		"damage": effect.get("damage", [20, 30]),
+		"trigger": effect.get("trigger", "enemy_enter"),
+		"status": effect.get("add_status", {}),
+		"name": item.get("name", "陷阱"),
+	}
+	_append_map_object(trap_obj)
+	return {success = true, trap = item.get("name", ""), pos = pos}
+
+func _append_map_object(obj: Dictionary) -> void:
+	var objects = map_data.get("objects", [])
+	objects.append(obj)
+	map_data["objects"] = objects

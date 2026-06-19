@@ -3,16 +3,19 @@
  */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, execute, queryAll } from '../models/database';
+import { queryOne, execute } from '../models/database';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { MapGenerator } from '../mapgen/generator';
 import { GenerateParams } from '../mapgen/types';
 import { success, error } from '../utils/response';
+import { validateBody } from '../middleware/validate';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { mapGenerateSchema, missionCompleteSchema } from '../utils/validation';
 
 export const mapRoutes = Router();
 
 // 获取战役关卡列表
-mapRoutes.get('/campaign', (_req, res) => {
+mapRoutes.get('/campaign', asyncHandler(async (_req, res) => {
   const chapters = [
     {
       chapter: 1, name: '觉醒',
@@ -69,10 +72,10 @@ mapRoutes.get('/campaign', (_req, res) => {
   ];
 
   return success(res, { chapters });
-});
+}));
 
 // 获取关卡详情（生成地图）
-mapRoutes.get('/:level_id', authMiddleware, (req: AuthRequest, res) => {
+mapRoutes.get('/:level_id', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const { level_id } = req.params;
 
   const match = level_id.match(/ch(\d+)_m(\d+)/);
@@ -106,10 +109,10 @@ mapRoutes.get('/:level_id', authMiddleware, (req: AuthRequest, res) => {
     difficulty: params.difficulty,
     map_data: mapData,
   });
-});
+}));
 
 // 随机生成关卡
-mapRoutes.post('/generate', authMiddleware, (req: AuthRequest, res) => {
+mapRoutes.post('/generate', authMiddleware, validateBody(mapGenerateSchema), asyncHandler(async (req: AuthRequest, res) => {
   const { size, seed, theme, mission_type, difficulty } = req.body;
 
   const params: GenerateParams = {
@@ -128,10 +131,10 @@ mapRoutes.post('/generate', authMiddleware, (req: AuthRequest, res) => {
   );
 
   return success(res, mapData);
-});
+}));
 
 // 上报关卡结果
-mapRoutes.post('/:level_id/complete', authMiddleware, (req: AuthRequest, res) => {
+mapRoutes.post('/:level_id/complete', authMiddleware, validateBody(missionCompleteSchema), asyncHandler(async (req: AuthRequest, res) => {
   const { level_id } = req.params;
   const { result, turns, units_survived, zero_casualty, loot_collected, playtime_seconds, seed } = req.body;
 
@@ -173,10 +176,10 @@ mapRoutes.post('/:level_id/complete', authMiddleware, (req: AuthRequest, res) =>
     first_clear: !!firstClear,
     rewards,
   });
-});
+}));
 
 // 获取支线关卡
-mapRoutes.get('/sidequests/list', authMiddleware, (_req: AuthRequest, res) => {
+mapRoutes.get('/sidequests/list', authMiddleware, asyncHandler(async (_req: AuthRequest, res) => {
   const sidequests = [
     { id: 's1', name: '生存挑战 I', type: 'survival', difficulty: 3, locked: false },
     { id: 's2', name: '护送任务', type: 'escort', difficulty: 3, locked: true },
@@ -190,4 +193,4 @@ mapRoutes.get('/sidequests/list', authMiddleware, (_req: AuthRequest, res) => {
     { id: 's10', name: '终极挑战', type: 'ultimate', difficulty: 6, locked: true },
   ];
   return success(res, { sidequests });
-});
+}));

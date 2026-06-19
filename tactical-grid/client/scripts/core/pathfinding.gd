@@ -14,11 +14,11 @@ static func find_path(
 	height: int,
 	move_cost_fn: Callable,
 	blocked_check: Callable
-) -> Array[Vector2i]:
+) -> Array:
 	if start == end:
 		return []
 
-	var open_set: Array[Dictionary] = []
+	var open_set: Array = []
 	var came_from: Dictionary = {}
 	var g_score: Dictionary = {}
 	var f_score: Dictionary = {}
@@ -65,8 +65,8 @@ static func find_path(
 	return []  # 不可达
 
 ## 重建路径
-static func reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector2i]:
-	var path: Array[Vector2i] = [current]
+static func reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array:
+	var path: Array = [current]
 	while came_from.has(current):
 		current = came_from[current]
 		path.push_front(current)
@@ -86,7 +86,7 @@ static func get_reachable_cells(
 	blocked_check: Callable
 ) -> Dictionary:
 	var distances: Dictionary = {}
-	var queue: Array[Dictionary] = [{pos = start, cost = 0}]
+	var queue: Array = [{pos = start, cost = 0}]
 	distances[start] = 0
 
 	while queue.size() > 0:

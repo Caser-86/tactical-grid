@@ -82,6 +82,15 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_saves_user_id ON saves(user_id);
+    CREATE INDEX IF NOT EXISTS idx_saves_user_created ON saves(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_mission_results_user_id ON mission_results(user_id);
+    CREATE INDEX IF NOT EXISTS idx_mission_results_level_id ON mission_results(level_id);
+    CREATE INDEX IF NOT EXISTS idx_mission_results_user_level ON mission_results(user_id, level_id);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_user_id ON telemetry(user_id);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_event_type ON telemetry(event_type);
+    CREATE INDEX IF NOT EXISTS idx_maps_seed ON maps(seed);
   `);
 
   saveDatabase();

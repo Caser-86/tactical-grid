@@ -1,0 +1,129 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/settings_menu.gd" id="1"]
+
+[node name="SettingsMenu" type="Control"]
+script = ExtResource("1")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.07, 0.09, 1)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -350.0
+offset_top = -300.0
+offset_right = 350.0
+offset_bottom = 300.0
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "设置"
+horizontal_alignment = 1
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Panel/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Difficulty" type="HBoxContainer" parent="Panel/VBox/Scroll/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBox/Scroll/VBox/Difficulty"]
+layout_mode = 2
+text = "难度"
+custom_minimum_size = Vector2(120, 0)
+
+[node name="DifficultyOption" type="OptionButton" parent="Panel/VBox/Scroll/VBox/Difficulty"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Audio" type="VBoxContainer" parent="Panel/VBox/Scroll/VBox"]
+layout_mode = 2
+
+[node name="AudioTitle" type="Label" parent="Panel/VBox/Scroll/VBox/Audio"]
+layout_mode = 2
+text = "音频"
+
+[node name="SfxLabel" type="Label" parent="Panel/VBox/Scroll/VBox/Audio"]
+layout_mode = 2
+text = "音效音量"
+
+[node name="SfxSlider" type="HSlider" parent="Panel/VBox/Scroll/VBox/Audio"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 80.0
+
+[node name="BgmLabel" type="Label" parent="Panel/VBox/Scroll/VBox/Audio"]
+layout_mode = 2
+text = "背景音乐"
+
+[node name="BgmSlider" type="HSlider" parent="Panel/VBox/Scroll/VBox/Audio"]
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 70.0
+
+[node name="Display" type="VBoxContainer" parent="Panel/VBox/Scroll/VBox"]
+layout_mode = 2
+
+[node name="DisplayTitle" type="Label" parent="Panel/VBox/Scroll/VBox/Display"]
+layout_mode = 2
+text = "显示"
+
+[node name="GridToggle" type="CheckBox" parent="Panel/VBox/Scroll/VBox/Display"]
+layout_mode = 2
+text = "始终显示网格"
+
+[node name="DangerZoneLabel" type="Label" parent="Panel/VBox/Scroll/VBox/Display"]
+layout_mode = 2
+text = "危险区域显示"
+
+[node name="DangerZoneOption" type="OptionButton" parent="Panel/VBox/Scroll/VBox/Display"]
+layout_mode = 2
+
+[node name="Accessibility" type="VBoxContainer" parent="Panel/VBox/Scroll/VBox"]
+layout_mode = 2
+
+[node name="AccessTitle" type="Label" parent="Panel/VBox/Scroll/VBox/Accessibility"]
+layout_mode = 2
+text = "辅助功能"
+
+[node name="ColorblindLabel" type="Label" parent="Panel/VBox/Scroll/VBox/Accessibility"]
+layout_mode = 2
+text = "色盲模式"
+
+[node name="ColorblindOption" type="OptionButton" parent="Panel/VBox/Scroll/VBox/Accessibility"]
+layout_mode = 2
+
+[node name="LargeFontToggle" type="CheckBox" parent="Panel/VBox/Scroll/VBox/Accessibility"]
+layout_mode = 2
+text = "大字体模式"
+
+[node name="ReduceMotionToggle" type="CheckBox" parent="Panel/VBox/Scroll/VBox/Accessibility"]
+layout_mode = 2
+text = "减少动态效果"
+
+[node name="BackButton" type="Button" parent="Panel"]
+layout_mode = 2
+text = "返回"
+custom_minimum_size = Vector2(120, 40)

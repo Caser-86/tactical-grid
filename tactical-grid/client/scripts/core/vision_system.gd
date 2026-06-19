@@ -18,8 +18,8 @@ static func has_line_of_sight(
 	return true
 
 ## Bresenham 直线算法
-static func bresenham_line(start: Vector2i, end: Vector2i) -> Array[Vector2i]:
-	var points: Array[Vector2i] = []
+static func bresenham_line(start: Vector2i, end: Vector2i) -> Array:
+	var points: Array = []
 	var x0 = start.x
 	var y0 = start.y
 	var x1 = end.x
@@ -52,8 +52,8 @@ static func get_visible_cells(
 	width: int,
 	height: int,
 	is_blocking_fn: Callable
-) -> Array[Vector2i]:
-	var visible: Array[Vector2i] = []
+) -> Array:
+	var visible: Array = []
 
 	for y in range(maxi(0, origin.y - vision_range), mini(height, origin.y + vision_range + 1)):
 		for x in range(maxi(0, origin.x - vision_range), mini(width, origin.x + vision_range + 1)):

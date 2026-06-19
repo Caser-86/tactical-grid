@@ -49,8 +49,8 @@ func load_game(slot: int = 0) -> Dictionary:
 	return data if data else {}
 
 ## 获取所有本地存档
-func get_local_saves() -> Array[Dictionary]:
-	var saves: Array[Dictionary] = []
+func get_local_saves() -> Array:
+	var saves: Array = []
 	for slot in range(MAX_LOCAL_SAVES):
 		var data = load_game(slot)
 		if data.size() > 0:
@@ -126,6 +126,11 @@ func create_default_save() -> Dictionary:
 			"story_flags": {},
 		},
 		"characters": [],
+		"inventory": [
+			{"id": "med_kit", "type": "consumable", "count": 2},
+			{"id": "painkiller", "type": "consumable", "count": 1},
+			{"id": "grenade", "type": "throwable", "count": 1}
+		],
 		"resources": {
 			"credit": 0,
 			"intel": 0,

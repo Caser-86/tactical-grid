@@ -1,15 +1,18 @@
 /**
  * 用户路由
  */
-import { queryOne } from '../models/database';
+import { queryOne, execute } from '../models/database';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { success, error } from '../utils/response';
 import { Router } from 'express';
+import { validateBody } from '../middleware/validate';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { updateProfileSchema } from '../utils/validation';
 
 export const userRoutes = Router();
 
 // 获取用户信息
-userRoutes.get('/profile', authMiddleware, (req: AuthRequest, res) => {
+userRoutes.get('/profile', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const user = queryOne(
     'SELECT id, username, email, is_guest, created_at, last_login FROM users WHERE id = ?',
     [req.userId]
@@ -48,9 +51,23 @@ userRoutes.get('/profile', authMiddleware, (req: AuthRequest, res) => {
       achievement_count: 0,
     },
   });
-});
+}));
 
 // 更新用户信息
-userRoutes.put('/profile', authMiddleware, (_req: AuthRequest, res) => {
+userRoutes.put('/profile', authMiddleware, validateBody(updateProfileSchema), asyncHandler(async (req: AuthRequest, res) => {
+  const { username, email } = req.body;
+
+  if (username) {
+    const existing = queryOne('SELECT id FROM users WHERE username = ? AND id != ?', [username, req.userId]);
+    if (existing) {
+      return error(res, 2003, 'Username already exists', 409);
+    }
+    execute('UPDATE users SET username = ? WHERE id = ?', [username, req.userId]);
+  }
+
+  if (email !== undefined) {
+    execute('UPDATE users SET email = ? WHERE id = ?', [email || null, req.userId]);
+  }
+
   return success(res, { updated: true });
-});
+}));

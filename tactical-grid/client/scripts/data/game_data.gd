@@ -8,6 +8,11 @@ var enemy_data: Dictionary = {}
 var weapon_data: Dictionary = {}
 var item_data: Dictionary = {}
 var skill_data: Dictionary = {}
+var level_data: Dictionary = {}
+var boss_data: Dictionary = {}
+var dialogue_data: Dictionary = {}
+var achievement_data: Dictionary = {}
+var roguelike_data: Dictionary = {}
 
 func _ready() -> void:
 	_load_data()
@@ -19,18 +24,27 @@ func _load_data() -> void:
 	weapon_data = _load_json("res://data/weapons.json")
 	item_data = _load_json("res://data/items.json")
 	skill_data = _load_json("res://data/skills.json")
+	level_data = _load_json("res://data/levels.json")
+	boss_data = _load_json("res://data/bosses.json")
+	dialogue_data = _load_json("res://data/dialogues.json")
+	achievement_data = _load_json("res://data/achievements.json")
+	roguelike_data = _load_json("res://data/roguelike.json")
 
 func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
-		print("Warning: Data file not found: ", path)
+		push_warning("Data file not found: " + path)
 		return {}
 	var file = FileAccess.open(path, FileAccess.READ)
 	if not file:
+		push_error("Failed to open data file: " + path)
 		return {}
 	var text = file.get_as_text()
 	file.close()
 	var json = JSON.parse_string(text)
-	return json if json else {}
+	if not json:
+		push_error("Failed to parse JSON: " + path)
+		return {}
+	return json
 
 ## 获取地形数据
 func get_terrain(terrain_id: int) -> Dictionary:
@@ -77,10 +91,12 @@ func get_move_cost(job: String, terrain_id: int) -> int:
 	var matrix = job_data.get("move_cost_matrix", {})
 	var job_costs = matrix.get(job, {})
 	var cost = job_costs.get(str(terrain_id), 1)
+	if job == "scout" and terrain_id in [2, 3, 8]:
+		cost = 1
 	return int(cost)
 
 ## 创建玩家单位
-func create_player_unit(job_id: String, name: String = "") -> Dictionary:
+func create_player_unit(job_id: String, name: String = "") -> Unit:
 	var unit = Unit.new()
 	var job_info = get_job(job_id)
 
@@ -100,11 +116,28 @@ func create_player_unit(job_id: String, name: String = "") -> Dictionary:
 	unit.crit_chance = 0.05 + unit.stats.per * 0.005
 	unit.dodge = unit.stats.agi * 0.015
 	unit.armor = 0
+	unit.max_hp += 20
+	unit.current_hp = unit.max_hp
+	unit.vision_range += 1
+	unit.second_wind_available = true
+	match job_id:
+		"sniper":
+			unit.crit_multiplier += 0.5
+			unit.vision_range += 1
+		"medic":
+			unit.heal_bonus = 1.2
+		"scout":
+			unit.move_points += 1
+			unit.dodge += 0.05
+		"assault":
+			unit.crit_chance += 0.05
 
+	# 初始化组
+	unit._init_group()
 	return unit
 
 ## 创建敌人单位
-func create_enemy_unit(enemy_id: String) -> Dictionary:
+func create_enemy_unit(enemy_id: String) -> Unit:
 	var unit = Unit.new()
 	var enemy_info = get_enemy(enemy_id)
 
@@ -124,4 +157,6 @@ func create_enemy_unit(enemy_id: String) -> Dictionary:
 	unit.weapon_damage = enemy_info.get("damage", [15, 25])
 	unit.weapon_optimal_range = weapon_range[1] / 2
 
+	# 初始化组
+	unit._init_group()
 	return unit

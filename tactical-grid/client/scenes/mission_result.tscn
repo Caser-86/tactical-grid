@@ -1,0 +1,131 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/mission_result.gd" id="1"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_1"]
+font_size = 36
+outline_size = 4
+outline_color = Color(0, 0, 0, 1)
+
+[node name="MissionResult" type="Control"]
+script = ExtResource("1")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Overlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.7)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -280.0
+offset_right = 300.0
+offset_bottom = 280.0
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "任务完成"
+horizontal_alignment = 1
+label_settings = SubResource("LabelSettings_1")
+
+[node name="HSeparator" type="HSeparator" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="StarsContainer" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="StatsLabel" type="GridContainer" parent="Panel/VBox"]
+layout_mode = 2
+columns = 2
+
+[node name="TurnsLabel" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "回合数:"
+
+[node name="TurnsValue" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "0"
+
+[node name="SurvivedLabel" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "存活:"
+
+[node name="SurvivedValue" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "0/0"
+
+[node name="TimeLabel" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "用时:"
+
+[node name="TimeValue" type="Label" parent="Panel/VBox/StatsLabel"]
+layout_mode = 2
+text = "0:00"
+
+[node name="HSeparator2" type="HSeparator" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="RewardsLabel" type="GridContainer" parent="Panel/VBox"]
+layout_mode = 2
+columns = 2
+
+[node name="CreditTitle" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "信用币:"
+
+[node name="CreditValue" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "0"
+
+[node name="ExpTitle" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "经验值:"
+
+[node name="ExpValue" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "0"
+
+[node name="IntelTitle" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "情报值:"
+
+[node name="IntelValue" type="Label" parent="Panel/VBox/RewardsLabel"]
+layout_mode = 2
+text = "0"
+
+[node name="LootContainer" type="VBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="RetryButton" type="Button" parent="Panel/VBox/Buttons"]
+layout_mode = 2
+text = "重试"
+custom_minimum_size = Vector2(120, 45)
+
+[node name="BaseButton" type="Button" parent="Panel/VBox/Buttons"]
+layout_mode = 2
+text = "返回基地"
+custom_minimum_size = Vector2(120, 45)
+
+[node name="NextButton" type="Button" parent="Panel/VBox/Buttons"]
+layout_mode = 2
+text = "下一关"
+custom_minimum_size = Vector2(120, 45)

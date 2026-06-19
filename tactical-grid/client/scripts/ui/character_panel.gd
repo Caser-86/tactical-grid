@@ -1,5 +1,3 @@
-## 角色详情面板
-## 显示角色属性、装备、技能树
 extends Control
 class_name CharacterPanel
 
@@ -21,13 +19,12 @@ class_name CharacterPanel
 @onready var tab_buttons = $Panel/TabContainer
 @onready var back_button = $Panel/BackButton
 
-var current_unit: Node = null  # Unit
-var current_tab: int = 0  # 0=属性, 1=装备, 2=技能
+var current_unit: Node = null
+var current_tab: int = 0
 
 func _ready() -> void:
 	back_button.pressed.connect(_on_back)
-
-	# 连接 Tab 按钮
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	for i in range(tab_buttons.get_child_count()):
 		var btn = tab_buttons.get_child(i)
 		btn.pressed.connect(_on_tab_changed.bind(i))
@@ -41,25 +38,22 @@ func _update_display() -> void:
 	if not current_unit:
 		return
 
-	# 基本信息
 	name_label.text = current_unit.unit_name
 	job_label.text = GameData.get_job(current_unit.job).get("name", current_unit.job)
 	level_label.text = "Lv." + str(current_unit.stats.get("level", 1))
-
-	# HP
-	hp_bar.value = float(current_unit.current_hp) / float(current_unit.max_hp) * 100
+	hp_bar.value = float(current_unit.current_hp) / float(current_unit.max_hp) * 100.0
 	hp_label.text = "%d/%d" % [current_unit.current_hp, current_unit.max_hp]
 	ap_label.text = "AP: %d/%d" % [current_unit.current_ap, current_unit.max_ap]
 	move_label.text = "移动: %d" % current_unit.move_points
 	vision_label.text = "视野: %d" % current_unit.vision_range
 
-	# 六维属性
+	var team = current_unit.team if current_unit.team != "" else "player"
+	var portrait_tex = ArtAssets.get_portrait_for_unit(current_unit.job, team)
+	portrait.texture = portrait_tex
+	portrait.visible = portrait_tex != null
+
 	_update_stats()
-
-	# 装备
 	_update_equipment()
-
-	# 技能树
 	_update_skill_tree()
 
 func _update_stats() -> void:
@@ -67,13 +61,12 @@ func _update_stats() -> void:
 		child.queue_free()
 
 	var stat_names = {
-		"str": "力量", "agi": "敏捷", "int": "智力",
-		"vit": "体质", "per": "感知", "wil": "意志"
-	}
-
-	var stat_colors = {
-		"str": Color.RED, "agi": Color.GREEN, "int": Color.BLUE,
-		"vit": Color.ORANGE, "per": Color.CYAN, "wil": Color.PURPLE
+		"str": "力量",
+		"agi": "敏捷",
+		"int": "智力",
+		"vit": "体质",
+		"per": "感知",
+		"wil": "意志"
 	}
 
 	for stat_id in ["str", "agi", "int", "vit", "per", "wil"]:
@@ -85,7 +78,6 @@ func _update_stats() -> void:
 		name_lbl.custom_minimum_size = Vector2(60, 20)
 		row.add_child(name_lbl)
 
-		# 进度条
 		var bar = ProgressBar.new()
 		bar.min_value = 0
 		bar.max_value = 10
@@ -98,7 +90,6 @@ func _update_stats() -> void:
 		val_lbl.custom_minimum_size = Vector2(30, 20)
 		row.add_child(val_lbl)
 
-		# 加点按钮（如果有可分配点数）
 		if current_unit.stats.get("stat_points_unspent", 0) > 0:
 			var plus_btn = Button.new()
 			plus_btn.text = "+"
@@ -124,7 +115,6 @@ func _update_equipment() -> void:
 
 	for slot_id in slots:
 		var row = HBoxContainer.new()
-
 		var slot_label = Label.new()
 		slot_label.text = slots[slot_id] + ":"
 		slot_label.custom_minimum_size = Vector2(60, 24)
@@ -141,7 +131,6 @@ func _update_equipment() -> void:
 			equip_label.modulate = Color.GRAY
 		equip_label.custom_minimum_size = Vector2(150, 24)
 		row.add_child(equip_label)
-
 		equipment_container.add_child(row)
 
 func _update_skill_tree() -> void:
@@ -150,21 +139,44 @@ func _update_skill_tree() -> void:
 
 	var job_data = GameData.get_job(current_unit.job)
 	var trees = job_data.get("skill_trees", [])
+	var job_skills = GameData.get_job_skills(current_unit.job)
 
 	for tree_name in trees:
-		var tree_label = Label.new()
-		tree_label.text = tree_name
-		tree_label.add_theme_font_size_override("font_size", 16)
-		skill_tree_container.add_child(tree_label)
+		var tree_header = Label.new()
+		tree_header.text = "▶ " + tree_name
+		tree_header.add_theme_font_size_override("font_size", 16)
+		tree_header.modulate = GameTheme.ACCENT
+		skill_tree_container.add_child(tree_header)
 
-		# TODO: 显示技能树节点
+		for skill_info in job_skills:
+			var skill = skill_info.data
+			if skill.get("tree", "") != tree_name and tree_name != "":
+				continue
+
+			var skill_row = HBoxContainer.new()
+			skill_row.custom_minimum_size = Vector2(0, 28)
+
+			var skill_label = Label.new()
+			var unlock_lv = skill.get("unlock_level", 0)
+			var is_unlocked = current_unit.stats.get("level", 1) >= unlock_lv
+			var type_tag = "[被动]" if skill.get("type") == "passive" else "[主动]"
+			skill_label.text = "  %s %s (Lv.%d)" % [type_tag, skill.get("name", skill_info.id), unlock_lv]
+			skill_label.custom_minimum_size = Vector2(250, 28)
+			skill_label.modulate = Color.WHITE if is_unlocked else Color(0.5, 0.5, 0.5)
+			skill_row.add_child(skill_label)
+
+			var desc_label = Label.new()
+			desc_label.text = skill.get("description", "")
+			desc_label.modulate = GameTheme.TEXT_SECONDARY
+			skill_row.add_child(desc_label)
+
+			skill_tree_container.add_child(skill_row)
 
 func _on_stat_up(stat_id: String) -> void:
 	if current_unit.stats.get("stat_points_unspent", 0) <= 0:
 		return
 	current_unit.stats[stat_id] += 1
 	current_unit.stats.stat_points_unspent -= 1
-	# 重新计算派生属性
 	_recalc_derived_stats()
 	_update_display()
 
@@ -177,7 +189,9 @@ func _recalc_derived_stats() -> void:
 
 func _on_tab_changed(tab: int) -> void:
 	current_tab = tab
-	# TODO: 切换显示内容
+	stat_container.visible = (tab == 0)
+	equipment_container.visible = (tab == 1)
+	skill_tree_container.visible = (tab == 2)
 
 func _on_back() -> void:
 	hide()
