@@ -46,7 +46,7 @@ saveRoutes.post('/', authMiddleware, validateBody(saveUploadSchema), asyncHandle
   execute(
     `INSERT INTO saves (id, user_id, save_type, save_data, save_hash, version, chapter, mission, playtime)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [saveId, req.userId!, save_type || 'auto', save_data, save_hash || '', version || '1.0.0', chapter || null, mission || null, playtime || 0]
+    [saveId, req.userId!, save_type || 'auto', save_data, save_hash || '', version || '1.1.0', chapter || null, mission || null, playtime || 0]
   );
 
   return success(res, {

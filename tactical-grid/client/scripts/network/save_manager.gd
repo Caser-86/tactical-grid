@@ -20,7 +20,7 @@ func save_game(save_data: Dictionary, slot: int = 0) -> bool:
 		print("Failed to open save file: ", path)
 		return false
 
-	save_data["save_version"] = "1.0.0"
+	save_data["save_version"] = "1.1.0"
 	save_data["save_time"] = Time.get_unix_time_from_system()
 
 	var json_str = JSON.stringify(save_data, "  ")
@@ -84,7 +84,7 @@ func _sync_to_cloud(save_data: Dictionary, slot: int) -> void:
 	var result = await api.upload_save({
 		"save_type": "auto",
 		"save_data": JSON.stringify(save_data),
-		"version": "1.0.0",
+		"version": "1.1.0",
 	})
 
 	api.queue_free()
@@ -116,7 +116,7 @@ func load_from_cloud() -> Dictionary:
 ## 创建默认存档数据
 func create_default_save() -> Dictionary:
 	return {
-		"save_version": "1.0.0",
+		"save_version": "1.1.0",
 		"playtime_seconds": 0,
 		"campaign_progress": {
 			"current_chapter": 1,
