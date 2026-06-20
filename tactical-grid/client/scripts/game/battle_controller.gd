@@ -77,6 +77,10 @@ func _load_battle() -> void:
 		GameManager.turn_manager.player_turn_started.connect(_on_player_turn_started)
 	if not GameManager.enemy_action_started.is_connected(_on_enemy_action_started):
 		GameManager.enemy_action_started.connect(_on_enemy_action_started)
+	if not hud.skill_hovered.is_connected(_on_skill_hovered):
+		hud.skill_hovered.connect(_on_skill_hovered)
+	if not hud.skill_preview_cleared.is_connected(_on_skill_preview_cleared):
+		hud.skill_preview_cleared.connect(_on_skill_preview_cleared)
 	_setup_tutorial()
 	battle_objective_text = _get_mission_objective_text()
 	hud.update_objective(battle_objective_text)
@@ -364,6 +368,12 @@ func _move_towards_attack_range(attacker: Node, target: Node) -> void:
 		AudioManager.sfx_ui_error()
 
 func _handle_right_click() -> void:
+	var world_pos = get_global_mouse_position()
+	var cell = GridSystem.world_to_grid(world_pos)
+	var unit_at_cell = _get_unit_at(cell)
+	if unit_at_cell and unit_at_cell.team == "enemy":
+		_show_enemy_info_panel(unit_at_cell)
+		return
 	_cancel_pending_target_selection()
 	_deselect_unit()
 	current_action = "move"
@@ -631,6 +641,43 @@ func _on_tutorial_finished() -> void:
 func _on_enemy_action_started(enemy: Node, _action_type: String) -> void:
 	focus_on_unit(enemy, 0.35)
 
+var _skill_preview_active: bool = false
+
+func _on_skill_hovered(skill_id: String) -> void:
+	if not selected_unit:
+		return
+	_clear_overlay()
+	_render_map()
+	_skill_preview_active = true
+	var skill = GameData.get_skill(skill_id)
+	if skill.is_empty():
+		return
+	var skill_range = _get_skill_range(skill_id, selected_unit)
+	var min_r = skill_range[0]
+	var max_r = skill_range[1]
+	var center = selected_unit.grid_pos
+	for y in range(map_height):
+		for x in range(map_width):
+			var pos = Vector2i(x, y)
+			var dist = GridSystem.manhattan_distance(center, pos)
+			if dist >= min_r and dist <= max_r and pos != center:
+				var color = COLOR_ATTACK
+				var enemy_at = _get_unit_at(pos)
+				if enemy_at and enemy_at.team == "enemy":
+					color = COLOR_ATTACK.lerp(Color(1.0, 0.2, 0.2), 0.5)
+				elif not enemy_at:
+					color = COLOR_ATTACK.lerp(Color(0.5, 0.5, 0.6), 0.5)
+				_highlight_cell(pos, color, color.darkened(0.3))
+
+func _on_skill_preview_cleared() -> void:
+	if _skill_preview_active:
+		_skill_preview_active = false
+		_clear_overlay()
+		_render_map()
+		if selected_unit:
+			current_action = "move"
+			_show_move_range(selected_unit)
+
 func _on_player_turn_started() -> void:
 	AudioManager.sfx_turn_start(true)
 
@@ -767,6 +814,80 @@ func _update_unit_info(unit: Node) -> void:
 
 func _check_victory() -> void:
 	GameManager._check_victory()
+	_update_objective_progress()
+
+func _update_objective_progress() -> void:
+	var mission_type = map_data.get("mission_type", "extract")
+	var alive_enemies = GameManager.enemy_units.filter(func(u): return u.is_alive)
+	match mission_type:
+		"assassinate":
+			var total = GameManager.enemy_units.size()
+			var killed = total - alive_enemies.size()
+			hud.update_objective("任务目标：消灭所有敌人  %d/%d" % [killed, total])
+		"destroy":
+			var targets = map_data.get("objects", []).filter(func(o):
+				return o.get("type") == "destructible_target"
+			)
+			var total = targets.size()
+			var alive = targets.filter(func(t): return t.get("hp", 0) > 0).size()
+			hud.update_objective("任务目标：摧毁所有目标  %d/%d 已摧毁" % [total - alive, total])
+		_:
+			hud.update_objective(battle_objective_text)
+
+func _show_enemy_info_panel(enemy: Node) -> void:
+	var panel_name = "EnemyInfoPanel"
+	var existing = get_tree().current_scene.get_node_or_null(panel_name)
+	if existing:
+		existing.queue_free()
+		return
+	var job_data = GameData.get_job(enemy.job)
+	var job_name = job_data.get("name", enemy.job)
+	var hp_text = "%d/%d" % [enemy.current_hp, enemy.max_hp]
+	var ap_text = "%d/%d" % [enemy.current_ap, enemy.max_ap]
+	var armor_text = "%d" % enemy.armor
+	var range_text = "%d~%d" % [enemy.weapon_range[0], enemy.weapon_range[1]]
+	var dmg_text = "%d~%d" % [enemy.weapon_damage[0], enemy.weapon_damage[1]]
+	var weapon_text = String(enemy.weapon_name) if "weapon_name" in enemy else "未知"
+	var status_text = ""
+	if enemy.has_method("get_all_statuses"):
+		var statuses = enemy.get_all_statuses()
+		if statuses.size() > 0:
+			status_text = " | ".join(statuses.keys())
+
+	var info_text = "%s\nHP: %s  AP: %s\n护甲: %s  射程: %s\n伤害: %s  武器: %s" % [
+		job_name, hp_text, ap_text, armor_text, range_text, dmg_text, weapon_text
+	]
+	if status_text != "":
+		info_text += "\n状态: " + status_text
+
+	var panel = PanelContainer.new()
+	panel.name = panel_name
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.1, 0.15, 0.92)
+	style.border_color = GameTheme.ENEMY_COLOR
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(10)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var label = Label.new()
+	label.text = info_text
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", GameTheme.TEXT_PRIMARY)
+	panel.add_child(label)
+
+	var pos = GridSystem.grid_to_world(enemy.grid_pos) + Vector2(GridSystem.CELL_SIZE + 4, 0)
+	if pos.x + 200 > map_width * GridSystem.CELL_SIZE:
+		pos.x -= GridSystem.CELL_SIZE + 210
+	panel.position = pos
+	overlay.add_child(panel)
+
+	var timer = Timer.new()
+	timer.wait_time = 3.0
+	timer.one_shot = true
+	timer.timeout.connect(func(): if is_instance_valid(panel): panel.queue_free())
+	panel.add_child(timer)
+	timer.start()
 
 func _refresh_all_unit_sprites() -> void:
 	for sprite in units_container.get_children():

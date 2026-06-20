@@ -3,6 +3,8 @@ class_name HUD
 
 signal action_selected(action: String)
 signal skill_selected(skill_id: String)
+signal skill_hovered(skill_id: String)
+signal skill_preview_cleared()
 signal item_selected(item_id: String)
 
 @onready var top_bar: Panel = get_node_or_null("TopBar") as Panel
@@ -288,6 +290,8 @@ func _build_popup_menus() -> void:
 	skill_menu.visible = false
 	add_child(skill_menu)
 	skill_menu.id_pressed.connect(_on_skill_popup_id_pressed)
+	skill_menu.id_hovered.connect(_on_skill_popup_hovered)
+	skill_menu.popup_hide.connect(_on_skill_menu_closed)
 
 	item_menu = PopupMenu.new()
 	item_menu.name = "ItemPopup"
@@ -396,6 +400,13 @@ func _on_skill_popup_id_pressed(id: int) -> void:
 	if id >= 0 and id < _skill_ids.size():
 		skill_selected.emit(_skill_ids[id])
 		skill_menu.hide()
+
+func _on_skill_popup_hovered(id: int) -> void:
+	if id >= 0 and id < _skill_ids.size():
+		skill_hovered.emit(_skill_ids[id])
+
+func _on_skill_menu_closed() -> void:
+	skill_preview_cleared.emit()
 
 func _on_item_popup_id_pressed(id: int) -> void:
 	if id >= 0 and id < _item_ids.size():
