@@ -1,0 +1,70 @@
+{
+  "style_base": "isometric tactical turn-based game asset, clean vector-like illustration, dark cyberpunk military aesthetic, deep blue and orange accent lighting, flat color blocks with subtle cel shading, transparent background, crisp edges, consistent art style across all assets",
+  "negative_base": "photorealistic, 3D render, noisy background, photobashing, blurry, watermark, text, signature, frame, border, multiple views, collage, sketch, hand-drawn, messy lines",
+  "portrait": {
+    "prefix": "Character portrait icon for tactical grid RPG, {style_base}, head-and-shoulders bust, front-facing, neutral expression, military tactical gear, glowing HUD visor or cybernetic implant hints, dark moody lighting",
+    "player": "friendly human {job_name} operative, {description}, blue team highlight accents, clean sci-fi soldier",
+    "enemy": "hostile {job_name} unit portrait, {description}, red-orange menacing glow, armored or robotic, aggressive stance",
+    "boss": "epic boss {job_name} portrait, {description}, massive imposing silhouette, neon core glow, final boss atmosphere, dramatic rim lighting"
+  },
+  "unit_sprite": {
+    "prefix": "Top-down isometric unit sprite for tactical grid RPG, {style_base}, full body visible from directly above, single static pose, 64x64 game sprite, centered, no shadow",
+    "player": "human {job_name} soldier, {description}, blue armor highlights, clean silhouette, readable from above",
+    "enemy": "hostile {job_name} unit, {description}, red-orange armor highlights, menacing silhouette, readable from above",
+    "boss": "giant boss {job_name}, {description}, large silhouette filling frame, glowing orange core, imposing from above"
+  },
+  "weapon_icon": {
+    "prefix": "Weapon inventory icon for tactical RPG, {style_base}, centered on dark circular backdrop, clean silhouette, 64x64 game icon, sci-fi military weapon",
+    "description": "{weapon_name}, {special}"
+  },
+  "item_icon": {
+    "prefix": "Item inventory icon for tactical RPG, {style_base}, centered on dark circular backdrop, clean symbolic design, 64x64 game icon",
+    "description": "{item_name}, {description}"
+  },
+  "skill_icon": {
+    "prefix": "Ability skill icon for tactical RPG, {style_base}, centered on dark hexagonal backdrop, symbolic action scene, blue energy glow, 64x64 game icon",
+    "description": "{skill_name}: {description}"
+  },
+  "object": {
+    "prefix": "Top-down isometric object sprite for tactical grid RPG, {style_base}, 64x64 game sprite, viewed from directly above, centered, no shadow",
+    "descriptions": {
+      "evac": "glowing green circular evacuation zone marker, landing pad ring",
+      "terminal": "holographic data terminal, glowing cyan screen, sci-fi computer console",
+      "alarm_panel": "wall-mounted alarm control panel, red blinking lights",
+      "destructible_target": "industrial comm relay or power core, fragile machinery with orange glow",
+      "defend_point": "shielded defensive objective, blue energy barrier",
+      "npc": "civilian VIP character, unarmed, vulnerable, crouching",
+      "resource": "supply crate, medkit box, loot container",
+      "crate": "metal crate, cover object, slightly damaged",
+      "wall": "concrete wall segment, full cover, dark gray"
+    }
+  },
+  "tile_theme": {
+    "prefix": "Seamless top-down tileset texture atlas for tactical grid RPG, {style_base}, 10 tiles arranged horizontally in one row, each tile 64x64 pixels, cohesive dark cyberpunk color palette, consistent lighting",
+    "description": "Theme: {theme_name}. Tiles in order: plain ground, road, forest/vegetation, sand, highland/elevated, water, wall, crate/cover, hazard pool, bridge. Top-down view, no perspective."
+  },
+  "effect": {
+    "prefix": "VFX sprite for tactical RPG, {style_base}, single frame, 64x64 game sprite, centered, glowing, no background",
+    "descriptions": {
+      "move_highlight": "blue circular tile highlight, soft glow, movement range indicator",
+      "attack_highlight": "red crosshair target reticle, attack range indicator",
+      "skill_highlight": "purple energy hexagon, skill range indicator",
+      "overwatch_highlight": "yellow eye cone, overwatch zone indicator",
+      "hit": "impact burst with sparks and damage hit effect",
+      "critical": "red explosive critical strike flash with shrapnel",
+      "heal": "green plus cross with gentle particle motes",
+      "explosion": "orange fireball explosion with smoke",
+      "smoke": "gray smoke cloud puff",
+      "muzzle_flash": "bright yellow muzzle flash burst",
+      "shield": "blue hexagonal energy barrier",
+      "barrier": "cyan energy barrier wall segment",
+      "buff": "upward golden arrows power up effect",
+      "debuff": "downward purple arrows weakened effect",
+      "teleport": "blue electric teleport swirl"
+    }
+  },
+  "ui_background": {
+    "prefix": "Game UI background illustration for tactical turn-based RPG menu screen, {style_base}, wide cinematic composition, atmospheric depth, no text, no buttons, no characters in foreground",
+    "description": "{scene_description}"
+  }
+}

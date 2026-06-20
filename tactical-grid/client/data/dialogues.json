@@ -135,6 +135,213 @@
       "lines": [
         { "speaker": "system", "text": "贴着掩体可以减少被命中的概率。半掩体+20抗性，全掩体+40抗性。", "emotion": "neutral" }
       ]
+    },
+    "ch2_m1_intro": {
+      "trigger": "mission_start",
+      "weather": "rain",
+      "lines": [
+        { "speaker": "alpha", "text": "雨下得真大。城市废墟的能见度很低。", "emotion": "concerned" },
+        { "speaker": "lila", "text": "好的一面是，敌人也很难看清我们。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "目标位置？", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "数据中心东翼，三楼。我们需要拿到他们的通讯密钥。", "emotion": "serious" },
+        { "speaker": "lila", "text": "我远程监控他们的通讯。他们内部似乎有分歧。", "emotion": "intrigued" }
+      ]
+    },
+    "ch2_m4_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "他们的狙击手很多...必须在视野压制下推进。", "emotion": "serious" },
+        { "speaker": "sniper_player", "text": "让我来对付他们的狙击手。我能看到他们。", "emotion": "confident" },
+        { "speaker": "commander", "text": "先制高点，再清理掩体。标准流程。", "emotion": "determined" }
+      ]
+    },
+    "ch2_m7_intro": {
+      "trigger": "mission_start",
+      "is_boss": true,
+      "lines": [
+        { "speaker": "alpha", "text": "那就是重装审判者...它的护盾能挡住大部分攻击。", "emotion": "concerned" },
+        { "speaker": "commander", "text": "我们必须先打掉护盾，再从背后攻击。", "emotion": "serious" },
+        { "speaker": "heavy_player", "text": "我准备好了。我的盾墙会保护大家。", "emotion": "determined" }
+      ]
+    },
+    "ch3_m1_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "地下通道...湿气很重。敌人可能有夜视优势。", "emotion": "concerned" },
+        { "speaker": "scout_player", "text": "我有热成像眼镜。黑暗对我们有利。", "emotion": "confident" },
+        { "speaker": "lila", "text": "注意：这里有警报系统。一旦触发，会有增援。", "emotion": "serious" }
+      ]
+    },
+    "ch3_m3_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "到处是陷阱。工兵部队被全歼了。", "emotion": "serious" },
+        { "speaker": "scout_player", "text": "让我先探路。我能发现陷阱。", "emotion": "determined" },
+        { "speaker": "commander", "text": "小心行动。", "emotion": "neutral" }
+      ]
+    },
+    "ch3_m6_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "alpha", "text": "影子佣兵倒下了。", "emotion": "triumphant" },
+        { "speaker": "shadow", "text": "你赢了。但你不知道...架构师是永生的。", "emotion": "defeated" },
+        { "speaker": "lila", "text": "永生？什么意思？", "emotion": "confused" },
+        { "speaker": "shadow", "text": "它...它一直都在。矩阵协议只是它的一个节点。", "emotion": "serious" },
+        { "speaker": "commander", "text": "继续。", "emotion": "determined" }
+      ]
+    },
+    "ch4_m1_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "矩阵协议的核心堡垒。所有的眼睛都在这里。", "emotion": "serious" },
+        { "speaker": "commander", "text": "攻破这里，矩阵协议就完了。", "emotion": "determined" },
+        { "speaker": "doctor", "text": "记住，不要让他们的护盾系统过载。那会触发反制。", "emotion": "neutral" }
+      ]
+    },
+    "ch4_m3_intro": {
+      "trigger": "mission_start",
+      "special": "defend",
+      "lines": [
+        { "speaker": "alpha", "text": "我们要守住军械库5个回合。增援会不断到来。", "emotion": "serious" },
+        { "speaker": "heavy_player", "text": "这里就是我的主场。来吧。", "emotion": "confident" },
+        { "speaker": "medic_player", "text": "我会确保大家活着。", "emotion": "calm" }
+      ]
+    },
+    "ch4_m5_intro": {
+      "trigger": "mission_start",
+      "weather": "snow",
+      "lines": [
+        { "speaker": "alpha", "text": "雪...会让一切变得更艰难。", "emotion": "concerned" },
+        { "speaker": "commander", "text": "但我们已经走到这里了。", "emotion": "determined" },
+        { "speaker": "sentinel", "text": "架构师...我能感觉到它在看着我们。", "emotion": "intense" }
+      ]
+    },
+    "ch4_m6_intro": {
+      "trigger": "mission_start",
+      "is_boss": true,
+      "lines": [
+        { "speaker": "matrix_general", "text": "欢迎来到指挥中心，指挥官。", "emotion": "cold" },
+        { "speaker": "matrix_general", "text": "你的旅程到此为止了。", "emotion": "confident" },
+        { "speaker": "alpha", "text": "将军又如何？", "emotion": "angry" },
+        { "speaker": "commander", "text": "用实力说话。", "emotion": "determined" }
+      ]
+    },
+    "ch5_m1_intro": {
+      "trigger": "mission_start",
+      "weather": "thunderstorm",
+      "lines": [
+        { "speaker": "alpha", "text": "核心外围。敌人最后的防线。", "emotion": "serious" },
+        { "speaker": "commander", "text": "这里之后，就是架构师。", "emotion": "determined" },
+        { "speaker": "sentinel", "text": "我能感觉到它的存在。架构师。", "emotion": "intense" },
+        { "speaker": "doctor", "text": "不管发生什么，我们都会在一起。", "emotion": "calm" }
+      ]
+    },
+    "ch5_m3_intro": {
+      "trigger": "mission_start",
+      "special": "permanent_stealth",
+      "lines": [
+        { "speaker": "scout_player", "text": "架构师之眼...我们必须不被发现。", "emotion": "tense" },
+        { "speaker": "commander", "text": "一步一步来。", "emotion": "calm" },
+        { "speaker": "sentinel", "text": "它知道我们要来。所以它给了我们机会。", "emotion": "mysterious" }
+      ]
+    },
+    "ch5_m4_intro": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "指挥官，这是你最后的选择。", "emotion": "serious" },
+        { "speaker": "commander", "text": "我知道了。", "emotion": "calm" },
+        { "speaker": "sentinel", "text": "无论你选什么，我都会跟随。", "emotion": "determined" }
+      ]
+    },
+    "bond_alpha_doctor_2": {
+      "trigger": "talk_in_base",
+      "condition": { "bond_level_gte": 2 },
+      "location": "base_lab",
+      "lines": [
+        { "speaker": "doctor", "text": "阿尔法，过来看看这个数据。", "emotion": "excited" },
+        { "speaker": "alpha", "text": "又发现什么了？", "emotion": "curious" },
+        { "speaker": "doctor", "text": "矩阵协议的核心代码。我找到了后门。", "emotion": "happy" },
+        { "speaker": "alpha", "text": "博士...没有你我们做不到。", "emotion": "warm" }
+      ],
+      "bond_change": { "alpha_doctor": 3 }
+    },
+    "bond_commander_alpha_5": {
+      "trigger": "talk_in_base",
+      "condition": { "bond_level_gte": 5 },
+      "location": "base_command_room",
+      "lines": [
+        { "speaker": "alpha", "text": "指挥官，有时候我回想这一切是怎么开始的。", "emotion": "reflective" },
+        { "speaker": "commander", "text": "那时候我们只是接了个普通任务。", "emotion": "calm" },
+        { "speaker": "alpha", "text": "你从来没退缩过。即使面对架构师。", "emotion": "respectful" },
+        { "speaker": "commander", "text": "因为我有最好的队伍。", "emotion": "determined" },
+        { "speaker": "alpha", "text": "...我们。", "emotion": "warm" }
+      ],
+      "bond_change": { "commander_alpha": 10 }
+    },
+    "bond_lila_sentinel_3": {
+      "trigger": "talk_in_base",
+      "condition": { "bond_level_gte": 3 },
+      "location": "base_server_room",
+      "lines": [
+        { "speaker": "lila", "text": "你真的曾经是它的一部分吗？", "emotion": "curious" },
+        { "speaker": "sentinel", "text": "我曾经是架构师的一个节点。我曾帮它监视这个世界。", "emotion": "melancholy" },
+        { "speaker": "lila", "text": "但你现在站在我们这边。", "emotion": "kind" },
+        { "speaker": "sentinel", "text": "是你让我看到了可能。莉拉。", "emotion": "warm" }
+      ],
+      "bond_change": { "lila_sentinel": 5 }
+    },
+    "mid_battle_taunt": {
+      "trigger": "turn_start",
+      "condition": { "turn_equals": 3 },
+      "lines": [
+        { "speaker": "system", "text": "战场节奏：第3回合。敌人正在集结，注意左右两翼。", "emotion": "warning" }
+      ]
+    },
+    "mid_battle_warning": {
+      "trigger": "turn_start",
+      "condition": { "turn_equals": 5 },
+      "lines": [
+        { "speaker": "system", "text": "战场节奏：第5回合。敌人的包围网正在形成。考虑撤退。", "emotion": "warning" }
+      ]
+    },
+    "low_hp_warning": {
+      "trigger": "low_hp",
+      "lines": [
+        { "speaker": "system", "text": "警告：单位血量过低！考虑使用医疗包或撤退。", "emotion": "warning" }
+      ]
+    },
+    "first_kill": {
+      "trigger": "first_kill",
+      "lines": [
+        { "speaker": "alpha", "text": "第一个！干得漂亮！", "emotion": "happy" }
+      ]
+    },
+    "boss_phase_change": {
+      "trigger": "boss_phase_change",
+      "lines": [
+        { "speaker": "system", "text": "Boss 进入新阶段！战况升级！", "emotion": "warning" }
+      ]
+    },
+    "achievement_unlock": {
+      "trigger": "achievement_unlocked",
+      "lines": [
+        { "speaker": "system", "text": "成就解锁！", "emotion": "happy" }
+      ]
+    },
+    "chapter_clear_ch1": {
+      "trigger": "chapter_1_complete",
+      "lines": [
+        { "speaker": "commander", "text": "第一章...完成了。", "emotion": "reflective" },
+        { "speaker": "alpha", "text": "这才刚开始。", "emotion": "determined" }
+      ]
+    },
+    "chapter_clear_ch5": {
+      "trigger": "chapter_5_complete",
+      "lines": [
+        { "speaker": "alpha", "text": "我们做到了。", "emotion": "triumphant" },
+        { "speaker": "commander", "text": "是的。但故事还没有结束。", "emotion": "calm" },
+        { "speaker": "sentinel", "text": "未来，由我们书写。", "emotion": "hopeful" }
+      ]
     }
   }
 }

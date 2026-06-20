@@ -121,11 +121,17 @@ func _update_equipment() -> void:
 		row.add_child(slot_label)
 
 		var equip = current_unit.equipment.get(slot_id, "")
+		var equip_icon = TextureRect.new()
+		equip_icon.custom_minimum_size = Vector2(24, 24)
+		equip_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		row.add_child(equip_icon)
+
 		var equip_label = Label.new()
 		if equip != "":
 			var weapon_data = GameData.get_weapon(equip)
 			equip_label.text = weapon_data.get("name", equip)
 			equip_label.modulate = GameTheme.get_rarity_color(weapon_data.get("rarity", "common"))
+			equip_icon.texture = ArtAssets.get_weapon_icon(equip)
 		else:
 			equip_label.text = "（空）"
 			equip_label.modulate = Color.GRAY
@@ -176,16 +182,16 @@ func _on_stat_up(stat_id: String) -> void:
 	if current_unit.stats.get("stat_points_unspent", 0) <= 0:
 		return
 	current_unit.stats[stat_id] += 1
-	current_unit.stats.stat_points_unspent -= 1
+	current_unit.stats["stat_points_unspent"] -= 1
 	_recalc_derived_stats()
 	_update_display()
 
 func _recalc_derived_stats() -> void:
 	var s = current_unit.stats
-	current_unit.max_hp = s.vit * 10 + 50
-	current_unit.base_hit = 50 + s.per * 3
-	current_unit.crit_chance = 0.05 + s.per * 0.005
-	current_unit.dodge = s.agi * 0.015
+	current_unit.max_hp = s.get("vit", 5) * 10 + 50
+	current_unit.base_hit = 50 + s.get("per", 5) * 3
+	current_unit.crit_chance = 0.05 + s.get("per", 5) * 0.005
+	current_unit.dodge = s.get("agi", 5) * 0.015
 
 func _on_tab_changed(tab: int) -> void:
 	current_tab = tab

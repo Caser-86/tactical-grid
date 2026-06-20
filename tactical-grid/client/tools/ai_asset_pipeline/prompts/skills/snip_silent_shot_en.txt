@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 无声射击: 攻击不暴露位置，需消音器

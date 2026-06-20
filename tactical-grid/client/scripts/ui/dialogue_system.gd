@@ -41,6 +41,10 @@ func start_dialogue(dialogue_id: String) -> void:
 
 	current_lines = dialogue_data.get("lines", [])
 	current_index = 0
+	if current_lines.is_empty():
+		dialogue_finished.emit()
+		hide()
+		return
 	show()
 	_show_line(current_lines[current_index])
 
@@ -96,10 +100,17 @@ func _show_choices() -> void:
 	continue_hint.visible = false
 
 func _on_choice_selected(index: int) -> void:
+	if index < 0 or index >= current_choices.size():
+		return
 	var choice = current_choices[index]
 	if choice.has("flag"):
 		choice_made.emit(choice.flag)
-		GameManager.save_data.campaign_progress.story_flags[choice.flag] = true
+		if not GameManager.save_data.has("campaign_progress"):
+			GameManager.save_data["campaign_progress"] = {"story_flags": {}}
+		var campaign_progress = GameManager.save_data["campaign_progress"]
+		if not campaign_progress.has("story_flags"):
+			campaign_progress["story_flags"] = {}
+		campaign_progress["story_flags"][choice.flag] = true
 
 	if choice.has("response"):
 		current_lines = [choice.response]

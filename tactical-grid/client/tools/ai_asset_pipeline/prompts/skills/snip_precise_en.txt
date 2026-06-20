@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 精准射击: 命中+30，暴击+20%，需架设1回合

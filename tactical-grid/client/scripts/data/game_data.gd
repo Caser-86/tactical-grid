@@ -83,7 +83,7 @@ func get_job_skills(job: String) -> Array:
 	for skill_id in skill_data.get("skills", {}):
 		var skill = skill_data.skills[skill_id]
 		if skill.get("job") == job or skill.get("job") == "all":
-			result.append({id = skill_id, data = skill})
+			result.append({"id": skill_id, "data": skill})
 	return result
 
 ## 获取移动成本
@@ -112,9 +112,9 @@ func create_player_unit(job_id: String, name: String = "") -> Unit:
 	unit.current_ap = 2
 
 	# 根据属性计算派生值
-	unit.base_hit = 50 + unit.stats.per * 3
-	unit.crit_chance = 0.05 + unit.stats.per * 0.005
-	unit.dodge = unit.stats.agi * 0.015
+	unit.base_hit = 50 + unit.stats.get("per", 5) * 3
+	unit.crit_chance = 0.05 + unit.stats.get("per", 5) * 0.005
+	unit.dodge = unit.stats.get("agi", 5) * 0.015
 	unit.armor = 0
 	unit.max_hp += 20
 	unit.current_hp = unit.max_hp
@@ -132,6 +132,19 @@ func create_player_unit(job_id: String, name: String = "") -> Unit:
 		"assault":
 			unit.crit_chance += 0.05
 
+	# 装备默认武器
+	var weapons_allowed = job_info.get("weapons_allowed", [])
+	if weapons_allowed.size() > 0:
+		var weapon_id = weapons_allowed[0]
+		var weapon = get_weapon(weapon_id)
+		if not weapon.is_empty():
+			unit.equipped_weapon = weapon_id
+			unit.weapon_range = weapon.get("range", unit.weapon_range)
+			unit.weapon_damage = weapon.get("damage", unit.weapon_damage)
+			unit.weapon_optimal_range = weapon.get("optimal_range", int((unit.weapon_range[0] + unit.weapon_range[1]) / 2))
+			unit.crit_multiplier = weapon.get("crit_multiplier", unit.crit_multiplier)
+			unit.base_hit += weapon.get("hit_modifier", 0)
+
 	# 初始化组
 	unit._init_group()
 	return unit
@@ -140,6 +153,8 @@ func create_player_unit(job_id: String, name: String = "") -> Unit:
 func create_enemy_unit(enemy_id: String) -> Unit:
 	var unit = Unit.new()
 	var enemy_info = get_enemy(enemy_id)
+	if enemy_info.is_empty():
+		enemy_info = boss_data.get("bosses", {}).get(enemy_id, {})
 
 	unit.unit_name = enemy_info.get("name", "Enemy")
 	unit.job = enemy_id

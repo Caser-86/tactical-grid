@@ -1,0 +1,1 @@
+Top-down isometric unit sprite for a tactical grid RPG, {style_base}, full body visible from above, 64x64 pixel art style, single static pose, human 突击兵 soldier, 近战突破、绕侧、高机动, blue team colors

@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 手雷, 范围伤害40-60，破坏掩体

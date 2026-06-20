@@ -1,4 +1,4 @@
-﻿extends Node2D
+extends Node2D
 class_name BattleController
 
 @onready var terrain_layer: Node2D = get_node_or_null("TerrainLayer") as Node2D
@@ -19,21 +19,29 @@ var pending_skill_target_kind: String = ""
 var pending_item_id: String = ""
 var pending_item_target_kind: String = ""
 var battle_objective_text: String = "消灭所有敌人"
+var _camera_dragging: bool = false
+var _camera_drag_start: Vector2 = Vector2.ZERO
+var _camera_drag_start_pos: Vector2 = Vector2.ZERO
+var _camera_min_zoom: float = 0.5
+var _camera_max_zoom: float = 3.0
 
 const ACTION_SYSTEM_SCRIPT := preload("res://scripts/game/action_system.gd")
 
-const COLOR_MOVE = Color(0.13, 0.59, 0.95, 0.38)
-const COLOR_ATTACK = Color(0.96, 0.26, 0.21, 0.34)
+const COLOR_MOVE = Color(0.13, 0.59, 0.95, 0.28)
+const COLOR_ATTACK = Color(0.96, 0.26, 0.21, 0.28)
+const COLOR_MOVE_BORDER = Color(0.13, 0.59, 0.95, 0.65)
+const COLOR_ATTACK_BORDER = Color(0.96, 0.26, 0.21, 0.65)
+const COLOR_SELECTED = Color(1.0, 1.0, 1.0, 0.85)
 
 func _ready() -> void:
 	if not terrain_layer or not units_container or not overlay or not hud or not camera_2d:
 		push_error("Battle scene layout is incomplete.")
 		return
-	AudioManager.bgm_battle("small")
 	action_system = ACTION_SYSTEM_SCRIPT.new() as ActionSystem
 	if not action_system:
 		push_error("ActionSystem init failed")
 		return
+	add_child(action_system)
 	action_system.rng.randomize()
 	_connect_hud_buttons()
 	_load_battle()
@@ -46,20 +54,87 @@ func _exit_tree() -> void:
 	AudioManager.stop_bgm()
 
 func _load_battle() -> void:
-	var level_data = LocalMapData.get_test_level()
+	var level_data = GameManager.current_map_data
+	if level_data.is_empty():
+		level_data = LocalMapData.get_test_level()
 	map_data = MapLoader.load_from_dict(level_data)
-	map_width = map_data.size.width
-	map_height = map_data.size.height
+	map_width = map_data.get("size", {}).get("width", 10)
+	map_height = map_data.get("size", {}).get("height", 8)
+	var theme = map_data.get("theme", "warehouse")
+	BattleVisuals.set_theme(theme)
 	action_system.set_map_data(map_data)
 	GameManager.current_map_data = map_data
 	GameManager.player_units.clear()
 	GameManager.enemy_units.clear()
+	_setup_audio_for_theme(theme)
 	_render_map()
 	_spawn_units()
 	GameManager.enemy_director.setup(map_data.get("scripts", []))
+	if not GameManager.enemy_director.reinforcement_spawned.is_connected(_on_reinforcement_spawned):
+		GameManager.enemy_director.reinforcement_spawned.connect(_on_reinforcement_spawned)
 	GameManager.turn_manager.start_battle()
-	battle_objective_text = "消灭所有敌人"
+	if not GameManager.turn_manager.player_turn_started.is_connected(_on_player_turn_started):
+		GameManager.turn_manager.player_turn_started.connect(_on_player_turn_started)
+	_setup_tutorial()
+	battle_objective_text = _get_mission_objective_text()
 	hud.update_objective(battle_objective_text)
+	hud.show_battle_hint(battle_objective_text, 2.5)
+	_center_camera_on_map()
+
+func _setup_audio_for_theme(theme: String) -> void:
+	AudioManager.bgm_battle(_get_bgm_size())
+	AudioManager.play_ambient("ambient_" + theme)
+
+func _get_bgm_size() -> String:
+	var cells = map_width * map_height
+	if cells > 200:
+		return "large"
+	if cells > 100:
+		return "medium"
+	return "small"
+
+func _get_mission_objective_text() -> String:
+	var mission_type = map_data.get("mission_type", "extract")
+	match mission_type:
+		"assassinate":
+			return "任务目标：消灭所有敌方单位"
+		"destroy":
+			return "任务目标：摧毁所有目标设施"
+		"defend":
+			var defend_turns = _get_defend_turns()
+			return "任务目标：坚守 %d 回合" % defend_turns
+		"extract":
+			var evac = map_data.get("evac_point", {})
+			if evac:
+				return "任务目标：抵达撤离点 (%d,%d)" % [evac.get("x", 0), evac.get("y", 0)]
+			return "任务目标：消灭所有敌人"
+		"escort":
+			return "任务目标：护送目标到达撤离点"
+		_:
+			return "任务目标：消灭所有敌人"
+
+func _get_defend_turns() -> int:
+	var victory = map_data.get("victory", {})
+	if victory.get("type", "") == "survive_turns" and victory.has("turns"):
+		return int(victory.get("turns", 5))
+	var special_rules = map_data.get("special_rules", [])
+	for rule in special_rules:
+		if rule is String and rule.begins_with("defend_"):
+			var num = rule.replace("defend_", "")
+			if num.is_valid_int():
+				return num.to_int()
+		if rule is String and rule.begins_with("survive_"):
+			var parts = rule.split("_")
+			if parts.size() >= 2 and parts[1].is_valid_int():
+				return parts[1].to_int()
+	return 5
+
+func _on_reinforcement_spawned(unit: Node, _pos: Vector2i) -> void:
+	if not units_container:
+		return
+	var sprite = _create_unit_sprite(unit)
+	sprite.position = GridSystem.grid_to_world(unit.grid_pos)
+	units_container.add_child(sprite)
 
 func _connect_hud_buttons() -> void:
 	if not hud.action_selected.is_connected(_on_action_selected):
@@ -82,6 +157,27 @@ func _render_map() -> void:
 		for x in range(map_width):
 			if blocker[y][x] != 0:
 				_draw_tile(Vector2i(x, y), blocker[y][x], 1)
+
+	_render_objects()
+	_draw_grid_lines()
+	_draw_unit_shadows()
+
+func _render_objects() -> void:
+	var objects = map_data.get("objects", [])
+	for obj in objects:
+		var obj_type = obj.get("type", "")
+		if obj_type in ["spawn_player", "spawn_enemy"]:
+			continue
+		var texture = ArtAssets.get_object_texture(obj_type)
+		if not texture:
+			continue
+		var sprite = Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.position = GridSystem.grid_to_world(Vector2i(obj.get("x", 0), obj.get("y", 0)))
+		sprite.scale = Vector2(GridSystem.CELL_SIZE / texture.get_width(), GridSystem.CELL_SIZE / texture.get_height())
+		sprite.z_index = 2
+		terrain_layer.add_child(sprite)
 
 func _draw_tile(pos: Vector2i, terrain_id: int, layer: int) -> void:
 	var visuals = get_node_or_null("/root/BattleVisuals")
@@ -107,13 +203,42 @@ func _draw_tile(pos: Vector2i, terrain_id: int, layer: int) -> void:
 	sprite.z_index = layer
 	terrain_layer.add_child(sprite)
 
+func _draw_grid_lines() -> void:
+	var grid_node = Node2D.new()
+	grid_node.name = "GridLines"
+	grid_node.z_index = 0
+	terrain_layer.add_child(grid_node)
+	grid_node.draw.connect(func():
+		var width = map_width * GridSystem.CELL_SIZE
+		var height = map_height * GridSystem.CELL_SIZE
+		for x in range(map_width + 1):
+			var wx = x * GridSystem.CELL_SIZE
+			grid_node.draw_line(Vector2(wx, 0), Vector2(wx, height), Color(1, 1, 1, 0.06), 1.0)
+		for y in range(map_height + 1):
+			var wy = y * GridSystem.CELL_SIZE
+			grid_node.draw_line(Vector2(0, wy), Vector2(width, wy), Color(1, 1, 1, 0.06), 1.0)
+	)
+
+func _draw_unit_shadows() -> void:
+	var shadow_node = Node2D.new()
+	shadow_node.name = "UnitShadows"
+	shadow_node.z_index = 1
+	terrain_layer.add_child(shadow_node)
+	shadow_node.draw.connect(func():
+		for unit in GameManager.player_units + GameManager.enemy_units:
+			if not unit.is_alive:
+				continue
+			var center = GridSystem.grid_to_world(unit.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0 + 8)
+			shadow_node.draw_circle(center, 18, Color(0, 0, 0, 0.35))
+	)
+
 func _spawn_units() -> void:
 	var player_spawns = MapLoader.get_player_spawns(map_data)
 	var jobs = ["assault", "sniper", "medic", "scout"]
 
 	for i in range(min(player_spawns.size(), 4)):
 		var spawn = player_spawns[i]
-		var unit = GameData.create_player_unit(jobs[i % jobs.size()], "鐜╁" + str(i + 1))
+		var unit = GameData.create_player_unit(jobs[i % jobs.size()], "玩家" + str(i + 1))
 		unit.grid_pos = Vector2i(spawn.x, spawn.y)
 		var sprite = _create_unit_sprite(unit)
 		sprite.position = GridSystem.grid_to_world(unit.grid_pos)
@@ -134,16 +259,59 @@ func _create_unit_sprite(unit: Node) -> UnitSprite:
 	return sprite
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_left_click(event.position)
+			if event.pressed:
+				_camera_dragging = true
+				_camera_drag_start = event.position
+				_camera_drag_start_pos = camera_2d.position
+			else:
+				_camera_dragging = false
+				var drag_delta = event.position - _camera_drag_start
+				if drag_delta.length() < 8.0:
+					var world_pos = get_global_mouse_position()
+					_handle_left_click(world_pos)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_handle_right_click()
+			if event.pressed:
+				_handle_right_click()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom_camera(1.1)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom_camera(0.9)
+	elif event is InputEventMouseMotion:
+		if _camera_dragging:
+			var drag_delta = event.position - _camera_drag_start
+			camera_2d.position = _camera_drag_start_pos - drag_delta / camera_2d.zoom.x
+		else:
+			_update_hover_preview()
+
+func _update_hover_preview() -> void:
+	if not selected_unit:
+		return
+	if selected_unit.team != "player":
+		return
+	var world_pos = get_global_mouse_position()
+	var grid_pos = GridSystem.world_to_grid(world_pos)
+	# 恢复基础移动范围高亮
+	_clear_overlay()
+	_render_map()
+	_show_move_range(selected_unit)
+	# 如果悬停在可达格子上，显示路径预览
+	if reachable_cells.has(grid_pos) and grid_pos != selected_unit.grid_pos:
+		_draw_preview_path(grid_pos)
+
+func _zoom_camera(factor: float) -> void:
+	if not camera_2d:
+		return
+	var new_zoom = camera_2d.zoom.x * factor
+	new_zoom = clampf(new_zoom, _camera_min_zoom, _camera_max_zoom)
+	camera_2d.zoom = Vector2(new_zoom, new_zoom)
 
 func _handle_left_click(world_pos: Vector2) -> void:
 	var grid_pos = GridSystem.world_to_grid(world_pos)
 	var clicked_unit = _get_unit_at(grid_pos)
 
+	# 技能/物品目标选择保持原逻辑
 	match current_action:
 		"skill_target":
 			_handle_skill_target_click(grid_pos, clicked_unit)
@@ -151,14 +319,47 @@ func _handle_left_click(world_pos: Vector2) -> void:
 		"item_target":
 			_handle_item_target_click(grid_pos, clicked_unit)
 			return
-		"move":
-			if clicked_unit and clicked_unit.team == "player":
-				_select_unit(clicked_unit)
-			elif selected_unit and reachable_cells.has(grid_pos):
-				_move_unit(selected_unit, grid_pos)
-		"attack":
-			if selected_unit and clicked_unit and clicked_unit.team == "enemy":
+
+	# 简化操作：选中单位后，根据点击目标自动判断意图
+	if clicked_unit:
+		if clicked_unit.team == "player":
+			_select_unit(clicked_unit)
+			return
+		elif selected_unit and clicked_unit.team == "enemy":
+			# 如果敌人在射程内直接攻击，否则尝试移动到射程内
+			if _can_attack(selected_unit, clicked_unit):
 				_attack_unit(selected_unit, clicked_unit)
+			else:
+				_move_towards_attack_range(selected_unit, clicked_unit)
+			return
+
+	# 点击空地：如果选中了我方单位且格子可达，直接移动
+	if selected_unit and selected_unit.team == "player" and reachable_cells.has(grid_pos):
+		_move_unit(selected_unit, grid_pos)
+		return
+
+func _can_attack(attacker: Node, target: Node) -> bool:
+	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
+	return dist >= attacker.weapon_range[0] and dist <= attacker.weapon_range[1]
+
+func _move_towards_attack_range(attacker: Node, target: Node) -> void:
+	if attacker.current_ap <= 0 or attacker.move_points <= 0:
+		return
+	var best_cell: Vector2i = Vector2i(-1, -1)
+	var best_dist: int = 999999
+	for cell in reachable_cells:
+		if _get_unit_at(cell):
+			continue
+		var dist = GridSystem.manhattan_distance(cell, target.grid_pos)
+		if dist >= attacker.weapon_range[0] and dist <= attacker.weapon_range[1]:
+			var move_cost = GridSystem.manhattan_distance(attacker.grid_pos, cell)
+			if move_cost < best_dist:
+				best_dist = move_cost
+				best_cell = cell
+	if best_cell != Vector2i(-1, -1):
+		_move_unit(attacker, best_cell)
+	else:
+		AudioManager.sfx_ui_error()
 
 func _handle_right_click() -> void:
 	_cancel_pending_target_selection()
@@ -173,10 +374,28 @@ func _select_unit(unit: Node) -> void:
 		if sprite is UnitSprite and sprite.unit == unit:
 			sprite.set_selected(true)
 			break
+	_highlight_selected_unit(unit)
 	_show_move_range(unit)
 	_update_unit_info(unit)
 	hud.update_action_menu(unit)
 	AudioManager.sfx_select_unit()
+
+func _highlight_selected_unit(unit: Node) -> void:
+	var cell_world := GridSystem.grid_to_world(unit.grid_pos)
+	var line = Line2D.new()
+	line.points = PackedVector2Array([
+		Vector2(1, 1),
+		Vector2(GridSystem.CELL_SIZE - 1, 1),
+		Vector2(GridSystem.CELL_SIZE - 1, GridSystem.CELL_SIZE - 1),
+		Vector2(1, GridSystem.CELL_SIZE - 1),
+		Vector2(1, 1),
+	])
+	line.default_color = COLOR_SELECTED
+	line.width = 3.0
+	line.position = cell_world
+	line.joint_mode = Line2D.LINE_JOINT_SHARP
+	line.name = "SelectedUnitHighlight"
+	overlay.add_child(line)
 
 func _deselect_unit() -> void:
 	_cancel_pending_target_selection()
@@ -205,7 +424,7 @@ func _show_move_range(unit: Node) -> void:
 	)
 	for cell in reachable_cells:
 		if cell != unit.grid_pos:
-			_highlight_cell(cell, COLOR_MOVE)
+			_highlight_cell(cell, COLOR_MOVE, COLOR_MOVE_BORDER)
 
 func _show_attack_range(unit: Node) -> void:
 	_clear_overlay()
@@ -215,12 +434,30 @@ func _show_attack_range(unit: Node) -> void:
 			var pos = Vector2i(x, y)
 			var dist = GridSystem.manhattan_distance(unit.grid_pos, pos)
 			if dist >= unit.weapon_range[0] and dist <= unit.weapon_range[1] and pos != unit.grid_pos:
-				_highlight_cell(pos, COLOR_ATTACK)
+				_highlight_cell(pos, COLOR_ATTACK, COLOR_ATTACK_BORDER)
+
+func _draw_preview_path(target_pos: Vector2i) -> void:
+	if not selected_unit:
+		return
+	if not reachable_cells.has(target_pos):
+		return
+	if target_pos == selected_unit.grid_pos:
+		return
+	var path = Pathfinding.find_path(
+		selected_unit.grid_pos,
+		target_pos,
+		map_width,
+		map_height,
+		_get_move_cost.bind(selected_unit.job),
+		_is_blocked
+	)
+	_draw_path_line(path)
 
 func _move_unit(unit: Node, target: Vector2i) -> void:
 	if not unit.spend_ap(1):
 		return
 	unit.move_to(target)
+	unit.add_status("moved", 1)
 	var sprite = _get_sprite_for_unit(unit)
 	if sprite:
 		sprite.animate_move_to(GridSystem.grid_to_world(target))
@@ -229,8 +466,37 @@ func _move_unit(unit: Node, target: Vector2i) -> void:
 	_show_move_range(unit)
 	hud.update_action_menu(unit)
 	_update_unit_info(unit)
-	AudioManager.sfx_move()
+	var terrain = MapLoader.get_terrain_at(map_data, target.x, target.y)
+	AudioManager.sfx_move(terrain)
 	_shake_camera(2.0, 0.08)
+	TutorialManager.advance_if("move")
+
+func _draw_path_line(path: Array) -> void:
+	if path.size() < 2:
+		return
+	var line = Line2D.new()
+	line.width = 4.0
+	line.default_color = Color(0.18, 0.74, 1.0, 0.85)
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	for cell in path:
+		line.add_point(GridSystem.grid_to_world(Vector2i(cell)) + Vector2(32, 32))
+	overlay.add_child(line)
+
+	# 在路径终点画一个箭头
+	var last = path[-1]
+	var second_last = path[-2] if path.size() >= 2 else path[-1]
+	var dir = Vector2(Vector2i(last) - Vector2i(second_last)).normalized()
+	var arrow = Polygon2D.new()
+	var tip = GridSystem.grid_to_world(Vector2i(last)) + Vector2(32, 32)
+	arrow.polygon = PackedVector2Array([
+		tip + dir.rotated(PI * 0.85) * 14,
+		tip + dir.rotated(-PI * 0.85) * 14,
+		tip + dir * 18,
+	])
+	arrow.color = Color(0.18, 0.74, 1.0, 0.9)
+	overlay.add_child(arrow)
 
 func _attack_unit(attacker: Node, target: Node) -> void:
 	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
@@ -257,26 +523,43 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 		rng
 	)
 
+	var attacker_sprite := _get_sprite_for_unit(attacker)
 	var target_sprite := _get_sprite_for_unit(target)
 
-	if result.hit:
-		target.take_damage(result.damage)
-		AudioManager.sfx_hit()
-		_show_floating_text(target.grid_pos, "-%d" % result.damage, GameTheme.HP_LOW)
+	if attacker_sprite:
+		attacker_sprite.play("attack")
+
+	# 播放弹道特效
+	var attacker_world = GridSystem.grid_to_world(attacker.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+	var target_world = GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+	BattleEffects.play_muzzle_flash(attacker_world, self)
+	_spawn_projectile(attacker_world, target_world, attacker.weapon_type if "weapon_type" in attacker else "rifle")
+
+	if result.get("hit", false):
+		target.take_damage(int(result.get("damage", 0)))
+		var target_terrain = MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y)
+		AudioManager.sfx_hit(target_terrain)
+		BattleEffects.play_hit(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
+		_show_floating_text(target.grid_pos, "-%d" % int(result.get("damage", 0)), GameTheme.HP_LOW)
 		if target_sprite:
+			target_sprite.play("hit")
 			target_sprite.flash_hit()
 		_shake_camera(4.0, 0.12)
-		if result.critical:
+		if result.get("critical", false):
 			AudioManager.sfx_critical()
+			BattleEffects.play_critical(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
 			_show_floating_text(target.grid_pos + Vector2i(0, -1), "CRIT", Color(1.0, 0.75, 0.03))
 		if not target.is_alive:
 			AudioManager.sfx_unit_down()
 			_show_floating_text(target.grid_pos, "K.O.", Color(0.96, 0.26, 0.21))
 			if target_sprite:
-				target_sprite.fade_out()
+				if target.has_meta("is_boss"):
+					target_sprite.play_defeated_shatter()
+				else:
+					target_sprite.fade_out()
 			_check_victory()
 	else:
-		if result.dodged:
+		if result.get("dodged", false):
 			_show_floating_text(target.grid_pos, "DODGE", Color(0.42, 0.86, 1.0))
 		else:
 			_show_floating_text(target.grid_pos, "MISS", Color(0.65, 0.65, 0.65))
@@ -284,6 +567,62 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 	_refresh_all_unit_sprites()
 	_update_unit_info(null)
 	_deselect_unit()
+	TutorialManager.advance_if("attack")
+
+func _spawn_projectile(from: Vector2, to: Vector2, weapon_type: String) -> void:
+	var projectile = Line2D.new()
+	projectile.width = 3.0
+	projectile.default_color = _projectile_color(weapon_type)
+	projectile.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	projectile.end_cap_mode = Line2D.LINE_CAP_ROUND
+	projectile.add_point(from)
+	projectile.add_point(from)
+	projectile.z_index = 10
+	overlay.add_child(projectile)
+
+	var duration := 0.12
+	var tween = create_tween()
+	tween.tween_method(func(t: float):
+		projectile.set_point_position(1, from.lerp(to, t))
+	, 0.0, 1.0, duration)
+	tween.tween_callback(func():
+		projectile.queue_free()
+		BattleEffects.play_muzzle_flash(from)
+	)
+
+func _projectile_color(weapon_type: String) -> Color:
+	match weapon_type:
+		"laser", "beam", "plasma":
+			return Color(0.2, 0.85, 1.0, 0.95)
+		"plasma_cannon", "rocket":
+			return Color(1.0, 0.45, 0.1, 0.95)
+		"shotgun", "pistol", "rifle", "sniper":
+			return Color(1.0, 0.95, 0.4, 0.9)
+		_:
+			return Color(1.0, 0.95, 0.4, 0.9)
+
+func _setup_tutorial() -> void:
+	var levels = GameData.level_data.get("levels", {})
+	var level = levels.get(GameManager.current_level_id, {})
+	var flags = level.get("tutorial_flags", [])
+	if flags.size() == 0:
+		return
+	if not TutorialManager.step_changed.is_connected(_on_tutorial_step_changed):
+		TutorialManager.step_changed.connect(_on_tutorial_step_changed)
+	if not TutorialManager.tutorial_finished.is_connected(_on_tutorial_finished):
+		TutorialManager.tutorial_finished.connect(_on_tutorial_finished)
+	TutorialManager.start(flags)
+
+func _on_tutorial_step_changed(text: String) -> void:
+	if hud:
+		hud.show_battle_hint(text, 5.0)
+
+func _on_tutorial_finished() -> void:
+	if hud:
+		hud.show_battle_hint("教学完成，继续任务！", 2.0)
+
+func _on_player_turn_started() -> void:
+	AudioManager.sfx_turn_start(true)
 
 func _on_end_turn() -> void:
 	GameManager.turn_manager.end_player_turn()
@@ -372,12 +711,38 @@ func _get_move_cost(pos: Vector2i, job: String) -> int:
 func _is_blocked(pos: Vector2i) -> bool:
 	return not MapLoader.is_passable(map_data, pos.x, pos.y)
 
-func _highlight_cell(pos: Vector2i, color: Color) -> void:
-	var rect = ColorRect.new()
-	rect.color = color
-	rect.size = Vector2(GridSystem.CELL_SIZE - 2, GridSystem.CELL_SIZE - 2)
-	rect.position = GridSystem.grid_to_world(pos) + Vector2(1, 1)
-	overlay.add_child(rect)
+func _highlight_cell(pos: Vector2i, color: Color, border_color: Color = Color.TRANSPARENT) -> void:
+	var padding := 4
+	var cell_world := GridSystem.grid_to_world(pos)
+	var inner_size := GridSystem.CELL_SIZE - padding * 2
+
+	# 填充
+	var poly = Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(padding, padding),
+		Vector2(padding + inner_size, padding),
+		Vector2(padding + inner_size, padding + inner_size),
+		Vector2(padding, padding + inner_size),
+	])
+	poly.color = color
+	poly.position = cell_world
+	overlay.add_child(poly)
+
+	# 边框
+	if border_color.a > 0:
+		var line = Line2D.new()
+		line.points = PackedVector2Array([
+			Vector2(padding, padding),
+			Vector2(padding + inner_size, padding),
+			Vector2(padding + inner_size, padding + inner_size),
+			Vector2(padding, padding + inner_size),
+			Vector2(padding, padding),
+		])
+		line.default_color = border_color
+		line.width = 2.0
+		line.position = cell_world
+		line.joint_mode = Line2D.LINE_JOINT_SHARP
+		overlay.add_child(line)
 
 func _clear_overlay() -> void:
 	_clear_children(overlay)
@@ -391,9 +756,7 @@ func _update_unit_info(unit: Node) -> void:
 		hud.update_unit_info(unit)
 
 func _check_victory() -> void:
-	var alive_enemies = GameManager.enemy_units.filter(func(u): return u.is_alive)
-	if alive_enemies.size() == 0:
-		AudioManager.sfx_victory()
+	GameManager._check_victory()
 
 func _refresh_all_unit_sprites() -> void:
 	for sprite in units_container.get_children():
@@ -440,12 +803,10 @@ func _get_skill_target_kind(skill_id: String) -> String:
 		return "none"
 	if skill_id in ["medic_heal", "medic_revive", "medic_adrenaline_shot", "medic_cure", "medic_pain_block", "medic_stim_pack", "heavy_protect", "scout_shadow_step"]:
 		return "unit_ally"
-	if skill_id in ["asslt_dash_strike", "asslt_breach", "asslt_blink", "heavy_grenade", "heavy_barrage", "heavy_cleave", "heavy_ground_slam", "medic_mass_cure", "scout_scan", "scout_trap", "scout_recon_drone", "scout_decoy", "gen_interact"]:
+	if skill_id in ["asslt_dash_strike", "asslt_breach", "asslt_blink", "heavy_grenade", "heavy_barrage", "heavy_cleave", "heavy_ground_slam", "medic_mass_cure", "scout_scan", "scout_trap", "scout_recon_drone", "scout_decoy", "gen_interact", "scout_sabotage", "asslt_storm_dash", "asslt_chain_slash"]:
 		return "position"
 	if skill_id in ["snip_highground"]:
 		return "none"
-	if skill_id in ["gen_interact", "scout_sabotage", "asslt_storm_dash", "asslt_chain_slash"]:
-		return "position"
 	if skill_id in ["snip_suppressing_fire"]:
 		return "unit_enemy"
 	return "unit_enemy"
@@ -453,7 +814,7 @@ func _get_skill_target_kind(skill_id: String) -> String:
 func _build_skill_target(skill_id: String, caster: Node) -> Dictionary:
 	if skill_id in ["asslt_adrenaline", "heavy_taunt", "heavy_iron_fortress", "heavy_self_repair", "medic_barrier_blast", "gen_hunker_down", "gen_sprint", "gen_reposition", "scout_stealth", "snip_highground"]:
 		return {}
-	if skill_id in ["medic_heal", "medic_revive", "medic_adrenaline_shot", "medic_cure", "medic_pain_block", "medic_stim_pack", "heavy_protect", "scout_shadow_step"]:
+	if skill_id in ["medic_heal", "medic_revive", "medic_adrenaline_shot", "medic_cure", "medic_pain_block", "medic_stim_pack", "heavy_protect"]:
 		return {"target_unit": _find_best_ally_target(caster)}
 	if skill_id in ["asslt_dash_strike", "asslt_breach", "asslt_blink", "heavy_grenade", "heavy_barrage", "heavy_cleave", "heavy_ground_slam", "medic_mass_cure", "scout_scan", "scout_trap", "scout_recon_drone", "scout_decoy", "gen_interact", "scout_sabotage", "asslt_storm_dash", "asslt_chain_slash"]:
 		return {"position": _find_target_position(caster, _find_best_enemy_target(caster))}
@@ -510,15 +871,97 @@ func _use_skill(skill_id: String, target_data: Dictionary = {}) -> void:
 		hud.update_action_menu(selected_unit)
 		_update_unit_info(selected_unit)
 		_check_victory()
-		_show_floating_text(selected_unit.grid_pos, "SKILL", Color(0.42, 0.86, 1.0))
+		_show_skill_floating_text(selected_unit, skill_id, result)
+		_play_skill_visuals(selected_unit, skill_id, result)
 		if skill_id == "snip_overwatch" or skill_id == "gen_overwatch":
 			AudioManager.sfx_overwatch()
 	else:
 		_show_floating_text(selected_unit.grid_pos, "SKILL FAIL", Color(0.8, 0.4, 0.4))
-	_clear_pending_skill_target()
-	current_action = "move"
-	_restore_battle_objective()
-	_show_move_range(selected_unit)
+		_clear_pending_skill_target()
+		current_action = "move"
+		_restore_battle_objective()
+		_show_move_range(selected_unit)
+
+func _show_skill_floating_text(caster: Node, skill_id: String, result: Dictionary) -> void:
+	var skill = GameData.get_skill(skill_id)
+	var skill_name = skill.get("name", "SKILL")
+	_show_floating_text(caster.grid_pos, skill_name, Color(0.42, 0.86, 1.0))
+
+	# 治疗类
+	var healed = result.get("healed", 0)
+	if healed > 0:
+		_show_floating_text(caster.grid_pos + Vector2i(0, -1), "+%d" % healed, Color(0.25, 0.9, 0.4))
+		return
+
+	# 直接伤害类
+	var target = result.get("target")
+	if target is Node and result.get("damage", 0) > 0:
+		_show_floating_text(target.grid_pos, "-%d" % int(result.damage), GameTheme.HP_LOW)
+		return
+
+	# 多目标伤害类
+	var targets = result.get("targets", 0)
+	if targets is int and targets > 0:
+		_show_floating_text(caster.grid_pos + Vector2i(0, -1), "命中 %d" % targets, Color(1.0, 0.75, 0.03))
+		return
+
+	# 增益/位移类
+	var buff = result.get("buff", "")
+	if buff != "":
+		_show_floating_text(caster.grid_pos + Vector2i(0, -1), buff, Color(0.9, 0.75, 0.3))
+
+func _play_skill_visuals(caster: Node, skill_id: String, result: Dictionary) -> void:
+	var caster_sprite := _get_sprite_for_unit(caster)
+	if caster_sprite:
+		caster_sprite.play("attack")
+
+	var skill = GameData.get_skill(skill_id)
+	var tags = skill.get("tags", [])
+	var effect = String(skill.get("effect", ""))
+	var center = GridSystem.grid_to_world(caster.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+	var target_pos = result.get("target_pos", caster.grid_pos)
+	var target_world = GridSystem.grid_to_world(target_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+	var target_node = result.get("target")
+	if target_node is Node:
+		target_world = GridSystem.grid_to_world(target_node.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+
+	# 元素/类型特效
+	if skill_id.contains("emp") or effect.contains("emp"):
+		BattleEffects.play_electro(target_world, self)
+		return
+	if skill_id.contains("burn") or effect.contains("burn") or "fire" in tags:
+		BattleEffects.play_burn(target_world, self)
+		return
+	if skill_id.contains("freeze") or skill_id.contains("ice") or effect.contains("freeze"):
+		BattleEffects.play_freeze(target_world, self)
+		return
+	if skill_id.contains("blink") or skill_id.contains("shadow_step") or effect.contains("shadow_step") or skill_id.contains("teleport"):
+		BattleEffects.play_teleport(center, self)
+		return
+	if skill_id.contains("smoke") or skill_id.contains("stealth"):
+		BattleEffects.play_smoke(center, self)
+		return
+
+	# 通用 tags
+	if tags is Array:
+		if "heal" in tags:
+			BattleEffects.play_heal(target_world, self)
+			return
+		if "explosive" in tags:
+			BattleEffects.play_explosion(target_world, self)
+			return
+		if "shield" in tags or effect.contains("shield") or skill_id.contains("shield"):
+			BattleEffects.play_shield(target_world if target_node is Node else center, self)
+			return
+		if "buff" in tags or effect.contains("buff") or effect.contains("warcry") or effect.contains("fortify") or effect.contains("inspire") or effect.contains("rally"):
+			BattleEffects.play_buff(center, self)
+			return
+		if "debuff" in tags or effect.contains("hack") or effect.contains("taunt") or effect.contains("mark") or skill_id.contains("suppressing"):
+			BattleEffects.play_debuff(target_world, self)
+			return
+
+	# 默认在施法者位置播放一次 hit 特效表示技能生效
+	BattleEffects.play_hit(center, self)
 
 func _build_item_target(item_id: String, caster: Node) -> Dictionary:
 	var item = GameData.get_item(item_id)
@@ -543,26 +986,30 @@ func _use_item(item_id: String, target_data: Dictionary = {}) -> void:
 
 	if item_type == "trap":
 		result = _place_trap_on_map(item, target_pos)
+	elif item_type == "throwable":
+		result = action_system.use_item(selected_unit, item_id, null, {"position": target_pos})
 	else:
-		if item_type == "throwable":
-			var proxy_target := Unit.new()
-			proxy_target.grid_pos = target_pos
-			result = action_system.use_item(selected_unit, item_id, proxy_target)
-		else:
-			result = action_system.use_item(selected_unit, item_id, target)
+		result = action_system.use_item(selected_unit, item_id, target)
 
 	if result.get("success", false):
 		_consume_inventory_item(item_id)
 		if item_type in ["throwable", "trap"]:
 			AudioManager.sfx_explosion()
+			var explosion_pos = target_data.get("position", selected_unit.grid_pos)
+			BattleEffects.play_explosion(GridSystem.grid_to_world(explosion_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0), self)
 		else:
 			AudioManager.sfx_heal()
+			var heal_target = result.get("target", selected_unit)
+			var heal_pos = selected_unit.grid_pos
+			if heal_target is Node:
+				heal_pos = heal_target.grid_pos
+			BattleEffects.play_heal(GridSystem.grid_to_world(heal_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0), self)
 		_render_map()
 		_refresh_all_unit_sprites()
 		hud.update_action_menu(selected_unit)
 		_update_unit_info(selected_unit)
 		_check_victory()
-		_show_floating_text(selected_unit.grid_pos, "ITEM", Color(0.42, 0.86, 1.0))
+		_show_item_floating_text(selected_unit, item, result)
 		_clear_pending_item_target()
 		current_action = "move"
 		if selected_unit:
@@ -574,6 +1021,20 @@ func _use_item(item_id: String, target_data: Dictionary = {}) -> void:
 		_restore_battle_objective()
 		if selected_unit:
 			_show_move_range(selected_unit)
+
+func _show_item_floating_text(caster: Node, item: Dictionary, result: Dictionary) -> void:
+	var item_name = item.get("name", "ITEM")
+	_show_floating_text(caster.grid_pos, item_name, Color(0.42, 0.86, 1.0))
+	var healed = result.get("healed", 0)
+	if healed > 0:
+		var target = result.get("target")
+		var pos = caster.grid_pos if not (target is Node) else target.grid_pos
+		_show_floating_text(pos + Vector2i(0, -1), "+%d" % healed, Color(0.25, 0.9, 0.4))
+	var damage = result.get("damage", 0)
+	if damage > 0:
+		var target = result.get("target")
+		if target is Node:
+			_show_floating_text(target.grid_pos, "-%d" % int(damage), GameTheme.HP_LOW)
 
 func _handle_skill_target_click(grid_pos: Vector2i, clicked_unit: Node) -> void:
 	if not pending_skill_id or not selected_unit:
@@ -744,7 +1205,7 @@ func _highlight_item_position_targets(target_range: Array[int]) -> void:
 
 func _place_trap_on_map(item: Dictionary, pos: Vector2i) -> Dictionary:
 	if not MapLoader.is_passable(map_data, pos.x, pos.y):
-		return {success = false, reason = "invalid_position"}
+		return {"success": false, "reason": "invalid_position"}
 
 	var effect = item.get("effect", {})
 	var trap_obj = {
@@ -761,7 +1222,7 @@ func _place_trap_on_map(item: Dictionary, pos: Vector2i) -> Dictionary:
 	if not map_data.has("objects"):
 		map_data["objects"] = []
 	map_data.objects.append(trap_obj)
-	return {success = true, trap = item.get("name", ""), pos = pos}
+	return {"success": true, "trap": item.get("name", ""), "pos": pos}
 
 func _consume_inventory_item(item_id: String) -> void:
 	var inventory = GameManager.save_data.get("inventory", [])
@@ -812,19 +1273,20 @@ func _show_floating_text(grid_pos: Vector2i, text: String, color: Color) -> void
 	tween.tween_callback(Callable(label, "queue_free"))
 
 func _world_to_screen(world_pos: Vector2) -> Vector2:
-	var camera = get_viewport().get_camera_2d()
-	if camera:
-		return camera.unproject_position(world_pos)
-	return world_pos
+	return get_viewport().get_canvas_transform() * world_pos
 
 func _shake_camera(strength: float, duration: float) -> void:
 	if not camera_2d:
 		return
 	var base_pos = camera_2d.position
+	var base_zoom = camera_2d.zoom
 	var tween = create_tween()
 	tween.tween_method(Callable(self, "_apply_camera_shake").bind(base_pos, strength), 0.0, 1.0, duration)
+	tween.parallel().tween_property(camera_2d, "zoom", base_zoom * 1.08, duration * 0.5)
+	tween.tween_property(camera_2d, "zoom", base_zoom, duration * 0.5)
 	tween.tween_callback(func():
 		camera_2d.position = base_pos
+		camera_2d.zoom = base_zoom
 	)
 
 func _apply_camera_shake(t: float, base_pos: Vector2, strength: float) -> void:
@@ -832,3 +1294,19 @@ func _apply_camera_shake(t: float, base_pos: Vector2, strength: float) -> void:
 		sin(t * TAU * 4.0) * strength,
 		cos(t * TAU * 6.0) * strength * 0.5
 	)
+
+func _center_camera_on_map() -> void:
+	if not camera_2d:
+		return
+	var map_pixel_width = map_width * GridSystem.CELL_SIZE
+	var map_pixel_height = map_height * GridSystem.CELL_SIZE
+	var center = Vector2(map_pixel_width * 0.5, map_pixel_height * 0.5)
+	camera_2d.position = center
+	# 根据地图尺寸自动调整缩放，确保地图能完整显示在屏幕内
+	var viewport_size = get_viewport_rect().size
+	var scale_x = map_pixel_width / viewport_size.x
+	var scale_y = map_pixel_height / viewport_size.y
+	var target_zoom = maxf(scale_x, scale_y)
+	# 限制最小缩放，避免地图过大时单位太小看不清
+	target_zoom = clampf(target_zoom, 1.0, 3.0)
+	camera_2d.zoom = Vector2(target_zoom, target_zoom)

@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, EMP手雷, 对机械单位80伤害，禁用技能2回合

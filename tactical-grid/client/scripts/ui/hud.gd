@@ -1,4 +1,4 @@
-﻿extends CanvasLayer
+extends CanvasLayer
 class_name HUD
 
 signal action_selected(action: String)
@@ -75,14 +75,29 @@ const SUPPORTED_SKILLS := {
 func _ready() -> void:
 	if not top_bar or not right_panel or not bottom_bar or not turn_label or not phase_label or not objective_label or not unit_info_panel or not action_bar or not end_turn_button:
 		push_warning("HUD layout nodes are incomplete; using safe fallback behavior.")
+	# 让非交互面板放行鼠标事件，使点击能穿透到游戏世界
+	if top_bar:
+		top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if right_panel:
+		right_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if bottom_bar:
+		bottom_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if unit_info_panel:
+		unit_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for label in [turn_label, phase_label, objective_label]:
+		if label:
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_action_menu()
 	_build_popup_menus()
+	_build_unit_info_ui()
 	_apply_theme()
 	if GameManager.turn_manager:
 		if not GameManager.turn_manager.turn_phase_changed.is_connected(_on_phase_changed):
 			GameManager.turn_manager.turn_phase_changed.connect(_on_phase_changed)
 		if not GameManager.turn_manager.turn_ended.is_connected(_on_turn_ended):
 			GameManager.turn_manager.turn_ended.connect(_on_turn_ended)
+	if not GameManager.boss_phase_changed.is_connected(_on_boss_phase_changed):
+		GameManager.boss_phase_changed.connect(_on_boss_phase_changed)
 	if end_turn_button and not end_turn_button.pressed.is_connected(_on_end_turn_pressed):
 		end_turn_button.pressed.connect(_on_end_turn_pressed)
 
@@ -154,10 +169,10 @@ func _style_button(button: Button) -> void:
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_color_override("font_pressed_color", GameTheme.ACCENT)
 	button.add_theme_color_override("font_focus_color", Color.WHITE)
-	button.add_theme_stylebox_override("normal", _make_button_style(Color(0.11, 0.12, 0.15, 0.95), Color(0.26, 0.36, 0.48, 1)))
-	button.add_theme_stylebox_override("hover", _make_button_style(Color(0.15, 0.18, 0.22, 0.98), GameTheme.ACCENT))
-	button.add_theme_stylebox_override("pressed", _make_button_style(Color(0.09, 0.11, 0.14, 0.98), Color(0.14, 0.62, 0.96, 1)))
-	button.add_theme_stylebox_override("disabled", _make_button_style(Color(0.06, 0.07, 0.08, 0.75), Color(0.18, 0.18, 0.2, 1)))
+	button.add_theme_stylebox_override("normal", _make_button_style(Color(0.08, 0.11, 0.16, 0.85), Color(0.26, 0.36, 0.48, 1)))
+	button.add_theme_stylebox_override("hover", _make_button_style(Color(0.11, 0.18, 0.28, 0.92), GameTheme.ACCENT))
+	button.add_theme_stylebox_override("pressed", _make_button_style(Color(0.06, 0.09, 0.12, 0.98), Color(0.14, 0.62, 0.96, 1)))
+	button.add_theme_stylebox_override("disabled", _make_button_style(Color(0.05, 0.06, 0.07, 0.65), Color(0.18, 0.18, 0.2, 1)))
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.expand_icon = true
 
@@ -202,15 +217,16 @@ func _style_popup_menu(menu: PopupMenu) -> void:
 func _build_action_menu() -> void:
 	action_menu = ActionMenu.new()
 	action_menu.name = "ActionMenu"
-	action_menu.anchor_left = 0.5
-	action_menu.anchor_right = 0.5
-	action_menu.anchor_top = 1.0
-	action_menu.anchor_bottom = 1.0
-	action_menu.offset_left = -220.0
-	action_menu.offset_top = -250.0
-	action_menu.offset_right = 220.0
-	action_menu.offset_bottom = -70.0
+	action_menu.anchor_left = 1.0
+	action_menu.anchor_right = 1.0
+	action_menu.anchor_top = 0.5
+	action_menu.anchor_bottom = 0.5
+	action_menu.offset_left = -240.0
+	action_menu.offset_top = -180.0
+	action_menu.offset_right = -20.0
+	action_menu.offset_bottom = 180.0
 	action_menu.visible = false
+	action_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var panel = Panel.new()
 	panel.name = "Panel"
@@ -218,6 +234,7 @@ func _build_action_menu() -> void:
 	panel.anchor_top = 0.0
 	panel.anchor_right = 1.0
 	panel.anchor_bottom = 1.0
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	action_menu.add_child(panel)
 
 	var title = Label.new()
@@ -231,6 +248,7 @@ func _build_action_menu() -> void:
 	title.offset_top = 12.0
 	title.offset_right = -14.0
 	title.offset_bottom = 34.0
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(title)
 
 	var vbox = VBoxContainer.new()
@@ -244,6 +262,7 @@ func _build_action_menu() -> void:
 	vbox.offset_right = -12.0
 	vbox.offset_bottom = -12.0
 	vbox.add_theme_constant_override("separation", 8)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(vbox)
 
 	for item in [
@@ -314,7 +333,10 @@ func _open_skill_popup() -> void:
 		var index = _skill_ids.size()
 		_skill_ids.append(skill_info.id)
 		skill_menu.add_item(label, index)
-		if current_unit.current_ap < ap_cost or not current_unit.can_act():
+		var skill_icon = ArtAssets.get_skill_icon(skill_info.id)
+		if skill_icon:
+			skill_menu.set_item_icon(index, skill_icon)
+		if current_unit.current_ap < ap_cost or not current_unit.can_act() or current_unit.get_skill_cooldown(skill_info.id) > 0:
 			skill_menu.set_item_disabled(index, true)
 
 	if _skill_ids.is_empty():
@@ -353,6 +375,9 @@ func _open_item_popup() -> void:
 		if item.get("description", "") != "":
 			label += " - " + item.get("description", "")
 		item_menu.add_item(label, index)
+		var item_icon = ArtAssets.get_item_icon(item_id)
+		if item_icon:
+			item_menu.set_item_icon(index, item_icon)
 
 	if _item_ids.is_empty():
 		item_menu.add_item("背包为空", 0)
@@ -429,6 +454,8 @@ func _count_available_skills(unit: Node) -> int:
 			continue
 		if int(skill.get("ap_cost", 1)) > unit.current_ap:
 			continue
+		if unit.get_skill_cooldown(skill_info.id) > 0:
+			continue
 		if not unit.can_act():
 			continue
 		count += 1
@@ -450,18 +477,18 @@ func _make_ui_icon(icon_id: String) -> Texture2D:
 func _make_panel_style() -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = GameTheme.BG_PANEL
-	style.border_color = Color(0.23, 0.48, 0.76, 0.8)
+	style.border_color = GameTheme.ACCENT
 	style.border_width_left = 1
 	style.border_width_top = 1
 	style.border_width_right = 1
 	style.border_width_bottom = 1
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
-	style.shadow_color = Color(0, 0, 0, 0.35)
-	style.shadow_size = 8
-	style.shadow_offset = Vector2(0, 2)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.shadow_color = GameTheme.ACCENT_GLOW
+	style.shadow_size = 12
+	style.shadow_offset = Vector2(0, 0)
 	return style
 
 func _make_button_style(bg: Color, border: Color) -> StyleBoxFlat:
@@ -478,67 +505,258 @@ func _make_button_style(bg: Color, border: Color) -> StyleBoxFlat:
 	style.corner_radius_bottom_right = 5
 	return style
 
+func _make_glass_panel() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = GameTheme.BG_PANEL
+	style.border_color = GameTheme.ACCENT
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	style.shadow_color = GameTheme.ACCENT_GLOW
+	style.shadow_size = 16
+	style.shadow_offset = Vector2(0, 0)
+	return style
+
 func update_turn_display(turn: int, phase: int) -> void:
 	if not turn_label or not phase_label:
 		return
 	turn_label.text = "回合 " + str(turn)
-	match phase:
-		1:
-			phase_label.text = "玩家回合"
-			phase_label.modulate = Color(0.42, 0.86, 1.0)
-		4:
-			phase_label.text = "敌方回合"
-			phase_label.modulate = Color(1.0, 0.35, 0.31)
-		_:
-			phase_label.text = "..."
+	var phase_enum = TurnManager.TurnPhase
+	if phase == phase_enum.PLAYER_START or phase == phase_enum.PLAYER_ACTION or phase == phase_enum.PLAYER_END:
+		phase_label.text = "玩家回合"
+		phase_label.modulate = Color(0.42, 0.86, 1.0)
+	elif phase == phase_enum.ENEMY_START or phase == phase_enum.ENEMY_ACTION or phase == phase_enum.ENEMY_END:
+		phase_label.text = "敌方回合"
+		phase_label.modulate = Color(1.0, 0.35, 0.31)
+	else:
+		phase_label.text = "..."
+
+func _build_unit_info_ui() -> void:
+	if not unit_info_panel:
+		return
+	for child in unit_info_panel.get_children():
+		child.queue_free()
+
+	var title = Label.new()
+	title.name = "UnitName"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", GameTheme.ACCENT)
+	unit_info_panel.add_child(title)
+
+	unit_info_panel.add_child(_make_bar("HPBar", Color(0.85, 0.2, 0.2), Color(0.35, 0.05, 0.05)))
+	unit_info_panel.add_child(_make_bar_label("HPLabel"))
+
+	unit_info_panel.add_child(_make_bar("APBar", Color(0.25, 0.65, 0.95), Color(0.05, 0.25, 0.4)))
+	unit_info_panel.add_child(_make_bar_label("APLabel"))
+
+	var attrs = Label.new()
+	attrs.name = "AttrsLabel"
+	attrs.add_theme_font_size_override("font_size", 14)
+	attrs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_panel.add_child(attrs)
+
+	var status = Label.new()
+	status.name = "StatusLabel"
+	status.add_theme_font_size_override("font_size", 13)
+	status.add_theme_color_override("font_color", Color(0.9, 0.8, 0.5))
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_panel.add_child(status)
+
+	var weapon = Label.new()
+	weapon.name = "WeaponLabel"
+	weapon.add_theme_font_size_override("font_size", 13)
+	weapon.add_theme_color_override("font_color", Color(0.75, 0.75, 0.8))
+	weapon.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_panel.add_child(weapon)
+
+	var hint = Label.new()
+	hint.name = "InfoLabel"
+	hint.text = "未选中单位\n点击战场中的单位查看详情。"
+	hint.add_theme_font_size_override("font_size", 14)
+	hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unit_info_panel.add_child(hint)
+
+func _make_bar(name: String, fg: Color, bg: Color) -> ProgressBar:
+	var bar = ProgressBar.new()
+	bar.name = name
+	bar.custom_minimum_size = Vector2(200, 18)
+	bar.max_value = 100
+	bar.value = 100
+	bar.step = 1
+	bar.show_percentage = false
+	var fg_style = StyleBoxFlat.new()
+	fg_style.bg_color = fg
+	fg_style.corner_radius_top_left = 4
+	fg_style.corner_radius_top_right = 4
+	fg_style.corner_radius_bottom_left = 4
+	fg_style.corner_radius_bottom_right = 4
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = bg
+	bg_style.corner_radius_top_left = 4
+	bg_style.corner_radius_top_right = 4
+	bg_style.corner_radius_bottom_left = 4
+	bg_style.corner_radius_bottom_right = 4
+	bar.add_theme_stylebox_override("fill", fg_style)
+	bar.add_theme_stylebox_override("background", bg_style)
+	return bar
+
+func _make_bar_label(name: String) -> Label:
+	var label = Label.new()
+	label.name = name
+	label.add_theme_font_size_override("font_size", 12)
+	return label
 
 func update_unit_info(unit: Node) -> void:
 	if not unit_info_panel:
 		return
 	if not unit:
 		unit_info_panel.show()
+		for child in unit_info_panel.get_children():
+			child.visible = (child.name == "InfoLabel")
 		var placeholder = unit_info_panel.get_node_or_null("InfoLabel")
-		if placeholder and placeholder is Label:
+		if placeholder:
 			placeholder.text = "未选中单位\n点击战场中的单位查看详情。"
 		return
+
 	unit_info_panel.show()
-
-	var info_text = "%s\nHP: %d/%d\nAP: %d/%d\n移动: %d\n位置: (%d, %d)" % [
-		unit.unit_name,
-		unit.current_hp, unit.max_hp,
-		unit.current_ap, unit.max_ap,
-		unit.move_points,
-		unit.grid_pos.x, unit.grid_pos.y
-	]
-
-	var label = unit_info_panel.get_node_or_null("InfoLabel")
-	if label and label is Label:
-		label.text = info_text
-		_style_label(label, 16)
-		return
-
 	for child in unit_info_panel.get_children():
-		if child is Label:
-			child.text = info_text
-			_style_label(child, 16)
-			return
+		child.visible = (child.name != "InfoLabel")
 
-	var new_label = Label.new()
-	new_label.name = "InfoLabel"
-	new_label.text = info_text
-	new_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	unit_info_panel.add_child(new_label)
-	_style_label(new_label, 16)
+	var name_label = unit_info_panel.get_node_or_null("UnitName")
+	if name_label:
+		name_label.text = "%s  (%s)" % [unit.unit_name, unit.job]
+
+	var hp_bar = unit_info_panel.get_node_or_null("HPBar")
+	var hp_label = unit_info_panel.get_node_or_null("HPLabel")
+	if hp_bar and hp_label:
+		hp_bar.max_value = unit.max_hp
+		hp_bar.value = unit.current_hp
+		hp_label.text = "HP: %d / %d" % [unit.current_hp, unit.max_hp]
+
+	var ap_bar = unit_info_panel.get_node_or_null("APBar")
+	var ap_label = unit_info_panel.get_node_or_null("APLabel")
+	if ap_bar and ap_label:
+		ap_bar.max_value = unit.max_ap
+		ap_bar.value = unit.current_ap
+		ap_label.text = "AP: %d / %d" % [unit.current_ap, unit.max_ap]
+
+	var attrs_label = unit_info_panel.get_node_or_null("AttrsLabel")
+	if attrs_label:
+		attrs_label.text = "移动: %d  护甲: %d\n命中: %d  暴击: %d%%  闪避: %d%%\n位置: (%d, %d)" % [
+			unit.move_points,
+			unit.armor,
+			unit.base_hit,
+			int(unit.crit_chance * 100),
+			int(unit.dodge * 100),
+			unit.grid_pos.x, unit.grid_pos.y
+		]
+
+	var status_label = unit_info_panel.get_node_or_null("StatusLabel")
+	if status_label:
+		if unit.status_effects.size() == 0:
+			status_label.text = ""
+			status_label.visible = false
+		else:
+			var parts = []
+			for eff in unit.status_effects:
+				parts.append("%s(%d)" % [eff.id, eff.duration])
+			status_label.text = "状态: " + ", ".join(parts)
+			status_label.visible = true
+
+	var weapon_label = unit_info_panel.get_node_or_null("WeaponLabel")
+	if weapon_label:
+		var weapon_text = "武器: %d-%d 伤害 / 射程 %d-%d" % [
+			unit.weapon_damage[0], unit.weapon_damage[1],
+			unit.weapon_range[0], unit.weapon_range[1]
+		]
+		if unit.equipped_weapon != "":
+			weapon_text = GameData.get_weapon(unit.equipped_weapon).get("name", unit.equipped_weapon) + "\n" + weapon_text
+		weapon_label.text = weapon_text
 
 func update_objective(text: String) -> void:
 	if objective_label:
 		objective_label.text = text
 
+func show_battle_hint(text: String, duration: float = 2.0) -> void:
+	var hint = Label.new()
+	hint.name = "BattleHint"
+	hint.text = text
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 22)
+	hint.add_theme_color_override("font_color", Color.WHITE)
+	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	hint.add_theme_constant_override("shadow_offset_x", 2)
+	hint.add_theme_constant_override("shadow_offset_y", 2)
+	hint.anchor_left = 0.5
+	hint.anchor_right = 0.5
+	hint.anchor_top = 0.25
+	hint.anchor_bottom = 0.25
+	hint.offset_left = -300
+	hint.offset_right = 300
+	hint.offset_top = -20
+	hint.offset_bottom = 20
+	add_child(hint)
+
+	var tween = create_tween()
+	hint.modulate = Color(1, 1, 1, 0)
+	tween.tween_property(hint, "modulate", Color.WHITE, 0.25)
+	tween.tween_interval(duration)
+	tween.tween_property(hint, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(hint.queue_free)
+
+func show_turn_hint(text: String, subtitle: String = "") -> void:
+	var hint = Label.new()
+	hint.name = "TurnHint"
+	hint.text = text
+	if subtitle != "":
+		hint.text += "\n" + subtitle
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 28)
+	hint.add_theme_color_override("font_color", GameTheme.ACCENT)
+	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	hint.add_theme_constant_override("shadow_offset_x", 2)
+	hint.add_theme_constant_override("shadow_offset_y", 2)
+	hint.anchor_left = 0.5
+	hint.anchor_right = 0.5
+	hint.anchor_top = 0.5
+	hint.anchor_bottom = 0.5
+	hint.offset_left = -300
+	hint.offset_right = 300
+	hint.offset_top = -50
+	hint.offset_bottom = 50
+	add_child(hint)
+
+	var tween = create_tween()
+	hint.scale = Vector2(0.9, 0.9)
+	hint.modulate = Color(1, 1, 1, 0)
+	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(hint, "scale", Vector2.ONE, 0.4)
+	tween.parallel().tween_property(hint, "modulate", Color.WHITE, 0.3)
+	tween.tween_interval(1.2)
+	tween.tween_property(hint, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(hint.queue_free)
+
 func _on_phase_changed(phase: int) -> void:
 	update_turn_display(GameManager.turn_manager.turn_number, phase)
+	match phase:
+		TurnManager.TurnPhase.PLAYER_START:
+			show_turn_hint("玩家回合", "部署你的单位")
+		TurnManager.TurnPhase.ENEMY_START:
+			show_turn_hint("敌方回合", "等待敌人行动")
 
 func _on_turn_ended(turn: int) -> void:
 	pass
+
+func _on_boss_phase_changed(_boss: Node, phase_name: String) -> void:
+	show_battle_hint("BOSS 进入 %s" % phase_name, 2.5)
 
 func _on_end_turn_pressed() -> void:
 	GameManager.turn_manager.end_player_turn()

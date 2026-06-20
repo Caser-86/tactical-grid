@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，再生血清, 每回合恢复15HP，4回合

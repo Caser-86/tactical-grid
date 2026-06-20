@@ -6,16 +6,25 @@ class_name MapLoader
 static func load_from_dict(data: Dictionary) -> Dictionary:
 	var map_data = data.get("map_data", data)
 
+	var layers = map_data.get("layers", {})
+	# 兼容旧数据中的 height_level 键名
+	if layers.has("height_level") and not layers.has("height"):
+		layers["height"] = layers["height_level"]
+
 	var result = {
 		"map_id": map_data.get("map_id", ""),
 		"seed": map_data.get("seed", 0),
 		"size": map_data.get("size", {"width": 10, "height": 8}),
 		"theme": map_data.get("theme", "warehouse"),
 		"mission_type": map_data.get("mission_type", "extract"),
-		"layers": map_data.get("layers", {}),
+		"layers": layers,
 		"objects": map_data.get("objects", []),
 		"scripts": map_data.get("scripts", []),
 		"victory": map_data.get("victory", {}),
+		"spawns": map_data.get("spawns", {}),
+		"evac_point": map_data.get("evac_point", {}),
+		"is_boss": map_data.get("is_boss", false),
+		"boss_id": map_data.get("boss_id", ""),
 	}
 
 	return result
@@ -72,7 +81,7 @@ static func get_player_spawns(map_data: Dictionary) -> Array:
 	var spawns = map_data.get("spawns", {})
 	if spawns.has("player"):
 		return spawns.player
-	return map_data.get("objects", []).filter(func(o): return o.type == "spawn_player")
+	return map_data.get("objects", []).filter(func(o): return o.get("type", "") == "spawn_player")
 
 ## 获取敌人出生点
 static func get_enemy_spawns(map_data: Dictionary) -> Array:
@@ -80,10 +89,10 @@ static func get_enemy_spawns(map_data: Dictionary) -> Array:
 	var spawns = map_data.get("spawns", {})
 	if spawns.has("enemies"):
 		return spawns.enemies
-	return map_data.get("objects", []).filter(func(o): return o.type == "spawn_enemy")
+	return map_data.get("objects", []).filter(func(o): return o.get("type", "") == "spawn_enemy")
 
 ## 获取所有交互点
 static func get_interactables(map_data: Dictionary) -> Array:
 	return map_data.get("objects", []).filter(func(o):
-		return o.type in ["terminal", "evac", "resource", "destructible_target", "alarm_panel", "npc"]
+		return o.get("type", "") in ["terminal", "evac", "resource", "destructible_target", "alarm_panel", "npc"]
 	)

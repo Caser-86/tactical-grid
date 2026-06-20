@@ -1,4 +1,4 @@
-﻿extends Node2D
+extends Node2D
 
 @onready var terrain_layer: Node2D = get_node_or_null("TerrainLayer") as Node2D
 @onready var units_container: Node2D = get_node_or_null("Units") as Node2D
@@ -27,6 +27,7 @@ func _ready() -> void:
 	if not action_system:
 		push_error("ActionSystem init failed")
 		return
+	add_child(action_system)
 	action_system.rng.randomize()
 	_connect_hud_buttons()
 	_load_local_map()
@@ -42,8 +43,9 @@ func _exit_tree() -> void:
 func _load_local_map() -> void:
 	var level_data = LocalMapData.get_test_level()
 	map_data = MapLoader.load_from_dict(level_data)
-	map_width = map_data.size.width
-	map_height = map_data.size.height
+	map_width = map_data.get("size", {}).get("width", 10)
+	map_height = map_data.get("size", {}).get("height", 8)
+	BattleVisuals.set_theme(map_data.get("theme", "warehouse"))
 	action_system.set_map_data(map_data)
 	GameManager.current_map_data = map_data
 	GameManager.player_units.clear()
@@ -51,8 +53,19 @@ func _load_local_map() -> void:
 	_render_map()
 	_spawn_units()
 	GameManager.enemy_director.setup(map_data.get("scripts", []))
+	if not GameManager.enemy_director.reinforcement_spawned.is_connected(_on_reinforcement_spawned):
+		GameManager.enemy_director.reinforcement_spawned.connect(_on_reinforcement_spawned)
 	GameManager.turn_manager.start_battle()
+	if not GameManager.turn_manager.player_turn_started.is_connected(_on_player_turn_started):
+		GameManager.turn_manager.player_turn_started.connect(_on_player_turn_started)
 	hud.update_objective("消灭所有敌人")
+
+func _on_reinforcement_spawned(unit: Node, _pos: Vector2i) -> void:
+	if not units_container:
+		return
+	var sprite = _create_unit_sprite(unit)
+	sprite.position = GridSystem.grid_to_world(unit.grid_pos)
+	units_container.add_child(sprite)
 
 func _connect_hud_buttons() -> void:
 	if not hud.action_selected.is_connected(_on_action_selected):
@@ -75,6 +88,25 @@ func _render_map() -> void:
 		for x in range(map_width):
 			if blocker[y][x] != 0:
 				_draw_tile(Vector2i(x, y), blocker[y][x], 1)
+
+	_render_objects()
+
+func _render_objects() -> void:
+	var objects = map_data.get("objects", [])
+	for obj in objects:
+		var obj_type = obj.get("type", "")
+		if obj_type in ["spawn_player", "spawn_enemy"]:
+			continue
+		var texture = ArtAssets.get_object_texture(obj_type)
+		if not texture:
+			continue
+		var sprite = Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.position = GridSystem.grid_to_world(Vector2i(obj.get("x", 0), obj.get("y", 0)))
+		sprite.scale = Vector2(GridSystem.CELL_SIZE / texture.get_width(), GridSystem.CELL_SIZE / texture.get_height())
+		sprite.z_index = 2
+		terrain_layer.add_child(sprite)
 
 func _draw_tile(pos: Vector2i, terrain_id: int, layer: int) -> void:
 	var visuals = get_node_or_null("/root/BattleVisuals")
@@ -106,7 +138,7 @@ func _spawn_units() -> void:
 
 	for i in range(min(player_spawns.size(), 4)):
 		var spawn = player_spawns[i]
-		var unit = GameData.create_player_unit(jobs[i % jobs.size()], "鐜╁" + str(i + 1))
+		var unit = GameData.create_player_unit(jobs[i % jobs.size()], "玩家" + str(i + 1))
 		unit.grid_pos = Vector2i(spawn.x, spawn.y)
 		var sprite = _create_unit_sprite(unit)
 		sprite.position = GridSystem.grid_to_world(unit.grid_pos)
@@ -129,7 +161,7 @@ func _create_unit_sprite(unit: Node) -> UnitSprite:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_left_click(event.position)
+			_handle_left_click(get_global_mouse_position())
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_handle_right_click()
 
@@ -214,7 +246,8 @@ func _move_unit(unit: Node, target: Vector2i) -> void:
 	_show_move_range(unit)
 	hud.update_action_menu(unit)
 	_update_unit_info(unit)
-	AudioManager.sfx_move()
+	var terrain = MapLoader.get_terrain_at(map_data, target.x, target.y)
+	AudioManager.sfx_move(terrain)
 	_shake_camera(2.0, 0.08)
 
 func _attack_unit(attacker: Node, target: Node) -> void:
@@ -244,15 +277,18 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 
 	var target_sprite := _get_sprite_for_unit(target)
 
-	if result.hit:
-		target.take_damage(result.damage)
-		AudioManager.sfx_hit()
-		_show_floating_text(target.grid_pos, "-%d" % result.damage, GameTheme.HP_LOW)
+	if result.get("hit", false):
+		target.take_damage(int(result.get("damage", 0)))
+		var target_terrain = MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y)
+		AudioManager.sfx_hit(target_terrain)
+		BattleEffects.play_hit(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
+		_show_floating_text(target.grid_pos, "-%d" % int(result.get("damage", 0)), GameTheme.HP_LOW)
 		if target_sprite:
 			target_sprite.flash_hit()
 		_shake_camera(4.0, 0.12)
-		if result.critical:
+		if result.get("critical", false):
 			AudioManager.sfx_critical()
+			BattleEffects.play_critical(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
 			_show_floating_text(target.grid_pos + Vector2i(0, -1), "CRIT", Color(1.0, 0.75, 0.03))
 		if not target.is_alive:
 			AudioManager.sfx_unit_down()
@@ -261,7 +297,7 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 				target_sprite.fade_out()
 			_check_victory()
 	else:
-		if result.dodged:
+		if result.get("dodged", false):
 			_show_floating_text(target.grid_pos, "DODGE", Color(0.42, 0.86, 1.0))
 		else:
 			_show_floating_text(target.grid_pos, "MISS", Color(0.65, 0.65, 0.65))
@@ -269,6 +305,9 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 	_refresh_all_unit_sprites()
 	_update_unit_info(null)
 	_deselect_unit()
+
+func _on_player_turn_started() -> void:
+	AudioManager.sfx_turn_start(true)
 
 func _on_end_turn() -> void:
 	GameManager.turn_manager.end_player_turn()
@@ -356,9 +395,7 @@ func _update_unit_info(unit: Node) -> void:
 		hud.update_unit_info(unit)
 
 func _check_victory() -> void:
-	var alive_enemies = GameManager.enemy_units.filter(func(u): return u.is_alive)
-	if alive_enemies.size() == 0:
-		AudioManager.sfx_victory()
+	GameManager._check_victory()
 
 func _refresh_all_unit_sprites() -> void:
 	for sprite in units_container.get_children():
@@ -403,7 +440,7 @@ func _find_target_position(caster: Node, target: Node = null) -> Vector2i:
 func _build_skill_target(skill_id: String, caster: Node) -> Dictionary:
 	if skill_id in ["asslt_adrenaline", "heavy_taunt", "heavy_iron_fortress", "heavy_self_repair", "medic_barrier_blast", "gen_hunker_down", "gen_sprint", "gen_reposition", "scout_stealth"]:
 		return {}
-	if skill_id in ["medic_heal", "medic_revive", "medic_adrenaline_shot", "medic_cure", "medic_pain_block", "medic_stim_pack", "heavy_protect", "scout_shadow_step"]:
+	if skill_id in ["medic_heal", "medic_revive", "medic_adrenaline_shot", "medic_cure", "medic_pain_block", "medic_stim_pack", "heavy_protect"]:
 		return {"target_unit": _find_best_ally_target(caster)}
 	if skill_id in ["gen_interact", "scout_sabotage", "asslt_storm_dash", "asslt_chain_slash"]:
 		return {"position": _find_target_position(caster, _find_best_enemy_target(caster))}
@@ -434,6 +471,9 @@ func _use_skill(skill_id: String) -> void:
 			AudioManager.sfx_overwatch()
 	else:
 		_show_floating_text(selected_unit.grid_pos, "SKILL FAIL", Color(0.8, 0.4, 0.4))
+	current_action = "move"
+	if selected_unit:
+		_show_move_range(selected_unit)
 
 func _build_item_target(item_id: String, caster: Node) -> Dictionary:
 	var item = GameData.get_item(item_id)
@@ -457,13 +497,10 @@ func _use_item(item_id: String) -> void:
 
 	if item_type == "trap":
 		result = _place_trap_on_map(item, target_pos)
+	elif item_type == "throwable":
+		result = action_system.use_item(selected_unit, item_id, null, {"position": target_pos})
 	else:
-		if item_type == "throwable":
-			var proxy_target := Unit.new()
-			proxy_target.grid_pos = target_pos
-			result = action_system.use_item(selected_unit, item_id, proxy_target)
-		else:
-			result = action_system.use_item(selected_unit, item_id, target)
+		result = action_system.use_item(selected_unit, item_id, target)
 
 	if result.get("success", false):
 		_consume_inventory_item(item_id)
@@ -479,10 +516,13 @@ func _use_item(item_id: String) -> void:
 		_show_floating_text(selected_unit.grid_pos, "ITEM", Color(0.42, 0.86, 1.0))
 	else:
 		_show_floating_text(selected_unit.grid_pos, "ITEM FAIL", Color(0.8, 0.4, 0.4))
+	current_action = "move"
+	if selected_unit:
+		_show_move_range(selected_unit)
 
 func _place_trap_on_map(item: Dictionary, pos: Vector2i) -> Dictionary:
 	if not MapLoader.is_passable(map_data, pos.x, pos.y):
-		return {success = false, reason = "invalid_position"}
+		return {"success": false, "reason": "invalid_position"}
 
 	var effect = item.get("effect", {})
 	var trap_obj = {
@@ -494,12 +534,12 @@ func _place_trap_on_map(item: Dictionary, pos: Vector2i) -> Dictionary:
 		"damage": effect.get("damage", [20, 30]),
 		"trigger": effect.get("trigger", "enemy_enter"),
 		"status": effect.get("add_status", {}),
-		"name": item.get("name", "闄烽槺"),
+		"name": item.get("name", "陷阱"),
 	}
 	if not map_data.has("objects"):
 		map_data["objects"] = []
 	map_data.objects.append(trap_obj)
-	return {success = true, trap = item.get("name", ""), pos = pos}
+	return {"success": true, "trap": item.get("name", ""), "pos": pos}
 
 func _consume_inventory_item(item_id: String) -> void:
 	var inventory = GameManager.save_data.get("inventory", [])
@@ -550,10 +590,7 @@ func _show_floating_text(grid_pos: Vector2i, text: String, color: Color) -> void
 	tween.tween_callback(Callable(label, "queue_free"))
 
 func _world_to_screen(world_pos: Vector2) -> Vector2:
-	var camera = get_viewport().get_camera_2d()
-	if camera:
-		return camera.unproject_position(world_pos)
-	return world_pos
+	return get_viewport().get_canvas_transform() * world_pos
 
 func _shake_camera(strength: float, duration: float) -> void:
 	if not camera_2d:

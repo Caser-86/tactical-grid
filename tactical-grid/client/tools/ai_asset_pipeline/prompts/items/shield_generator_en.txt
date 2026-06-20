@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 护盾发生器, 获得50点屏障，持续2回合

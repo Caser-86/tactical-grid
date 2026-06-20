@@ -1,6 +1,7 @@
 ## 游戏颜色主题
 ## 统一管理所有 UI 和游戏元素的颜色
 class_name GameTheme
+extends RefCounted
 
 # 阵营颜色
 const PLAYER_COLOR = Color(0.13, 0.59, 0.95)      # 蓝色
@@ -34,11 +35,13 @@ const HALF_COVER_COLOR = Color(1.0, 0.98, 0.77, 0.6)
 const FULL_COVER_COLOR = Color(0.98, 0.75, 0.10, 0.6)
 
 # UI 颜色
-const BG_DARK = Color(0.06, 0.07, 0.09, 1)
-const BG_PANEL = Color(0.10, 0.11, 0.13, 0.95)
+const BG_DARK = Color(0.04, 0.05, 0.07, 1)
+const BG_PANEL = Color(0.08, 0.11, 0.16, 0.72)
+const BG_PANEL_SOLID = Color(0.08, 0.11, 0.16, 0.92)
 const TEXT_PRIMARY = Color(0.95, 0.95, 0.95)
 const TEXT_SECONDARY = Color(0.65, 0.65, 0.65)
 const ACCENT = Color(0.13, 0.59, 0.95)
+const ACCENT_GLOW = Color(0.13, 0.59, 0.95, 0.45)
 
 # 状态颜色
 const HP_FULL = Color(0.30, 0.85, 0.30)

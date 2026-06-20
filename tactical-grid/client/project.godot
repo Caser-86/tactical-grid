@@ -22,8 +22,15 @@ GameManager="*res://scripts/game/game_manager.gd"
 GameData="*res://scripts/data/game_data.gd"
 ArtAssets="*res://scripts/data/art_assets.gd"
 BattleVisuals="*res://scripts/game/battle_visuals.gd"
+BattleEffects="*res://scripts/game/battle_effects.gd"
 SaveManager="*res://scripts/network/save_manager.gd"
 AudioManager="*res://scripts/game/audio_manager.gd"
+RoguelikeManager="*res://scripts/data/roguelike_manager.gd"
+TransitionManager="*res://scripts/ui/transition_manager.gd"
+TutorialManager="*res://scripts/game/tutorial_manager.gd"
+PerformanceMonitor="*res://scripts/debug/performance_monitor.gd"
+LocalizationManager="*res://scripts/data/localization_manager.gd"
+FontManager="*res://scripts/ui/font_manager.gd"
 
 [display]
 

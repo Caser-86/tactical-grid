@@ -1,45 +1,42 @@
 extends Node
 
-const TERRAIN_ATLAS_PATH := "res://assets/tiles/战棋游戏地形贴图集_俯视角_低多边形风格_包含平地_道路_森_2026-06-17T18-06-17.png"
 const UI_ICON_ATLAS_PATH := "res://assets/ui/游戏UI图标集_战术战棋游戏_包含移动_攻击_技能_物品_警_2026-06-17T18-05-49.png"
+const CELL_SIZE := 64
 
+var _current_theme: String = "warehouse"
 var _atlas_texture: Texture2D
 var _ui_icon_texture: Texture2D
+
+## 切换当前主题（在加载关卡时调用）
+func set_theme(theme_id: String) -> void:
+	if theme_id == _current_theme and _atlas_texture:
+		return
+	_current_theme = theme_id
+	_atlas_texture = null
 
 func get_atlas_texture() -> Texture2D:
 	if _atlas_texture:
 		return _atlas_texture
-	_atlas_texture = load(TERRAIN_ATLAS_PATH)
+	var path = "res://assets/tiles/generated/theme_" + _current_theme + ".png"
+	if FileAccess.file_exists(path):
+		_atlas_texture = load(path)
+	else:
+		# 回退到默认仓库主题
+		_atlas_texture = load("res://assets/tiles/generated/theme_warehouse.png")
 	return _atlas_texture
 
 func get_source_texture() -> Texture2D:
 	return get_atlas_texture()
 
+## 地形/阻挡都按标准 10x1 网格 atlas 取格子
 func get_terrain_region(terrain_id: int) -> Rect2:
-	match terrain_id:
-		0:
-			return Rect2(54, 42, 285, 281)
-		1:
-			return Rect2(367, 42, 276, 281)
-		2:
-			return Rect2(683, 42, 285, 281)
-		3:
-			return Rect2(54, 695, 285, 270)
-		4:
-			return Rect2(367, 695, 285, 270)
-		5:
-			return Rect2(683, 695, 285, 270)
-		_:
-			return Rect2(54, 42, 285, 281)
+	var idx = clampi(terrain_id, 0, 9)
+	return Rect2(idx * CELL_SIZE, 0, CELL_SIZE, CELL_SIZE)
 
 func get_blocker_region(block_id: int) -> Rect2:
-	match block_id:
-		6:
-			return Rect2(683, 363, 285, 286)
-		7:
-			return Rect2(54, 363, 285, 286)
-		_:
-			return Rect2(54, 42, 285, 281)
+	# 墙体=6 用第7格，箱子=7 用第8格
+	var idx = 7 if block_id == 6 else 8
+	return Rect2(idx * CELL_SIZE, 0, CELL_SIZE, CELL_SIZE)
 
 func get_ui_icon_texture() -> Texture2D:
 	if _ui_icon_texture:

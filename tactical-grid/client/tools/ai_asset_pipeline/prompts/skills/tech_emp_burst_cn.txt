@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，EMP爆发: 范围4格内机械敌人眩晕2回合+失去护盾

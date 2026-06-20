@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，火焰地雷, 50伤害+燃烧3回合

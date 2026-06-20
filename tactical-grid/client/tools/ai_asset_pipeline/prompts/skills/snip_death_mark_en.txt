@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 死亡标记: 标记敌人，全队对其命中+15，2回合

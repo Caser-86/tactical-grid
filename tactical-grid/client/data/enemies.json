@@ -4,7 +4,7 @@
       "name": "侦查无人机",
       "hp": 30, "armor": 0, "move": 6, "vision": 7, "ap": 2,
       "weapon": "laser_light",
-      "range": [1, 4], "damage": [10, 18],
+      "range": [1, 4], "damage": [8, 14],
       "special": ["flying", "ignore_terrain"],
       "chapter": 1,
       "ai_weights": { "patrol": 0.4, "approach": 0.3, "attack": 0.3 }
@@ -31,7 +31,7 @@
       "name": "基础哨兵",
       "hp": 60, "armor": 5, "move": 4, "vision": 6, "ap": 2,
       "weapon": "rifle",
-      "range": [2, 6], "damage": [18, 28],
+      "range": [2, 6], "damage": [14, 22],
       "special": [],
       "chapter": 1,
       "ai_weights": { "guard_point": 0.5, "attack": 0.3, "take_cover": 0.2 }
@@ -40,7 +40,7 @@
       "name": "精英哨兵",
       "hp": 90, "armor": 8, "move": 4, "vision": 7, "ap": 2,
       "weapon": "precision_rifle",
-      "range": [3, 8], "damage": [25, 40],
+      "range": [3, 8], "damage": [22, 34],
       "special": ["mark_target"],
       "chapter": 2,
       "ai_weights": { "guard_point": 0.4, "attack": 0.4, "take_cover": 0.2 }

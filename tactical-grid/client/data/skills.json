@@ -408,6 +408,241 @@
       "ap_cost": 1, "cooldown": 0, "unlock_level": 0,
       "description": "与相邻交互点互动",
       "effect": "interact"
+    },
+    "asslt_vortex_blade": {
+      "name": "旋风斩", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 6,
+      "description": "周围1格所有敌人受到70%近战伤害，命中-10%",
+      "effect": "whirlwind_attack",
+      "radius": 1,
+      "damage_mod": 0.7,
+      "hit_mod": -10
+    },
+    "asslt_warcry": {
+      "name": "战吼", "job": "assault", "type": "active",
+      "ap_cost": 1, "cooldown": 4, "unlock_level": 4,
+      "description": "周围2格盟友+15%命中+10%暴击，3回合",
+      "effect": "warcry_buff",
+      "radius": 2,
+      "buff_hit": 15,
+      "buff_crit": 10,
+      "duration": 3
+    },
+    "asslt_aimed_shot": {
+      "name": "精准射击", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 2, "unlock_level": 3,
+      "description": "远距离精确攻击，+30%命中+20%暴击",
+      "effect": "aimed_shot",
+      "range": 12,
+      "hit_mod": 30,
+      "crit_mod": 20
+    },
+    "asslt_execute": {
+      "name": "处决", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 8,
+      "description": "对受伤敌人+50%伤害，目标HP<30%时+100%",
+      "effect": "execute_attack",
+      "range": 1,
+      "execute_bonus": 50,
+      "low_hp_bonus": 100
+    },
+    "sg_shotgun_burst": {
+      "name": "霰弹连射", "job": "assault", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 5,
+      "description": "对前方3格锥形范围2次连射，每次50%伤害",
+      "effect": "cone_burst",
+      "range": 3,
+      "cone_width": 2,
+      "hits": 2,
+      "damage_mod": 0.5
+    },
+    "sniper_pierce_shot": {
+      "name": "贯穿射击", "job": "sniper", "type": "active",
+      "ap_cost": 2, "cooldown": 2, "unlock_level": 4,
+      "description": "对一条直线上所有敌人造成60%伤害，命中-5%",
+      "effect": "pierce_line",
+      "range": 15,
+      "damage_mod": 0.6,
+      "hit_mod": -5
+    },
+    "sniper_overwatch_setup": {
+      "name": "完美布置", "job": "sniper", "type": "active",
+      "ap_cost": 1, "cooldown": 5, "unlock_level": 6,
+      "description": "本回合警戒射击+1次+50%暴击",
+      "effect": "perfect_overwatch",
+      "duration": 1
+    },
+    "sniper_killing_spree": {
+      "name": "连杀时刻", "job": "sniper", "type": "active",
+      "ap_cost": 2, "cooldown": 4, "unlock_level": 9,
+      "description": "对3个不同敌人射击，每个+30%命中+30%暴击",
+      "effect": "multi_shot",
+      "shots": 3,
+      "hit_mod": 30,
+      "crit_mod": 30
+    },
+    "heavy_shield_wall": {
+      "name": "盾墙", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 4, "unlock_level": 3,
+      "description": "本回合+50%抗性，无法移动",
+      "effect": "shield_wall",
+      "armor_mod": 50,
+      "lock_movement": true
+    },
+    "heavy_slam": {
+      "name": "震荡重击", "job": "heavy", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 5,
+      "description": "近战攻击+击退2格+眩晕1回合",
+      "effect": "slam_attack",
+      "range": 1,
+      "knockback": 2,
+      "stun_chance": 1.0
+    },
+    "heavy_fortify": {
+      "name": "坚守阵地", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 5, "unlock_level": 7,
+      "description": "周围2格盟友+20%护甲+15%最大HP，4回合",
+      "effect": "fortify_buff",
+      "radius": 2,
+      "armor_mod": 20,
+      "hp_mod": 15,
+      "duration": 4
+    },
+    "heavy_taunt": {
+      "name": "嘲讽", "job": "heavy", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 4,
+      "description": "周围5格敌人强制攻击自己，2回合",
+      "effect": "taunt",
+      "radius": 5,
+      "duration": 2
+    },
+    "scout_shadow_step": {
+      "name": "暗影步", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 3,
+      "description": "瞬移到7格内任意位置，下一回合获得潜行",
+      "effect": "shadow_step",
+      "range": 7,
+      "stealth_on_arrive": true
+    },
+    "scout_trap_master": {
+      "name": "陷阱大师", "job": "scout", "type": "active",
+      "ap_cost": 1, "cooldown": 4, "unlock_level": 5,
+      "description": "免费放置2个陷阱+陷阱伤害+30%",
+      "effect": "trap_master",
+      "traps": 2,
+      "trap_damage_mod": 0.3
+    },
+    "scout_ghost_protocol": {
+      "name": "幽灵协议", "job": "scout", "type": "active",
+      "ap_cost": 2, "cooldown": 5, "unlock_level": 8,
+      "description": "全体盟友潜行3回合，移动+1",
+      "effect": "team_stealth",
+      "duration": 3,
+      "movement_bonus": 1
+    },
+    "scout_quick_reload": {
+      "name": "快速装填", "job": "scout", "type": "active",
+      "ap_cost": 0, "cooldown": 2, "unlock_level": 4,
+      "description": "本回合AP+1",
+      "effect": "bonus_ap",
+      "ap_bonus": 1
+    },
+    "medic_healing_storm": {
+      "name": "医疗风暴", "job": "medic", "type": "active",
+      "ap_cost": 2, "cooldown": 4, "unlock_level": 4,
+      "description": "治疗周围2格所有盟友30HP+移除负面状态",
+      "effect": "aoe_heal",
+      "radius": 2,
+      "amount": 30,
+      "cleanse": true
+    },
+    "medic_rez": {
+      "name": "战地复活", "job": "medic", "type": "active",
+      "ap_cost": 3, "cooldown": 6, "unlock_level": 7,
+      "description": "复活一个倒下的盟友(50%HP)，范围3格",
+      "effect": "revive",
+      "range": 3,
+      "rez_percent": 0.5
+    },
+    "medic_shield_boost": {
+      "name": "护盾强化", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 5,
+      "description": "目标盟友获得50点屏障+抗性+15%，3回合",
+      "effect": "shield_boost",
+      "range": 6,
+      "barrier": 50,
+      "armor_mod": 15,
+      "duration": 3
+    },
+    "medic_overheal": {
+      "name": "过量治疗", "job": "medic", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 2,
+      "description": "治疗目标40HP+超量部分形成护盾",
+      "effect": "overheal",
+      "range": 6,
+      "amount": 40,
+      "shield_from_overheal": true
+    },
+    "tech_emp_burst": {
+      "name": "EMP爆发", "job": "tech", "type": "active",
+      "ap_cost": 2, "cooldown": 3, "unlock_level": 4,
+      "description": "范围4格内机械敌人眩晕2回合+失去护盾",
+      "effect": "emp_burst",
+      "radius": 4,
+      "stun": 2,
+      "strip_shield": true,
+      "mechanical_only": true
+    },
+    "tech_turret_deploy": {
+      "name": "炮塔部署", "job": "tech", "type": "active",
+      "ap_cost": 2, "cooldown": 4, "unlock_level": 5,
+      "description": "部署自动炮塔，3回合内自动攻击范围内敌人",
+      "effect": "deploy_turret",
+      "duration": 3,
+      "turret_damage": 25,
+      "turret_range": 6
+    },
+    "tech_overload": {
+      "name": "能量过载", "job": "tech", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 6,
+      "description": "下次攻击+50%伤害+燃烧3回合",
+      "effect": "self_buff",
+      "damage_mod": 0.5,
+      "burn": 3,
+      "duration": 2
+    },
+    "tech_hack": {
+      "name": "系统入侵", "job": "tech", "type": "active",
+      "ap_cost": 1, "cooldown": 2, "unlock_level": 3,
+      "description": "控制一个机械敌人1回合(对玩家攻击)",
+      "effect": "hack_enemy",
+      "duration": 1,
+      "mechanical_only": true
+    },
+    "psycho_inspire": {
+      "name": "激励", "job": "commander", "type": "active",
+      "ap_cost": 1, "cooldown": 3, "unlock_level": 3,
+      "description": "全体盟友+1AP+15%命中，本回合",
+      "effect": "inspire_team",
+      "ap_bonus": 1,
+      "hit_mod": 15,
+      "duration": 1
+    },
+    "psycho_command": {
+      "name": "指挥官号令", "job": "commander", "type": "active",
+      "ap_cost": 2, "cooldown": 4, "unlock_level": 6,
+      "description": "一个盟友立刻再次行动(消耗其下次行动)",
+      "effect": "extra_turn",
+      "range": 12
+    },
+    "psycho_rally": {
+      "name": "振奋", "job": "commander", "type": "active",
+      "ap_cost": 2, "cooldown": 5, "unlock_level": 8,
+      "description": "全体盟友+25最大HP+15%护甲，本关卡",
+      "effect": "rally_buff",
+      "hp_mod": 25,
+      "armor_mod": 15,
+      "duration_battle": true
     }
   }
 }

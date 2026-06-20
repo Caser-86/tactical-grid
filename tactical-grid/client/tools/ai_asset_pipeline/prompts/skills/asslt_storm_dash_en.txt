@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 风暴冲刺: 移动+5格，路径上敌人受20伤害

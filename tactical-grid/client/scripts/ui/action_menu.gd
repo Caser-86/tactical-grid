@@ -1,5 +1,5 @@
-﻿## 琛屽姩鑿滃崟
-## 鏄剧ず褰撳墠鍗曚綅鍙敤鐨勮鍔ㄩ€夐」
+## 行动菜单
+## 显示当前单位可用的行动选项
 extends Control
 class_name ActionMenu
 
@@ -26,7 +26,7 @@ func _ready() -> void:
 	if end_turn_button:
 		end_turn_button.pressed.connect(func(): action_selected.emit("end_turn"))
 
-## 鏍规嵁鍗曚綅鐘舵€佹洿鏂版寜閽彲鐢ㄦ€?
+## 根据单位状态更新按钮可用性
 func update_for_unit(unit: Node) -> void:
 	if not unit:
 		hide()
@@ -45,7 +45,7 @@ func update_for_unit(unit: Node) -> void:
 	if overwatch_button:
 		overwatch_button.disabled = unit.current_ap < 1
 
-	# 绉诲姩鍚庢敾鍑婚檺鍒?
+	# 移动后攻击限制
 	if unit.has_status("moved"):
 		if attack_button:
 			attack_button.disabled = true

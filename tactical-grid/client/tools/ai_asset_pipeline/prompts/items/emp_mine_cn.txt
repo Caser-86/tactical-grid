@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，EMP地雷, 60伤害+致AI失效2回合

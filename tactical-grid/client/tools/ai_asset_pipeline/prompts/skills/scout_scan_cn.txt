@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，侦察扫描: 揭示5×5内所有敌人意图

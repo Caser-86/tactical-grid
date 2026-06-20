@@ -1,0 +1,1 @@
+Weapon icon for a tactical RPG inventory, {style_base}, centered, 64x64, recognizable silhouette, 消音手枪, silent_no_expose

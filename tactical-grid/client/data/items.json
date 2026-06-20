@@ -165,6 +165,129 @@
       "rarity": "common",
       "stack": 2,
       "description": "踩踏减速2回合+出血"
+    },
+    "sniper_mine": {
+      "name": "反器材地雷",
+      "type": "trap",
+      "effect": { "damage": 120, "pierce_armor": true, "radius": 1 },
+      "detect_per": 4,
+      "weight": 2,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "120穿透伤害，1格半径"
+    },
+    "flame_trap": {
+      "name": "火焰地雷",
+      "type": "trap",
+      "effect": { "damage": 50, "add_status": { "burn": 3 }, "radius": 1 },
+      "detect_per": 6,
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "50伤害+燃烧3回合"
+    },
+    "stun_grenade": {
+      "name": "眩晕手雷",
+      "type": "throwable",
+      "effect": { "add_status": { "stun": 1 }, "area": "3x3" },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 1,
+      "rarity": "common",
+      "stack": 2,
+      "description": "3x3范围眩晕1回合"
+    },
+    "plasma_grenade": {
+      "name": "等离子手雷",
+      "type": "throwable",
+      "effect": { "damage": [80, 100], "area": "3x3", "ignore_armor": true },
+      "ap_cost": 1,
+      "range": [1, 6],
+      "weight": 1,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "3x3无视护甲伤害80-100"
+    },
+    "ai_disruptor": {
+      "name": "AI干扰器",
+      "type": "throwable",
+      "effect": { "add_status": { "jammed": 3 }, "area": "5x5" },
+      "ap_cost": 1,
+      "range": [1, 5],
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "5x5范围致机械AI失效3回合"
+    },
+    "stim_pack": {
+      "name": "兴奋剂",
+      "type": "consumable",
+      "effect": { "add_status": { "adrenaline": 1 } },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "common",
+      "stack": 3,
+      "description": "获得+1AP持续1回合"
+    },
+    "hunting_potion": {
+      "name": "猎人药剂",
+      "type": "consumable",
+      "effect": { "add_status": { "hunt_mark": 3 } },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "uncommon",
+      "stack": 2,
+      "description": "对敌人伤害+30%，3回合"
+    },
+    "shield_matrix": {
+      "name": "护盾力场",
+      "type": "consumable",
+      "effect": { "add_status": { "barrier_100": 3 } },
+      "ap_cost": 1,
+      "weight": 1,
+      "rarity": "legendary",
+      "stack": 1,
+      "description": "获得100点屏障，3回合"
+    },
+    "tactical_visor": {
+      "name": "战术目镜",
+      "type": "consumable",
+      "effect": { "add_status": { "vision_plus_2": 5 } },
+      "ap_cost": 0,
+      "weight": 0.5,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "视野+2，5回合"
+    },
+    "thermal_goggles": {
+      "name": "热成像仪",
+      "type": "consumable",
+      "effect": { "add_status": { "thermal_vision": 4 } },
+      "ap_cost": 0,
+      "weight": 0.5,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "看穿隐形，4回合"
+    },
+    "regen_vial": {
+      "name": "再生血清",
+      "type": "consumable",
+      "effect": { "add_status": { "regen": 4 } },
+      "ap_cost": 1,
+      "weight": 0.5,
+      "rarity": "epic",
+      "stack": 1,
+      "description": "每回合恢复15HP，4回合"
+    },
+    "emp_mine": {
+      "name": "EMP地雷",
+      "type": "trap",
+      "effect": { "damage": 60, "add_status": { "jammed": 2 }, "radius": 1 },
+      "detect_per": 5,
+      "weight": 1,
+      "rarity": "rare",
+      "stack": 1,
+      "description": "60伤害+致AI失效2回合"
     }
   },
   "ammo": {

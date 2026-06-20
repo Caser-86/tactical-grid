@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 能量过载: 下次攻击+50%伤害+燃烧3回合

@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 霰弹连射: 对前方3格锥形范围2次连射，每次50%伤害

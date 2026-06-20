@@ -1,0 +1,11 @@
+Godot Engine v4.6.3.stable.official.7d41c59c4 - https://godotengine.org
+OpenGL API 3.3.0 Core Profile Context 24.10.39.10.250109 - Compatibility - Using Device: ATI Technologies Inc. - AMD Radeon 780M Graphics
+
+=== BattleController._ready() START ===
+  level_data keys: ["id", "name", "mission_type", "size", "seed", "layers", "spawns", "evac_point", "scripts"]
+  map_data keys: ["map_id", "seed", "size", "theme", "mission_type", "layers", "objects", "scripts", "victory", "spawns", "evac_point"]
+  spawns: { "player": [{ "x": 1, "y": 6 }, { "x": 2, "y": 7 }, { "x": 1, "y": 7 }, { "x": 0, "y": 6 }], "enemies": [{ "x": 8, "y": 1, "job": "sentry_basic" }, { "x": 9, "y": 2, "job": "sentry_basic" }, { "x": 7, "y": 0, "job": "sentry_sniper" }] }
+  player_units: 4
+  enemy_units: 3
+=== BattleController._ready() DONE ===
+  [CLICK] world=(55.0, 391.0) grid=(0, 6) action=move selected=<null>

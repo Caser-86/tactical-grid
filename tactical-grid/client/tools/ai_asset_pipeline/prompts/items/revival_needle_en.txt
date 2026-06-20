@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 复活针, 复活倒地友军至30%生命值

@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 处决: 对受伤敌人+50%伤害，目标HP<30%时+100%

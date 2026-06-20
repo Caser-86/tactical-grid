@@ -47,6 +47,8 @@ func _apply_volumes() -> void:
 func play_bgm(bgm_id: String) -> void:
 	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
 		return
+	if not bgm_player:
+		return
 	if bgm_id == current_bgm:
 		return
 	current_bgm = bgm_id
@@ -58,14 +60,17 @@ func play_bgm(bgm_id: String) -> void:
 
 ## 停止 BGM
 func stop_bgm() -> void:
-	bgm_player.stop()
-	bgm_player.stream = null
+	if bgm_player:
+		bgm_player.stop()
+		bgm_player.stream = null
 	current_bgm = ""
 	audio_cache.clear()
 
 ## 播放音效
 func play_sfx(sfx_id: String) -> void:
 	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
+		return
+	if not sfx_player:
 		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
@@ -76,6 +81,8 @@ func play_sfx(sfx_id: String) -> void:
 func play_ambient(ambient_id: String) -> void:
 	if OS.has_feature("headless") or DisplayServer.get_name() == "headless":
 		return
+	if not ambient_player:
+		return
 	var stream = _load_audio("ambient", ambient_id)
 	if stream:
 		ambient_player.stream = stream
@@ -83,16 +90,24 @@ func play_ambient(ambient_id: String) -> void:
 
 ## 停止环境音
 func stop_ambient() -> void:
-	ambient_player.stop()
-	ambient_player.stream = null
+	if ambient_player:
+		ambient_player.stop()
+		ambient_player.stream = null
 	audio_cache.clear()
 
 func _exit_tree() -> void:
 	stop_bgm()
-	sfx_player.stop()
-	sfx_player.stream = null
+	if sfx_player:
+		sfx_player.stop()
+		sfx_player.stream = null
 	stop_ambient()
 	audio_cache.clear()
+
+## 检查音频文件是否存在（不加载）
+func _audio_exists(category: String, audio_id: String) -> bool:
+	var path_ogg = "res://assets/audio/" + category + "/" + audio_id + ".ogg"
+	var path_wav = "res://assets/audio/" + category + "/" + audio_id + ".wav"
+	return FileAccess.file_exists(path_ogg) or FileAccess.file_exists(path_wav)
 
 ## 加载音频文件
 func _load_audio(category: String, audio_id: String) -> AudioStream:
@@ -128,17 +143,74 @@ func sfx_ui_click() -> void:
 func sfx_ui_hover() -> void:
 	play_sfx("sfx_ui_hover")
 
+func sfx_ui_error() -> void:
+	play_sfx("sfx_ui_error")
+
 func sfx_select_unit() -> void:
 	play_sfx("sfx_select_unit")
 
-func sfx_move() -> void:
-	play_sfx("sfx_unit_land")
+func sfx_move(terrain = "ground") -> void:
+	var terrain_name = _terrain_to_name(terrain)
+	var map := {
+		"road": "sfx_step_road", "asphalt": "sfx_step_road",
+		"grass": "sfx_step_grass", "forest": "sfx_step_grass",
+		"sand": "sfx_step_sand", "dirt": "sfx_step_sand",
+		"water": "sfx_step_water", "river": "sfx_step_water",
+		"snow": "sfx_step_snow", "ice": "sfx_step_snow",
+		"metal": "sfx_step_metal", "floor": "sfx_step_metal",
+		"highland": "sfx_step_rock", "rock": "sfx_step_rock",
+	}
+	var sfx_id = map.get(terrain_name, "sfx_step_ground")
+	if not _audio_exists("sfx", sfx_id):
+		sfx_id = "sfx_unit_land"
+	play_sfx(sfx_id)
 
 func sfx_attack(weapon_type: String = "pistol") -> void:
-	play_sfx("sfx_combat_" + weapon_type)
+	var map := {
+		"shotgun": "sfx_combat_shotgun", "shotgun_mk2": "sfx_combat_shotgun", "double_barrel_shotgun": "sfx_combat_shotgun",
+		"smg": "sfx_combat_rifle", "smg_x7": "sfx_combat_rifle",
+		"rifle": "sfx_combat_rifle",
+		"sniper_rifle": "sfx_combat_sniper", "marksman_rifle": "sfx_combat_sniper", "em_sniper": "sfx_combat_sniper",
+		"heavy_anti_materiel": "sfx_combat_sniper", "orbital_strike_rifle": "sfx_combat_sniper",
+		"mg": "sfx_combat_rifle", "gatling": "sfx_combat_rifle", "railgun": "sfx_combat_sniper",
+		"pistol": "sfx_combat_pistol", "silenced_pistol": "sfx_combat_pistol", "silenced_pistol_mk2": "sfx_combat_pistol",
+		"knife": "sfx_combat_pistol", "plasma_blade": "sfx_combat_pistol", "nano_blade": "sfx_combat_pistol",
+		"phantom_dual_blade": "sfx_combat_pistol", "energy_dagger": "sfx_combat_pistol",
+		"grenade_launcher": "sfx_explosion", "plasma_grenade_cannon": "sfx_explosion",
+		"flamethrower_mk2": "sfx_explosion",
+		"med_gun": "sfx_combat_pistol", "nano_med_gun": "sfx_combat_pistol",
+		"bio_toxin_gun": "sfx_combat_pistol", "life_drain_gun": "sfx_combat_pistol",
+		"bomb": "sfx_explosion", "laser_light": "sfx_combat_rifle", "dual_laser": "sfx_combat_rifle",
+		"precision_rifle": "sfx_combat_sniper", "rocket_launcher": "sfx_explosion",
+		"energy_blade": "sfx_combat_pistol", "poison_gun": "sfx_combat_pistol", "flamethrower": "sfx_explosion",
+	}
+	var sfx_id = map.get(weapon_type, "sfx_combat_pistol")
+	play_sfx(sfx_id)
 
-func sfx_hit() -> void:
-	play_sfx("sfx_hit_flesh")
+func sfx_hit(terrain = "ground") -> void:
+	var terrain_name = _terrain_to_name(terrain)
+	var map := {
+		"water": "sfx_hit_water", "river": "sfx_hit_water",
+		"metal": "sfx_hit_metal", "floor": "sfx_hit_metal",
+		"wall": "sfx_hit_metal", "crate": "sfx_hit_wood",
+		"rock": "sfx_hit_rock", "highland": "sfx_hit_rock",
+	}
+	var sfx_id = map.get(terrain_name, "sfx_hit_flesh")
+	if not _audio_exists("sfx", sfx_id):
+		sfx_id = "sfx_hit_flesh"
+	play_sfx(sfx_id)
+
+func _terrain_to_name(terrain) -> String:
+	if terrain is String:
+		return terrain.to_lower()
+	if terrain is int:
+		var map := {
+			0: "plain", 1: "road", 2: "forest", 3: "sand",
+			4: "highland", 5: "water", 6: "wall", 7: "crate",
+			8: "poison", 9: "bridge",
+		}
+		return map.get(terrain, "ground")
+	return "ground"
 
 func sfx_critical() -> void:
 	play_sfx("sfx_critical_hit")

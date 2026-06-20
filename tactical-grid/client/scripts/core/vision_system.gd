@@ -1,5 +1,6 @@
 ## 视线计算系统
 ## 使用 Bresenham 算法判断两个格子之间是否有视线
+extends RefCounted
 class_name VisionSystem
 
 ## 检查 from 到 to 之间是否有视线（无硬阻挡）

@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 冲刺突袭: 移动+3格后近战攻击，命中+20%

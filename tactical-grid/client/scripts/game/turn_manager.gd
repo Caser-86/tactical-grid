@@ -44,7 +44,12 @@ func set_phase(phase: TurnPhase) -> void:
 		TurnPhase.ENEMY_START:
 			enemy_turn_started.emit()
 			_refresh_enemy_units()
-			set_phase(TurnPhase.ENEMY_ACTION)
+			current_phase = TurnPhase.ENEMY_ACTION
+			turn_phase_changed.emit(current_phase)
+			# 注意：不在此处递归切换到 ENEMY_ACTION
+			# 等待 GameManager._on_turn_phase_changed 接收 ENEMY_START 信号后
+			# 执行敌人回合再调用 end_enemy_turn() 切换到 ENEMY_END
+			return
 
 		TurnPhase.ENEMY_END:
 			set_phase(TurnPhase.CHECK_VICTORY)
@@ -66,13 +71,15 @@ func end_enemy_turn() -> void:
 		set_phase(TurnPhase.ENEMY_END)
 
 func _refresh_player_units() -> void:
-	var units = get_tree().get_nodes_in_group("player_units")
-	for unit in units:
+	for unit in GameManager.player_units:
 		if unit.has_method("refresh_ap"):
 			unit.refresh_ap()
+		if unit.has_method("reduce_skill_cooldowns"):
+			unit.reduce_skill_cooldowns()
 
 func _refresh_enemy_units() -> void:
-	var units = get_tree().get_nodes_in_group("enemy_units")
-	for unit in units:
+	for unit in GameManager.enemy_units:
 		if unit.has_method("refresh_ap"):
 			unit.refresh_ap()
+		if unit.has_method("reduce_skill_cooldowns"):
+			unit.reduce_skill_cooldowns()

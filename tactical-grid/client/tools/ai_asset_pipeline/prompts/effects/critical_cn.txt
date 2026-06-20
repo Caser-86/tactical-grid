@@ -1,0 +1,1 @@
+VFX sprite for a tactical RPG, {style_base}, single frame, 64x64，red explosive critical strike flash

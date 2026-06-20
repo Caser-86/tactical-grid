@@ -1,5 +1,6 @@
 ## 战斗公式
 ## 命中率、伤害、暴击等计算
+extends RefCounted
 class_name CombatFormulas
 
 ## 计算命中率（返回 0.0-1.0）
@@ -25,9 +26,9 @@ static func calculate_hit(
 		"soft":
 			hit -= 15.0
 
-	# 距离惩罚（超过最佳射程后每格 -5）
+	# 距离惩罚（超过最佳射程后每格 -8）
 	if distance > weapon_optimal_range:
-		hit -= (distance - weapon_optimal_range) * 5.0
+		hit -= (distance - weapon_optimal_range) * 8.0
 
 	# 限制在 5%-95%
 	hit = clampf(hit, 5.0, 95.0)
@@ -40,14 +41,14 @@ static func calculate_damage(
 	is_critical: bool,
 	crit_multiplier: float
 ) -> int:
-	# 护甲减伤（百分比）
-	var damage_reduction = armor / 100.0
-	var damage = float(base_damage) * (1.0 - damage_reduction)
+	# 护甲固定减伤（每点护甲减2点伤害），最少保留10%基础伤害
+	var min_damage = max(1, int(base_damage * 0.1))
+	var damage = max(base_damage - armor * 2, min_damage)
 
 	if is_critical:
-		damage *= crit_multiplier
+		damage = int(damage * crit_multiplier)
 
-	return int(damage)
+	return damage
 
 ## 判断是否暴击
 static func is_critical_hit(crit_chance: float, rng: RandomNumberGenerator) -> bool:
@@ -98,11 +99,11 @@ static func resolve_attack(
 
 	# 先判定闪避
 	if rng.randf() < final_dodge:
-		return {hit = false, damage = 0, critical = false, dodged = true}
+		return {"hit": false, "damage": 0, "critical": false, "dodged": true}
 
 	# 再判定命中
 	if rng.randf() > hit_chance:
-		return {hit = false, damage = 0, critical = false, dodged = false}
+		return {"hit": false, "damage": 0, "critical": false, "dodged": false}
 
 	# 命中，判定暴击
 	var final_crit = calculate_crit_chance(crit_chance, attacker_height, target_height)
@@ -111,4 +112,4 @@ static func resolve_attack(
 	# 计算伤害
 	var damage = calculate_damage(base_damage, target_armor, is_crit, crit_multiplier)
 
-	return {hit = true, damage = damage, critical = is_crit, dodged = false}
+	return {"hit": true, "damage": damage, "critical": is_crit, "dodged": false}

@@ -77,14 +77,14 @@ static func _try_support_action(enemy, players, enemies, special: Array, actions
 		var ally = _find_best_damaged_ally(enemy, players, enemies)
 		if ally and GridSystem.manhattan_distance(enemy.grid_pos, ally.grid_pos) <= 5:
 			ally.heal(40)
-			ally.add_status("barrier", 2, {amount = 10})
+			ally.add_status("barrier", 2, {"amount": 10})
 			enemy.spend_ap(1)
 			actions_log.append({"unit": enemy.unit_name, "action": "heal_ally", "target": ally.unit_name})
 			return true
 	if "ally_barrier_40" in special or enemy.job == "shield_maestro":
 		var shield_target = _find_best_damaged_ally(enemy, players, enemies)
 		if shield_target and GridSystem.manhattan_distance(enemy.grid_pos, shield_target.grid_pos) <= 5:
-			shield_target.add_status("barrier", 2, {amount = 40})
+			shield_target.add_status("barrier", 2, {"amount": 40})
 			enemy.spend_ap(1)
 			actions_log.append({"unit": enemy.unit_name, "action": "barrier_ally", "target": shield_target.unit_name})
 			return true
@@ -110,8 +110,8 @@ static func _do_attack(attacker, target, map_data, rng) -> Dictionary:
 		target.armor, attacker.crit_chance, attacker.crit_multiplier,
 		target.dodge, MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y), rng
 	)
-	if result.hit:
-		target.take_damage(result.damage)
+	if result.get("hit", false):
+		target.take_damage(int(result.get("damage", 0)))
 	return result
 
 static func _do_move(unit, target_pos, map_data) -> bool:
@@ -121,7 +121,7 @@ static func _do_move(unit, target_pos, map_data) -> bool:
 		return false
 	var path = Pathfinding.find_path(
 		unit.grid_pos, target_pos,
-		map_data.size.width, map_data.size.height,
+		map_data.get("size", {}).get("width", 10), map_data.get("size", {}).get("height", 8),
 		func(pos): return _calc_step_cost(pos, map_data),
 		func(pos): return _check_blocked(pos, map_data)
 	)
@@ -147,6 +147,7 @@ static func _do_move(unit, target_pos, map_data) -> bool:
 		unit.move_to(last)
 	else:
 		unit.move_to(target_pos)
+	unit.spend_ap(1)
 	return true
 
 static func _find_best_damaged_ally(enemy, players, enemies):
@@ -165,7 +166,7 @@ static func _find_best_damaged_ally(enemy, players, enemies):
 static func _find_best_highground_position(enemy, enemies, players, map_data) -> Vector2i:
 	var reachable = Pathfinding.get_reachable_cells(
 		enemy.grid_pos, enemy.move_points,
-		map_data.size.width, map_data.size.height,
+		map_data.get("size", {}).get("width", 10), map_data.get("size", {}).get("height", 8),
 		func(pos): return _calc_step_cost(pos, map_data),
 		func(pos): return _check_blocked(pos, map_data)
 	)

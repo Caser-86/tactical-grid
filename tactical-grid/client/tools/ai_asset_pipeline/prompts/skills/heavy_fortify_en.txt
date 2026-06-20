@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 坚守阵地: 周围2格盟友+20%护甲+15%最大HP，4回合

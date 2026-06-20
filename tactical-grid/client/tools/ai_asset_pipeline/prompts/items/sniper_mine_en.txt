@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 反器材地雷, 120穿透伤害，1格半径

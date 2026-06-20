@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, AI干扰器, 5x5范围致机械AI失效3回合

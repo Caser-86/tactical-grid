@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，指挥官号令: 一个盟友立刻再次行动(消耗其下次行动)

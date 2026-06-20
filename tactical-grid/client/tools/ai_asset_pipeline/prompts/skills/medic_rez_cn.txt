@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，战地复活: 复活一个倒下的盟友(50%HP)，范围3格

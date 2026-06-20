@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，兴奋剂, 获得+1AP持续1回合

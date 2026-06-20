@@ -1,5 +1,6 @@
 ## 网格坐标系统
 ## 处理逻辑坐标与世界坐标的转换
+extends RefCounted
 class_name GridSystem
 
 const CELL_SIZE := 64  ## 每格像素大小

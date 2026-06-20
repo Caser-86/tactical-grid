@@ -1,0 +1,1 @@
+Top-down isometric unit sprite for a tactical grid RPG, {style_base}, full body visible from above, 64x64 pixel art style, single static pose, giant boss 矩阵将军, 阶段1 阶段2 阶段3, takes up most of frame, imposing

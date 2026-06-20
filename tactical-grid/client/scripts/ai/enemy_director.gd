@@ -3,6 +3,8 @@
 extends Node
 class_name EnemyDirector
 
+signal reinforcement_spawned(unit: Node, pos: Vector2i)
+
 var turn_count: int = 0
 var reinforcement_triggers: Array = []
 var pressure_level: float = 0.0  # 0-1，玩家优势度
@@ -19,8 +21,13 @@ func setup(scripts: Array) -> void:
 	# 从地图脚本中提取增援触发器
 	reinforcement_triggers.clear()
 	for script in scripts:
-		if script.action == "spawn_reinforcement":
-			reinforcement_triggers.append(script)
+		if script.get("action", "") == "spawn_reinforcement":
+			var trigger_data = {
+				"triggered": false,
+				"trigger": script.get("trigger", {}),
+				"data": script.get("data", {}),
+			}
+			reinforcement_triggers.append(trigger_data)
 
 ## 每回合更新
 func on_turn_start(turn_number: int) -> void:
@@ -32,11 +39,8 @@ func on_turn_start(turn_number: int) -> void:
 
 ## 评估当前压力
 func _evaluate_pressure() -> void:
-	var player_units = get_tree().get_nodes_in_group("player_units")
-	var enemy_units = get_tree().get_nodes_in_group("enemy_units")
-
-	var alive_players = player_units.filter(func(u): return u.is_alive).size()
-	var alive_enemies = enemy_units.filter(func(u): return u.is_alive).size()
+	var alive_players = GameManager.player_units.filter(func(u): return u.is_alive).size()
+	var alive_enemies = GameManager.enemy_units.filter(func(u): return u.is_alive).size()
 
 	if alive_players == 0:
 		pressure_level = 0.0
@@ -101,6 +105,7 @@ func _spawn_reinforcement(data: Dictionary) -> void:
 		var unit = GameData.create_enemy_unit(enemy_type)
 		unit.grid_pos = spawn_pos
 		GameManager.enemy_units.append(unit)
+		reinforcement_spawned.emit(unit, spawn_pos)
 
 		# 通知消息
 		var msg = data.get("message", "敌方增援已到达！")

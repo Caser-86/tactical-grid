@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，护盾强化: 目标盟友获得50点屏障+抗性+15%，3回合

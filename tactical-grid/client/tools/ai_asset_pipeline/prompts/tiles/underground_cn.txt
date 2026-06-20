@@ -1,0 +1,1 @@
+Top-down tileset texture atlas for a tactical grid RPG, {style_base}, 10 tiles arranged horizontally, each tile 64x64，Theme: 地下设施，金属格栅地面，管道，幽蓝应急灯. Tiles in order: plain ground, road, forest, sand, highland, water, wall, crate/cover, poison pool, bridge. Cohesive color palette.

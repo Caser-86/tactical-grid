@@ -1,0 +1,52 @@
+{
+  "rules": [
+    {
+      "source": "ai_output/assault",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/sniper",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/medic",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/scout",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/heavy",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/enemies",
+      "target": "client/assets/units",
+      "size": "128x128",
+      "padding": true
+    },
+    {
+      "source": "ai_output/warehouse",
+      "target": "client/assets/tiles",
+      "size": "1024x1024",
+      "padding": false
+    },
+    {
+      "source": "ai_output/explosion",
+      "target": "client/assets/effects/sequences/explosion_frames",
+      "size": "128x128",
+      "padding": false
+    }
+  ]
+}

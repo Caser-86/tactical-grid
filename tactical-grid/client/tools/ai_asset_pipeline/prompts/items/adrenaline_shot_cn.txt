@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，肾上腺素针, 获得1点额外行动点，持续1回合

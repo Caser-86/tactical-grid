@@ -1,0 +1,1 @@
+Top-down isometric unit sprite for a tactical grid RPG, {style_base}, full body visible from above, 64x64 pixel art style, single static pose，giant boss 架构师, 秩序 混沌 终焉, takes up most of frame, imposing

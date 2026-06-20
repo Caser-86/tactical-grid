@@ -1,5 +1,6 @@
 ## A* 寻路算法
 ## 用于计算单位移动路径和可达范围
+extends RefCounted
 class_name Pathfinding
 
 ## 地形通行成本函数类型
@@ -25,7 +26,7 @@ static func find_path(
 
 	g_score[start] = 0
 	f_score[start] = manhattan(start, end)
-	open_set.append({pos = start, f = f_score[start]})
+	open_set.append({"pos": start, "f": f_score[start]})
 
 	while open_set.size() > 0:
 		# 找 f_score 最小的
@@ -60,7 +61,7 @@ static func find_path(
 						in_open = true
 						break
 				if not in_open:
-					open_set.append({pos = neighbor, f = f_score[neighbor_key]})
+					open_set.append({"pos": neighbor, "f": f_score[neighbor_key]})
 
 	return []  # 不可达
 
@@ -86,7 +87,7 @@ static func get_reachable_cells(
 	blocked_check: Callable
 ) -> Dictionary:
 	var distances: Dictionary = {}
-	var queue: Array = [{pos = start, cost = 0}]
+	var queue: Array = [{"pos": start, "cost": 0}]
 	distances[start] = 0
 
 	while queue.size() > 0:
@@ -110,7 +111,7 @@ static func get_reachable_cells(
 			if not distances.has(neighbor) or new_cost < distances[neighbor]:
 				distances[neighbor] = new_cost
 				if new_cost <= move_points:
-					queue.append({pos = neighbor, cost = new_cost})
+					queue.append({"pos": neighbor, "cost": new_cost})
 
 	return distances
 

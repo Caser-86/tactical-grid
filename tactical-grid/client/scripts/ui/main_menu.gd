@@ -13,29 +13,46 @@ func _ready() -> void:
 	quick_battle_button.pressed.connect(_on_quick_battle)
 	settings_button.pressed.connect(_on_settings)
 	quit_button.pressed.connect(_on_quit)
+
 	background_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
 	var bg = ArtAssets.get_menu_background()
 	if bg:
 		background_art.texture = bg
 
-	AudioManager.bgm_menu()
+	_apply_localization()
 
-	var has_save = _check_save()
-	continue_button.disabled = not has_save
+	var has_save = SaveManager.load_latest_save().size() > 0
+	continue_button.visible = has_save
+
+	AudioManager.play_bgm("bgm_main_menu")
+
+func _apply_localization() -> void:
+	continue_button.text = LocalizationManager.get_text("continue", continue_button.text)
+	new_game_button.text = LocalizationManager.get_text("new_game", new_game_button.text)
+	quick_battle_button.text = LocalizationManager.get_text("quick_battle", quick_battle_button.text)
+	settings_button.text = LocalizationManager.get_text("settings", settings_button.text)
+	quit_button.text = LocalizationManager.get_text("quit", quit_button.text)
+	var title = get_node_or_null("CenterContainer/VBoxContainer/TitleLabel")
+	if title:
+		title.text = LocalizationManager.get_text("game_title", title.text)
 
 func _on_continue() -> void:
-	get_tree().change_scene_to_file("res://scenes/base.tscn")
+	var save = SaveManager.load_latest_save()
+	if save.size() > 0:
+		GameManager.save_data = save
+	TransitionManager.change_scene("res://scenes/base.tscn")
 
 func _on_new_game() -> void:
-	get_tree().change_scene_to_file("res://scenes/base.tscn")
+	GameManager.save_data = SaveManager.create_default_save()
+	SaveManager.auto_save(GameManager.save_data)
+	TransitionManager.change_scene("res://scenes/base.tscn")
 
 func _on_quick_battle() -> void:
-	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+	TransitionManager.change_scene("res://scenes/battle.tscn")
 
 func _on_settings() -> void:
-	get_tree().change_scene_to_file("res://scenes/settings.tscn")
+	TransitionManager.change_scene("res://scenes/settings.tscn")
 
 func _on_quit() -> void:
 	get_tree().quit()

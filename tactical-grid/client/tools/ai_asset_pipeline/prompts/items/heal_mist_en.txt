@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 治疗雾, 友军每回合恢复15HP，3回合

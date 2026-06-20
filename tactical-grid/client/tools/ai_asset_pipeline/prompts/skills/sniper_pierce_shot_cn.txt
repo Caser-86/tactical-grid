@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，贯穿射击: 对一条直线上所有敌人造成60%伤害，命中-5%

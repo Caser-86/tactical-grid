@@ -1,0 +1,1 @@
+Top-down isometric unit sprite for a tactical grid RPG, {style_base}, full body visible from above, 64x64 pixel art style, single static pose, enemy 喷火兵, burn_ground ignore_half_cover, red team colors

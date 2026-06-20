@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene, 战吼: 周围2格盟友+15%命中+10%暴击，3回合

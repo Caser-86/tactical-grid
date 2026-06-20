@@ -7,7 +7,7 @@
 script = ExtResource("1_th188")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1018980327]
-position = Vector2(320, 256)
+position = Vector2(512, 384)
 
 [node name="TerrainLayer" type="Node2D" parent="." unique_id=1499133923]
 

@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，精准射击: 远距离精确攻击，+30%命中+20%暴击

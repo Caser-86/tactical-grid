@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64, 猎人药剂, 对敌人伤害+30%，3回合

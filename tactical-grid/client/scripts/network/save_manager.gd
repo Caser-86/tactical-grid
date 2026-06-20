@@ -4,6 +4,7 @@ extends Node
 
 const SAVE_DIR = "user://saves/"
 const MAX_LOCAL_SAVES = 3
+const CURRENT_SAVE_VERSION = "1.1.0"
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -15,12 +16,24 @@ func _ensure_save_dir() -> void:
 ## 保存游戏
 func save_game(save_data: Dictionary, slot: int = 0) -> bool:
 	var path = SAVE_DIR + "save_%d.json" % slot
+	var backup_path = SAVE_DIR + "save_%d_backup.json" % slot
+
+	# 先备份旧存档
+	if FileAccess.file_exists(path):
+		var old_file = FileAccess.open(path, FileAccess.READ)
+		if old_file:
+			var backup = FileAccess.open(backup_path, FileAccess.WRITE)
+			if backup:
+				backup.store_string(old_file.get_as_text())
+				backup.close()
+			old_file.close()
+
 	var file = FileAccess.open(path, FileAccess.WRITE)
 	if not file:
 		print("Failed to open save file: ", path)
 		return false
 
-	save_data["save_version"] = "1.1.0"
+	save_data["save_version"] = CURRENT_SAVE_VERSION
 	save_data["save_time"] = Time.get_unix_time_from_system()
 
 	var json_str = JSON.stringify(save_data, "  ")
@@ -46,7 +59,36 @@ func load_game(slot: int = 0) -> Dictionary:
 	file.close()
 
 	var data = JSON.parse_string(text)
-	return data if data else {}
+	if not data:
+		# 存档损坏，尝试从备份恢复
+		return restore_from_backup(slot)
+	return _migrate_save(data)
+
+## 从备份恢复存档
+func restore_from_backup(slot: int = 0) -> Dictionary:
+	var backup_path = SAVE_DIR + "save_%d_backup.json" % slot
+	if not FileAccess.file_exists(backup_path):
+		return {}
+
+	var file = FileAccess.open(backup_path, FileAccess.READ)
+	if not file:
+		return {}
+
+	var text = file.get_as_text()
+	file.close()
+
+	var data = JSON.parse_string(text)
+	if not data:
+		return {}
+
+	# 恢复为主存档
+	var path = SAVE_DIR + "save_%d.json" % slot
+	var main = FileAccess.open(path, FileAccess.WRITE)
+	if main:
+		main.store_string(text)
+		main.close()
+
+	return _migrate_save(data)
 
 ## 获取所有本地存档
 func get_local_saves() -> Array:
@@ -65,6 +107,14 @@ func get_local_saves() -> Array:
 ## 自动存档
 func auto_save(save_data: Dictionary) -> bool:
 	return save_game(save_data, 0)
+
+## 加载最新存档
+func load_latest_save() -> Dictionary:
+	var saves = get_local_saves()
+	if saves.is_empty():
+		return {}
+	saves.sort_custom(func(a, b): return a.save_time > b.save_time)
+	return load_game(saves[0].slot)
 
 ## 删除存档
 func delete_save(slot: int) -> void:
@@ -89,8 +139,8 @@ func _sync_to_cloud(save_data: Dictionary, slot: int) -> void:
 
 	api.queue_free()
 
-	if result.code != 0:
-		print("Cloud sync failed: ", result.message)
+	if result.get("code", -1) != 0:
+		print("Cloud sync failed: ", result.get("message", ""))
 
 ## 从云端加载最新存档
 func load_from_cloud() -> Dictionary:
@@ -104,14 +154,48 @@ func load_from_cloud() -> Dictionary:
 	var result = await api.download_save("latest")
 	api.queue_free()
 
-	if result.code != 0:
+	if result.get("code", -1) != 0:
 		return {}
 
-	var save_data_str = result.data.get("save_data", "")
+	var save_data_str = result.get("data", {}).get("save_data", "")
 	if save_data_str == "":
 		return {}
 
 	return JSON.parse_string(save_data_str)
+
+## 存档版本迁移
+func _migrate_save(data: Dictionary) -> Dictionary:
+	var version = data.get("save_version", "")
+	if version == CURRENT_SAVE_VERSION:
+		return data
+
+	# 1.0.0 -> 1.1.0 迁移
+	if not data.has("resources"):
+		data["resources"] = {}
+	var resources = data["resources"]
+	if not resources.has("materials"):
+		resources["materials"] = {}
+	if not resources.has("credit"):
+		resources["credit"] = 0
+	if not resources.has("intel"):
+		resources["intel"] = 0
+	if not data.has("inventory"):
+		data["inventory"] = []
+	if not data.has("stats_tracking"):
+		data["stats_tracking"] = {"total_kills": 0, "total_missions": 0, "total_playtime": 0}
+	if not data.has("campaign_progress"):
+		data["campaign_progress"] = {
+			"current_chapter": 1,
+			"current_mission": "ch1_m1",
+			"completed_missions": [],
+			"mission_ratings": {},
+			"story_flags": {},
+		}
+	if not data.has("settings"):
+		data["settings"] = {"difficulty": "standard", "permadeath": false}
+
+	data["save_version"] = CURRENT_SAVE_VERSION
+	return data
 
 ## 创建默认存档数据
 func create_default_save() -> Dictionary:

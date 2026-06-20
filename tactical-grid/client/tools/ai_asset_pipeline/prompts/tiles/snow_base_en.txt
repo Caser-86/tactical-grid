@@ -1,0 +1,1 @@
+Top-down tileset texture atlas for a tactical grid RPG, {style_base}, 10 tiles arranged horizontally, each tile 64x64, Theme: snow_base. Tiles in order: plain ground, road, forest, sand, highland, water, wall, crate/cover, poison pool, bridge. Cohesive color palette.

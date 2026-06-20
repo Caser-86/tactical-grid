@@ -101,13 +101,18 @@ func _on_buy(item: Dictionary) -> void:
 		return
 
 	player_credit -= item.price
+	var resources = GameManager.save_data.get("resources", {})
+	resources["credit"] = player_credit
+	GameManager.save_data["resources"] = resources
+
 	var inv = GameManager.save_data.get("inventory", [])
 	var existing = inv.filter(func(i): return i.get("id") == item.id)
 	if existing.size() > 0:
 		existing[0]["count"] = existing[0].get("count", 1) + 1
 	else:
-		inv.append({"id": item.id, "type": item.type, "count": 1})
+		inv.append({"id": item.get("id", ""), "type": item.get("type", ""), "count": 1})
 	GameManager.save_data["inventory"] = inv
+	SaveManager.auto_save(GameManager.save_data)
 	_display_items()
 
 func _on_refresh() -> void:

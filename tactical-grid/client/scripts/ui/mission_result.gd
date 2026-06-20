@@ -20,6 +20,8 @@ func _ready() -> void:
 	next_button.pressed.connect(_on_next)
 
 func show_result(data: Dictionary) -> void:
+	modulate = Color(1, 1, 1, 0)
+	visible = true
 	var is_victory = data.get("result", "defeat") == "victory"
 	if is_victory:
 		title_label.text = "任务完成"
@@ -29,6 +31,12 @@ func show_result(data: Dictionary) -> void:
 		title_label.text = "任务失败"
 		title_label.modulate = Color.RED
 		AudioManager.bgm_defeat()
+
+	# 入场动画
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate", Color.WHITE, 0.5)
+	tween.parallel().tween_property($Panel, "scale", Vector2.ONE, 0.5).from(Vector2(0.85, 0.85))
 
 	_show_stars(data.get("stars", 0))
 	turns_label.text = str(data.get("turns", 0))
@@ -79,7 +87,16 @@ func _on_retry() -> void:
 	get_tree().reload_current_scene()
 
 func _on_base() -> void:
-	get_tree().change_scene_to_file("res://scenes/base.tscn")
+	GameManager.player_units.clear()
+	GameManager.enemy_units.clear()
+	GameManager.selected_unit = null
+	if GameManager.in_roguelike:
+		RoguelikeManager.complete_floor({"credit": 100})
+		RoguelikeManager.advance_floor()
+		GameManager.in_roguelike = false
+		TransitionManager.change_scene("res://scenes/roguelike_map.tscn")
+	else:
+		TransitionManager.change_scene("res://scenes/base.tscn")
 
 func _on_next() -> void:
 	var current_id = GameManager.current_level_id
@@ -91,12 +108,16 @@ func _on_next() -> void:
 		var mission = int(regex_result.get_string(2))
 		var next_mission = mission + 1
 		var next_id = "ch%d_m%d" % [chapter, next_mission]
-		if next_mission > 7:
+		var levels = GameData.level_data.get("levels", {})
+		if not levels.has(next_id):
 			next_id = "ch%d_m1" % (chapter + 1)
+			if not levels.has(next_id):
+				TransitionManager.change_scene("res://scenes/base.tscn")
+				return
 		GameManager.load_level(next_id)
-		get_tree().change_scene_to_file("res://scenes/battle.tscn")
+		TransitionManager.change_scene("res://scenes/battle.tscn")
 	else:
-		get_tree().change_scene_to_file("res://scenes/base.tscn")
+		TransitionManager.change_scene("res://scenes/base.tscn")
 
 func _exit_tree() -> void:
 	AudioManager.stop_bgm()

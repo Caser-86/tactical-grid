@@ -1,0 +1,1 @@
+Skill ability icon for a tactical RPG, {style_base}, centered, 64x64, symbolic action scene，医疗风暴: 治疗周围2格所有盟友30HP+移除负面状态

@@ -1,0 +1,1 @@
+Top-down object sprite for a tactical grid RPG, {style_base}, 64x64, viewed from above，wall-mounted alarm control panel, red lights

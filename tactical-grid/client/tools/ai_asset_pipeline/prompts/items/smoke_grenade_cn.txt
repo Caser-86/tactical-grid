@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，烟雾弹, 生成软遮蔽烟雾3回合

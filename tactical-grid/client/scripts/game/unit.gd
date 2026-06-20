@@ -33,6 +33,8 @@ var grid_pos: Vector2i = Vector2i.ZERO
 var last_grid_pos: Vector2i = Vector2i.ZERO
 var height: int = 0
 
+var skill_cooldowns: Dictionary = {}  # skill_id -> remaining_turns
+
 var is_alive: bool = true
 var is_downed: bool = false
 var status_effects: Array = []
@@ -41,6 +43,7 @@ var equipment: Dictionary = {}
 var weapon_range: Array = [1, 5]
 var weapon_damage: Array = [20, 30]
 var weapon_optimal_range: int = 3
+var equipped_weapon: String = ""
 var heal_bonus: float = 1.0
 var second_wind_available: bool = true
 
@@ -130,7 +133,7 @@ func move_to(new_pos: Vector2i) -> void:
 	last_grid_pos = old_pos
 	grid_pos = new_pos
 	if job == "scout":
-		add_status("evasive_step", 1, {dodge = 0.2})
+		add_status("evasive_step", 1, {"dodge": 0.2})
 	unit_moved.emit(self, old_pos, new_pos)
 
 func add_status(effect_id: String, duration: int, data: Dictionary = {}) -> void:
@@ -139,10 +142,11 @@ func add_status(effect_id: String, duration: int, data: Dictionary = {}) -> void
 			effect.duration = maxi(effect.duration, duration)
 			if data.has("amount"):
 				var current_amount = int(effect.data.get("amount", 0))
+				var new_amount = int(data.get("amount", 0))
 				if effect_id == "barrier":
-					effect.data["amount"] = current_amount + int(data.get("amount", 0))
+					effect.data["amount"] = current_amount + new_amount
 				else:
-					effect.data["amount"] = maxi(current_amount, int(data.get("amount", 0)))
+					effect.data["amount"] = maxi(current_amount, new_amount)
 			for key in data:
 				if key == "amount":
 					continue
@@ -184,6 +188,21 @@ func can_act() -> bool:
 
 func can_move() -> bool:
 	return is_alive and not has_status("stun") and not has_status("rooted")
+
+func set_skill_cooldown(skill_id: String, turns: int) -> void:
+	if turns <= 0:
+		skill_cooldowns.erase(skill_id)
+	else:
+		skill_cooldowns[skill_id] = turns
+
+func get_skill_cooldown(skill_id: String) -> int:
+	return skill_cooldowns.get(skill_id, 0)
+
+func reduce_skill_cooldowns() -> void:
+	for skill_id in skill_cooldowns.keys():
+		skill_cooldowns[skill_id] -= 1
+		if skill_cooldowns[skill_id] <= 0:
+			skill_cooldowns.erase(skill_id)
 
 func has_status(effect_id: String) -> bool:
 	return status_effects.any(func(e): return e.id == effect_id)

@@ -1,0 +1,1 @@
+Top-down isometric unit sprite for a tactical grid RPG, {style_base}, full body visible from above, 64x64 pixel art style, single static pose，enemy 火箭兵, aoe_3x3 destroy_cover, red team colors

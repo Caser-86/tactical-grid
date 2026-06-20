@@ -1,0 +1,1 @@
+Item icon for a tactical RPG inventory, {style_base}, centered, 64x64，燃烧瓶, 生成燃烧地面2回合
