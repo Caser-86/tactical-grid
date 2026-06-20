@@ -657,6 +657,14 @@ func _on_enemy_action_started(enemy: Node, _action_type: String) -> void:
 
 var _skill_preview_active: bool = false
 
+func _get_skill_range(skill_id: String, unit: Node) -> Array:
+	var skill = GameData.get_skill(skill_id)
+	if skill.is_empty():
+		return [1, 1]
+	var max_range = int(skill.get("range", unit.weapon_range[1] if unit.weapon_range.size() > 1 else 5))
+	var min_range = 1
+	return [min_range, max_range]
+
 func _on_skill_hovered(skill_id: String) -> void:
 	if not selected_unit:
 		return
