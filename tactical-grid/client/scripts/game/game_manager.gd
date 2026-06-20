@@ -3,6 +3,8 @@
 extends Node
 
 signal boss_phase_changed(boss: Node, phase_name: String)
+signal enemy_action_started(enemy: Node, action_type: String)
+signal enemy_action_finished(enemy: Node)
 
 var current_map_data: Dictionary = {}
 var player_units: Array = []
@@ -193,9 +195,11 @@ func _execute_enemy_turn() -> void:
 		if not enemy.is_alive:
 			continue
 
+		enemy_action_started.emit(enemy, "start")
 		var actions = EnemyTemplates.execute_turn(
 			enemy, player_units, current_map_data, enemy_units, enemy_director, rng
 		)
+		enemy_action_finished.emit(enemy)
 
 		if _check_victory():
 			return

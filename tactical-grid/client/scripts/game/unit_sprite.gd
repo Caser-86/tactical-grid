@@ -16,6 +16,7 @@ var _frame_index: int = 0
 var _frame_timer: float = 0.0
 var _frame_interval: float = 0.18
 var _current_state: String = "idle"
+var _one_shot_states: Array[String] = ["attack", "hit"]
 
 func _process(delta: float) -> void:
 	if not unit:
@@ -29,7 +30,15 @@ func _process(delta: float) -> void:
 		_frame_timer += delta
 		if _frame_timer >= _frame_interval:
 			_frame_timer = 0.0
-			_frame_index = (_frame_index + 1) % _frames.size()
+			_frame_index += 1
+			if _frame_index >= _frames.size():
+				if _current_state == "death":
+					_frame_index = _frames.size() - 1
+				elif _current_state in _one_shot_states:
+					play("idle")
+					return
+				else:
+					_frame_index = 0
 			queue_redraw()
 
 func _draw() -> void:
@@ -163,6 +172,8 @@ func play(state: String) -> void:
 	_frame_timer = 0.0
 	if unit:
 		_frames = ArtAssets.get_unit_sprite_frames(unit.job, state)
+		if _frames.size() == 0 and state == "death":
+			_frames = ArtAssets.get_unit_sprite_frames(unit.job, "hit")
 		if _frames.size() == 0 and state != "idle":
 			_frames = ArtAssets.get_unit_sprite_frames(unit.job, "idle")
 	queue_redraw()

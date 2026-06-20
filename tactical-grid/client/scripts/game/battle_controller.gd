@@ -75,6 +75,8 @@ func _load_battle() -> void:
 	GameManager.turn_manager.start_battle()
 	if not GameManager.turn_manager.player_turn_started.is_connected(_on_player_turn_started):
 		GameManager.turn_manager.player_turn_started.connect(_on_player_turn_started)
+	if not GameManager.enemy_action_started.is_connected(_on_enemy_action_started):
+		GameManager.enemy_action_started.connect(_on_enemy_action_started)
 	_setup_tutorial()
 	battle_objective_text = _get_mission_objective_text()
 	hud.update_objective(battle_objective_text)
@@ -379,6 +381,7 @@ func _select_unit(unit: Node) -> void:
 	_update_unit_info(unit)
 	hud.update_action_menu(unit)
 	AudioManager.sfx_select_unit()
+	focus_on_unit(unit, 0.22)
 
 func _highlight_selected_unit(unit: Node) -> void:
 	var cell_world := GridSystem.grid_to_world(unit.grid_pos)
@@ -556,7 +559,11 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 				if target.has_meta("is_boss"):
 					target_sprite.play_defeated_shatter()
 				else:
-					target_sprite.fade_out()
+					target_sprite.play("death")
+					var death_tween = create_tween()
+					death_tween.tween_interval(0.6)
+					death_tween.tween_property(target_sprite, "modulate:a", 0.0, 0.25)
+					death_tween.tween_callback(target_sprite.queue_free)
 			_check_victory()
 	else:
 		if result.get("dodged", false):
@@ -620,6 +627,9 @@ func _on_tutorial_step_changed(text: String) -> void:
 func _on_tutorial_finished() -> void:
 	if hud:
 		hud.show_battle_hint("教学完成，继续任务！", 2.0)
+
+func _on_enemy_action_started(enemy: Node, _action_type: String) -> void:
+	focus_on_unit(enemy, 0.35)
 
 func _on_player_turn_started() -> void:
 	AudioManager.sfx_turn_start(true)
@@ -1295,18 +1305,32 @@ func _apply_camera_shake(t: float, base_pos: Vector2, strength: float) -> void:
 		cos(t * TAU * 6.0) * strength * 0.5
 	)
 
+func focus_on_position(world_pos: Vector2, duration: float = 0.25) -> void:
+	if not camera_2d:
+		return
+	if _camera_dragging:
+		return
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(camera_2d, "position", world_pos, duration)
+
+func focus_on_unit(unit: Node, duration: float = 0.25) -> void:
+	if not unit:
+		return
+	var world_pos = GridSystem.grid_to_world(unit.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+	focus_on_position(world_pos, duration)
+
 func _center_camera_on_map() -> void:
 	if not camera_2d:
 		return
-	var map_pixel_width = map_width * GridSystem.CELL_SIZE
-	var map_pixel_height = map_height * GridSystem.CELL_SIZE
-	var center = Vector2(map_pixel_width * 0.5, map_pixel_height * 0.5)
+	var used = terrain_layer.get_used_rect()
+	var center = Vector2(
+		(used.position.x + used.size.x / 2.0) * GridSystem.CELL_SIZE,
+		(used.position.y + used.size.y / 2.0) * GridSystem.CELL_SIZE
+	)
 	camera_2d.position = center
-	# 根据地图尺寸自动调整缩放，确保地图能完整显示在屏幕内
-	var viewport_size = get_viewport_rect().size
-	var scale_x = map_pixel_width / viewport_size.x
-	var scale_y = map_pixel_height / viewport_size.y
+	var scale_x = float(get_viewport().size.x) / (used.size.x * GridSystem.CELL_SIZE)
+	var scale_y = float(get_viewport().size.y) / (used.size.y * GridSystem.CELL_SIZE)
 	var target_zoom = maxf(scale_x, scale_y)
-	# 限制最小缩放，避免地图过大时单位太小看不清
 	target_zoom = clampf(target_zoom, 1.0, 3.0)
 	camera_2d.zoom = Vector2(target_zoom, target_zoom)

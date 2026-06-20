@@ -174,17 +174,21 @@ func sfx_attack(weapon_type: String = "pistol") -> void:
 		"heavy_anti_materiel": "sfx_combat_sniper", "orbital_strike_rifle": "sfx_combat_sniper",
 		"mg": "sfx_combat_rifle", "gatling": "sfx_combat_rifle", "railgun": "sfx_combat_sniper",
 		"pistol": "sfx_combat_pistol", "silenced_pistol": "sfx_combat_pistol", "silenced_pistol_mk2": "sfx_combat_pistol",
-		"knife": "sfx_combat_pistol", "plasma_blade": "sfx_combat_pistol", "nano_blade": "sfx_combat_pistol",
-		"phantom_dual_blade": "sfx_combat_pistol", "energy_dagger": "sfx_combat_pistol",
+		"knife": "sfx_combat_melee", "plasma_blade": "sfx_combat_melee", "nano_blade": "sfx_combat_melee",
+		"phantom_dual_blade": "sfx_combat_melee", "energy_dagger": "sfx_combat_melee", "energy_blade": "sfx_combat_melee",
 		"grenade_launcher": "sfx_explosion", "plasma_grenade_cannon": "sfx_explosion",
-		"flamethrower_mk2": "sfx_explosion",
-		"med_gun": "sfx_combat_pistol", "nano_med_gun": "sfx_combat_pistol",
+		"flamethrower_mk2": "sfx_explosion", "flamethrower": "sfx_explosion",
+		"med_gun": "sfx_heal_effect", "nano_med_gun": "sfx_heal_effect",
 		"bio_toxin_gun": "sfx_combat_pistol", "life_drain_gun": "sfx_combat_pistol",
-		"bomb": "sfx_explosion", "laser_light": "sfx_combat_rifle", "dual_laser": "sfx_combat_rifle",
+		"bomb": "sfx_explosion", "laser_light": "sfx_combat_laser", "dual_laser": "sfx_combat_laser",
 		"precision_rifle": "sfx_combat_sniper", "rocket_launcher": "sfx_explosion",
-		"energy_blade": "sfx_combat_pistol", "poison_gun": "sfx_combat_pistol", "flamethrower": "sfx_explosion",
+		"poison_gun": "sfx_combat_pistol",
 	}
 	var sfx_id = map.get(weapon_type, "sfx_combat_pistol")
+	if not _audio_exists("sfx", sfx_id):
+		# 按大类 fallback
+		if sfx_id in ["sfx_combat_melee", "sfx_combat_laser"]:
+			sfx_id = "sfx_combat_pistol"
 	play_sfx(sfx_id)
 
 func sfx_hit(terrain = "ground") -> void:
