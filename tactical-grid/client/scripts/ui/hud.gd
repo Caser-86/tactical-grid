@@ -325,8 +325,12 @@ func _open_skill_popup() -> void:
 		var ap_cost = int(skill.get("ap_cost", 1))
 		var unlock_level = int(skill.get("unlock_level", 0))
 		var cooldown = int(skill.get("cooldown", 0))
+		var unit_level = current_unit.stats.get("level", 1)
 		var desc = skill.get("description", "")
-		var label = "%s  AP:%d  CD:%d  Lv:%d" % [
+		var locked_by_level = unit_level < unlock_level
+		var locked_label = "[锁定] " if locked_by_level else ""
+		var label = "%s%s  AP:%d  CD:%d  Lv:%d" % [
+			locked_label,
 			skill.get("name", skill_info.id),
 			ap_cost,
 			cooldown,
@@ -340,8 +344,8 @@ func _open_skill_popup() -> void:
 		var skill_icon = ArtAssets.get_skill_icon(skill_info.id)
 		if skill_icon:
 			skill_menu.set_item_icon(index, skill_icon)
-		if current_unit.current_ap < ap_cost or not current_unit.can_act() or current_unit.get_skill_cooldown(skill_info.id) > 0:
-			skill_menu.set_item_disabled(index, true)
+		var is_disabled = locked_by_level or current_unit.current_ap < ap_cost or not current_unit.can_act() or current_unit.get_skill_cooldown(skill_info.id) > 0
+		skill_menu.set_item_disabled(index, is_disabled)
 
 	if _skill_ids.is_empty():
 		skill_menu.add_item("暂无可用技能", 0)

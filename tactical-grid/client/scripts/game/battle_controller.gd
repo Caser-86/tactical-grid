@@ -4,6 +4,7 @@ class_name BattleController
 @onready var terrain_layer: Node2D = get_node_or_null("TerrainLayer") as Node2D
 @onready var units_container: Node2D = get_node_or_null("Units") as Node2D
 @onready var overlay: Node2D = get_node_or_null("Overlay") as Node2D
+@onready var info_layer: Node2D = get_node_or_null("InfoLayer") as Node2D
 @onready var hud: HUD = get_node_or_null("HUD") as HUD
 @onready var camera_2d: Camera2D = get_node_or_null("Camera2D") as Camera2D
 
@@ -469,11 +470,34 @@ func _draw_preview_path(target_pos: Vector2i) -> void:
 func _move_unit(unit: Node, target: Vector2i) -> void:
 	if not unit.spend_ap(1):
 		return
+	var from_pos = unit.grid_pos
 	unit.move_to(target)
 	unit.add_status("moved", 1)
 	var sprite = _get_sprite_for_unit(unit)
 	if sprite:
 		sprite.animate_move_to(GridSystem.grid_to_world(target))
+
+	# 检查 overwatch 触发
+	if action_system:
+		var triggers = action_system.check_overwatch_trigger(unit, from_pos, target)
+		for trigger in triggers:
+			var watcher = trigger.get("watcher")
+			var result = trigger.get("result", {})
+			var watcher_sprite = _get_sprite_for_unit(watcher)
+			if watcher_sprite:
+				watcher_sprite.play("attack")
+			var watcher_world = GridSystem.grid_to_world(watcher.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+			var target_world = GridSystem.grid_to_world(unit.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
+			BattleEffects.play_muzzle_flash(watcher_world, self)
+			_spawn_projectile(watcher_world, target_world, "rifle")
+			if result.get("hit", false):
+				_show_floating_text(unit.grid_pos, "-%d" % int(result.get("damage", 0)), GameTheme.HP_LOW)
+				AudioManager.sfx_hit(MapLoader.get_terrain_at(map_data, unit.grid_pos.x, unit.grid_pos.y))
+				BattleEffects.play_hit(target_world)
+				if not unit.is_alive:
+					_check_victory()
+				if watcher_sprite:
+					AudioManager.sfx_attack("rifle")
 	_clear_overlay()
 	_render_map()
 	_show_move_range(unit)
@@ -512,29 +536,14 @@ func _draw_path_line(path: Array) -> void:
 	overlay.add_child(arrow)
 
 func _attack_unit(attacker: Node, target: Node) -> void:
-	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
-	if dist < attacker.weapon_range[0] or dist > attacker.weapon_range[1]:
-		return
-	if not attacker.spend_ap(1):
+	var result = action_system.execute_attack(attacker, target)
+	if not result.get("success", false):
+		var reason = result.get("reason", "")
+		if reason == "out_of_range":
+			_show_floating_text(attacker.grid_pos, "OUT OF RANGE", Color(0.8, 0.4, 0.4))
 		return
 
-	var cover = VisionSystem.calculate_cover(
-		target.grid_pos, attacker.grid_pos,
-		func(pos): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-	)
-
-	var rng = RandomNumberGenerator.new()
-	rng.randomize()
-	var result = CombatFormulas.resolve_attack(
-		attacker.base_hit,
-		attacker.height, target.height,
-		cover, dist, attacker.weapon_optimal_range,
-		int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2),
-		target.armor,
-		attacker.crit_chance, attacker.crit_multiplier,
-		target.dodge, MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y),
-		rng
-	)
+	var attack_result = result.get("result", {})
 
 	var attacker_sprite := _get_sprite_for_unit(attacker)
 	var target_sprite := _get_sprite_for_unit(target)
@@ -546,21 +555,25 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 	var attacker_world = GridSystem.grid_to_world(attacker.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
 	var target_world = GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE / 2.0, GridSystem.CELL_SIZE / 2.0)
 	BattleEffects.play_muzzle_flash(attacker_world, self)
-	_spawn_projectile(attacker_world, target_world, attacker.weapon_type if "weapon_type" in attacker else "rifle")
+	var weapon_id = attacker.get("equipped_weapon")
+	if weapon_id == null:
+		weapon_id = ""
+	var weapon_data = GameData.get_weapon(str(weapon_id))
+	var wtype = String(weapon_data.get("type", "rifle")) if weapon_data else "rifle"
+	_spawn_projectile(attacker_world, target_world, wtype)
 
-	if result.get("hit", false):
-		target.take_damage(int(result.get("damage", 0)))
+	if attack_result.get("hit", false):
 		var target_terrain = MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y)
 		AudioManager.sfx_hit(target_terrain)
-		BattleEffects.play_hit(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
-		_show_floating_text(target.grid_pos, "-%d" % int(result.get("damage", 0)), GameTheme.HP_LOW)
+		BattleEffects.play_hit(target_world)
+		_show_floating_text(target.grid_pos, "-%d" % int(attack_result.get("damage", 0)), GameTheme.HP_LOW)
 		if target_sprite:
 			target_sprite.play("hit")
 			target_sprite.flash_hit()
 		_shake_camera(4.0, 0.12)
-		if result.get("critical", false):
+		if attack_result.get("critical", false):
 			AudioManager.sfx_critical()
-			BattleEffects.play_critical(GridSystem.grid_to_world(target.grid_pos) + Vector2(GridSystem.CELL_SIZE/2.0, GridSystem.CELL_SIZE/2.0))
+			BattleEffects.play_critical(target_world)
 			_show_floating_text(target.grid_pos + Vector2i(0, -1), "CRIT", Color(1.0, 0.75, 0.03))
 		if not target.is_alive:
 			AudioManager.sfx_unit_down()
@@ -576,11 +589,12 @@ func _attack_unit(attacker: Node, target: Node) -> void:
 					death_tween.tween_callback(target_sprite.queue_free)
 			_check_victory()
 	else:
-		if result.get("dodged", false):
+		if attack_result.get("dodged", false):
 			_show_floating_text(target.grid_pos, "DODGE", Color(0.42, 0.86, 1.0))
 		else:
 			_show_floating_text(target.grid_pos, "MISS", Color(0.65, 0.65, 0.65))
 
+	AudioManager.sfx_attack(wtype)
 	_refresh_all_unit_sprites()
 	_update_unit_info(null)
 	_deselect_unit()
@@ -812,6 +826,15 @@ func _update_unit_info(unit: Node) -> void:
 	if hud:
 		hud.update_unit_info(unit)
 
+func _play_dot_death(unit: Node) -> void:
+	var sprite = _get_sprite_for_unit(unit)
+	if sprite:
+		sprite.play("death")
+		var tween = create_tween()
+		tween.tween_interval(0.6)
+		tween.tween_property(sprite, "modulate:a", 0.0, 0.25)
+		tween.tween_callback(sprite.queue_free)
+
 func _check_victory() -> void:
 	GameManager._check_victory()
 	_update_objective_progress()
@@ -880,7 +903,12 @@ func _show_enemy_info_panel(enemy: Node) -> void:
 	if pos.x + 200 > map_width * GridSystem.CELL_SIZE:
 		pos.x -= GridSystem.CELL_SIZE + 210
 	panel.position = pos
-	overlay.add_child(panel)
+	# 使用 info_layer 避免被 _clear_overlay 清除
+	if not info_layer:
+		info_layer = Node2D.new()
+		info_layer.name = "InfoLayer"
+		add_child(info_layer)
+	info_layer.add_child(panel)
 
 	var timer = Timer.new()
 	timer.wait_time = 3.0
@@ -1444,14 +1472,14 @@ func focus_on_unit(unit: Node, duration: float = 0.25) -> void:
 func _center_camera_on_map() -> void:
 	if not camera_2d:
 		return
-	var used = terrain_layer.get_used_rect()
-	var center = Vector2(
-		(used.position.x + used.size.x / 2.0) * GridSystem.CELL_SIZE,
-		(used.position.y + used.size.y / 2.0) * GridSystem.CELL_SIZE
-	)
+	# terrain_layer 是普通 Node2D，get_used_rect() 无效
+	# 直接用 map_width/map_height 计算地图中心
+	var map_pixel_w = map_width * GridSystem.CELL_SIZE
+	var map_pixel_h = map_height * GridSystem.CELL_SIZE
+	var center = Vector2(map_pixel_w / 2.0, map_pixel_h / 2.0)
 	camera_2d.position = center
-	var scale_x = float(get_viewport().size.x) / (used.size.x * GridSystem.CELL_SIZE)
-	var scale_y = float(get_viewport().size.y) / (used.size.y * GridSystem.CELL_SIZE)
+	var scale_x = float(get_viewport().size.x) / map_pixel_w
+	var scale_y = float(get_viewport().size.y) / map_pixel_h
 	var target_zoom = maxf(scale_x, scale_y)
-	target_zoom = clampf(target_zoom, 1.0, 3.0)
+	target_zoom = clampf(target_zoom, 0.5, 3.0)
 	camera_2d.zoom = Vector2(target_zoom, target_zoom)

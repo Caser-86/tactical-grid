@@ -32,6 +32,8 @@ func _ready() -> void:
 	if not turn_manager.player_turn_started.is_connected(_on_player_turn_started):
 		turn_manager.player_turn_started.connect(_on_player_turn_started)
 	turn_manager.turn_phase_changed.connect(_on_turn_phase_changed)
+	if not turn_manager.turn_limit_reached.is_connected(_on_turn_limit_reached):
+		turn_manager.turn_limit_reached.connect(_on_turn_limit_reached)
 
 	enemy_director = EnemyDirector.new()
 	add_child(enemy_director)
@@ -194,6 +196,13 @@ func _execute_enemy_turn() -> void:
 	for enemy in enemy_units:
 		if not enemy.is_alive:
 			continue
+		# 先触发持续伤害（流血/燃烧/中毒）
+		if enemy.has_method("on_turn_start"):
+			enemy.on_turn_start()
+		if not enemy.is_alive:
+			# 持续伤害杀死敌人也更新目标
+			_on_unit_killed_by_dot(enemy)
+			continue
 
 		enemy_action_started.emit(enemy, "start")
 		var actions = EnemyTemplates.execute_turn(
@@ -207,6 +216,14 @@ func _execute_enemy_turn() -> void:
 		await get_tree().create_timer(0.5).timeout
 
 	turn_manager.end_enemy_turn()
+
+func _on_unit_killed_by_dot(unit: Node) -> void:
+	AudioManager.sfx_unit_down()
+	# 通知场景查找并播放死亡动画
+	var scene = get_tree().current_scene
+	if scene and scene.has_method("_play_dot_death"):
+		scene._play_dot_death(unit)
+	_check_victory()
 
 func _check_victory() -> bool:
 	var alive_players = player_units.filter(func(u): return u.is_alive)
@@ -309,7 +326,6 @@ func _get_defend_turns() -> int:
 	return 5
 
 func _on_victory() -> void:
-	print("Victory!")
 	AudioManager.sfx_victory()
 	var result_data = {
 		"result": "victory",
@@ -322,7 +338,6 @@ func _on_victory() -> void:
 	_report_mission_result(result_data)
 
 func _on_defeat() -> void:
-	print("Defeat!")
 	AudioManager.sfx_defeat()
 	var result_data = {
 		"result": "defeat",
@@ -333,6 +348,10 @@ func _on_defeat() -> void:
 		"playtime_seconds": _get_battle_playtime()
 	}
 	_report_mission_result(result_data)
+
+func _on_turn_limit_reached() -> void:
+	_on_defeat()
+
 
 var _battle_start_time: int = 0
 

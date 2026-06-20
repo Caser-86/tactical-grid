@@ -104,6 +104,7 @@ func create_player_unit(job_id: String, name: String = "") -> Unit:
 	unit.job = job_id
 	unit.team = "player"
 	unit.stats = job_info.get("base_stats", unit.stats)
+	unit.stats["level"] = unit.stats.get("level", 3)
 	unit.max_hp = job_info.get("base_hp", 100)
 	unit.current_hp = unit.max_hp
 	unit.move_points = job_info.get("base_move", 5)

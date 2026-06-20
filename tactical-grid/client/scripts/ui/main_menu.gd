@@ -49,6 +49,8 @@ func _on_new_game() -> void:
 	TransitionManager.change_scene("res://scenes/base.tscn")
 
 func _on_quick_battle() -> void:
+	if GameManager.save_data.size() == 0:
+		GameManager.save_data = SaveManager.create_default_save()
 	TransitionManager.change_scene("res://scenes/battle.tscn")
 
 func _on_settings() -> void:

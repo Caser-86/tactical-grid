@@ -7,6 +7,7 @@ signal turn_phase_changed(phase: TurnPhase)
 signal player_turn_started()
 signal enemy_turn_started()
 signal turn_ended(turn_number: int)
+signal turn_limit_reached()
 
 enum TurnPhase {
 	PLAYER_START,
@@ -57,8 +58,7 @@ func set_phase(phase: TurnPhase) -> void:
 		TurnPhase.CHECK_VICTORY:
 			turn_ended.emit(turn_number)
 			if turn_number >= max_turns:
-				# 回合超时
-				pass
+				turn_limit_reached.emit()
 			else:
 				set_phase(TurnPhase.PLAYER_START)
 
