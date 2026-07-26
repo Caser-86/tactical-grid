@@ -1,78 +1,50 @@
-# Tactical Grid - 平面回合制战棋游戏
+# Tactical Grid
 
-> 全 AI 制作的战术战棋游戏，基于 Godot 4 + Node.js + TypeScript
+Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游戏项目。当前版本可以启动并运行基础战斗、存档和战役流程，但仍处于开发阶段，**不是已发布或内容完整的游戏**。
 
-## 项目简介
+## 当前状态
 
-Tactical Grid 是一款平面格子回合制战术战棋游戏（参考 XCOM 2 + Fire Emblem + Into the Breach），包含完整的后端 API、地图生成器、AI 系统和 Godot 前端。游戏采用 2AP 回合制、混合信息制（友方透明/敌方迷雾），支持 PC 和移动双端。
+- Godot 客户端可从 `boot.tscn` 启动，包含主菜单、基地、战斗、设置、暂停、结算和对话流程。
+- 核心逻辑的 Godot 无头测试为 189/189 通过；服务端 Jest 测试为 29/29 通过。
+- 地图生成器已生成并校验 30 张锁定地图，但客户端尚未使用这些正式地图。
+- 正式任务目标、美术、动画、音频、许可证材料和可发布构建仍未完成。
 
-## 技术栈
+完整的已验证状态、限制和下一步请见 [项目状态](tactical-grid/PROJECT_STATUS.md) 与 [接管路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)。
 
-| 模块 | 技术 |
-|------|------|
-| 前端 | Godot 4.2 + GDScript |
-| 后端 | Node.js + Express + TypeScript |
-| 数据库 | sql.js（纯 WASM SQLite） |
-| 测试 | Jest |
-| 地图格式 | JSON（Tiled 兼容） |
+## 仓库结构
 
-## 项目结构
-
-```
-├── tactical-grid/           # 主项目
-│   ├── server/              # Node.js 后端
-│   ├── client/              # Godot 前端
-│   ├── docs/                # 项目文档
-│   ├── tools/               # 开发工具
-│   └── README.md
-├── docs/                    # 顶层设计文档
-└── README.md
+```text
+.
+├── tactical-grid/          # 可运行项目模块
+│   ├── client/             # Godot 4.7.1 客户端
+│   ├── server/             # 可选 Node.js 地图与 API 开发工具
+│   ├── README.md           # 本地运行、测试和目录说明
+│   └── PROJECT_STATUS.md   # 当前实测状态
+└── docs/                   # 活跃文档、路线图与历史归档
 ```
 
 ## 快速开始
 
-```bash
-# 后端启动
-cd tactical-grid/server
-npm install
-npm run dev            # http://localhost:3000
+需要：Godot 4.7.1、Node.js 20+（仅服务端和地图工具）、Git。
 
-# 运行测试
-npm test               # 29 个单元测试
+在 Godot 中打开 `tactical-grid/client/project.godot` 并运行项目，或从命令行启动：
 
-# 生成地图
-npx tsx src/mapgen/cli.ts --size small --seed 12345 --visualize
-
-# 前端启动
-# 用 Godot 4.2 编辑器打开 tactical-grid/client/project.godot
-# 按 F5 运行
+```powershell
+godot --path tactical-grid/client
 ```
 
-## 核心系统
+`tactical-grid/start.bat` 是开发启动器：它会打开 Godot 编辑器；传入 `--with-server` 时会额外启动本地 Node 服务。
 
-| 系统 | 说明 |
-|------|------|
-| 网格坐标系统 | 逻辑坐标与世界坐标转换 |
-| A* 寻路算法 | 移动路径和可达范围计算 |
-| 视线计算 | Bresenham 视线、掩体判定 |
-| 战斗公式 | 命中、伤害、暴击、闪避 |
-| 回合管理 | 2AP 回合状态机 |
-| 单位系统 | 属性、状态、装备、HP/AP |
-| Utility AI | 评分决策 AI 系统 |
-| 地图生成器 | 种子可复现、自动校验 |
+## 文档入口
 
-## 开发进度
+- [项目模块说明](tactical-grid/README.md)：安装、启动、测试和目录结构。
+- [当前状态](tactical-grid/PROJECT_STATUS.md)：当前实测结果与发布阻断项。
+- [接管路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)：唯一的开发任务、优先级与验收记录。
+- [文档索引](docs/README.md)：活跃文档和历史参考的完整导航。
+- [活跃设计范围](docs/design/README.md)：首发版本的边界与玩法原则。
 
-- ✅ 核心系统完成（29/29 测试通过）
-- ✅ 地图生成器（三档尺寸/五主题/六任务类型）
-- ✅ 后端 API（认证/关卡/存档/遥测）
-- ✅ AI 系统（Utility AI + Director）
-- ✅ UI 系统（主菜单/战斗HUD/结算/设置）
-- ✅ 数据系统（全量 JSON 配置）
-- ✅ 美术资产基础（AI 生成）
-- 🔄 场景文件细节调优
-- 📋 音效/动画/剧情完善
+## 贡献约定
 
-## 设计文档
-
-详细设计文档见 [`docs/`](docs/) 目录。
+- 功能完成必须包含可复现的验证记录，不以 JSON 条目、界面占位或未接入资源作为完成依据。
+- 新增资源必须记录来源、许可证和游戏内用途；来源不明或带水印的资源不得进入发布版本。
+- 设计扩展先更新路线图或活跃设计范围；历史设计稿仅供参考，不自动成为开发承诺。
