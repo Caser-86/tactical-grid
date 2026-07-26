@@ -96,7 +96,7 @@ Run a repository link/reference scan and confirm that every link target exists.
 
 Run `git diff --cached --name-only` and verify it contains only README and `docs/`/`PROJECT_STATUS.md` documentation paths.
 
-- [ ] **Step 3: Commit and push**
+- [x] **Step 3: Commit and push**
 
 Commit with `docs: refresh project documentation`, push `codex/docs-refresh`, and create a draft pull request unless direct push to the default branch is explicitly requested.
 
