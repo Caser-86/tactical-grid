@@ -10,9 +10,12 @@ var _test_units: Array = []
 
 const TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
+const AudioManagerScript = preload("res://scripts/game/audio_manager.gd")
 
 func _ready() -> void:
 	print("=== Tactical Grid 无头冒烟测试 ===")
+	await get_tree().process_frame
+	_test_audio_bus_contract()
 	await get_tree().process_frame
 	_run_core_tests()
 	await get_tree().process_frame
@@ -63,6 +66,43 @@ func _track(unit) -> Node:
 	if unit and unit is Node:
 		_test_units.append(unit)
 	return unit
+
+## ===== 音频总线契约 =====
+
+func _test_audio_bus_contract() -> void:
+	_check(AudioServer.get_bus_index(&"Music") >= 0, "Audio: Music 总线存在")
+	_check(AudioServer.get_bus_index(&"SFX") >= 0, "Audio: SFX 总线存在")
+
+	var audio_manager = AudioManagerScript.new()
+	add_child(audio_manager)
+	_check(audio_manager.bgm_player.bus == &"Music", "Audio: BGMPlayer 路由到 Music")
+	_check(audio_manager.sfx_player.bus == &"SFX", "Audio: SFXPlayer 路由到 SFX")
+	_check(audio_manager.ambient_player.bus == &"SFX", "Audio: AmbientPlayer 路由到 SFX")
+	audio_manager.queue_free()
+	for audio_path in [
+		"res://assets/audio/bgm/bgm_menu.wav",
+		"res://assets/audio/bgm/bgm_battle_small.wav",
+		"res://assets/audio/bgm/bgm_boss.wav",
+		"res://assets/audio/bgm/bgm_victory.wav",
+		"res://assets/audio/bgm/bgm_defeat.wav",
+		"res://assets/audio/sfx/sfx_ui_click.wav",
+		"res://assets/audio/sfx/sfx_select_unit.wav",
+		"res://assets/audio/sfx/sfx_unit_land.wav",
+		"res://assets/audio/sfx/sfx_combat_pistol.wav",
+		"res://assets/audio/sfx/sfx_hit_flesh.wav",
+		"res://assets/audio/sfx/sfx_critical_hit.wav",
+		"res://assets/audio/sfx/sfx_unit_down.wav",
+		"res://assets/audio/sfx/sfx_skill_cast.wav",
+		"res://assets/audio/sfx/sfx_mission_victory.wav",
+		"res://assets/audio/sfx/sfx_mission_defeat.wav",
+	]:
+		_check(FileAccess.file_exists(audio_path), "Audio: 正式资源存在 %s" % audio_path)
+		var stream = load(audio_path)
+		_check(stream is AudioStream, "Audio: Godot 可加载 %s" % audio_path)
+	_check(FileAccess.file_exists("res://data/RESOURCE_MANIFEST.md"), "Assets: 资源清单存在")
+	var export_presets = FileAccess.get_file_as_string("res://export_presets.cfg")
+	for legacy_directory in ["assets/characters/*", "assets/effects/*", "assets/tiles/*", "assets/ui/*"]:
+		_check(export_presets.contains(legacy_directory), "Assets: 导出排除历史参考目录 %s" % legacy_directory)
 
 ## ===== 核心系统测试 =====
 
@@ -680,6 +720,7 @@ func _run_progression_tests() -> void:
 	_test_progression_save_roundtrip()
 	_test_scene_flow_state_contract()
 	_test_first_chapter_reward_and_unlock_flow()
+	_test_first_clear_loot_delivery()
 	_test_chapter_one_completion_flag()
 	_test_tutorial_flag_system()
 	_test_mission_failure_recovery()
@@ -972,6 +1013,40 @@ func _test_first_chapter_reward_and_unlock_flow() -> void:
 	resources = GameManager.current_save.resources
 	_check(resources.credit == 1200, "Campaign: 重复通关只发基础信用点")
 	_check(resources.intel == 10, "Campaign: 重复通关不重复发放首通情报")
+
+	SaveManager.delete_save(slot)
+	GameManager.current_save = backup_save
+	GameManager.current_slot = backup_slot
+	GameManager.current_level_id = backup_level
+
+## 首通战利品必须写入库存，并且重玩不能重复发放。
+func _test_first_clear_loot_delivery() -> void:
+	var backup_save = GameManager.current_save.duplicate(true)
+	var backup_slot = GameManager.current_slot
+	var backup_level = GameManager.current_level_id
+	var slot = 2
+
+	GameManager.current_slot = slot
+	GameManager.current_save = SaveManager.create_default_save()
+	GameManager.current_save.characters = GameManager.progression.create_starter_roster()
+	GameManager.current_level_id = "ch1_m6"
+	var victory_result = {
+		"result": "victory",
+		"level_id": "ch1_m6",
+		"rating": 3,
+		"survivor_count": 4,
+		"units_survived": 4,
+		"units_total": 4,
+		"rewards": {"credit": 1000, "exp": 500, "intel": 0},
+	}
+	GameManager.complete_mission(victory_result)
+	_check(GameManager.get_inventory().get("plasma_blade", 0) == 1, "Campaign: 首通传奇战利品写入库存")
+	_check(victory_result.get("loot", []).size() == 1, "Campaign: 首通结算包含战利品")
+	_check(victory_result.get("loot", [])[0].get("name") == "等离子刃", "Campaign: 首通结算战利品名称正确")
+
+	var repeat_result = victory_result.duplicate(true)
+	GameManager.complete_mission(repeat_result)
+	_check(GameManager.get_inventory().get("plasma_blade", 0) == 1, "Campaign: 重复通关不重复发放战利品")
 
 	SaveManager.delete_save(slot)
 	GameManager.current_save = backup_save
@@ -2165,17 +2240,13 @@ func _test_reinforcement_scripts_in_locked_maps() -> void:
 ## ===== 战利品 ID 校验测试 =====
 ## 任何配置中的 loot ID 必须在 weapons.json 或 items.json 中存在；
 ## 无效战利品在构建期测试失败，不能写入不可显示的库存。
-## 第一章切片范围内（ch1_m1-m6 + data_sentinel）的 loot ID 必须严格有效；
-## 后续章节将在各自章节切片中校验，当前仅记录以便追溯。
+## 所有章节的 loot ID 都必须有效；无效奖励会导致玩家无法装备或查看掉落。
 func _test_loot_id_validation() -> void:
 	print("\n--- 战利品 ID 校验测试 ---")
-	# 第一章严格校验范围
-	var ch1_strict_levels = ["ch1_m1", "ch1_m2", "ch1_m3", "ch1_m4", "ch1_m5", "ch1_m6"]
-	var ch1_strict_bosses = ["data_sentinel"]
 	var levels_data = GameData.level_data
 	var levels: Dictionary = levels_data.get("levels", {})
 	var checked_count = 0
-	# 1. levels.json 中所有 first_clear.loot：第一章严格校验，其他章节仅记录
+	# 1. levels.json 中所有 first_clear.loot 必须有效。
 	for lid in levels.keys():
 		var cfg = levels[lid]
 		if not cfg is Dictionary:
@@ -2192,18 +2263,12 @@ func _test_loot_id_validation() -> void:
 		var w = GameData.get_weapon(loot_id)
 		var i = GameData.get_item(loot_id)
 		var is_valid = (not w.is_empty()) or (not i.is_empty())
-		var is_ch1 = lid in ch1_strict_levels
-		if is_ch1:
-			_check(is_valid,
-				"LootID[%s]: first_clear.loot=%s 在 weapons.json/items.json 中存在" % [lid, loot_id])
-		else:
-			# 后续章节：仅记录，不在第一章切片中阻断
-			if not is_valid:
-				print("  [WARN] LootID[%s]: first_clear.loot=%s 待后续章节切片修复" % [lid, loot_id])
+		_check(is_valid,
+			"LootID[%s]: first_clear.loot=%s 在 weapons.json/items.json 中存在" % [lid, loot_id])
 		checked_count += 1
 	_check(checked_count > 0, "LootID: levels.json 至少校验了 1 个 loot 字段（共 %d 个）" % checked_count)
 
-	# 2. bosses.json 中所有 rewards.loot：第一章 Boss 严格校，其他仅记录
+	# 2. bosses.json 中所有 rewards.loot 必须有效。
 	var bosses: Dictionary = GameData.boss_data.get("bosses", {})
 	var boss_checked = 0
 	for bid in bosses.keys():
@@ -2219,13 +2284,8 @@ func _test_loot_id_validation() -> void:
 		var w = GameData.get_weapon(loot_id)
 		var i = GameData.get_item(loot_id)
 		var is_valid = (not w.is_empty()) or (not i.is_empty())
-		var is_ch1 = bid in ch1_strict_bosses
-		if is_ch1:
-			_check(is_valid,
-				"LootID[BOSS %s]: rewards.loot=%s 在 weapons.json/items.json 中存在" % [bid, loot_id])
-		else:
-			if not is_valid:
-				print("  [WARN] LootID[BOSS %s]: rewards.loot=%s 待后续章节切片修复" % [bid, loot_id])
+		_check(is_valid,
+			"LootID[BOSS %s]: rewards.loot=%s 在 weapons.json/items.json 中存在" % [bid, loot_id])
 		boss_checked += 1
 	_check(boss_checked > 0, "LootID: bosses.json 至少校验了 1 个 loot 字段（共 %d 个）" % boss_checked)
 

@@ -120,6 +120,18 @@ func complete_mission(result: Dictionary) -> void:
 		var first_clear_rewards: Dictionary = CampaignRepository.get_level(level_id).get("rewards", {}).get("first_clear", {})
 		rewards["credit"] = rewards.get("credit", 0) + first_clear_rewards.get("credit", 0)
 		rewards["intel"] = rewards.get("intel", 0) + first_clear_rewards.get("intel", 0)
+		var loot_id := str(first_clear_rewards.get("loot", ""))
+		if not loot_id.is_empty():
+			var loot_data := GameData.get_weapon(loot_id)
+			if loot_data.is_empty():
+				loot_data = GameData.get_item(loot_id)
+			if not loot_data.is_empty():
+				var inventory = current_save.get("inventory", {})
+				inventory[loot_id] = inventory.get(loot_id, 0) + 1
+				current_save["inventory"] = inventory
+				result["loot"] = [{"id": loot_id, "name": loot_data.get("name", loot_id)}]
+			else:
+				push_warning("First-clear loot is not defined: %s" % loot_id)
 		result["first_clear"] = true
 	else:
 		result["first_clear"] = false
@@ -146,6 +158,8 @@ func complete_mission(result: Dictionary) -> void:
 	current_save["campaign_progress"] = progress
 	current_save["resources"] = resources
 	current_save["stats_tracking"] = stats
+	if is_first_clear and not result.get("loot", []).is_empty():
+		inventory_changed.emit()
 
 	# 成就检查
 	var survived_count = result.get("survivor_count", result.get("units_survived", 0))

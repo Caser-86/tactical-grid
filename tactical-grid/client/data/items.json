@@ -165,6 +165,22 @@
       "rarity": "common",
       "stack": 2,
       "description": "踩踏减速2回合+出血"
+    },
+    "legendary_armor": {
+      "name": "重裁者装甲",
+      "type": "armor",
+      "armor": 18,
+      "weight": 5,
+      "rarity": "legendary",
+      "description": "从重裁者残骸回收的复合装甲，提供18点护甲。"
+    },
+    "legendary_full_set": {
+      "name": "架构师全域战甲",
+      "type": "armor",
+      "armor": 24,
+      "weight": 4,
+      "rarity": "legendary",
+      "description": "架构师的自适应战甲套装，以单个护甲槽位装备，提供24点护甲。"
     }
   },
   "ammo": {

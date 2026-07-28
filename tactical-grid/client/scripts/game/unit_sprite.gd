@@ -17,8 +17,10 @@ func _draw() -> void:
 	# 阴影
 	draw_circle(Vector2(0, 4), radius, Color(0, 0, 0, 0.3))
 
-	# 主体
-	draw_circle(Vector2.ZERO, radius, color)
+	# 阵营底座：保留清晰的棋盘可读性，主体轮廓在其上区分职业和敌人。
+	draw_circle(Vector2.ZERO, radius, color.darkened(0.45))
+	draw_circle(Vector2.ZERO, radius - 3, color.darkened(0.18))
+	_draw_tactical_silhouette(color)
 
 	# 边框
 	var border_color = Color.WHITE if selected else color.darkened(0.3)
@@ -47,6 +49,44 @@ func _get_unit_color() -> Color:
 		return GameTheme.ENEMY_COLOR
 	else:
 		return GameTheme.NEUTRAL_COLOR
+
+## 以简洁的俯视轮廓区分单位，而不是只显示单色圆点。
+func _draw_tactical_silhouette(team_color: Color) -> void:
+	var body_color := Color(0.075, 0.10, 0.13) if unit.team == "player" else Color(0.17, 0.055, 0.045)
+	var highlight := team_color.lightened(0.22)
+	if unit.team == "enemy":
+		# 敌方使用机械菱形、核心和天线，缩小时仍能快速识别。
+		var drone := PackedVector2Array([
+			Vector2(0, -15), Vector2(14, 0), Vector2(0, 15), Vector2(-14, 0)
+		])
+		draw_colored_polygon(drone, body_color)
+		draw_polyline(PackedVector2Array([drone[0], drone[1], drone[2], drone[3], drone[0]]), highlight, 2.0, true)
+		draw_circle(Vector2.ZERO, 5, Color(1.0, 0.26, 0.18))
+		draw_line(Vector2(0, -15), Vector2(0, -21), highlight, 2.0)
+		draw_circle(Vector2(0, -22), 2, highlight)
+		return
+
+	# 玩家单位使用头盔、护甲和武器朝向的组合，职业用武器轮廓区分。
+	draw_circle(Vector2(0, -7), 6, Color(0.70, 0.82, 0.86))
+	draw_rect(Rect2(-9, -2, 18, 15), body_color, true)
+	draw_rect(Rect2(-7, 0, 14, 8), highlight.darkened(0.45), true)
+	draw_line(Vector2(-10, -2), Vector2(10, -2), highlight, 2.0)
+	match unit.job:
+		"sniper":
+			draw_line(Vector2(4, 1), Vector2(19, -8), highlight, 3.0)
+			draw_circle(Vector2(10, -3), 3, Color(0.75, 0.92, 1.0))
+		"heavy":
+			draw_rect(Rect2(5, -1, 13, 6), highlight.darkened(0.2), true)
+			draw_line(Vector2(18, 2), Vector2(22, 2), highlight, 2.0)
+		"medic":
+			draw_circle(Vector2(0, 6), 4, Color(0.28, 0.95, 0.62))
+			draw_line(Vector2(-4, 6), Vector2(4, 6), Color.WHITE, 1.5)
+			draw_line(Vector2(0, 2), Vector2(0, 10), Color.WHITE, 1.5)
+		"scout":
+			draw_line(Vector2(5, 0), Vector2(16, -4), highlight, 2.0)
+			draw_circle(Vector2(-8, -10), 2, Color(0.54, 0.98, 0.98))
+		_:
+			draw_line(Vector2(5, 1), Vector2(16, -5), highlight, 3.0)
 
 func _draw_hp_bar(radius: int) -> void:
 	var bar_width = radius * 2

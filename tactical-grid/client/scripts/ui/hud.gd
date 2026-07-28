@@ -21,6 +21,7 @@ var _log_lines: Array[String] = []
 const MAX_LOG_LINES = 8
 
 func _ready() -> void:
+	_apply_visual_theme()
 	move_button.pressed.connect(_on_move_pressed)
 	attack_button.pressed.connect(_on_attack_pressed)
 	skill_button.pressed.connect(_on_skill_pressed)
@@ -29,6 +30,46 @@ func _ready() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
 	pause_button.pressed.connect(_on_pause_pressed)
 	set_action_buttons_visible(false)
+
+## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
+func _apply_visual_theme() -> void:
+	$TopBar.add_theme_stylebox_override("panel", _make_panel_style(Color(0.035, 0.055, 0.075, 0.94), Color(0.18, 0.72, 0.82, 0.62)))
+	$RightPanel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.045, 0.06, 0.08, 0.92), Color(0.18, 0.55, 0.66, 0.50)))
+	$BottomBar.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.04, 0.055, 0.96), Color(0.16, 0.68, 0.80, 0.68)))
+	for button in [move_button, attack_button, skill_button, item_button, overwatch_button, end_turn_button, pause_button]:
+		_style_button(button)
+	end_turn_button.add_theme_color_override("font_color", Color(0.95, 0.84, 0.55))
+	phase_label.add_theme_font_size_override("font_size", 18)
+	turn_label.add_theme_font_size_override("font_size", 18)
+	objective_label.add_theme_color_override("font_color", Color(0.72, 0.95, 1.0))
+	unit_info_label.add_theme_color_override("font_color", Color(0.82, 0.92, 0.96))
+	battle_log.add_theme_color_override("font_color", Color(0.62, 0.78, 0.84))
+
+func _make_panel_style(background: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 5
+	style.corner_radius_top_right = 5
+	style.corner_radius_bottom_left = 5
+	style.corner_radius_bottom_right = 5
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	return style
+
+func _style_button(button: Button) -> void:
+	var normal := _make_panel_style(Color(0.07, 0.13, 0.17, 0.98), Color(0.20, 0.55, 0.66, 0.78))
+	var hover := _make_panel_style(Color(0.09, 0.23, 0.29, 1.0), Color(0.32, 0.94, 1.0, 0.95))
+	var pressed := _make_panel_style(Color(0.04, 0.32, 0.39, 1.0), Color(0.68, 1.0, 1.0, 1.0))
+	var disabled := _make_panel_style(Color(0.055, 0.065, 0.075, 0.92), Color(0.20, 0.25, 0.28, 0.65))
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override("font_color", Color(0.82, 0.95, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(0.94, 1.0, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.48, 0.52))
 
 func set_battle_controller(controller: Node) -> void:
 	_battle_controller = controller

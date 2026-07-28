@@ -16,17 +16,21 @@ var audio_cache: Dictionary = {}
 func _ready() -> void:
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.name = "BGMPlayer"
+	bgm_player.bus = &"Music"
 	add_child(bgm_player)
 
 	sfx_player = AudioStreamPlayer.new()
 	sfx_player.name = "SFXPlayer"
+	sfx_player.bus = &"SFX"
 	add_child(sfx_player)
 
 	ambient_player = AudioStreamPlayer.new()
 	ambient_player.name = "AmbientPlayer"
+	ambient_player.bus = &"SFX"
 	add_child(ambient_player)
 
 	_load_settings()
+	bgm_player.finished.connect(_restart_bgm)
 
 func _load_settings() -> void:
 	var file = FileAccess.open("user://settings.json", FileAccess.READ)
@@ -39,9 +43,21 @@ func _load_settings() -> void:
 	_apply_volumes()
 
 func _apply_volumes() -> void:
-	bgm_player.volume_db = linear_to_db(bgm_volume)
-	sfx_player.volume_db = linear_to_db(sfx_volume)
-	ambient_player.volume_db = linear_to_db(ambient_volume)
+	set_bus_volumes(1.0, bgm_volume, sfx_volume)
+
+## 将存档中的线性音量应用到正式的 Master/Music/SFX 总线。
+func set_bus_volumes(master: float, music: float, sfx: float) -> void:
+	_set_bus_volume(&"Master", master)
+	_set_bus_volume(&"Music", music)
+	_set_bus_volume(&"SFX", sfx)
+	bgm_volume = music
+	sfx_volume = sfx
+	ambient_volume = sfx
+
+func _set_bus_volume(bus_name: StringName, volume: float) -> void:
+	var index := AudioServer.get_bus_index(bus_name)
+	if index >= 0:
+		AudioServer.set_bus_volume_db(index, linear_to_db(clampf(volume, 0.0, 1.0)))
 
 ## 播放 BGM
 func play_bgm(bgm_id: String) -> void:
@@ -50,6 +66,14 @@ func play_bgm(bgm_id: String) -> void:
 	current_bgm = bgm_id
 
 	var stream = _load_audio("bgm", bgm_id)
+	if stream:
+		bgm_player.stream = stream
+		bgm_player.play()
+
+func _restart_bgm() -> void:
+	if current_bgm == "":
+		return
+	var stream = _load_audio("bgm", current_bgm)
 	if stream:
 		bgm_player.stream = stream
 		bgm_player.play()
@@ -90,6 +114,9 @@ func _load_audio(category: String, audio_id: String) -> AudioStream:
 			return null
 
 	var stream = load(path)
+	# First-pass audio covers a common firearm profile; other weapon IDs stay audible.
+	if stream == null and category == "sfx" and audio_id != "sfx_combat_pistol" and audio_id.begins_with("sfx_combat_"):
+		stream = _load_audio("sfx", "sfx_combat_pistol")
 	if stream:
 		audio_cache[cache_key] = stream
 	return stream
@@ -97,11 +124,11 @@ func _load_audio(category: String, audio_id: String) -> AudioStream:
 ## 设置音量
 func set_bgm_volume(volume: float) -> void:
 	bgm_volume = clamp(volume, 0.0, 1.0)
-	bgm_player.volume_db = linear_to_db(bgm_volume)
+	_set_bus_volume(&"Music", bgm_volume)
 
 func set_sfx_volume(volume: float) -> void:
 	sfx_volume = clamp(volume, 0.0, 1.0)
-	sfx_player.volume_db = linear_to_db(sfx_volume)
+	_set_bus_volume(&"SFX", sfx_volume)
 
 ## === 战斗音效快捷方法 ===
 

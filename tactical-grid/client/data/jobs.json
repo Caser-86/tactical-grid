@@ -55,7 +55,7 @@
       "base_hp": 60,
       "base_move": 7,
       "base_vision": 8,
-      "weapons_allowed": ["silenced_pistol", "marking_rifle", "silenced_pistol_mk2", "energy_dagger", "phantom_dual_blade"],
+      "weapons_allowed": ["silenced_pistol", "marking_rifle", "silenced_pistol_mk2", "energy_dagger", "phantom_dual_blade", "legendary_weapon_shadow_blade"],
       "skill_trees": ["stealth", "recon", "sabotage"],
       "upgrade_path": ["scout", "prowler", "shadow"],
       "role": "recon"

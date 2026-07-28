@@ -98,7 +98,11 @@ func _apply_display() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
 func _apply_audio() -> void:
-	AudioServer.set_bus_volume_db(0, linear_to_db(_settings.get("master_volume", 1.0)))
+	AudioManager.set_bus_volumes(
+		_settings.get("master_volume", 1.0),
+		_settings.get("music_volume", 1.0),
+		_settings.get("sfx_volume", 1.0)
+	)
 
 ## 应用可访问性设置到当前场景树
 ## - large_text: 放大默认字体尺寸

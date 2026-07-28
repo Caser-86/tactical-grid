@@ -14,6 +14,11 @@ GameManager="*res://scripts/game/game_manager.gd"
 GameData="*res://scripts/data/game_data.gd"
 SaveManager="*res://scripts/network/save_manager.gd"
 CampaignRepository="*res://scripts/data/campaign_repository.gd"
+AudioManager="*res://scripts/game/audio_manager.gd"
+
+[audio]
+
+default_bus_layout="res://default_bus_layout.tres"
 
 [display]
 

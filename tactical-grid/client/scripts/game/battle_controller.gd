@@ -870,21 +870,17 @@ func _render_map() -> void:
 	for y in range(map_height):
 		for x in range(map_width):
 			var terrain = base_terrain[y][x]
-			var color = GameTheme.get_terrain_color(terrain)
-			_draw_cell_on(map_layer, Vector2i(x, y), color)
-
 			var block = blocker[y][x]
-			if block != 0:
-				_draw_cell_on(map_layer, Vector2i(x, y), GameTheme.get_terrain_color(block))
+			_draw_tactical_tile(Vector2i(x, y), terrain, block)
 
 	# 标记撤离点、目标和终端
 	for obj in map_data.objects:
 		if obj.type == "evac":
-			_draw_cell_on(map_layer, Vector2i(obj.x, obj.y), COLOR_EVAC)
+			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "evac")
 		elif obj.type == "destructible_target":
-			_draw_cell_on(map_layer, Vector2i(obj.x, obj.y), COLOR_TARGET)
+			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "destructible_target")
 		elif obj.type == "terminal":
-			_draw_cell_on(map_layer, Vector2i(obj.x, obj.y), COLOR_TERMINAL)
+			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "terminal")
 
 	# 调整相机
 	camera.position = Vector2(map_width * CELL_SIZE / 2.0, map_height * CELL_SIZE / 2.0)
@@ -915,6 +911,12 @@ func _draw_cell_on(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	rect.position = GridSystem.grid_to_world(pos)
 	layer.add_child(rect)
 
+func _draw_tactical_tile(pos: Vector2i, terrain: int, block: int = 0, objective: String = "") -> void:
+	var tile := TacticalTile.new()
+	tile.position = GridSystem.grid_to_world(pos)
+	tile.setup(terrain, block, objective)
+	map_layer.add_child(tile)
+
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	var rect = ColorRect.new()
 	rect.color = color
@@ -929,6 +931,10 @@ func _clear_layer(layer: Node2D) -> void:
 ## ===== 战斗流程 =====
 
 func _start_battle() -> void:
+	if boss_unit:
+		AudioManager.bgm_boss()
+	else:
+		AudioManager.bgm_battle()
 	# 应用难度回合限制加成（故事难度+5回合，困难难度-3回合）
 	var diff_params = GameManager.get_difficulty_params()
 	var turn_limit = 20 + int(diff_params.get("turn_limit_bonus", 0))
@@ -1124,10 +1130,14 @@ func _find_reinforcement_spawn() -> Vector2i:
 
 func _on_battle_won(result: Dictionary) -> void:
 	_log("胜利！")
+	AudioManager.sfx_victory()
+	AudioManager.bgm_victory()
 	_finish_battle(true, result)
 
 func _on_battle_lost(result: Dictionary) -> void:
 	_log("失败...")
+	AudioManager.sfx_defeat()
+	AudioManager.bgm_defeat()
 	_finish_battle(false, result)
 
 func _finish_battle(victory: bool, result: Dictionary) -> void:
@@ -1502,6 +1512,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 	selected_unit.move_points -= cost
 	selected_unit.move_to(grid_pos)
 	_update_unit_sprite_pos(selected_unit)
+	AudioManager.sfx_move()
 
 	# 检查警戒触发
 	var triggers = action_system.check_overwatch_trigger(selected_unit, old_pos, grid_pos)
@@ -1564,6 +1575,8 @@ func _attack_destructible(attacker: Unit, target_pos: Vector2i) -> void:
 	# 计算伤害（可破坏目标无护甲、无闪避，固定命中）
 	var avg_dmg = int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2)
 	state.hp = max(0, int(state.hp) - avg_dmg)
+	_spawn_effect("muzzle", attacker.grid_pos)
+	_spawn_effect("destroy" if state.hp <= 0 else "hit", target_pos)
 	# 记录遥测：可破坏目标算作命中
 	_telemetry.shots_fired += 1
 	_telemetry.shots_hit += 1
@@ -1593,6 +1606,7 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 		_log("AP 不足")
 		return false
 	terminals_activated += 1
+	_spawn_effect("terminal", term_pos)
 	_log("%s 激活终端 (%d/%d)" % [unit.unit_name, terminals_activated, terminals_required])
 	hud.update_objective(_get_objective_text())
 	_check_victory_instant()
@@ -1601,11 +1615,18 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var result = action_system.execute_attack(attacker, target)
 	if result.get("success", false):
+		AudioManager.sfx_attack()
+		_spawn_effect("muzzle", attacker.grid_pos)
 		var r = result.get("result", {})
 		var hit = r.get("hit", false)
 		var damage = int(r.get("damage", 0))
 		var critical = r.get("critical", false)
 		if hit:
+			_spawn_effect("crit" if critical else "hit", target.grid_pos)
+			if critical:
+				AudioManager.sfx_critical()
+			else:
+				AudioManager.sfx_hit()
 			if r.get("dodged", false):
 				_log("%s 攻击 %s - 闪避!" % [attacker.unit_name, target.unit_name])
 			elif critical:
@@ -1613,6 +1634,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			else:
 				_log("%s 命中 %s - %d伤害" % [attacker.unit_name, target.unit_name, damage])
 		else:
+			_spawn_effect("miss", target.grid_pos)
 			_log("%s 攻击 %s - 未命中" % [attacker.unit_name, target.unit_name])
 		# 记录遥测：闪避算作命中（攻击命中判定通过，但被闪避）
 		_record_attack_telemetry(attacker, target, hit, damage, critical)
@@ -1661,6 +1683,8 @@ func on_skill_button() -> void:
 		target_data = {"position": selected_unit.grid_pos}
 	var skill_result = action_system.execute_skill(selected_unit, skill_id, target_data)
 	if skill_result.get("success", false):
+		AudioManager.sfx_skill()
+		_spawn_effect("heal" if skill_id.contains("heal") else "terminal", selected_unit.grid_pos)
 		_log("%s 使用技能：%s" % [selected_unit.unit_name, skill_name])
 		_record_skill_telemetry()
 		hud.update_unit_info(selected_unit)
@@ -1681,6 +1705,8 @@ func on_item_button() -> void:
 	var item_name = item_data.get("name", item_id)
 	var item_result = action_system.use_item(selected_unit, item_id, selected_unit, {})
 	if item_result.get("success", false):
+		AudioManager.sfx_heal()
+		_spawn_effect("heal", selected_unit.grid_pos)
 		_log("%s 使用物品：%s" % [selected_unit.unit_name, item_name])
 		_record_item_telemetry()
 		hud.update_unit_info(selected_unit)
@@ -1690,6 +1716,7 @@ func on_item_button() -> void:
 func on_overwatch_button() -> void:
 	if selected_unit and selected_unit.team == "player" and selected_unit.current_ap > 0:
 		if action_system.enter_overwatch(selected_unit):
+			AudioManager.sfx_overwatch()
 			_log("%s 进入警戒" % selected_unit.unit_name)
 			_record_overwatch_telemetry()
 			hud.update_unit_info(selected_unit)
@@ -1705,6 +1732,7 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 
 func _on_unit_died(unit: Unit) -> void:
 	_log("%s 阵亡" % unit.unit_name)
+	AudioManager.sfx_unit_down()
 	_update_unit_sprite_pos(unit)
 	_record_death_telemetry(unit)
 	# Boss 死亡时更新目标显示
@@ -1717,6 +1745,12 @@ func _on_unit_damaged(unit: Unit, _amount: int) -> void:
 	# Boss 受伤时检查阶段切换
 	if unit == boss_unit and boss_unit and boss_unit.is_alive:
 		_check_boss_phase_transition(unit)
+
+func _spawn_effect(kind: String, grid_pos: Vector2i) -> void:
+	var effect := TacticalEffect.new()
+	effect.position = GridSystem.grid_to_world(grid_pos)
+	effect.setup(kind)
+	effect_layer.add_child(effect)
 
 func _check_victory_instant() -> void:
 	if _check_victory():

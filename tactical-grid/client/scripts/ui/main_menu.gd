@@ -8,6 +8,7 @@ extends Control
 
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.MAIN_MENU
+	AudioManager.bgm_menu()
 
 	continue_button.pressed.connect(_on_continue)
 	new_game_button.pressed.connect(_on_new_game)
@@ -25,14 +26,18 @@ func _ready() -> void:
 		new_game_button.grab_focus()
 
 func _on_continue() -> void:
+	AudioManager.sfx_ui_click()
 	if not GameManager.continue_game():
 		continue_button.disabled = true
 
 func _on_new_game() -> void:
+	AudioManager.sfx_ui_click()
 	GameManager.new_game(0)
 
 func _on_settings() -> void:
+	AudioManager.sfx_ui_click()
 	GameManager.go_to_settings("main_menu")
 
 func _on_quit() -> void:
+	AudioManager.sfx_ui_click()
 	GameManager.quit_game()

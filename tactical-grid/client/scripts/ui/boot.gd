@@ -66,9 +66,11 @@ func _apply_settings(settings: Dictionary) -> void:
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
-	# 音量
-	AudioServer.set_bus_volume_db(0, linear_to_db(settings.get("master_volume", 1.0)))
-	# TODO: 建立 Music/SFX bus 后分别设置
+	AudioManager.set_bus_volumes(
+		settings.get("master_volume", 1.0),
+		settings.get("music_volume", 1.0),
+		settings.get("sfx_volume", 1.0)
+	)
 
 func _step_migrate_saves() -> void:
 	_show_status("检查存档...")

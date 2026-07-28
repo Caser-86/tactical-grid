@@ -16,6 +16,7 @@ class_name MissionResult
 @onready var next_button = $Panel/Buttons/NextButton
 
 func _ready() -> void:
+	_apply_visual_theme()
 	retry_button.pressed.connect(_on_retry)
 	base_button.pressed.connect(_on_base)
 	next_button.pressed.connect(_on_next)
@@ -37,17 +38,17 @@ func show_result(data: Dictionary) -> void:
 	_show_stars(data.get("stars", 0))
 
 	# 显示统计
-	turns_label.text = str(data.get("turns", 0))
+	turns_label.text = "回合数  %s" % str(data.get("turns", 0))
 	var survived = data.get("units_survived", 0)
 	var total = data.get("units_total", 4)
-	survived_label.text = "%d/%d" % [survived, total]
-	time_label.text = _format_time(data.get("playtime_seconds", 0))
+	survived_label.text = "存活单位  %d/%d" % [survived, total]
+	time_label.text = "任务时间  %s" % _format_time(data.get("playtime_seconds", 0))
 
 	# 显示奖励
 	var rewards = data.get("rewards", {})
-	credit_label.text = str(rewards.get("credit", 0))
-	exp_label.text = str(rewards.get("exp", 0))
-	intel_label.text = str(rewards.get("intel", 0))
+	credit_label.text = "信用点  +%s" % str(rewards.get("credit", 0))
+	exp_label.text = "经验值  +%s" % str(rewards.get("exp", 0))
+	intel_label.text = "情报  +%s" % str(rewards.get("intel", 0))
 
 	# 显示首通奖励
 	if data.get("first_clear", false):
@@ -66,6 +67,47 @@ func show_result(data: Dictionary) -> void:
 	# 按钮可用性
 	next_button.visible = is_victory
 	retry_button.visible = true
+	retry_button.modulate = Color("f4b45a") if not is_victory else Color.WHITE
+
+func _apply_visual_theme() -> void:
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color("101b22")
+	panel_style.border_color = Color("36aeca")
+	panel_style.set_border_width_all(2)
+	panel_style.corner_radius_top_left = 10
+	panel_style.corner_radius_top_right = 10
+	panel_style.corner_radius_bottom_right = 10
+	panel_style.corner_radius_bottom_left = 10
+	panel_style.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	panel_style.shadow_size = 16
+	$Panel.add_theme_stylebox_override("panel", panel_style)
+
+	for label in [turns_label, survived_label, time_label, credit_label, exp_label, intel_label]:
+		label.add_theme_font_size_override("font_size", 18)
+		label.modulate = Color("d7ebef")
+
+	for button in [retry_button, base_button, next_button]:
+		_style_button(button)
+
+func _style_button(button: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color("172b34")
+	normal.border_color = Color("3e8797")
+	normal.set_border_width_all(1)
+	normal.corner_radius_top_left = 5
+	normal.corner_radius_top_right = 5
+	normal.corner_radius_bottom_right = 5
+	normal.corner_radius_bottom_left = 5
+	var hover := normal.duplicate()
+	hover.bg_color = Color("1d4753")
+	hover.border_color = Color("6dd6e5")
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color("0c151a")
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", Color("e8f6f7"))
+	button.add_theme_font_size_override("font_size", 17)
 
 func _show_stars(stars: int) -> void:
 	for child in stars_container.get_children():

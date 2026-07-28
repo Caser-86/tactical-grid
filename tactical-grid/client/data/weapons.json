@@ -263,6 +263,18 @@
       "crit_multiplier": 2.5,
       "special": "dual_wield_double_strike_kill_refund_ap",
       "rarity": "legendary"
+    },
+    "legendary_weapon_shadow_blade": {
+      "name": "幽影裁决刃",
+      "type": "primary",
+      "job": "scout",
+      "range": [1, 1],
+      "damage": [58, 78],
+      "hit_modifier": 25,
+      "crit_multiplier": 2.6,
+      "ammo_per_shot": 0,
+      "special": "silent_crit_plus_10",
+      "rarity": "legendary"
     }
   }
 }
