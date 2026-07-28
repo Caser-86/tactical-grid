@@ -19,7 +19,7 @@
           "enrage": "attack_plus_50"
         }
       ],
-      "rewards": { "credit": 1000, "intel": 50, "loot": "epic_weapon" }
+      "rewards": { "credit": 1000, "intel": 50, "loot": "plasma_blade" }
     },
     "heavy_judge": {
       "name": "重装审判者", "chapter": 2,

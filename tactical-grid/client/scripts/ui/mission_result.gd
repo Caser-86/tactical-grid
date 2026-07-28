@@ -19,6 +19,8 @@ func _ready() -> void:
 	retry_button.pressed.connect(_on_retry)
 	base_button.pressed.connect(_on_base)
 	next_button.pressed.connect(_on_next)
+	# 显示战斗结果（GameManager 在切换场景前已存入 battle_result）
+	show_result(GameManager.battle_result)
 
 ## 显示结算结果
 func show_result(data: Dictionary) -> void:
@@ -82,12 +84,14 @@ func _format_time(seconds: int) -> String:
 	return "%d:%02d" % [m, s]
 
 func _on_retry() -> void:
-	get_tree().reload_current_scene()
+	GameManager.go_to_battle(GameManager.current_level_id)
 
 func _on_base() -> void:
-	get_tree().change_scene_to_file("res://scenes/base.tscn")
+	GameManager.go_to_base()
 
 func _on_next() -> void:
-	# 加载下一关
-	# TODO: 计算下一关 ID
-	get_tree().change_scene_to_file("res://scenes/base.tscn")
+	var next_id = CampaignRepository.get_next_level(GameManager.current_level_id)
+	if next_id != "":
+		GameManager.go_to_battle(next_id)
+	else:
+		GameManager.go_to_base()

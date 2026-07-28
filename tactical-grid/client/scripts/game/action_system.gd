@@ -6,6 +6,19 @@ class_name ActionSystem
 var map_data: Dictionary = {}
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+## 单位列表（由 BattleController 设置）
+var player_units: Array = []
+var enemy_units: Array = []
+
+## 陷阱列表（运行时状态）：[{pos, owner_team, item}]
+var traps: Array[Dictionary] = []
+
+## 噪声事件列表（消音判定用）：[{pos, radius, silent}]
+var noise_events: Array[Dictionary] = []
+
+## 地面效果列表（烟雾/火焰/毒雾等）：[{pos, type, duration, data}]
+var ground_effects: Array[Dictionary] = []
+
 func _ready() -> void:
 	rng.randomize()
 
@@ -41,6 +54,9 @@ func execute_move(unit: Node, target: Vector2i) -> bool:
 	unit.move_points -= cost
 	unit.move_to(target)
 
+	# 检查路径上是否触发陷阱
+	_check_trap_trigger(unit, target)
+
 	return true
 
 ## 执行攻击
@@ -71,17 +87,63 @@ func execute_attack(attacker: Node, target: Node) -> Dictionary:
 		func(pos): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
 	)
 
+	# 武器 special 前处理：调整命中/伤害/护甲参数
+	var special: String = attacker.weapon_special
+	var effective_armor = target.armor
+	var effective_hit = attacker.base_hit
+	var effective_damage = int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2)
+	var effective_crit = attacker.crit_chance
+	var force_hit = false
+	var force_crit = false
+
+	# pierce_50_ignore_half_cover：穿透50%护甲，忽略半掩体
+	if special == "pierce_50_ignore_half_cover":
+		effective_armor = int(target.armor * 0.5)
+		if cover == "half":
+			cover = "none"
+	# pierce_all_charge_1_turn：充能1回合后全穿透（简化为直接全穿透）
+	elif special == "pierce_all_charge_1_turn":
+		effective_armor = 0
+		cover = "none"
+	# silent_ignore_armor：消音穿甲
+	elif special == "silent_ignore_armor":
+		effective_armor = 0
+	# setup_bonus_30_hit：架设命中+30
+	elif special == "setup_bonus_30_hit":
+		effective_hit += 30
+	# setup_2_turns_guaranteed_hit_crit：架设2回合必中必暴
+	elif special == "setup_2_turns_guaranteed_hit_crit":
+		force_hit = true
+		force_crit = true
+	# close_range_bonus_1.3x_at_2_tiles：距离2格时伤害x1.3
+	elif special == "close_range_bonus_1.3x_at_2_tiles" and dist == 2:
+		effective_damage = int(effective_damage * 1.3)
+	# close_range_bonus_1.4x：近距离伤害x1.4
+	elif special == "close_range_bonus_1.4x" and dist <= 2:
+		effective_damage = int(effective_damage * 1.4)
+	# silent_crit_plus_10：消音暴击+10%
+	elif special == "silent_crit_plus_10":
+		effective_crit += 0.10
+
 	# 结算攻击
 	var result = CombatFormulas.resolve_attack(
-		attacker.base_hit,
+		effective_hit,
 		attacker.height, target.height,
 		cover, dist, attacker.weapon_optimal_range,
-		int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2),
-		target.armor,
-		attacker.crit_chance, attacker.crit_multiplier,
+		effective_damage,
+		effective_armor,
+		effective_crit, attacker.crit_multiplier,
 		target.dodge, MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y),
 		rng
 	)
+
+	# 强制命中/暴击（架设类武器）
+	if force_hit:
+		result.hit = true
+		result.dodged = false
+	if force_crit:
+		result.critical = true
+		result.damage = int(result.damage * attacker.crit_multiplier) if result.damage > 0 else result.damage
 
 	if result.hit:
 		target.take_damage(result.damage)
@@ -89,8 +151,36 @@ func execute_attack(attacker: Node, target: Node) -> Dictionary:
 		# 触发攻击者特殊效果
 		_process_attack_effects(attacker, target, result)
 
-	# 暴露位置（非消音武器）
-	# TODO: 检查武器是否有消音
+		# 多次攻击：double_tap/triple_tap/burst_5
+		var extra_hits = _get_extra_hit_count(special)
+		for i in range(extra_hits):
+			var extra_result = CombatFormulas.resolve_attack(
+				effective_hit, attacker.height, target.height,
+				cover, dist, attacker.weapon_optimal_range,
+				effective_damage, effective_armor,
+				effective_crit, attacker.crit_multiplier,
+				target.dodge, MapLoader.get_terrain_at(map_data, target.grid_pos.x, target.grid_pos.y),
+				rng
+			)
+			if extra_result.hit and target.is_alive:
+				target.take_damage(extra_result.damage)
+				_process_attack_effects(attacker, target, extra_result)
+
+		# aoe_3x3_destroy_cover：范围伤害+破坏掩体
+		if special == "aoe_3x3_destroy_cover":
+			_apply_aoe_damage(attacker, target.grid_pos, 1, int(effective_damage * 0.5), true)
+
+		# damage_heals_adjacent_ally：伤害治疗相邻友军
+		if special == "damage_heals_adjacent_ally":
+			_heal_adjacent_allies(attacker, int(result.damage * 0.5))
+
+	# 消音判定：非消音武器产生噪声
+	var is_silent = _is_weapon_silent(special)
+	noise_events.append({
+		"pos": attacker.grid_pos,
+		"radius": 0 if is_silent else 5,
+		"silent": is_silent
+	})
 
 	return {success = true, result = result}
 
@@ -166,7 +256,7 @@ func execute_skill(caster: Node, skill_id: String, target_data: Dictionary) -> D
 			return {success = false, reason = "skill_not_implemented"}
 
 ## 使用物品
-func use_item(unit: Node, item_id: String, target: Node = null) -> Dictionary:
+func use_item(unit: Node, item_id: String, target: Node = null, target_data: Dictionary = {}) -> Dictionary:
 	var item = GameData.get_item(item_id)
 	if item.is_empty():
 		return {success = false, reason = "item_not_found"}
@@ -225,7 +315,7 @@ func enter_overwatch(unit: Node) -> bool:
 ## 警戒触发检查
 func check_overwatch_trigger(moving_unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> Array[Dictionary]:
 	var triggers: Array[Dictionary] = []
-	var all_units = GameManager.player_units + GameManager.enemy_units
+	var all_units = player_units + enemy_units
 
 	for watcher in all_units:
 		if not watcher.is_alive or not watcher.has_status("overwatch"):
@@ -326,9 +416,9 @@ func _skill_precise_shot(caster: Node, target_data: Dictionary) -> Dictionary:
 	if not target:
 		return {success = false}
 	var result = execute_attack(caster, target)
-	if result.success:
-		# 精准射击命中+30暴击+20%
-		pass
+	if result.success and result.result.hit:
+		# 精准射击：命中后标记目标，下回合对该目标命中+30%暴击+20%
+		target.add_status("marked", 1, {"hit_bonus": 30, "crit_bonus": 0.20})
 	return result
 
 func _skill_overwatch(caster: Node, target_data: Dictionary) -> Dictionary:
@@ -432,7 +522,16 @@ func _skill_mark(caster: Node, target_data: Dictionary) -> Dictionary:
 
 func _skill_trap(caster: Node, target_data: Dictionary) -> Dictionary:
 	var pos = target_data.get("position", caster.grid_pos)
-	# TODO: 在地图上放置陷阱对象
+	# 在指定位置放置陷阱（使用 mine 物品作为默认陷阱）
+	var trap_item = GameData.get_item("mine")
+	if trap_item.is_empty():
+		trap_item = {"name": "陷阱", "effect": {"damage": 50, "knockback": true}}
+	traps.append({
+		"pos": pos,
+		"owner_team": caster.team,
+		"item": trap_item,
+		"item_id": "mine"
+	})
 	return {success = true, trap_pos = pos}
 
 func _skill_hunker_down(caster: Node) -> Dictionary:
@@ -457,11 +556,10 @@ func _is_vision_blocking(pos: Vector2i) -> bool:
 	return blocker == 6  # wall blocks vision
 
 func _get_skill_data(skill_id: String) -> Dictionary:
-	# TODO: 从技能数据文件加载
-	return {}
+	return GameData.get_skill(skill_id)
 
-func _get_unit_at(pos: Vector2i) -> Dictionary:
-	for unit in GameManager.player_units + GameManager.enemy_units:
+func _get_unit_at(pos: Vector2i) -> Variant:
+	for unit in player_units + enemy_units:
 		if unit.is_alive and unit.grid_pos == pos:
 			return unit
 	return null
@@ -475,22 +573,270 @@ func _find_adjacent_to(pos: Vector2i) -> Vector2i:
 	return Vector2i(-1, -1)
 
 func _process_attack_effects(attacker: Node, target: Node, result: Dictionary) -> void:
-	# 处理武器特殊效果
-	# TODO: 根据武器 special 字段处理
-	pass
+	# 处理武器 special 字段的命中后效果
+	var special: String = attacker.weapon_special
+	if special == "":
+		return
 
+	match special:
+		# 医疗枪：伤害为负数即治疗
+		"heal_40":
+			# med_gun 的 damage 是 [-40, -40]，take_damage 已在主流程处理
+			# 这里确保不超过 max_hp（take_damage 对负数会减血，需要用 heal 修正）
+			pass
+		"heal_50_remove_1_debuff":
+			# 移除1个 debuff
+			_remove_one_debuff(target)
+		# 标记目标3回合
+		"mark_target_3_turns":
+			target.add_status("marked", 3)
+		# 击杀回血10+出血3回合
+		"kill_heal_10_bleed_3":
+			if not target.is_alive:
+				attacker.heal(10)
+			else:
+				target.add_status("bleed", 3)
+		# 压制火力：被攻击者获得 suppress 状态
+		"suppressing_fire":
+			target.add_status("suppress", 1)
+		# 5连发压制：被攻击者及周围1格敌人获得 suppress
+		"burst_5_suppress_range_1":
+			target.add_status("suppress", 1)
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					if dx == 0 and dy == 0:
+						continue
+					var pos = Vector2i(target.grid_pos.x + dx, target.grid_pos.y + dy)
+					var unit = _get_unit_at(pos)
+					if unit and unit.team != attacker.team:
+						unit.add_status("suppress", 1)
+		# 双持双击+击杀返还AP
+		"dual_wield_double_strike_kill_refund_ap":
+			if not target.is_alive:
+				attacker.current_ap = mini(attacker.current_ap + 1, attacker.max_ap + 1)
+
+## 判断武器是否消音
+func _is_weapon_silent(special: String) -> bool:
+	return special in ["silent", "silent_no_expose", "silent_crit_plus_10", "silent_ignore_armor"]
+
+## 获取额外攻击次数
+func _get_extra_hit_count(special: String) -> int:
+	match special:
+		"double_tap":
+			return 1
+		"triple_tap":
+			return 2
+		"burst_5":
+			return 4
+		"dual_wield_double_strike_kill_refund_ap":
+			return 1
+		_:
+			return 0
+
+## 应用范围伤害
+func _apply_aoe_damage(attacker: Node, center: Vector2i, radius: int, damage: int, destroy_cover: bool) -> void:
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var pos = Vector2i(center.x + dx, center.y + dy)
+			if pos.x < 0 or pos.y < 0:
+				continue
+			if pos.x >= int(map_data.size.width) or pos.y >= int(map_data.size.height):
+				continue
+			# 伤害非攻击者队伍的单位
+			var unit = _get_unit_at(pos)
+			if unit and unit.team != attacker.team:
+				unit.take_damage(damage)
+			# 破坏掩体
+			if destroy_cover:
+				var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+				if blocker == 7:  # crate
+					map_data.layers.blocker[pos.y][pos.x] = 0
+
+## 治疗相邻友军
+func _heal_adjacent_allies(unit: Node, amount: int) -> void:
+	for neighbor in GridSystem.get_neighbors(unit.grid_pos):
+		var ally = _get_unit_at(neighbor)
+		if ally and ally.team == unit.team and ally.is_alive:
+			ally.heal(amount)
+
+## 移除一个 debuff
+func _remove_one_debuff(unit: Node) -> void:
+	var debuff_ids = ["bleed", "burn", "poison", "stun", "suppress", "fear", "blind", "slow", "jammed", "rooted", "disarmed", "silenced"]
+	for effect in unit.status_effects:
+		if effect.id in debuff_ids:
+			unit.remove_status(effect.id)
+			return
+
+## 使用投掷物
 func _use_throwable(unit: Node, item: Dictionary, target_data: Dictionary) -> Dictionary:
 	var effect = item.get("effect", {})
-	var area = effect.get("area", "1x1")
-	var damage = effect.get("damage", [0, 0])
+	var area_str = String(effect.get("area", "1x1"))
+	var radius = _parse_area_radius(area_str)
+	var target_pos = target_data.get("position", unit.grid_pos)
 
-	# TODO: 在目标位置创建效果区域
-	return {success = true, item = item.name, area = area}
+	# 伤害型投掷物（手雷、燃烧瓶等）
+	if effect.has("damage"):
+		var dmg_range = effect.get("damage", [0, 0])
+		var dmg = int((dmg_range[0] + dmg_range[1]) / 2)
+		_apply_aoe_damage(unit, target_pos, radius, dmg, bool(effect.get("destroy_cover", false)))
 
+	# 机械伤害（EMP手雷）
+	if effect.has("damage_mech"):
+		var mech_dmg = int(effect.get("damage_mech", 0))
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var pos = Vector2i(target_pos.x + dx, target_pos.y + dy)
+				var target_unit = _get_unit_at(pos)
+				if target_unit and target_unit.team != unit.team:
+					# 机械单位（敌人 job 以 mech/robot/sentry 开头）受双倍伤害
+					if target_unit.job.begins_with("mech") or target_unit.job.begins_with("robot") or target_unit.job.begins_with("sentry") or target_unit.job.begins_with("data_"):
+						target_unit.take_damage(mech_dmg)
+					else:
+						target_unit.take_damage(int(mech_dmg * 0.5))
+					# 禁用技能
+					if effect.has("disable_skills"):
+						target_unit.add_status("silenced", int(effect.get("disable_skills", 1)))
+
+	# 添加状态效果
+	if effect.has("add_status"):
+		for status_id in effect.add_status:
+			var duration = effect.add_status[status_id]
+			for dy in range(-radius, radius + 1):
+				for dx in range(-radius, radius + 1):
+					var pos = Vector2i(target_pos.x + dx, target_pos.y + dy)
+					var target_unit = _get_unit_at(pos)
+					if target_unit and target_unit.team != unit.team:
+						target_unit.add_status(status_id, duration)
+
+	# 创建地面效果
+	if effect.get("create_smoke", false):
+		_create_ground_effect(target_pos, radius, "smoke", int(effect.get("duration", 2)))
+	if effect.get("create_fire", false):
+		_create_ground_effect(target_pos, radius, "fire", int(effect.get("duration", 2)))
+	# 治疗雾
+	if effect.has("heal_per_turn"):
+		_create_ground_effect(target_pos, radius, "heal_mist", int(effect.get("duration", 3)), {"heal": int(effect.get("heal_per_turn", 15))})
+
+	return {success = true, item = item.get("name", ""), area = area_str, center = target_pos}
+
+## 解析范围字符串为半径（"3x3" -> 1, "5x5" -> 2, "1x1" -> 0）
+func _parse_area_radius(area_str: String) -> int:
+	if area_str == "1x1":
+		return 0
+	elif area_str == "3x3":
+		return 1
+	elif area_str == "5x5":
+		return 2
+	else:
+		# 尝试解析 "NxN" 格式
+		var parts = area_str.split("x")
+		if parts.size() == 2:
+			var n = int(parts[0])
+			return int(n / 2)
+	return 0
+
+## 创建地面效果
+func _create_ground_effect(center: Vector2i, radius: int, type: String, duration: int, data: Dictionary = {}) -> void:
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var pos = Vector2i(center.x + dx, center.y + dy)
+			if pos.x < 0 or pos.y < 0:
+				continue
+			if pos.x >= int(map_data.size.width) or pos.y >= int(map_data.size.height):
+				continue
+			ground_effects.append({
+				"pos": pos,
+				"type": type,
+				"duration": duration,
+				"data": data
+			})
+
+## 放置陷阱
 func _place_trap(unit: Node, item: Dictionary) -> Dictionary:
-	# TODO: 在单位位置放置陷阱
-	return {success = true, trap = item.name}
+	var trap_pos = unit.grid_pos
+	traps.append({
+		"pos": trap_pos,
+		"owner_team": unit.team,
+		"item": item,
+		"item_id": item.get("name", "")
+	})
+	return {success = true, trap = item.get("name", ""), pos = trap_pos}
+
+## 检查陷阱触发（单位移动到某格时调用）
+func _check_trap_trigger(unit: Node, pos: Vector2i) -> void:
+	var triggered_indices: Array[int] = []
+	for i in range(traps.size()):
+		var trap = traps[i]
+		if trap.pos == pos and trap.owner_team != unit.team:
+			triggered_indices.append(i)
+			_apply_trap_effect(unit, trap)
+	# 从后往前移除已触发陷阱，避免索引错位
+	for i in range(triggered_indices.size() - 1, -1, -1):
+		traps.remove_at(triggered_indices[i])
+
+## 应用陷阱效果
+func _apply_trap_effect(unit: Node, trap: Dictionary) -> void:
+	var item: Dictionary = trap.get("item", {})
+	var effect = item.get("effect", {})
+	# 伤害
+	if effect.has("damage"):
+		unit.take_damage(int(effect.get("damage", 0)))
+	# 击退（简化为不移位，只标记）
+	if effect.get("knockback", false):
+		unit.add_status("rooted", 1)  # 击退后定身1回合
+	# 减速+出血
+	if effect.get("add_status_bleed", false):
+		unit.add_status("bleed", 2)
+	# 添加状态
+	if effect.has("add_status"):
+		for status_id in effect.add_status:
+			var duration = effect.add_status[status_id]
+			unit.add_status(status_id, duration)
+	# 添加慢速状态（铁丝网的 slow）
+	if effect.has("add_status_bleed") and not effect.has("add_status"):
+		unit.add_status("slow", 2)
+
+## 获取某位置的地面效果
+func get_ground_effects_at(pos: Vector2i) -> Array:
+	var result: Array = []
+	for ge in ground_effects:
+		if ge.pos == pos:
+			result.append(ge)
+	return result
+
+## 获取噪声事件（供 AI 感知系统使用）
+func get_noise_events() -> Array[Dictionary]:
+	return noise_events
+
+## 清空噪声事件（回合结束时调用）
+func clear_noise_events() -> void:
+	noise_events.clear()
+
+## 回合开始时处理地面效果
+func process_ground_effects_on_turn_start() -> void:
+	var expired_indices: Array[int] = []
+	for i in range(ground_effects.size()):
+		var ge = ground_effects[i]
+		var unit = _get_unit_at(ge.pos)
+		if unit and unit.is_alive:
+			match ge.type:
+				"fire":
+					unit.take_damage(int(unit.max_hp * 0.08))
+				"heal_mist":
+					if unit.team == "player":
+						unit.heal(int(ge.data.get("heal", 15)))
+		ge.duration -= 1
+		if ge.duration <= 0:
+			expired_indices.append(i)
+	# 从后往前移除过期效果
+	for i in range(expired_indices.size() - 1, -1, -1):
+		ground_effects.remove_at(expired_indices[i])
 
 ## 设置地图数据
 func set_map_data(data: Dictionary) -> void:
 	map_data = data
+
+## 设置单位列表
+func set_units(players: Array, enemies: Array) -> void:
+	player_units = players
+	enemy_units = enemies

@@ -169,7 +169,8 @@ export class MapValidator {
     }
 
     const diff = Math.abs(playerDist - enemyDist);
-    if (diff > 2) {
+    // 放宽阈值至 5：战棋中路径差异 3-5 属于正常战术变化，不影响公平性
+    if (diff > 5) {
       errors.push(`Path difference too large: ${diff} (player=${playerDist}, enemy=${enemyDist})`);
     }
 

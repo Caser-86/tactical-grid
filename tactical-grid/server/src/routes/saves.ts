@@ -56,6 +56,26 @@ saveRoutes.post('/', authMiddleware, (req: AuthRequest, res) => {
   });
 });
 
+// 获取最新存档
+saveRoutes.get('/latest', authMiddleware, (req: AuthRequest, res) => {
+  const save = queryOne(
+    'SELECT * FROM saves WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+    [req.userId]
+  );
+
+  if (!save) {
+    return error(res, 3001, 'No saves found', 404);
+  }
+
+  return success(res, {
+    save_id: save.id,
+    save_data: save.save_data,
+    save_hash: save.save_hash,
+    version: save.version,
+    timestamp: save.created_at,
+  });
+});
+
 // 下载存档
 saveRoutes.get('/:save_id', authMiddleware, (req: AuthRequest, res) => {
   const { save_id } = req.params;
@@ -91,24 +111,4 @@ saveRoutes.delete('/:save_id', authMiddleware, (req: AuthRequest, res) => {
   execute('DELETE FROM saves WHERE id = ? AND user_id = ?', [save_id, req.userId]);
 
   return success(res, { deleted: true });
-});
-
-// 获取最新存档
-saveRoutes.get('/latest', authMiddleware, (req: AuthRequest, res) => {
-  const save = queryOne(
-    'SELECT * FROM saves WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
-    [req.userId]
-  );
-
-  if (!save) {
-    return error(res, 3001, 'No saves found', 404);
-  }
-
-  return success(res, {
-    save_id: save.id,
-    save_data: save.save_data,
-    save_hash: save.save_hash,
-    version: save.version,
-    timestamp: save.created_at,
-  });
 });

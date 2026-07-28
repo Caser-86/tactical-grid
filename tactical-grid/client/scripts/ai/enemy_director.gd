@@ -3,11 +3,22 @@
 extends Node
 class_name EnemyDirector
 
+## 增援生成请求信号：参数为单位数据数组 [{type, position}, ...] 和提示消息
+signal reinforcement_spawned(units_data: Array, message: String)
+
 var turn_count: int = 0
 var reinforcement_triggers: Array[Dictionary] = []
 var pressure_level: float = 0.0  # 0-1，玩家优势度
 var player_losses_this_battle: int = 0
 var enemy_losses_this_battle: int = 0
+## 已生成增援总数（用于上限控制）
+var reinforcements_spawned: int = 0
+## 增援上限（防止无限生成，由 BattleController 根据关卡配置设置）
+var max_reinforcements: int = 20
+## 存活敌人数量（由 BattleController 每回合更新，用于上限控制）
+var alive_enemy_count: int = 0
+## 单次增援后场上敌人上限（防止一次刷出过多）
+var enemy_cap_per_wave: int = 12
 
 ## 初始化 Director
 func setup(scripts: Array) -> void:
@@ -15,62 +26,92 @@ func setup(scripts: Array) -> void:
 	player_losses_this_battle = 0
 	enemy_losses_this_battle = 0
 	pressure_level = 0.5
+	reinforcements_spawned = 0
 
 	# 从地图脚本中提取增援触发器
 	reinforcement_triggers.clear()
 	for script in scripts:
-		if script.action == "spawn_reinforcement":
-			reinforcement_triggers.append(script)
+		if script.get("action", "") == "spawn_reinforcement":
+			# 标记触发状态，避免重复触发
+			var entry = script.duplicate(true)
+			entry["triggered"] = false
+			reinforcement_triggers.append(entry)
 
-## 每回合更新
-func on_turn_start(turn_number: int) -> void:
+## 每回合更新：评估压力并检查增援触发
+## 返回本次触发的增援列表（可能为空）
+func on_turn_start(turn_number: int) -> Array:
 	turn_count = turn_number
 	_evaluate_pressure()
-
-	# 检查增援触发
-	_check_reinforcements(turn_number)
+	return _check_reinforcements(turn_number)
 
 ## 评估当前压力
 func _evaluate_pressure() -> void:
-	var player_units = get_tree().get_nodes_in_group("player_units")
-	var enemy_units = get_tree().get_nodes_in_group("enemy_units")
+	# pressure_level 由 BattleController 通过 set_alive_counts 更新
+	# 这里做兜底：若无外部更新则保持当前值
+	pass
 
-	var alive_players = player_units.filter(func(u): return u.is_alive).size()
-	var alive_enemies = enemy_units.filter(func(u): return u.is_alive).size()
-
+## 设置存活单位数量（由 BattleController 每回合调用）
+func set_alive_counts(alive_players: int, alive_enemies: int) -> void:
 	if alive_players == 0:
 		pressure_level = 0.0
 		return
-
-	# 比例：敌人越多，压力越高
 	var ratio = float(alive_enemies) / float(alive_players + alive_enemies)
 	pressure_level = clampf(ratio, 0.0, 1.0)
+	alive_enemy_count = alive_enemies
 
-## 检查增援
-func _check_reinforcements(turn: int) -> void:
+## 检查增援触发，返回本次生成的增援单位数据列表
+func _check_reinforcements(turn: int) -> Array:
+	var spawned: Array = []
 	for trigger in reinforcement_triggers:
-		if trigger.triggered:
+		if trigger.get("triggered", false):
 			continue
+		# 重复触发型触发器不标记 triggered
+		var is_repeat = trigger.get("repeat", false)
+		var condition = trigger.get("trigger", {}).get("condition", "")
+		if not _check_condition(condition, turn):
+			continue
+		# 达到增援上限则跳过
+		if reinforcements_spawned >= max_reinforcements:
+			break
+		# 场上敌人达到上限则跳过本次生成
+		var data = trigger.get("data", {})
+		var units_data = data.get("units", [])
+		var would_exceed = (alive_enemy_count + units_data.size()) > enemy_cap_per_wave
+		if would_exceed:
+			# 非重复触发器保留以便下回合再试
+			if not is_repeat:
+				pass
+			continue
+		# 标记触发（重复型不标记）
+		if not is_repeat:
+			trigger["triggered"] = true
+		# 累计已生成数量
+		reinforcements_spawned += units_data.size()
+		var msg = data.get("message", "")
+		spawned.append({"units": units_data, "message": msg})
+		# 发送信号通知 BattleController 实际生成单位
+		reinforcement_spawned.emit(units_data, msg)
+	return spawned
 
-		var condition = trigger.trigger.get("condition", "")
-		if _check_condition(condition, turn):
-			trigger.triggered = true
-			_spawn_reinforcement(trigger.data)
-
-## 检查条件
+## 检查条件（支持 ">= N"、"<N"、"==N"）
 func _check_condition(condition: String, turn: int) -> bool:
+	condition = condition.strip_edges()
 	if condition.begins_with(">="):
 		var value = int(condition.substr(2).strip_edges())
 		return turn >= value
+	if condition.begins_with("<="):
+		var value = int(condition.substr(2).strip_edges())
+		return turn <= value
+	if condition.begins_with("=="):
+		var value = int(condition.substr(2).strip_edges())
+		return turn == value
+	if condition.begins_with("<"):
+		var value = int(condition.substr(1).strip_edges())
+		return turn < value
+	if condition.begins_with(">"):
+		var value = int(condition.substr(1).strip_edges())
+		return turn > value
 	return false
-
-## 生成增援
-func _spawn_reinforcement(data: Dictionary) -> void:
-	# 通知游戏管理器生成增援
-	var units = data.get("units", [])
-	for unit_data in units:
-		# TODO: 实际生成敌人单位
-		print("Director: Spawning reinforcement: ", unit_data)
 
 ## 记录玩家损失
 func on_player_loss() -> void:

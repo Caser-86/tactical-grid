@@ -15,6 +15,7 @@
       "size": "small", "theme": "warehouse", "mission_type": "destroy",
       "difficulty": 1, "seed": 1002,
       "player_units": 3, "enemy_count": 5,
+      "intro_dialogue": "ch1_m2_intro", "outro_dialogue": "ch1_m2_outro",
       "new_unlocks": ["sniper_class", "highland_mechanic", "destructible_cover"],
       "tutorial_flags": ["teach_highground", "teach_destructible", "teach_resource"],
       "rewards": { "credit": 250, "exp": 200, "first_clear": { "credit": 350, "intel": 15 } }
@@ -24,6 +25,7 @@
       "size": "small", "theme": "warehouse", "mission_type": "extract",
       "difficulty": 1, "seed": 1003,
       "player_units": 3, "enemy_count": 5,
+      "intro_dialogue": "ch1_m3_intro", "outro_dialogue": "ch1_m3_outro",
       "tutorial_flags": ["teach_overwatch"],
       "rewards": { "credit": 250, "exp": 200, "first_clear": { "credit": 350, "intel": 15 } }
     },
@@ -32,14 +34,16 @@
       "size": "small", "theme": "warehouse", "mission_type": "escort",
       "difficulty": 1, "seed": 1004,
       "player_units": 4, "enemy_count": 5,
+      "intro_dialogue": "ch1_m4_intro", "outro_dialogue": "ch1_m4_outro",
       "tutorial_flags": ["teach_interaction", "teach_escort"],
       "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
     },
     "ch1_m5": {
       "name": "技能初探", "chapter": 1, "mission": 5,
-      "size": "small", "theme": "warehouse", "mission_type": "extract",
+      "size": "small", "theme": "warehouse", "mission_type": "steal_data",
       "difficulty": 2, "seed": 1005,
       "player_units": 4, "enemy_count": 6,
+      "intro_dialogue": "ch1_m5_intro", "outro_dialogue": "ch1_m5_outro",
       "tutorial_flags": ["teach_skills", "teach_items"],
       "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
     },
@@ -49,7 +53,8 @@
       "difficulty": 2, "seed": 1006,
       "player_units": 4, "enemy_count": 7,
       "is_boss": true, "boss_id": "data_sentinel",
-      "rewards": { "credit": 1000, "exp": 500, "first_clear": { "credit": 1500, "intel": 50, "loot": "epic_weapon" } }
+      "intro_dialogue": "ch1_m6_intro", "outro_dialogue": "ch1_m6_outro",
+      "rewards": { "credit": 1000, "exp": 500, "first_clear": { "credit": 1500, "intel": 50, "loot": "plasma_blade" } }
     },
     "ch2_m1": {
       "name": "雨夜突袭", "chapter": 2, "mission": 1,

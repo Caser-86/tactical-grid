@@ -27,6 +27,89 @@
         { "speaker": "alpha", "text": "这只是开始。矩阵协议不会善罢甘休的。", "emotion": "serious" }
       ]
     },
+    "ch1_m2_intro": {
+      "trigger": "mission_start",
+      "scene": "warehouse_interior",
+      "characters": [
+        { "id": "alpha", "name": "阿尔法", "portrait": "alpha_serious", "position": "left" },
+        { "id": "lila", "name": "莉拉", "portrait": "lila_neutral", "position": "right" }
+      ],
+      "lines": [
+        { "speaker": "alpha", "text": "莉拉，你终于归队了。这次目标是摧毁仓库深处的数据中继器。", "emotion": "neutral" },
+        { "speaker": "lila", "text": "我看到几个关键掩体。贴着半掩体开火，命中率会低很多。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "高处也更稳。我在二层平台架狙，你从侧翼包抄。", "emotion": "serious" },
+        { "speaker": "lila", "text": "注意——他们的弹药箱就在掩体旁边。打爆就能开路。", "emotion": "happy" }
+      ]
+    },
+    "ch1_m2_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "lila", "text": "中继器炸了。他们的通讯网断了一块。", "emotion": "happy" },
+        { "speaker": "alpha", "text": "干得漂亮。指挥官说博士有新发现，回基地详谈。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m3_intro": {
+      "trigger": "mission_start",
+      "scene": "warehouse_rooftop",
+      "characters": [
+        { "id": "alpha", "name": "阿尔法", "portrait": "alpha_serious", "position": "left" },
+        { "id": "commander", "name": "指挥官", "portrait": "commander_neutral", "position": "right" }
+      ],
+      "lines": [
+        { "speaker": "commander", "text": "这一关我们要练警戒。敌人会在我方移动时开火。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "明白。先卡好掩体，再分批撤离。", "emotion": "serious" },
+        { "speaker": "commander", "text": "狙击手架住高地视野，其他人沿掩体推进。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m3_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "alpha", "text": "全员撤离。警戒配合很关键。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "不错。下一关要护送一个 VIP，复杂度会上升。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m4_intro": {
+      "trigger": "mission_start",
+      "scene": "warehouse_interior",
+      "characters": [
+        { "id": "alpha", "name": "阿尔法", "portrait": "alpha_serious", "position": "left" },
+        { "id": "sentinel", "name": "哨兵", "portrait": "sentinel_neutral", "position": "right" }
+      ],
+      "lines": [
+        { "speaker": "alpha", "text": "你就是那个反水的哨兵？指挥官说让你跟着我们。", "emotion": "serious" },
+        { "speaker": "sentinel", "text": "我了解他们的协议。我可以激活终端，给你们撤离路径。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "好。你贴着我走，到撤离点之前别掉队。", "emotion": "neutral" },
+        { "speaker": "sentinel", "text": "明白。我会保持低调。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m4_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "sentinel", "text": "撤离成功。指挥官，我提供的协议有效吧？", "emotion": "neutral" },
+        { "speaker": "commander", "text": "有效。博士已经在分析你给的密钥。下一关要动用技能和物品了。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m5_intro": {
+      "trigger": "mission_start",
+      "scene": "warehouse_interior",
+      "characters": [
+        { "id": "alpha", "name": "阿尔法", "portrait": "alpha_serious", "position": "left" },
+        { "id": "doctor", "name": "博士", "portrait": "doctor_neutral", "position": "right" }
+      ],
+      "lines": [
+        { "speaker": "doctor", "text": "我给你们准备了几样新装备——手雷、烟雾弹、急救包。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "技能也可以用了？", "emotion": "neutral" },
+        { "speaker": "doctor", "text": "对。每人一项主动技能，记得合理使用 AP。", "emotion": "happy" },
+        { "speaker": "alpha", "text": "好。这次目标完成后就是 Boss 了，先磨合一下手感。", "emotion": "serious" }
+      ]
+    },
+    "ch1_m5_outro": {
+      "trigger": "mission_victory",
+      "lines": [
+        { "speaker": "alpha", "text": "技能和物品配合得不错。指挥官，全员就位。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "下一关就是数据哨兵。全员休整，准备硬仗。", "emotion": "serious" }
+      ]
+    },
     "ch1_m6_intro": {
       "trigger": "mission_start",
       "lines": [

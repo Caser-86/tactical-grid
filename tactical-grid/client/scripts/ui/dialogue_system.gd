@@ -23,6 +23,11 @@ var current_choices: Array = []
 func _ready() -> void:
 	hide()
 	continue_hint.visible = false
+	# 读取可访问性字幕速度设置（subtitle_speed > 1 表示更快，< 1 表示更慢）
+	var settings = GameManager.get_settings()
+	var subtitle_speed = settings.get("subtitle_speed", 1.0)
+	if subtitle_speed > 0.0:
+		type_speed = 0.03 / subtitle_speed
 
 func _input(event: InputEvent) -> void:
 	if not visible:
@@ -42,9 +47,14 @@ func start_dialogue(dialogue_id: String) -> void:
 	dialogue_data = _load_dialogue(dialogue_id)
 	if dialogue_data.is_empty():
 		dialogue_finished.emit()
+		queue_free()
 		return
 
 	current_lines = dialogue_data.get("lines", [])
+	if current_lines.is_empty():
+		dialogue_finished.emit()
+		queue_free()
+		return
 	current_index = 0
 	show()
 	_show_line(current_lines[current_index])
@@ -120,7 +130,8 @@ func _on_choice_selected(index: int) -> void:
 	# 触发 flag
 	if choice.has("flag"):
 		choice_made.emit(choice.flag)
-		GameManager.save_data.campaign_progress.story_flags[choice.flag] = true
+		GameManager.current_save.campaign_progress.story_flags[choice.flag] = true
+		GameManager.save_current()
 
 	# 显示回应
 	if choice.has("response"):
@@ -134,10 +145,14 @@ func _on_choice_selected(index: int) -> void:
 func _end_dialogue() -> void:
 	hide()
 	dialogue_finished.emit()
+	queue_free()
 
 ## 加载对话数据
 func _load_dialogue(dialogue_id: String) -> Dictionary:
-	# 从本地数据加载
+	# 优先使用 GameData 已加载的数据
+	if GameData and not GameData.get_dialogue(dialogue_id).is_empty():
+		return GameData.get_dialogue(dialogue_id)
+	# 兜底：直接从文件读取
 	var file = FileAccess.open("res://data/dialogues.json", FileAccess.READ)
 	if not file:
 		return {}

@@ -43,10 +43,19 @@ var is_downed: bool = false
 var status_effects: Array[Dictionary] = []  # 状态效果列表
 var equipment: Dictionary = {}
 
+# 每回合基础移动点（用于回合开始恢复）
+var base_move_points: int = 5
+
 # 武器
-var weapon_range: Array[int] = [1, 5]
-var weapon_damage: Array[int] = [20, 30]
+var weapon_range: Array = [1, 5]
+var weapon_damage: Array = [20, 30]
 var weapon_optimal_range: int = 3
+var weapon_special: String = ""  # 武器 special 字段（如 "silent"、"double_tap"）
+
+# 已学技能列表（从角色存档传入，用于战斗中技能按钮配置驱动）
+var learned_skills: Array = []
+# 可用物品列表（从库存传入，用于战斗中物品按钮配置驱动）
+var available_items: Array = []
 
 func _ready() -> void:
 	add_to_group(team + "_units")
@@ -68,6 +77,7 @@ func setup(data: Dictionary) -> void:
 ## 刷新 AP（回合开始时）
 func refresh_ap() -> void:
 	current_ap = max_ap
+	move_points = base_move_points
 	ap_changed.emit(self, current_ap)
 
 ## 消耗 AP

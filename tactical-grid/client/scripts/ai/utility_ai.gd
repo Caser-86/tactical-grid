@@ -42,14 +42,23 @@ static func decide_action(
 			})
 
 	# 2. 评估移动行动（朝最近玩家移动）
+	# 如果已经有攻击选项，降低移动优先级
+	var has_attack_option = false
+	for a in actions:
+		if a.type == "attack":
+			has_attack_option = true
+			break
 	var nearest_player = _find_nearest_player(enemy, player_units)
 	if nearest_player:
 		var best_move = _find_best_move_position(enemy, nearest_player, map_data)
 		if best_move:
+			var move_score = 30.0
+			if has_attack_option:
+				move_score = 5.0  # 已能攻击时很少移动
 			actions.append({
 				"type": "move",
 				"target_pos": best_move,
-				"score": 30.0,  # 移动的基础分
+				"score": move_score,
 			})
 
 	# 3. 评估寻找掩体
@@ -64,9 +73,12 @@ static func decide_action(
 
 	# 4. 评估警戒（如果还有 AP）
 	if enemy.current_ap >= 1:
+		var overwatch_score = 15.0
+		if has_attack_option:
+			overwatch_score = 3.0  # 已能攻击时很少警戒
 		actions.append({
 			"type": "overwatch",
-			"score": 15.0,
+			"score": overwatch_score,
 		})
 
 	# 选择最高分行动
@@ -93,7 +105,7 @@ static func _get_target_priority(target: Node) -> float:
 			return 1.0
 
 ## 找最近玩家
-static func _find_nearest_player(enemy: Node, players: Array) -> Dictionary:
+static func _find_nearest_player(enemy: Node, players: Array) -> Node:
 	var nearest = null
 	var min_dist = 9999
 	for p in players:
@@ -111,21 +123,26 @@ static func _find_best_move_position(
 	target: Node,
 	map_data: Dictionary
 ) -> Vector2i:
+	var cost_func = func(pos):
+		var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
+		var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+		if blocker == 6 or blocker == 7 or terrain == 5:
+			return -1
+		match terrain:
+			0,1,4,9: return 1
+			2,3,8: return 2
+			_: return 1
+
+	var blocked_func = func(pos):
+		return not MapLoader.is_passable(map_data, pos.x, pos.y)
+
 	var reachable = Pathfinding.get_reachable_cells(
 		enemy.grid_pos,
 		enemy.move_points,
 		map_data.size.width,
 		map_data.size.height,
-		func(pos):
-			var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
-			var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-			if blocker == 6 or blocker == 7 or terrain == 5:
-				return -1
-			match terrain:
-				0,1,4,9: return 1
-				2,3,8: return 2
-				_: return 1
-		func(pos): return not MapLoader.is_passable(map_data, pos.x, pos.y)
+		cost_func,
+		blocked_func
 	)
 
 	var best_pos = Vector2i(-1, -1)
@@ -154,21 +171,26 @@ static func _find_best_cover(
 	players: Array,
 	map_data: Dictionary
 ) -> Vector2i:
+	var cost_func = func(pos):
+		var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
+		var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+		if blocker == 6 or blocker == 7 or terrain == 5:
+			return -1
+		match terrain:
+			0,1,4,9: return 1
+			2,3,8: return 2
+			_: return 1
+
+	var blocked_func = func(pos):
+		return not MapLoader.is_passable(map_data, pos.x, pos.y)
+
 	var reachable = Pathfinding.get_reachable_cells(
 		enemy.grid_pos,
 		enemy.move_points,
 		map_data.size.width,
 		map_data.size.height,
-		func(pos):
-			var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
-			var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-			if blocker == 6 or blocker == 7 or terrain == 5:
-				return -1
-			match terrain:
-				0,1,4,9: return 1
-				2,3,8: return 2
-				_: return 1
-		func(pos): return not MapLoader.is_passable(map_data, pos.x, pos.y)
+		cost_func,
+		blocked_func
 	)
 
 	var best_pos = Vector2i(-1, -1)

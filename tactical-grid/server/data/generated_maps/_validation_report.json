@@ -1,0 +1,459 @@
+{
+  "generator_version": "1.0.0",
+  "generated_at": "2026-07-27T16:39:34.187Z",
+  "total_maps": 30,
+  "passed": 30,
+  "failed": 0,
+  "reports": [
+    {
+      "level_id": "ch1_m1",
+      "name": "初次接触",
+      "seed": 1001,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.042Z"
+    },
+    {
+      "level_id": "ch1_m2",
+      "name": "掩体战术",
+      "seed": 1002,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.056Z"
+    },
+    {
+      "level_id": "ch1_m3",
+      "name": "高地优势",
+      "seed": 1003,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.065Z"
+    },
+    {
+      "level_id": "ch1_m4",
+      "name": "交互点",
+      "seed": 1004,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.072Z"
+    },
+    {
+      "level_id": "ch1_m5",
+      "name": "技能初探",
+      "seed": 1005,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.075Z"
+    },
+    {
+      "level_id": "ch1_m6",
+      "name": "数据哨兵",
+      "seed": 1006,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.082Z"
+    },
+    {
+      "level_id": "ch2_m1",
+      "name": "雨夜突袭",
+      "seed": 2001,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.083Z"
+    },
+    {
+      "level_id": "ch2_m2",
+      "name": "烟雾迷宫",
+      "seed": 2002,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.088Z"
+    },
+    {
+      "level_id": "ch2_m3",
+      "name": "破墙而入",
+      "seed": 2003,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.089Z"
+    },
+    {
+      "level_id": "ch2_m4",
+      "name": "视野压制",
+      "seed": 2004,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.097Z"
+    },
+    {
+      "level_id": "ch2_m5",
+      "name": "双线作战",
+      "seed": 2005,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.105Z"
+    },
+    {
+      "level_id": "ch2_m6",
+      "name": "情报获取",
+      "seed": 2006,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.115Z"
+    },
+    {
+      "level_id": "ch2_m7",
+      "name": "重装审判者",
+      "seed": 2007,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.118Z"
+    },
+    {
+      "level_id": "ch3_m1",
+      "name": "地下入口",
+      "seed": 3001,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.122Z"
+    },
+    {
+      "level_id": "ch3_m2",
+      "name": "毒雾管道",
+      "seed": 3002,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.129Z"
+    },
+    {
+      "level_id": "ch3_m3",
+      "name": "陷阱迷宫",
+      "seed": 3003,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.134Z"
+    },
+    {
+      "level_id": "ch3_m4",
+      "name": "电力设施",
+      "seed": 3004,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.139Z"
+    },
+    {
+      "level_id": "ch3_m5",
+      "name": "通讯枢纽",
+      "seed": 3005,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.145Z"
+    },
+    {
+      "level_id": "ch3_m6",
+      "name": "影子佣兵",
+      "seed": 3006,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.150Z"
+    },
+    {
+      "level_id": "ch4_m1",
+      "name": "外围突破",
+      "seed": 4001,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.153Z"
+    },
+    {
+      "level_id": "ch4_m2",
+      "name": "城墙攀登",
+      "seed": 4002,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.156Z"
+    },
+    {
+      "level_id": "ch4_m3",
+      "name": "军械库",
+      "seed": 4003,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.159Z"
+    },
+    {
+      "level_id": "ch4_m4",
+      "name": "指挥中心",
+      "seed": 4004,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.160Z"
+    },
+    {
+      "level_id": "ch4_m5",
+      "name": "围城之夜",
+      "seed": 4005,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.165Z"
+    },
+    {
+      "level_id": "ch4_m6",
+      "name": "矩阵将军",
+      "seed": 4006,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.172Z"
+    },
+    {
+      "level_id": "ch5_m1",
+      "name": "核心外围",
+      "seed": 5001,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.175Z"
+    },
+    {
+      "level_id": "ch5_m2",
+      "name": "数据洪流",
+      "seed": 5002,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.177Z"
+    },
+    {
+      "level_id": "ch5_m3",
+      "name": "架构师之眼",
+      "seed": 5003,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.180Z"
+    },
+    {
+      "level_id": "ch5_m4",
+      "name": "最后选择",
+      "seed": 5004,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.182Z"
+    },
+    {
+      "level_id": "ch5_m5",
+      "name": "架构师",
+      "seed": 5005,
+      "generator_version": "1.0.0",
+      "passed": true,
+      "checks": {
+        "connectivity": true,
+        "fairness": true,
+        "safety": true,
+        "density": true
+      },
+      "errors": [],
+      "generated_at": "2026-07-27T16:39:34.185Z"
+    }
+  ]
+}

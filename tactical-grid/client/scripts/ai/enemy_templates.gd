@@ -197,19 +197,24 @@ static func _execute_move(
 	if not MapLoader.is_passable(map_data, target_pos.x, target_pos.y):
 		return false
 
+	var cost_func = func(pos):
+		var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
+		var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+		if blocker == 6 or blocker == 7 or terrain == 5:
+			return -1
+		match terrain:
+			0,1,4,9: return 1
+			2,3,8: return 2
+			_: return 1
+
+	var blocked_func = func(pos):
+		return not MapLoader.is_passable(map_data, pos.x, pos.y)
+
 	var path = Pathfinding.find_path(
 		unit.grid_pos, target_pos,
 		map_data.size.width, map_data.size.height,
-		func(pos):
-			var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
-			var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
-			if blocker == 6 or blocker == 7 or terrain == 5:
-				return -1
-			match terrain:
-				0,1,4,9: return 1
-				2,3,8: return 2
-				_: return 1
-		func(pos): return not MapLoader.is_passable(map_data, pos.x, pos.y)
+		cost_func,
+		blocked_func
 	)
 
 	if path.size() == 0:

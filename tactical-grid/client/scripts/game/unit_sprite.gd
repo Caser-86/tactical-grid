@@ -38,7 +38,7 @@ func _draw() -> void:
 	if selected:
 		draw_arc(Vector2.ZERO, radius + 6, 0, TAU, 32, Color.GREEN, 2)
 	elif hover:
-		draw_arc(Vector2.ZERO, radius + 4, 0, TAU, 32, Color.WHITE.opacity05, 1.5)
+		draw_arc(Vector2.ZERO, radius + 4, 0, TAU, 32, Color(1, 1, 1, 0.5), 1.5)
 
 func _get_unit_color() -> Color:
 	if unit.team == "player":
@@ -72,7 +72,7 @@ func _draw_hp_bar(radius: int) -> void:
 	# 边框
 	draw_rect(
 		Rect2(-bar_width / 2, bar_y, bar_width, bar_height),
-		Color.WHITE.opacity06,
+		Color(1, 1, 1, 0.6),
 		false, 1
 	)
 

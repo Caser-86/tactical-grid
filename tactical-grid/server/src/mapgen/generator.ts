@@ -10,12 +10,15 @@ import { SeededRandom } from './seed_random';
 import { MapValidator } from './validator';
 import { Pathfinding } from './pathfinding';
 
-/** 主题地形权重 */
+/** 生成器版本号：每次修改生成算法时递增，用于锁定地图的可追溯性 */
+export const GENERATOR_VERSION = '1.0.0';
+
+/** 主题地形权重（高地/水域权重较低，避免密度超标） */
 const THEME_WEIGHTS: Record<MapTheme, Partial<Record<TerrainType, number>>> = {
   warehouse: { [TerrainType.PLAIN]: 40, [TerrainType.ROAD]: 10, [TerrainType.WALL]: 15, [TerrainType.CRATE]: 12 },
-  city_ruins: { [TerrainType.PLAIN]: 25, [TerrainType.ROAD]: 20, [TerrainType.WALL]: 15, [TerrainType.HIGHLAND]: 8, [TerrainType.WATER]: 5 },
-  mountain_fort: { [TerrainType.PLAIN]: 35, [TerrainType.HIGHLAND]: 10, [TerrainType.WALL]: 10, [TerrainType.SAND]: 8, [TerrainType.WATER]: 3 },
-  forest_camp: { [TerrainType.PLAIN]: 30, [TerrainType.FOREST]: 25, [TerrainType.WATER]: 8, [TerrainType.HIGHLAND]: 5 },
+  city_ruins: { [TerrainType.PLAIN]: 30, [TerrainType.ROAD]: 20, [TerrainType.WALL]: 12, [TerrainType.HIGHLAND]: 5, [TerrainType.WATER]: 3 },
+  mountain_fort: { [TerrainType.PLAIN]: 40, [TerrainType.HIGHLAND]: 5, [TerrainType.WALL]: 8, [TerrainType.SAND]: 10, [TerrainType.WATER]: 2 },
+  forest_camp: { [TerrainType.PLAIN]: 35, [TerrainType.FOREST]: 25, [TerrainType.WATER]: 5, [TerrainType.HIGHLAND]: 3 },
   underground: { [TerrainType.PLAIN]: 45, [TerrainType.WALL]: 15, [TerrainType.POISON]: 3, [TerrainType.CRATE]: 8 },
 };
 
@@ -28,8 +31,8 @@ export class MapGenerator {
   static generate(params: GenerateParams): MapData {
     const config = SIZE_PRESETS[params.size];
 
-    // 尝试最多 20 个种子偏移
-    for (let attempt = 0; attempt < 20; attempt++) {
+    // 尝试最多 30 个种子偏移
+    for (let attempt = 0; attempt < 30; attempt++) {
       const attemptSeed = params.seed + attempt * 7919; // 用质数偏移
       const rng = new SeededRandom(attemptSeed);
       const map = this.generateOnce({ ...params, seed: attemptSeed }, rng, config);
@@ -40,14 +43,16 @@ export class MapGenerator {
       if (validation.passed) {
         // 恢复原始种子用于记录
         map.seed = params.seed;
+        map.generator_version = GENERATOR_VERSION;
         return map;
       }
     }
 
-    // 20 次都失败，生成一个简化版本（减少掩体密度，确保连通）
+    // 30 次都失败，生成一个简化版本（减少掩体密度，确保连通）
     const rng = new SeededRandom(params.seed);
     const fallbackMap = this.generateOnce(params, rng, config);
     fallbackMap.validation = MapValidator.validate(fallbackMap);
+    fallbackMap.generator_version = GENERATOR_VERSION;
     return fallbackMap;
   }
 
@@ -90,6 +95,9 @@ export class MapGenerator {
     const objects = this.placeObjects(
       base_terrain, blocker, width, height, config, params.mission_type, rng
     );
+
+    // 7.5 后处理：确保玩家出生点、目标、撤离点之间连通（失败则开凿直接路径）
+    this.ensureConnectivity(base_terrain, blocker, width, height, objects);
 
     // 8. 生成脚本
     const scripts = this.generateScripts(params.mission_type, rng);
@@ -201,7 +209,7 @@ export class MapGenerator {
     }
   }
 
-  /** 放置高地 */
+  /** 放置高地（限制密度，避免阻塞连通性） */
   private static placeHighlands(
     terrain: number[][],
     heightLayer: number[][],
@@ -209,10 +217,11 @@ export class MapGenerator {
     rng: SeededRandom
   ): void {
     const totalCells = width * height;
-    const maxHighlands = Math.floor(totalCells / 25) * 3;
+    // 降低高地上限：从 totalCells/25*3 改为 totalCells/25*2，留出更多通行空间
+    const maxHighlands = Math.max(2, Math.floor(totalCells / 25) * 2);
     let placed = 0;
 
-    const attempts = maxHighlands * 3;
+    const attempts = maxHighlands * 4;
     for (let i = 0; i < attempts && placed < maxHighlands; i++) {
       const x = rng.nextInt(1, width - 2);
       const y = rng.nextInt(1, height - 2);
@@ -232,8 +241,8 @@ export class MapGenerator {
       }
 
       if (!tooClose && terrain[y][x] === TerrainType.PLAIN) {
-        // 放置 2-4 格的高地平台
-        const clusterSize = rng.nextInt(2, 4);
+        // 缩小集群：1-2 格，避免大面积阻塞
+        const clusterSize = rng.nextInt(1, 2);
         for (let j = 0; j < clusterSize; j++) {
           const ox = x + rng.nextInt(-1, 1);
           const oy = y + rng.nextInt(-1, 1);
@@ -247,7 +256,7 @@ export class MapGenerator {
     }
   }
 
-  /** 放置掩体 */
+  /** 放置掩体（确保最低密度，避免阻塞主路径） */
   private static placeCovers(
     terrain: number[][],
     blocker: number[][],
@@ -257,11 +266,13 @@ export class MapGenerator {
     theme: MapTheme
   ): void {
     const totalCells = width * height;
-    const targetCoverCount = Math.floor(totalCells * 0.10); // 10% 掩体密度（避免过度阻挡）
+    // 目标密度 12%，最低 6%（避免低于校验阈值 5%）
+    const targetCoverCount = Math.floor(totalCells * 0.12);
+    const minCoverCount = Math.floor(totalCells * 0.06);
 
     let placed = 0;
     let attempts = 0;
-    const maxAttempts = targetCoverCount * 5;
+    const maxAttempts = targetCoverCount * 6;
 
     while (placed < targetCoverCount && attempts < maxAttempts) {
       attempts++;
@@ -282,6 +293,22 @@ export class MapGenerator {
         vision[y][x] = 2;
       }
       placed++;
+    }
+
+    // 补充掩体：如果低于最低密度，强制添加
+    if (placed < minCoverCount) {
+      let extraAttempts = minCoverCount * 10;
+      while (placed < minCoverCount && extraAttempts > 0) {
+        extraAttempts--;
+        const x = rng.nextInt(1, width - 2);
+        const y = rng.nextInt(1, height - 2);
+        if (y >= height - 2 || y <= 1) continue;
+        if (terrain[y][x] === TerrainType.WATER || terrain[y][x] === TerrainType.HIGHLAND) continue;
+        if (blocker[y][x] !== 0) continue;
+        blocker[y][x] = TerrainType.CRATE; // 用箱子补充（可破坏，不严重影响连通）
+        vision[y][x] = 2;
+        placed++;
+      }
     }
   }
 
@@ -304,21 +331,24 @@ export class MapGenerator {
       ...extra,
     });
 
-    // 玩家出生点（底部中间）
+    // 玩家出生点（底部中间，清除出生区阻挡和水域）
     const playerStartY = height - 1;
     const playerStartX = Math.floor(width / 2);
     for (let i = 0; i < config.playerUnits; i++) {
       const px = Math.max(0, Math.min(width - 1, playerStartX - Math.floor(config.playerUnits / 2) + i));
+      // 清除出生点周围的阻挡和水域
+      this.clearAreaAround(blocker, terrain, px, playerStartY, 1, width, height);
       objects.push(makeObj('spawn_player', px, playerStartY, { team: 'player' }));
     }
 
-    // 敌人出生点（顶部 + 两侧，距离玩家 ≥ 5 格）
+    // 敌人出生点（中段区域，距离玩家 ≥ 5 格，与目标距离适中以平衡路径）
     let enemiesPlaced = 0;
     let attempts = 0;
-    while (enemiesPlaced < config.enemyUnits && attempts < 100) {
+    while (enemiesPlaced < config.enemyUnits && attempts < 150) {
       attempts++;
+      // 敌人放在垂直中段（height/3 到 2*height/3），避免贴脸或离目标太近
       const ex = rng.nextInt(0, width - 1);
-      const ey = rng.nextInt(0, Math.floor(height / 2));
+      const ey = rng.nextInt(Math.floor(height / 3), Math.floor((2 * height) / 3));
 
       // 距离玩家出生点 ≥ 5
       const minDist = Math.min(
@@ -341,9 +371,11 @@ export class MapGenerator {
       enemiesPlaced++;
     }
 
-    // 主任务目标（中央偏上）
+    // 主任务目标（中央偏上，确保所在格及相邻格可通行）
     const objectiveX = Math.floor(width / 2);
     const objectiveY = Math.floor(height / 3);
+    // 清除目标格及相邻格的阻挡，确保可达
+    this.clearAreaAround(blocker, terrain, objectiveX, objectiveY, 1, width, height);
     // 找一个可放置的格子
     for (let dy = 0; dy < 3; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
@@ -361,9 +393,11 @@ export class MapGenerator {
       if (objects.find(o => o.type === 'terminal' || o.type === 'destructible_target')) break;
     }
 
-    // 撤离点（顶部角落）
+    // 撤离点（顶部角落，确保可达）
     const evacX = width - 1;
     const evacY = 0;
+    // 清除撤离点格的阻挡
+    this.clearAreaAround(blocker, terrain, evacX, evacY, 1, width, height);
     objects.push(makeObj('evac', evacX, evacY, { turnsToActivate: 3 }));
 
     // 资源点（侧路 1-2 个）
@@ -377,6 +411,124 @@ export class MapGenerator {
     }
 
     return objects;
+  }
+
+  /** 清除指定坐标周围的阻挡物（确保关键对象可达） */
+  private static clearAreaAround(
+    blocker: number[][],
+    terrain: number[][],
+    cx: number, cy: number,
+    radius: number,
+    width: number, height: number
+  ): void {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          // 清除墙体和箱子（保留地形），确保关键点通行
+          if (blocker[y][x] === TerrainType.WALL || blocker[y][x] === TerrainType.CRATE) {
+            blocker[y][x] = 0;
+          }
+          // 水域改为平地，确保关键点不落在水里
+          if (terrain[y][x] === TerrainType.WATER) {
+            terrain[y][x] = TerrainType.PLAIN;
+          }
+        }
+      }
+    }
+  }
+
+  /** 后处理：确保玩家出生点与目标、撤离点之间连通，失败则开凿直接路径 */
+  private static ensureConnectivity(
+    terrain: number[][],
+    blocker: number[][],
+    width: number, height: number,
+    objects: MapObject[]
+  ): void {
+    const blocked = new Set([TerrainType.WATER, TerrainType.WALL]);
+
+    const playerSpawn = objects.find(o => o.type === 'spawn_player');
+    if (!playerSpawn) return;
+
+    const start = { x: playerSpawn.x, y: playerSpawn.y };
+
+    // 检查并修复到主目标和撤离点的连通性
+    const criticalObjects = objects.filter(o =>
+      o.type === 'terminal' || o.type === 'destructible_target' || o.type === 'evac'
+    );
+
+    for (const obj of criticalObjects) {
+      const end = { x: obj.x, y: obj.y };
+      const passableGrid = this.buildPassableGrid(terrain, blocker, width, height);
+
+      if (!Pathfinding.isReachable(passableGrid, start, end, blocked)) {
+        // 开凿 L 型路径确保连通
+        this.carvePath(terrain, blocker, start, end, width, height);
+      }
+    }
+  }
+
+  /** 构建可通行网格（用于连通性检查） */
+  private static buildPassableGrid(
+    terrain: number[][],
+    blocker: number[][],
+    width: number, height: number
+  ): number[][] {
+    const grid: number[][] = [];
+    for (let y = 0; y < height; y++) {
+      grid[y] = [];
+      for (let x = 0; x < width; x++) {
+        if (blocker[y][x] === TerrainType.WALL || blocker[y][x] === TerrainType.CRATE) {
+          grid[y][x] = TerrainType.WALL;
+        } else {
+          grid[y][x] = terrain[y][x];
+        }
+      }
+    }
+    return grid;
+  }
+
+  /** 开凿 L 型路径（先水平后垂直），清除路径上的阻挡和水域 */
+  private static carvePath(
+    terrain: number[][],
+    blocker: number[][],
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    width: number, height: number
+  ): void {
+    // 水平段
+    const xDir = end.x > start.x ? 1 : -1;
+    let x = start.x;
+    while (x !== end.x) {
+      this.clearCell(terrain, blocker, x, start.y, width, height);
+      x += xDir;
+    }
+    // 垂直段
+    const yDir = end.y > start.y ? 1 : -1;
+    let y = start.y;
+    while (y !== end.y) {
+      this.clearCell(terrain, blocker, end.x, y, width, height);
+      y += yDir;
+    }
+    // 确保终点本身可通行
+    this.clearCell(terrain, blocker, end.x, end.y, width, height);
+  }
+
+  /** 清除单格阻挡和水域（改为道路+无阻挡） */
+  private static clearCell(
+    terrain: number[][],
+    blocker: number[][],
+    x: number, y: number,
+    width: number, height: number
+  ): void {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    if (blocker[y][x] === TerrainType.WALL || blocker[y][x] === TerrainType.CRATE) {
+      blocker[y][x] = 0;
+    }
+    if (terrain[y][x] === TerrainType.WATER) {
+      terrain[y][x] = TerrainType.ROAD;
+    }
   }
 
   /** 生成脚本 */

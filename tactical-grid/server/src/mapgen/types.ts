@@ -81,6 +81,7 @@ export interface ValidationResult {
 export interface MapData {
   map_id: string;
   seed: number;
+  generator_version?: string;
   size: { width: number; height: number };
   theme: MapTheme;
   mission_type: MissionType;
