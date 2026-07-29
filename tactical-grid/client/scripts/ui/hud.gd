@@ -134,6 +134,23 @@ func set_action_buttons_visible(visible: bool) -> void:
 	item_button.visible = visible
 	overwatch_button.visible = visible
 
+## 在窗口尺寸变化时更新 HUD 安全区域，避免裁切或大面积空白
+func apply_viewport_layout(viewport_size: Vector2i) -> void:
+	# RightPanel 固定宽度 250，贴右边缘
+	var right_panel = $RightPanel
+	right_panel.offset_left = -250.0
+	right_panel.offset_right = 0.0
+
+	# BattleLog 限制在左侧 350px 宽度内，距底部 70px
+	var log = $BattleLog
+	log.offset_right = min(350.0, float(viewport_size.x) * 0.3)
+
+	# ActionBar 居中，总宽度不超过视口 80%
+	var action_bar = $BottomBar/ActionBar
+	var bar_width = float(viewport_size.x) * 0.8
+	action_bar.offset_left = -bar_width * 0.5
+	action_bar.offset_right = bar_width * 0.5
+
 func add_log(msg: String) -> void:
 	_log_lines.append(msg)
 	if _log_lines.size() > MAX_LOG_LINES:
