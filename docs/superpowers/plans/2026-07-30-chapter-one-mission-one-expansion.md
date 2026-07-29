@@ -24,6 +24,70 @@
 
 ---
 
+## Execution Lanes and Model/Tool Routing
+
+Model names below are routing recommendations, not claims that a named model is currently available. If the UI exposes `Sol xhigh` or `5.6 Terra`, use the mapping below; otherwise select a model with the equivalent capability and reasoning level.
+
+### Workstream Matrix
+
+| Lane | Scope | Plan Tasks | Recommended Executor | Reasoning Level | Required Tools | Deliverable |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CODE-CORE` | Mission state, event integration, rewards, camera, regression fixes | 1, 2, 3, 5 | Strong coding model; `Sol xhigh` if available | `xhigh` | `apply_patch`, PowerShell, Godot headless tests, Git | Tested GDScript and scene integration |
+| `LEVEL-DATA` | Map layout, encounter scripting, turn budgets, balance data | 4 | Strong coding/game-design model; `5.6 Terra high/xhigh` if available | `high`, raise to `xhigh` for balance failures | JSON inspection, Godot tests, map validators | Valid 18×14 authored mission data |
+| `ART-GEN` | Generate the seven approved unit source illustrations | Task 6 Step 3 only | Image generation model/tool such as Codex Image Generation or `IMAGE2` | Image quality mode | Image generation, visual inspection | Seven unprocessed source PNGs |
+| `ART-PIPELINE` | Alpha cleanup, crop, resize, import, catalog wiring, runtime presentation | Task 6 Steps 1, 2, 4-7, 9 | Coding model with image-processing experience; `Sol xhigh` if available | `high` | PowerShell, image inspection, Godot importer/tests, `apply_patch` | Seven transparent 96×96 runtime assets integrated in-game |
+| `VISUAL-QA` | Judge silhouette separation, scale, clipping, combat readability, UI obstruction | Task 6 Step 8; Task 7 Step 7 visual checks | Vision-capable model plus Computer Use; human signs off final quality | `high` | Windowed Godot run, screenshots, image viewer | Screenshot evidence and issue list |
+| `CODE-QA` | E2E tests, release gate, export, deterministic regression diagnosis | Task 7 Steps 1-6 | Strong coding/debugging model; `Sol xhigh` if available | `xhigh` for failures, `high` for clean reruns | Godot headless, PowerShell release gate, export preset, Git | Passing release logs and runnable Windows build |
+| `PLAYTEST` | Duration, pacing, tactical choice, frustration, fun, victory/failure clarity | Task 7 Step 7 | AI may execute and collect telemetry; a human must make the final experience judgment | Human judgment | Windowed build, screen recording or screenshots, playtest sheet | Actual turn count, duration, defects, and signed-off experience notes |
+| `DOCS-PROVENANCE` | Resource licenses, AI-generation record, status and QA evidence | Task 6 Step 6; Task 7 Steps 8-9 | General or coding model | `medium/high` | Repository search, Git diff, verified test logs | Accurate manifests, status, and QA documents |
+
+### What Counts as Art Work
+
+- **Pure art generation:** only Task 6 Step 3. The image model creates seven source illustrations from the approved visual brief.
+- **Art engineering:** Task 6 Steps 1, 2, 4, 5, 6, 7, and 9. These are code/tool tasks, not image-generation tasks: tests, deterministic processing, transparency, sizing, catalog registration, import behavior, runtime composition, and provenance.
+- **Visual acceptance:** Task 6 Step 8 and the visual part of Task 7 Step 7. A vision-capable model can identify defects, but the final "looks like a finished game" decision needs human review.
+- An image is not complete merely because it was generated. It becomes a game asset only after processing, registration, in-game rendering, visual QA, and licensing/provenance documentation pass.
+
+### What Counts as Code, Data, or Tool Work
+
+- **Code:** Tasks 1, 2, 3, and 5; Task 6 art processing/integration; Task 7 automated QA and release work.
+- **Level and balance data:** Task 4. A general reasoning model may draft layout and numbers, but a coding-capable model must validate schemas, coordinates, triggers, and runtime behavior.
+- **Automated testing:** all RED/GREEN test steps and the release gate. These must be executed by tools; model reasoning alone is not test evidence.
+- **Documentation:** provenance and status updates may use a lower-cost model after implementation, but every factual claim must come from repository state, test output, or captured playtest evidence.
+- **Release:** export and smoke testing require the installed Godot executable and the generated build. No model may mark release complete from source review alone.
+
+### Recommended Model Assignment
+
+- Use **`Sol xhigh` or an equivalent strongest coding/reasoning model** for Tasks 1, 2, 3, 5, Task 6 runtime integration, and any failing release-gate diagnosis.
+- Use **`5.6 Terra high/xhigh` or an equivalent strong general/coding model** for Task 4 map authoring, balance-data iteration, test-log consolidation, and documentation. Escalate Task 4 to the strongest coding model if map triggers or scene integration fail.
+- Use **Codex Image Generation, `IMAGE2`, or an equivalent image model** only for Task 6 Step 3. It must not edit GDScript, manifests, import settings, or claim in-game completion.
+- Use a **vision-capable model with Computer Use** for windowed visual inspection and mechanical playthrough execution. Use a human for the final fun, pacing, and commercial-quality judgment.
+- Use **deterministic tools instead of a model** for PNG conversion, alpha cleanup, dimensions, file hashes, Godot import, tests, export, and Git operations.
+
+### Delegation and Merge Rules
+
+- Tasks 1 through 3 are sequential because they establish the mission interfaces and share `battle_controller.gd`.
+- Task 4 begins only after Tasks 1 and 2 freeze the mission-flow and event-trigger contracts.
+- Task 5 must not edit `battle_controller.gd` concurrently with Tasks 2 or 3. Run it afterward, or use an isolated worktree and review the cherry-pick manually.
+- Task 6 Step 3 may run in parallel with code work because source images live in an isolated directory. Task 6 integration begins only after all seven source files exist.
+- Task 7 begins only after Tasks 1 through 6 are integrated.
+- No two workers may concurrently modify `battle_controller.gd`, `battle_smoke_test_runner.gd`, or `battle_hud_contract_test.gd`.
+- Every delegated lane returns a focused commit, exact commands run, pass/fail output, changed-file list, and unresolved risks. The integration owner reviews each diff before merging.
+- A visual-generation worker returns source art only. The integration owner remains responsible for crop, alpha, dimensions, import settings, rendering, collisions where applicable, tests, and provenance.
+
+### Execution Order
+
+1. `CODE-CORE`: Task 1.
+2. `CODE-CORE`: Task 2.
+3. `CODE-CORE`: Task 3.
+4. `LEVEL-DATA`: Task 4.
+5. `CODE-CORE`: Task 5.
+6. `ART-GEN`: Task 6 Step 3 may start in parallel as soon as the approved prompts are available.
+7. `ART-PIPELINE` and `VISUAL-QA`: finish the remaining Task 6 steps.
+8. `CODE-QA`, `PLAYTEST`, and `DOCS-PROVENANCE`: Task 7 and final evidence.
+
+---
+
 ## File Structure
 
 - `client/scripts/game/mission_objective_state.gd`: mission phase, upload progress, resource state, victory gating, result modifiers.
@@ -47,7 +111,9 @@
 
 ---
 
-### Task 1: Mission Phase State Machine
+### Task 1: Mission Phase State Machine `[CODE-CORE / xhigh]`
+
+**Executor:** Strong coding model (`Sol xhigh` if available). Do not delegate implementation to an image model.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/chapter_one_objectives_test.gd`
@@ -213,7 +279,9 @@ git commit -m "feat(chapter1): add staged opening mission objective"
 
 ---
 
-### Task 2: Event Reinforcements and Battle Integration
+### Task 2: Event Reinforcements and Battle Integration `[CODE-CORE / xhigh]`
+
+**Executor:** Strong coding model (`Sol xhigh` if available). Keep this sequential with Tasks 1 and 3 because they share runtime interfaces.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/battle_smoke_test_runner.gd`
@@ -320,7 +388,9 @@ git commit -m "feat(chapter1): trigger reinforcements from mission stages"
 
 ---
 
-### Task 3: Optional Resource Interaction, Rating, and Rewards
+### Task 3: Optional Resource Interaction, Rating, and Rewards `[CODE-CORE / xhigh]`
+
+**Executor:** Strong coding model (`Sol xhigh` if available). This task spans battle, save/reward, result UI, and E2E contracts.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/battle_smoke_test_runner.gd`
@@ -447,7 +517,9 @@ git commit -m "feat(chapter1): add optional salvage objective and reward"
 
 ---
 
-### Task 4: Author the 18×14 Echo Yard Mission
+### Task 4: Author the 18×14 Echo Yard Mission `[LEVEL-DATA / high]`
+
+**Executor:** Strong coding/game-design model (`5.6 Terra high/xhigh` if available), with Godot validation owned by the integration worker.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/battle_smoke_test_runner.gd`
@@ -633,7 +705,9 @@ git commit -m "feat(chapter1): expand echo yard into a three-stage mission"
 
 ---
 
-### Task 5: Readable Large-Map Camera
+### Task 5: Readable Large-Map Camera `[CODE-CORE / xhigh]`
+
+**Executor:** Strong coding model (`Sol xhigh` if available) plus windowed visual verification. Do not merge from source review alone.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/battle_hud_contract_test.gd`
@@ -770,7 +844,9 @@ git commit -m "feat(camera): keep large battlefields readable and navigable"
 
 ---
 
-### Task 6: Replace Token-Like Units with Readable 96px Art
+### Task 6: Replace Token-Like Units with Readable 96px Art `[ART-GEN + ART-PIPELINE + VISUAL-QA]`
+
+**Executor split:** Image generation model for Step 3 only; coding model for Steps 1, 2, 4-7, and 9; vision-capable model plus human review for Step 8.
 
 **Files:**
 - Create: `tactical-grid/client/assets/generated/chapter1/source/ch1_m1_units/`
@@ -941,7 +1017,9 @@ git commit -m "feat(art): replace opening mission token units"
 
 ---
 
-### Task 7: Production E2E, Tutorial Order, and Release Evidence
+### Task 7: Production E2E, Tutorial Order, and Release Evidence `[CODE-QA + PLAYTEST + DOCS-PROVENANCE]`
+
+**Executor split:** Strong coding/debugging model for Steps 1-6; vision-capable model and human playtester for Step 7; documentation model for Steps 8-9 after evidence exists.
 
 **Files:**
 - Modify: `tactical-grid/client/tests/chapter_one_e2e_test.gd`
@@ -1071,3 +1149,6 @@ git commit -m "test(chapter1): verify expanded opening mission release path"
 - The map coordinates are unique, in bounds, and reserve three deployment slots.
 - Existing turn triggers, non-first-mission objective types, Boss camera feedback, and animation states remain covered.
 - No task uses enemy HP inflation, infinite reinforcement, or full-framework replacement to create playtime.
+- Every task is assigned to a workstream with an executor, reasoning level, required tools, and evidence boundary.
+- Image generation is isolated to source-art creation; processing, import, runtime integration, tests, and provenance remain explicit.
+- Automated QA, visual QA, and human experience acceptance are separate gates and cannot substitute for one another.
