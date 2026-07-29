@@ -22,6 +22,7 @@ func _ready() -> void:
 	GameManager.current_level_id = "ch1_m1"
 	await _test_hud_contract()
 	await _test_cooling_works_render_contract()
+	await _test_mission_event_reinforcement_bridge()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -271,6 +272,57 @@ func _test_cooling_works_render_contract() -> void:
 
 	await _dispose_battle()
 
+func _test_mission_event_reinforcement_bridge() -> void:
+	print("\n--- 测试: 任务事件驱动增援生成 ---")
+	GameManager.current_level_id = "ch1_m1"
+	_battle = BattleScene.instantiate()
+	add_child(_battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _battle.get_script() == null:
+		_check(false, "战斗脚本加载失败，跳过事件增援测试")
+		await _dispose_battle()
+		return
+
+	var mos: MissionObjectiveState = _battle.mission_objective_state
+	var connected := mos != null and mos.mission_event.is_connected(Callable(_battle, "_on_mission_event"))
+	_check(connected, "BattleController 连接 mission_event 到 _on_mission_event")
+	if not connected:
+		await _dispose_battle()
+		return
+
+	# 注入事件触发型增援：终端激活 → 2 个敌人
+	_battle.enemy_director.reinforcement_triggers.clear()
+	_battle.enemy_director.reinforcement_triggers.append({
+		"trigger_id": "test_terminal_wave",
+		"trigger": {"type": "event", "name": "terminal_activated"},
+		"action": "spawn_reinforcement",
+		"data": {"units": [
+			{"type": "sentry_basic", "position": [16, 12]},
+			{"type": "sentry_basic", "position": [17, 11]},
+		]},
+		"repeat": false,
+		"triggered": false,
+	})
+	_battle.enemy_director.max_reinforcements = 10
+	_battle.enemy_director.enemy_cap_per_wave = 20
+	var alive_p := 0
+	var alive_e := 0
+	for u in _battle.player_units:
+		if u and u.is_alive:
+			alive_p += 1
+	for u in _battle.enemy_units:
+		if u and u.is_alive:
+			alive_e += 1
+	_battle.enemy_director.set_alive_counts(alive_p, alive_e)
+
+	var before = _battle.enemy_units.size()
+	_battle.mission_objective_state.mission_event.emit(&"terminal_activated", {})
+	await get_tree().process_frame
+	var after = _battle.enemy_units.size()
+	_check(after == before + 2, "terminal_activated 事件生成 2 个增援单位 (before=%d after=%d)" % [before, after])
+
+	await _dispose_battle()
 func _dispose_battle() -> void:
 	if _battle and is_instance_valid(_battle):
 		# Units are detached data nodes. Tear this fixture down synchronously so the

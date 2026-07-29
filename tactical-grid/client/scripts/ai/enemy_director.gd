@@ -42,7 +42,7 @@ func setup(scripts: Array) -> void:
 func on_turn_start(turn_number: int) -> Array:
 	turn_count = turn_number
 	_evaluate_pressure()
-	return _check_reinforcements(turn_number)
+	return _evaluate_triggers(turn_number, &"")
 
 ## 评估当前压力
 func _evaluate_pressure() -> void:
@@ -59,16 +59,25 @@ func set_alive_counts(alive_players: int, alive_enemies: int) -> void:
 	pressure_level = clampf(ratio, 0.0, 1.0)
 	alive_enemy_count = alive_enemies
 
-## 检查增援触发，返回本次生成的增援单位数据列表
-func _check_reinforcements(turn: int) -> Array:
+## 触发器匹配：兼容回合触发和事件触发
+func _trigger_matches(entry: Dictionary, turn: int, event_name: StringName) -> bool:
+	var trigger: Dictionary = entry.get("trigger", {})
+	match String(trigger.get("type", "turn")):
+		"event":
+			return StringName(trigger.get("name", "")) == event_name
+		_:
+			# 回合型触发器只在事件名为空（回合评估）时匹配
+			return event_name.is_empty() and _check_condition(String(trigger.get("condition", "")), turn)
+
+## 统一评估增援触发器：回合触发和事件触发共用同一套上限/重复/信号逻辑
+func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 	var spawned: Array = []
 	for trigger in reinforcement_triggers:
 		if trigger.get("triggered", false):
 			continue
 		# 重复触发型触发器不标记 triggered
 		var is_repeat = trigger.get("repeat", false)
-		var condition = trigger.get("trigger", {}).get("condition", "")
-		if not _check_condition(condition, turn):
+		if not _trigger_matches(trigger, turn, event_name):
 			continue
 		# 达到增援上限则跳过
 		if reinforcements_spawned >= max_reinforcements:
@@ -92,6 +101,10 @@ func _check_reinforcements(turn: int) -> Array:
 		# 发送信号通知 BattleController 实际生成单位
 		reinforcement_spawned.emit(units_data, msg)
 	return spawned
+
+## 事件触发：由 BattleController 在收到 mission_event 时调用
+func on_event(event_name: StringName) -> Array:
+	return _evaluate_triggers(turn_count, event_name)
 
 ## 检查条件（支持 ">= N"、"<N"、"==N"）
 func _check_condition(condition: String, turn: int) -> bool:

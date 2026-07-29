@@ -2354,6 +2354,7 @@ func _test_reinforcement_system() -> void:
 	_test_reinforcement_max_cap()
 	_test_reinforcement_repeat_trigger()
 	_test_reinforcement_alive_count_cap()
+	_test_reinforcement_event_trigger()
 
 ## 验证从 scripts 中正确提取增援触发器
 func _test_reinforcement_trigger_parsing() -> void:
@@ -2514,6 +2515,32 @@ func _test_reinforcement_alive_count_cap() -> void:
 	# 非重复触发器未被标记，下回合可再试
 	var waves_t3 = director.on_turn_start(3)
 	_check(waves_t3.size() == 1, "Reinforce: 场上敌人减少后可触发")
+	director.queue_free()
+
+## 验证事件触发型增援（on_event）
+func _test_reinforcement_event_trigger() -> void:
+	var director := EnemyDirector.new()
+	add_child(director)
+	director.setup([
+		{
+			"trigger_id": "terminal_wave",
+			"trigger": {"type": "event", "name": "terminal_activated"},
+			"action": "spawn_reinforcement",
+			"data": {"units": [
+				{"type": "sentry_basic", "position": [16, 12]},
+				{"type": "drone_assault", "position": [17, 11]},
+			]},
+			"repeat": false,
+		},
+	])
+	director.max_reinforcements = 3
+	director.enemy_cap_per_wave = 7
+	director.set_alive_counts(3, 5)
+	_check(director.on_event(&"wrong_event").is_empty(), "Reinforce: 无关事件不触发增援")
+	var waves := director.on_event(&"terminal_activated")
+	_check(waves.size() == 1 and waves[0].units.size() == 2, "Reinforce: 终端事件触发配置的增援波次")
+	_check(director.on_event(&"terminal_activated").is_empty(), "Reinforce: 一次性事件不能重复触发")
+	_check(director.reinforcements_spawned == 2, "Reinforce: 事件增援计入增援上限")
 	director.queue_free()
 
 ## 验证锁定地图中的增援脚本可被加载

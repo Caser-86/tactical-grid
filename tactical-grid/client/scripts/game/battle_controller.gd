@@ -206,6 +206,7 @@ func _setup_objective_state() -> void:
 		"escort_vip": escort_vip,
 	}
 	mission_objective_state.setup(level_config, map_data, player_units, enemy_units, designations)
+	mission_objective_state.mission_event.connect(_on_mission_event)
 	_sync_objective_state_from_mos()
 
 ## 从 mos 同步目标状态到 battle_controller 的镜像变量。
@@ -323,6 +324,7 @@ func _init_subsystems() -> void:
 
 	enemy_director = EnemyDirector.new()
 	add_child(enemy_director)
+	enemy_director.reinforcement_spawned.connect(_on_reinforcement_spawned)
 
 	targeting_controller = TargetingController.new()
 	add_child(targeting_controller)
@@ -1248,14 +1250,8 @@ func _process_reinforcements(turn_number: int) -> void:
 		if u and u.is_alive:
 			alive_e += 1
 	enemy_director.set_alive_counts(alive_p, alive_e)
-	# 检查增援触发
-	var spawned_waves = enemy_director.on_turn_start(turn_number)
-	for wave in spawned_waves:
-		var units_data = wave.get("units", [])
-		var msg = wave.get("message", "")
-		_spawn_reinforcement_units(units_data)
-		if msg != "":
-			_log(msg)
+	# 检查增援触发：信号 reinforcement_spawned 驱动单位生成（见 _on_reinforcement_spawned）
+	enemy_director.on_turn_start(turn_number)
 	# 同步 action_system 的单位列表（增援可能已加入）
 	action_system.set_units(player_units, enemy_units)
 
@@ -1281,6 +1277,41 @@ func _spawn_reinforcement_units(units_data: Array) -> void:
 		_create_unit_sprite(unit)
 		_log("增援到达：%s (%d,%d)" % [unit.unit_name, spawn_pos.x, spawn_pos.y])
 
+## 增援信号回调：实际生成增援单位并记录日志
+## 由 EnemyDirector.reinforcement_spawned 驱动，回合触发和事件触发共用此路径
+func _on_reinforcement_spawned(units_data: Array, message: String) -> void:
+	_spawn_reinforcement_units(units_data)
+	if message != "":
+		_log(message)
+
+## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
+## 单位生成由 reinforcement_spawned 信号统一驱动，这里不直接 spawn
+func _on_mission_event(event_name: StringName, payload: Dictionary) -> void:
+	if not is_instance_valid(mission_objective_state):
+		return
+	# 更新存活计数，让事件增援遵循上限
+	var alive_p = 0
+	var alive_e = 0
+	for u in player_units:
+		if u and u.is_alive:
+			alive_p += 1
+	for u in enemy_units:
+		if u and u.is_alive:
+			alive_e += 1
+	if enemy_director:
+		enemy_director.set_alive_counts(alive_p, alive_e)
+		enemy_director.on_event(event_name)
+		action_system.set_units(player_units, enemy_units)
+	# 刷新目标文本（阶段变化、上传进度等）
+	hud.update_objective(mission_objective_state.get_status_text())
+
+## 敌人回合结束时推进上传进度（infiltrate 三阶段流）
+func _advance_upload_progress() -> void:
+	if not mission_objective_state:
+		return
+	var upload_result := mission_objective_state.on_enemy_turn_completed()
+	if upload_result.get("changed", false):
+		hud.update_objective(mission_objective_state.get_status_text())
 ## 在地图边缘（敌人侧）寻找可用的增援出生点
 func _find_reinforcement_spawn() -> Vector2i:
 	# 优先在地图右侧（敌人侧）边缘找空位
@@ -1389,6 +1420,7 @@ func _run_enemy_turn() -> void:
 	if mission_objective_state and mission_objective_state.is_enemy_passive(turn_manager.turn_number):
 		_log("敌人本回合待命（特殊规则）")
 		if not turn_manager.battle_over:
+			_advance_upload_progress()
 			turn_manager.end_enemy_turn()
 		return
 	# 敌人回合开始时处理 Boss 专属能力（召唤、护盾恢复等）
@@ -1402,6 +1434,7 @@ func _run_enemy_turn() -> void:
 		await get_tree().create_timer(0.3).timeout
 
 	if not turn_manager.battle_over:
+		_advance_upload_progress()
 		turn_manager.end_enemy_turn()
 
 func _execute_enemy_action(enemy: Unit) -> void:
