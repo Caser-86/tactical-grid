@@ -7,11 +7,37 @@ const CELL_SIZE := 64.0
 var terrain_id := -1
 var blocker_id := 0
 var objective_type := ""
+var environment_kit := ""
+var floor_variant := 0
+var blocker_variant := 0
+var edge_variants: Array = []
+var floor_texture: Texture2D
+var blocker_texture: Texture2D
+var edge_textures: Array[Texture2D] = []
 
-func setup(base_terrain: int, blocker: int = 0, objective: String = "") -> void:
+func setup(
+	base_terrain: int,
+	blocker: int = 0,
+	objective: String = "",
+	kit: String = "",
+	selected_floor_variant: int = 0,
+	selected_edge_variants: Array = [],
+	selected_blocker_variant: int = 0
+) -> void:
 	terrain_id = base_terrain
 	blocker_id = blocker
 	objective_type = objective
+	environment_kit = kit
+	floor_variant = selected_floor_variant
+	edge_variants = selected_edge_variants.duplicate()
+	blocker_variant = selected_blocker_variant
+	floor_texture = ArtCatalog.get_environment_component_texture(environment_kit, &"floor", floor_variant) if not environment_kit.is_empty() else null
+	blocker_texture = ArtCatalog.get_environment_component_texture(environment_kit, &"prop", blocker_variant) if blocker_id != 0 and not environment_kit.is_empty() else null
+	edge_textures.clear()
+	for edge_variant in edge_variants:
+		var texture := ArtCatalog.get_environment_component_texture(environment_kit, &"edge", int(edge_variant))
+		if texture:
+			edge_textures.append(texture)
 	queue_redraw()
 
 func _draw() -> void:
@@ -23,6 +49,11 @@ func _draw() -> void:
 		_draw_objective()
 
 func _draw_ground() -> void:
+	if floor_texture:
+		draw_texture_rect(floor_texture, Rect2(Vector2.ZERO, Vector2.ONE * CELL_SIZE), false)
+		for texture in edge_textures:
+			draw_texture_rect(texture, Rect2(Vector2.ZERO, Vector2.ONE * CELL_SIZE), false)
+		return
 	var base := GameTheme.get_terrain_color(terrain_id).darkened(0.35)
 	draw_rect(Rect2(Vector2.ZERO, Vector2.ONE * CELL_SIZE), base, true)
 	draw_rect(Rect2(Vector2(1, 1), Vector2.ONE * (CELL_SIZE - 2)), base.lightened(0.08), false, 1.0)
@@ -51,6 +82,9 @@ func _draw_ground() -> void:
 			draw_line(Vector2(2, 32), Vector2(62, 32), Color(0.65, 0.78, 0.80, 0.10), 1.0)
 
 func _draw_blocker() -> void:
+	if blocker_texture:
+		draw_texture_rect(blocker_texture, Rect2(Vector2.ZERO, Vector2.ONE * CELL_SIZE), false)
+		return
 	if blocker_id == 6: # 墙体
 		draw_rect(Rect2(6, 14, 52, 38), Color(0.10, 0.14, 0.17), true)
 		draw_rect(Rect2(6, 14, 52, 38), Color(0.38, 0.55, 0.60, 0.60), false, 2.0)

@@ -117,7 +117,8 @@ func complete_mission(result: Dictionary) -> void:
 	# 战斗层只传基础奖励。首通奖励必须在这里按存档进度判定，避免重玩重复发放。
 	var rewards: Dictionary = result.get("rewards", {}).duplicate(true)
 	if is_first_clear:
-		var first_clear_rewards: Dictionary = CampaignRepository.get_level(level_id).get("rewards", {}).get("first_clear", {})
+		var level_data := CampaignRepository.get_level(level_id)
+		var first_clear_rewards: Dictionary = level_data.get("rewards", {}).get("first_clear", {})
 		rewards["credit"] = rewards.get("credit", 0) + first_clear_rewards.get("credit", 0)
 		rewards["intel"] = rewards.get("intel", 0) + first_clear_rewards.get("intel", 0)
 		var loot_id := str(first_clear_rewards.get("loot", ""))
@@ -132,9 +133,12 @@ func complete_mission(result: Dictionary) -> void:
 				result["loot"] = [{"id": loot_id, "name": loot_data.get("name", loot_id)}]
 			else:
 				push_warning("First-clear loot is not defined: %s" % loot_id)
+		# 结算界面消费这一字段，避免玩家在基地列表中才发现新机制已可用。
+		result["new_unlocks"] = level_data.get("new_unlocks", []).duplicate()
 		result["first_clear"] = true
 	else:
 		result["first_clear"] = false
+		result["new_unlocks"] = []
 	result["rewards"] = rewards
 
 	# 累计资源
@@ -143,7 +147,7 @@ func complete_mission(result: Dictionary) -> void:
 	resources["intel"] = resources.get("intel", 0) + rewards.get("intel", 0)
 
 	# 角色经验
-	var xp_reward = rewards.get("xp", 50 + rating * 25)
+	var xp_reward = rewards.get("exp", rewards.get("xp", 50 + rating * 25))
 	var characters = current_save.get("characters", [])
 	for i in range(characters.size()):
 		# 只给参战角色（存活的）加经验
@@ -448,6 +452,7 @@ func get_settings() -> Dictionary:
 
 ## 更新设置
 func update_settings(settings: Dictionary) -> void:
+	InputBindings.apply_settings(settings)
 	current_save["settings"] = settings
 	SaveManager.save_game(current_save, current_slot)
 
@@ -541,7 +546,13 @@ func play_dialogue(dialogue_id: String, on_finished: Callable = Callable()) -> v
 		return
 
 	var dialogue = DialogueScene.instantiate()
-	current_scene.add_child(dialogue)
+	var dialogue_parent: Node = current_scene
+	var scene_hud: Node = current_scene.get_node_or_null("HUD")
+	if not scene_hud is CanvasLayer:
+		scene_hud = scene_tree.get_first_node_in_group("dialogue_layer")
+	if scene_hud is CanvasLayer:
+		dialogue_parent = scene_hud
+	dialogue_parent.add_child(dialogue)
 	_active_dialogue = dialogue
 
 	# 对话结束回调

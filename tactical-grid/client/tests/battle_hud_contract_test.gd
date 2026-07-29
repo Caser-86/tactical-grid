@@ -5,6 +5,7 @@ extends Node
 
 const BattleScene = preload("res://scenes/battle.tscn")
 const GameDataScript = preload("res://scripts/data/game_data.gd")
+const TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
 
 var _passed: int = 0
 var _failed: int = 0
@@ -18,11 +19,17 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	GameManager.begin_new_game_for_test(0)
+	GameManager.current_level_id = "ch1_m1"
 	await _test_hud_contract()
+	await _test_cooling_works_render_contract()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
+	# queue_free() is deferred; give both scene-tree queues a frame before exit so
+	# rendering resources from the two instantiated battle scenes are released.
+	await get_tree().process_frame
+	await get_tree().physics_frame
 	_print_summary()
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -41,11 +48,137 @@ func _test_hud_contract() -> void:
 	add_child(_battle)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_check(_battle.get_script() != null, "战斗控制脚本成功加载")
+	if _battle.get_script() == null:
+		return
 
 	var hud = _battle.get_node_or_null("HUD")
 	_check(hud != null, "HUD 节点存在")
 	if hud == null:
 		return
+
+	# 战斗地图必须使用可约束的专用相机，并在首帧完成地图/HUD 布局。
+	var camera = _battle.get_node_or_null("Camera2D")
+	_check(camera is BattleCameraController, "战斗场景使用 BattleCameraController")
+	if camera is BattleCameraController:
+		var expected_bounds_size = Vector2(_battle.map_width * _battle.CELL_SIZE, _battle.map_height * _battle.CELL_SIZE) + Vector2(80, 80)
+		_check(camera._map_bounds.size == expected_bounds_size, "相机边界包含地图和单位视觉安全边")
+		_check(camera._safe_viewport.size.x < get_viewport().get_visible_rect().size.x, "相机安全区为右侧单位面板预留空间")
+		_check(camera._safe_viewport.position.y >= 50.0, "相机安全区避开顶部 HUD")
+		var safe_center = camera._safe_viewport.get_center()
+		var viewport_center = get_viewport().get_visible_rect().size * 0.5
+		var map_screen_center = viewport_center + (camera._map_bounds.get_center() - camera.position) * camera.zoom
+		_check(map_screen_center.is_equal_approx(safe_center), "相机将地图中心对齐到无 HUD 遮挡的安全区")
+		var safe_fit_zoom = minf(camera._safe_viewport.size.x / camera._map_bounds.size.x, camera._safe_viewport.size.y / camera._map_bounds.size.y)
+		_check(camera.zoom.x <= minf(1.0, safe_fit_zoom) + 0.001, "相机缩放确保完整地图和部署行避开 HUD")
+	var action_bar = hud.get_node_or_null("BottomBar/ActionBar")
+	_check(action_bar != null and action_bar.offset_right > 0.0, "HUD 在启动时应用视口布局")
+	var objective_label: Label = hud.get_node_or_null("TopBar/ObjectiveLabel")
+	var viewport_width := get_viewport().get_visible_rect().size.x
+	_check(objective_label != null and objective_label.size.x >= viewport_width * 0.5, "顶部目标栏使用可显示 Boss 状态的响应式宽度")
+
+	# 战斗对话必须与教程一样位于 CanvasLayer，否则会被战场相机缩放和裁切。
+	var dialogue = GameManager._active_dialogue
+	_check(dialogue != null and dialogue.get_parent() == hud, "战斗对话挂载在 HUD CanvasLayer")
+	if dialogue:
+		var dialogue_panel: Control = dialogue.get_node("Panel")
+		var dialogue_rect := dialogue_panel.get_global_rect()
+		var dialogue_center := get_viewport().get_visible_rect().size * 0.5
+		_check(dialogue_rect.size.is_equal_approx(Vector2(800, 360)), "战斗对话保持 800x360 正式尺寸")
+		_check(dialogue_rect.get_center().is_equal_approx(dialogue_center), "战斗对话在视口居中")
+		dialogue.free()
+		GameManager._active_dialogue = null
+
+	# 教程必须位于不受战场相机缩放影响的 CanvasLayer，并保持正式弹窗尺寸。
+	_battle._show_tutorial_flag("teach_movement")
+	await get_tree().process_frame
+	var tutorial = _battle._active_tutorial_hint
+	_check(tutorial != null and tutorial.get_parent() == hud, "教程提示挂载在 HUD CanvasLayer")
+	if tutorial:
+		var tutorial_panel: Control = tutorial.get_node("Panel")
+		var panel_rect := tutorial_panel.get_global_rect()
+		var viewport_center := get_viewport().get_visible_rect().size * 0.5
+		_check(panel_rect.size.is_equal_approx(Vector2(600, 280)), "教程提示保持 600x280 正式尺寸")
+		_check(panel_rect.get_center().is_equal_approx(viewport_center), "教程提示在视口居中")
+		tutorial.free()
+		_battle._active_tutorial_hint = null
+		_battle._pending_tutorial_flags.clear()
+	_check(TutorialHintScript.get_hint_copy("teach_movement").contains("下方【移动】"), "移动教程说明动作栏与高亮目标格")
+	_check(TutorialHintScript.get_hint_copy("teach_attack").contains("下方【攻击】"), "攻击教程说明动作栏与红色目标")
+
+	# 正式地图必须渲染环境组件，而不是退回纯色程序格。
+	var map_layer = _battle.get_node_or_null("MapLayer")
+	var first_tile = map_layer.get_node_or_null("Tile_0_0") if map_layer else null
+	_check(first_tile != null, "环境渲染为每个格子提供稳定节点名")
+	if first_tile:
+		_check(first_tile.get("environment_kit") == "echo_yard", "ch1_m1 格子使用 echo_yard 环境套件")
+		_check(first_tile.get("floor_texture") is Texture2D, "环境格加载正式地板纹理")
+	var blocker_tile = map_layer.get_node_or_null("Tile_1_1") if map_layer else null
+	_check(blocker_tile != null and blocker_tile.get("blocker_texture") is Texture2D, "阻挡格加载独立货场道具纹理")
+	var threshold_tile = map_layer.get_node_or_null("Tile_5_0") if map_layer else null
+	var edge_variants = threshold_tile.get("edge_variants") if threshold_tile else null
+	_check(edge_variants is Array and not edge_variants.is_empty(), "材质交界格加载邻接边缘叠层")
+	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_0") != null, "战场实例化龙门吊地标")
+	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_1") != null, "战场实例化照明塔地标")
+
+	# 单位必须使用正式纹理并居中落在格内，不能再显示程序化字母棋子或格点偏移。
+	var unit_layer = _battle.get_node_or_null("UnitLayer")
+	var first_player_view: UnitSprite = null
+	if unit_layer:
+		for child in unit_layer.get_children():
+			if child is UnitSprite and child.unit.team == "player":
+				first_player_view = child
+				break
+	_check(first_player_view != null, "战场实例化玩家单位视图")
+	if first_player_view:
+		var art = first_player_view.get_node_or_null("Art")
+		_check(art is Sprite2D and art.texture is Texture2D, "玩家单位视图加载正式纹理")
+		var expected_center = GridSystem.grid_to_world(first_player_view.unit.grid_pos) + Vector2(_battle.CELL_SIZE, _battle.CELL_SIZE) * 0.5
+		_check(first_player_view.position.is_equal_approx(expected_center), "玩家单位位于战术格中心")
+		_battle._select_unit(first_player_view.unit)
+		var move_overlays = _battle.move_highlight.get_children()
+		_check(not move_overlays.is_empty(), "选中单位会创建移动范围高亮")
+		var overlays_ignore_mouse := true
+		for overlay in move_overlays:
+			if not overlay is Control or overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+				overlays_ignore_mouse = false
+				break
+		_check(overlays_ignore_mouse, "战术高亮不拦截玩家地图点击")
+		_battle._deselect_unit()
+
+	# 移动模式不能吞掉切换队员的点击，否则玩家移动一人后无法操作第二人。
+	if _battle.player_units.size() >= 2:
+		var first_player: Unit = _battle.player_units[0]
+		var second_player: Unit = _battle.player_units[1]
+		_battle._select_unit(first_player)
+		_battle.on_move_button()
+		var second_player_world = GridSystem.grid_to_world(second_player.grid_pos) + Vector2(_battle.CELL_SIZE, _battle.CELL_SIZE) * 0.5
+		_battle._handle_left_click(second_player_world)
+		_check(_battle.selected_unit == second_player, "移动模式下点击友军会切换当前操作单位")
+		_check(_battle.selected_action == "", "切换友军会退出残留的移动模式")
+		_battle._deselect_unit()
+
+	# 多人撤离必须使用可见的区域，而不是要求单位重叠在同一个锚点格。
+	var evac_zone_layer = _battle.get_node_or_null("EvacZoneLayer")
+	_check(_battle.evac_cells.size() >= _battle.player_units.size(), "撤离区域可容纳本关全部玩家单位")
+	_check(evac_zone_layer != null and evac_zone_layer.get_child_count() == _battle.evac_cells.size() - 1, "撤离区域为锚点外格子绘制常驻提示")
+	var evac_overlays_ignore_mouse := true
+	if evac_zone_layer:
+		for overlay in evac_zone_layer.get_children():
+			if not overlay is Control or overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+				evac_overlays_ignore_mouse = false
+				break
+	_check(evac_overlays_ignore_mouse, "撤离区域提示不拦截地图点击")
+	_check(objective_label != null and objective_label.text.contains("撤离区域"), "顶部目标明确要求到达撤离区域")
+
+	# 地面效果不能只存在于规则数据中，必须在战场上生成并在到期后移除视觉节点。
+	_battle.action_system._create_ground_effect(Vector2i(2, 2), 0, "smoke", 1)
+	await get_tree().process_frame
+	var effect_layer = _battle.get_node_or_null("EffectLayer")
+	_check(effect_layer != null and effect_layer.get_node_or_null("GroundEffect_2_2_smoke") != null, "烟雾地面效果显示在战场上")
+	_battle.action_system.process_ground_effects_on_turn_start()
+	await get_tree().process_frame
+	_check(effect_layer != null and effect_layer.get_node_or_null("GroundEffect_2_2_smoke") == null, "过期地面效果从战场移除")
 
 	# 验证行动按钮节点存在
 	var move_btn = hud.get_node_or_null("BottomBar/ActionBar/MoveButton")
@@ -72,7 +205,6 @@ func _test_hud_contract() -> void:
 
 	# 创建玩家单位并选中
 	var player_unit = GameData.create_player_unit("assault", "TestSoldier")
-	_battle.player_units = [player_unit]
 	_battle.selected_unit = player_unit
 	hud.update_unit_info(player_unit)
 
@@ -113,10 +245,39 @@ func _test_hud_contract() -> void:
 
 	# 清理
 	if player_unit and is_instance_valid(player_unit):
-		player_unit.queue_free()
+		player_unit.free()
 	if enemy_unit and is_instance_valid(enemy_unit):
-		enemy_unit.queue_free()
-	_battle.queue_free()
+		enemy_unit.free()
+	await _dispose_battle()
+
+func _test_cooling_works_render_contract() -> void:
+	print("\n--- 测试: Cooling Works 正式地图渲染 ---")
+	GameManager.current_level_id = "ch1_m2"
+	_battle = BattleScene.instantiate()
+	add_child(_battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	_check(_battle.map_width == 16 and _battle.map_height == 12, "ch1_m2 在战斗场景加载为 16 x 12 地图")
+	var map_layer = _battle.get_node_or_null("MapLayer")
+	_check(map_layer != null and map_layer.get_child_count() >= 192, "Cooling Works 为所有战术格实例化渲染节点")
+	var coolant_tile = map_layer.get_node_or_null("Tile_7_6") if map_layer else null
+	_check(coolant_tile != null and coolant_tile.get("environment_kit") == "cooling_works", "冷却液区域使用 cooling_works 环境套件")
+	_check(coolant_tile != null and coolant_tile.get("floor_variant") == 2 and coolant_tile.get("floor_texture") is Texture2D, "冷却液区域加载专属发光地板纹理")
+	var basin_blocker = map_layer.get_node_or_null("Tile_7_6") if map_layer else null
+	_check(basin_blocker != null and basin_blocker.get("blocker_texture") is Texture2D, "危险盆地的阻挡格加载专属环境道具")
+	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_0") != null, "战场实例化冷却塔地标")
+	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_1") != null, "战场实例化涡轮歧管地标")
+
+	await _dispose_battle()
+
+func _dispose_battle() -> void:
+	if _battle and is_instance_valid(_battle):
+		# Units are detached data nodes. Tear this fixture down synchronously so the
+		# headless runner does not exit before their scene-transition cleanup runs.
+		_battle._cleanup_units()
+		_battle.free()
+	_battle = null
 	await get_tree().process_frame
 
 func _print_summary() -> void:

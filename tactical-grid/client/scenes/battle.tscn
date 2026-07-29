@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/game/battle_controller.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="2"]
@@ -8,14 +8,18 @@
 [ext_resource type="Texture2D" path="res://assets/generated/chapter1/runtime/hud_icons/item_128.png" id="6"]
 [ext_resource type="Texture2D" path="res://assets/generated/chapter1/runtime/hud_icons/overwatch_128.png" id="7"]
 [ext_resource type="Texture2D" path="res://assets/generated/chapter1/runtime/hud_icons/end_turn_128.png" id="8"]
+[ext_resource type="Script" path="res://scripts/game/battle_camera_controller.gd" id="9"]
 
 [node name="Battle" type="Node2D"]
 script = ExtResource("1")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(320, 256)
+script = ExtResource("9")
 
 [node name="MapLayer" type="Node2D" parent="."]
+
+[node name="EvacZoneLayer" type="Node2D" parent="."]
 
 [node name="MoveHighlightLayer" type="Node2D" parent="."]
 
@@ -27,7 +31,7 @@ position = Vector2(320, 256)
 
 [node name="EffectLayer" type="Node2D" parent="."]
 
-[node name="HUD" type="CanvasLayer" parent="."]
+[node name="HUD" type="CanvasLayer" parent="." groups=["dialogue_layer"]]
 script = ExtResource("2")
 
 [node name="TopBar" type="Panel" parent="HUD"]
@@ -55,13 +59,13 @@ text = "玩家回合"
 
 [node name="ObjectiveLabel" type="Label" parent="HUD/TopBar"]
 layout_mode = 1
-anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -300.0
+offset_left = 370.0
 offset_top = 15.0
 offset_right = -100.0
 offset_bottom = 40.0
 text = "目标：夺取终端后撤离"
+text_overrun_behavior = 3
 horizontal_alignment = 2
 
 [node name="RightPanel" type="Panel" parent="HUD"]

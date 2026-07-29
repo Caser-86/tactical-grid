@@ -12,9 +12,12 @@ config/icon="res://icon.svg"
 
 GameManager="*res://scripts/game/game_manager.gd"
 GameData="*res://scripts/data/game_data.gd"
+ArtCatalog="*res://scripts/data/art_catalog.gd"
 SaveManager="*res://scripts/network/save_manager.gd"
 CampaignRepository="*res://scripts/data/campaign_repository.gd"
 AudioManager="*res://scripts/game/audio_manager.gd"
+AccessibilitySettings="*res://scripts/game/accessibility_settings.gd"
+InputBindings="*res://scripts/game/input_bindings.gd"
 
 [audio]
 
@@ -26,6 +29,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
+
+[gui]
+
+theme/custom="res://themes/tactical_ui_theme.tres"
 
 [input]
 

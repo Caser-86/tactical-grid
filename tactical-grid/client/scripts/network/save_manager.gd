@@ -196,6 +196,12 @@ func create_default_save() -> Dictionary:
 			"reduce_motion": false,
 			"colorblind_mode": "none",
 			"subtitle_speed": 1.0,
+			"keybindings": {
+				"pause": {"keycode": 0, "physical_keycode": 4194305},
+				"end_turn": {"keycode": 0, "physical_keycode": 32},
+				"next_unit": {"keycode": 0, "physical_keycode": 4194306},
+				"toggle_grid": {"keycode": 0, "physical_keycode": 71},
+			},
 		},
 		"stats_tracking": {
 			"total_kills": 0,
@@ -235,6 +241,8 @@ func _migrate_settings(data: Dictionary) -> void:
 		settings["colorblind_mode"] = "none"
 	if not settings.has("subtitle_speed"):
 		settings["subtitle_speed"] = 1.0
+	if not settings.has("keybindings"):
+		settings["keybindings"] = create_default_save().settings.keybindings
 	data["settings"] = settings
 
 ## 补全 stats_tracking 内部字段（开发期间新增的字段）

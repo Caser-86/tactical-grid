@@ -3,6 +3,8 @@
 extends Camera2D
 class_name BattleCameraController
 
+signal event_feedback_started(kind: StringName)
+
 ## 相机缩放范围
 const MIN_ZOOM := 0.65
 const MAX_ZOOM := 1.5
@@ -12,6 +14,7 @@ const PAN_SPEED := 600.0
 const ZOOM_STEP := 1.1
 ## 平滑跟随插值系数
 const FOLLOW_LERP := 8.0
+const FEEDBACK_EVENTS: Array[StringName] = [&"critical", &"explosion", &"boss_phase"]
 
 ## 地图边界（世界坐标）
 var _map_bounds: Rect2 = Rect2()
@@ -23,6 +26,7 @@ var _follow_target: Node2D = null
 var _edge_pan: Vector2 = Vector2.ZERO
 ## 是否启用键盘平移
 var _keyboard_pan: Vector2 = Vector2.ZERO
+var _feedback_tween: Tween
 
 func _ready() -> void:
 	enabled = true
@@ -65,8 +69,13 @@ func _input(event: InputEvent) -> void:
 func setup(map_bounds: Rect2, safe_viewport: Rect2) -> void:
 	_map_bounds = map_bounds
 	_safe_viewport = safe_viewport
-	# 初始定位到地图中心
-	position = map_bounds.get_center()
+	# Fit the complete playable map inside the portion of the screen not covered by HUD.
+	# The safe area's center differs from the physical viewport center when a side panel is open.
+	var safe_size := _get_safe_viewport().size
+	var fit_zoom := minf(safe_size.x / map_bounds.size.x, safe_size.y / map_bounds.size.y)
+	var zoom_value := clampf(minf(1.0, fit_zoom), MIN_ZOOM, MAX_ZOOM)
+	zoom = Vector2.ONE * zoom_value
+	position = map_bounds.get_center() + _get_safe_viewport_offset()
 	_clamp_to_bounds()
 
 ## 平滑定位到指定格子（世界坐标）
@@ -81,6 +90,33 @@ func set_follow_target(target: Node2D) -> void:
 ## 取消跟随
 func clear_follow_target() -> void:
 	_follow_target = null
+
+## Important-event feedback is owned by the camera so combat rules never manipulate it directly.
+func play_event_feedback(kind: StringName, world_pos: Vector2, duration_override: float = -1.0) -> void:
+	if kind not in FEEDBACK_EVENTS:
+		return
+	if GameManager.get_settings().get("reduce_motion", false):
+		return
+	if _feedback_tween and _feedback_tween.is_valid():
+		_feedback_tween.kill()
+
+	event_feedback_started.emit(kind)
+	var origin := position
+	var direction := (world_pos - origin).normalized()
+	if direction.length_squared() < 0.01:
+		direction = Vector2.RIGHT
+	var intensity := 3.0
+	match kind:
+		&"explosion": intensity = 4.0
+		&"boss_phase": intensity = 5.0
+	var duration := duration_override if duration_override > 0.0 else 0.20
+
+	_feedback_tween = create_tween()
+	_feedback_tween.tween_property(self, "position", origin + direction * intensity, duration * 0.24)
+	_feedback_tween.tween_property(self, "position", origin - direction * intensity * 0.65, duration * 0.24)
+	_feedback_tween.tween_property(self, "position", origin + direction.orthogonal() * intensity * 0.35, duration * 0.22)
+	_feedback_tween.tween_property(self, "position", origin, duration * 0.30)
+	_feedback_tween.finished.connect(_clamp_to_bounds)
 
 ## 在指定屏幕坐标处缩放
 func _zoom_at(screen_pos: Vector2, factor: float) -> void:
@@ -100,18 +136,33 @@ func _zoom_at(screen_pos: Vector2, factor: float) -> void:
 func _clamp_to_bounds() -> void:
 	if _map_bounds.size == Vector2.ZERO:
 		return
-	var viewport_size = get_viewport_rect().size / zoom
-	var half = viewport_size * 0.5
+	var safe_viewport := _get_safe_viewport()
+	var half = safe_viewport.size * 0.5 / zoom
+	# Camera2D is centered on the physical viewport, while the battlefield belongs
+	# in the shifted safe viewport. Clamp the safe viewport's world-space center.
+	var safe_center = position - _get_safe_viewport_offset()
 	var min_x = _map_bounds.position.x + half.x
 	var max_x = _map_bounds.position.x + _map_bounds.size.x - half.x
 	var min_y = _map_bounds.position.y + half.y
 	var max_y = _map_bounds.position.y + _map_bounds.size.y - half.y
-	# 如果地图比视口小，居中显示
+	# 如果地图比安全视口小，居中显示
 	if max_x < min_x:
-		position.x = _map_bounds.get_center().x
+		safe_center.x = _map_bounds.get_center().x
 	else:
-		position.x = clampf(position.x, min_x, max_x)
+		safe_center.x = clampf(safe_center.x, min_x, max_x)
 	if max_y < min_y:
-		position.y = _map_bounds.get_center().y
+		safe_center.y = _map_bounds.get_center().y
 	else:
-		position.y = clampf(position.y, min_y, max_y)
+		safe_center.y = clampf(safe_center.y, min_y, max_y)
+	position = safe_center + _get_safe_viewport_offset()
+
+
+func _get_safe_viewport() -> Rect2:
+	if _safe_viewport.size.x > 0.0 and _safe_viewport.size.y > 0.0:
+		return _safe_viewport
+	return Rect2(Vector2.ZERO, get_viewport_rect().size)
+
+
+func _get_safe_viewport_offset() -> Vector2:
+	var viewport_center := get_viewport_rect().size * 0.5
+	return (viewport_center - _get_safe_viewport().get_center()) / zoom

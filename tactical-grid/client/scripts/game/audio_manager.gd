@@ -114,9 +114,6 @@ func _load_audio(category: String, audio_id: String) -> AudioStream:
 			return null
 
 	var stream = load(path)
-	# First-pass audio covers a common firearm profile; other weapon IDs stay audible.
-	if stream == null and category == "sfx" and audio_id != "sfx_combat_pistol" and audio_id.begins_with("sfx_combat_"):
-		stream = _load_audio("sfx", "sfx_combat_pistol")
 	if stream:
 		audio_cache[cache_key] = stream
 	return stream
@@ -146,6 +143,18 @@ func sfx_move() -> void:
 
 func sfx_attack(weapon_type: String = "pistol") -> void:
 	play_sfx("sfx_combat_" + weapon_type)
+
+## 将现有武器 special 映射为可审核的听觉轮廓。
+func get_weapon_sfx_profile(weapon_special: String) -> String:
+	match weapon_special:
+		"close_range_bonus_1.3x_at_2_tiles": return "shotgun"
+		"double_tap": return "smg"
+		"silent": return "blade"
+		"setup_bonus_30_hit", "move_and_shoot": return "sniper"
+		"suppressing_fire": return "machine_gun"
+		"aoe_3x3_destroy_cover": return "launcher"
+		"heal_40", "heal_50", "heal_60": return "medical"
+		_: return "pistol"
 
 func sfx_hit() -> void:
 	play_sfx("sfx_hit_flesh")

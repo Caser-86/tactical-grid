@@ -112,9 +112,13 @@ func update_unit_info(unit: Node) -> void:
 		return
 
 	var team_label = "玩家" if unit.team == "player" else "敌人"
-	var info = "%s [%s]\nHP: %d/%d\nAP: %d/%d\n移动: %d\n位置: (%d, %d)" % [
+	var shield_info := ""
+	if unit.max_shield > 0:
+		shield_info = "\n护盾: %d/%d" % [unit.current_shield, unit.max_shield]
+	var info = "%s [%s]\nHP: %d/%d%s\nAP: %d/%d\n移动: %d\n位置: (%d, %d)" % [
 		unit.unit_name, team_label,
 		unit.current_hp, unit.max_hp,
+		shield_info,
 		unit.current_ap, unit.max_ap,
 		unit.move_points,
 		unit.grid_pos.x, unit.grid_pos.y
@@ -152,6 +156,10 @@ func set_action_buttons_visible(visible: bool) -> void:
 
 ## 在窗口尺寸变化时更新 HUD 安全区域，避免裁切或大面积空白
 func apply_viewport_layout(viewport_size: Vector2i) -> void:
+	# 目标栏占据回合信息与暂停按钮之间的空间，Boss 状态在窄屏也优先可读。
+	objective_label.offset_left = minf(370.0, float(viewport_size.x) * 0.36)
+	objective_label.offset_right = -100.0
+
 	# RightPanel 固定宽度 250，贴右边缘
 	var right_panel = $RightPanel
 	right_panel.offset_left = -250.0

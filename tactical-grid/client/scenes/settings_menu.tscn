@@ -26,107 +26,169 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -280.0
-offset_top = -380.0
+offset_top = -310.0
 offset_right = 280.0
-offset_bottom = 380.0
+offset_bottom = 310.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -8.0
+offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="Panel/VBoxContainer"]
+[node name="Title" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "设置"
 horizontal_alignment = 1
 
-[node name="ResolutionLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="ResolutionLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "分辨率"
 
-[node name="ResolutionOption" type="OptionButton" parent="Panel/VBoxContainer"]
+[node name="ResolutionOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="FullscreenCheck" type="CheckBox" parent="Panel/VBoxContainer"]
+[node name="FullscreenCheck" type="CheckBox" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "全屏"
 
-[node name="MasterLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="MasterLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "主音量"
 
-[node name="MasterSlider" type="HSlider" parent="Panel/VBoxContainer"]
+[node name="MasterSlider" type="HSlider" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 max_value = 100.0
 value = 100.0
 
-[node name="MusicLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="MusicLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "音乐音量"
 
-[node name="MusicSlider" type="HSlider" parent="Panel/VBoxContainer"]
+[node name="MusicSlider" type="HSlider" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 max_value = 100.0
 value = 100.0
 
-[node name="SFXLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="SFXLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "音效音量"
 
-[node name="SFXSlider" type="HSlider" parent="Panel/VBoxContainer"]
+[node name="SFXSlider" type="HSlider" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 max_value = 100.0
 value = 100.0
 
-[node name="DifficultyLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="DifficultyLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "难度"
 
-[node name="DifficultyOption" type="OptionButton" parent="Panel/VBoxContainer"]
+[node name="DifficultyOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="AccessibilityHeader" type="Label" parent="Panel/VBoxContainer"]
+[node name="AccessibilityHeader" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "可访问性"
 horizontal_alignment = 1
 
-[node name="LargeTextCheck" type="CheckBox" parent="Panel/VBoxContainer"]
+[node name="LargeTextCheck" type="CheckBox" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "大字体"
 
-[node name="ReduceMotionCheck" type="CheckBox" parent="Panel/VBoxContainer"]
+[node name="ReduceMotionCheck" type="CheckBox" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "减少动态效果"
 
-[node name="ColorblindLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="ColorblindLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "色弱配色"
 
-[node name="ColorblindOption" type="OptionButton" parent="Panel/VBoxContainer"]
+[node name="ColorblindOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="SubtitleSpeedLabel" type="Label" parent="Panel/VBoxContainer"]
+[node name="SubtitleSpeedLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "字幕/文字速度"
 
-[node name="SubtitleSpeedSlider" type="HSlider" parent="Panel/VBoxContainer"]
+[node name="SubtitleSpeedSlider" type="HSlider" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 max_value = 2.0
 step = 0.1
 min_value = 0.5
 value = 1.0
 
-[node name="BackButton" type="Button" parent="Panel/VBoxContainer"]
+[node name="KeybindingButton" type="Button" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+text = "按键绑定..."
+custom_minimum_size = Vector2(0, 40)
+
+[node name="BackButton" type="Button" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "返回"
 custom_minimum_size = Vector2(0, 40)
+
+[node name="ResolutionConfirmPanel" type="Panel" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -95.0
+offset_right = 210.0
+offset_bottom = 95.0
+grow_horizontal = 2
+grow_vertical = 2
+z_index = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ResolutionConfirmPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = 18.0
+offset_right = -18.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Message" type="Label" parent="ResolutionConfirmPanel/VBoxContainer"]
+layout_mode = 2
+text = "是否保留此分辨率？"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="ResolutionConfirmPanel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="KeepButton" type="Button" parent="ResolutionConfirmPanel/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "保留"
+custom_minimum_size = Vector2(140, 40)
+
+[node name="RevertButton" type="Button" parent="ResolutionConfirmPanel/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "恢复原设置"
+custom_minimum_size = Vector2(140, 40)
+
+[node name="ResolutionConfirmTimer" type="Timer" parent="."]
+wait_time = 1.0

@@ -31,6 +31,8 @@ const RULE_ENEMY_PASSIVE_TURN_1 := "enemy_passive_turn_1"
 ## ===== 任务状态 =====
 var mission_type: String = TYPE_EXTRACT
 var evac_point: Vector2i = Vector2i(-1, -1)
+## 撤离区域格。多人小队分别抵达其中任一格即可完成撤离，避免同格重叠。
+var evac_cells: Array[Vector2i] = []
 var destructible_targets: Array[Vector2i] = []
 ## pos -> { "hp": int, "max_hp": int, "destroyed": bool }
 var destructible_target_states: Dictionary = {}
@@ -141,10 +143,12 @@ func _extract_objectives_from_map(map_data: Dictionary, level_config: Dictionary
 	terminals_activated = 0
 	terminals_required = 0
 	evac_point = Vector2i(-1, -1)
+	evac_cells.clear()
 	for obj in map_data.get("objects", []):
 		var t = String(obj.get("type", ""))
 		if t == "evac":
 			evac_point = Vector2i(int(obj.x), int(obj.y))
+			evac_cells = _build_evac_zone(map_data, obj)
 		elif t == "destructible_target":
 			var pos = Vector2i(int(obj.x), int(obj.y))
 			if not pos in destructible_targets:
@@ -171,6 +175,49 @@ func _extract_objectives_from_map(map_data: Dictionary, level_config: Dictionary
 		max_turns = defend_turns_required
 	else:
 		max_turns = int(level_config.get("max_turns", 20))
+
+
+## 生成与当前小队规模匹配的撤离区域。
+## 锁定地图可用 radius 覆盖默认半径；边缘撤离点会自动向内扩展到可容纳全队。
+func _build_evac_zone(map_data: Dictionary, evac_data: Dictionary) -> Array[Vector2i]:
+	var size_data: Dictionary = map_data.get("size", {})
+	var width := int(size_data.get("width", 0))
+	var height := int(size_data.get("height", 0))
+	var origin := Vector2i(int(evac_data.get("x", -1)), int(evac_data.get("y", -1)))
+	if width <= 0 or height <= 0 or origin.x < 0 or origin.y < 0:
+		return []
+
+	var required_slots: int = maxi(1, _players.filter(func(u): return u and u.is_alive).size())
+	var radius: int = maxi(1, int(evac_data.get("radius", 1)))
+	var max_radius: int = maxi(width, height)
+	var cells: Array[Vector2i] = []
+	var layers: Dictionary = map_data.get("layers", {})
+	var blockers: Array = layers.get("blocker", [])
+	while radius <= max_radius:
+		cells.clear()
+		for y in range(maxi(0, origin.y - radius), mini(height, origin.y + radius + 1)):
+			for x in range(maxi(0, origin.x - radius), mini(width, origin.x + radius + 1)):
+				if _is_evac_cell_walkable(Vector2i(x, y), blockers):
+					cells.append(Vector2i(x, y))
+		if cells.size() >= required_slots:
+			return cells
+		radius += 1
+	return cells
+
+
+func _is_evac_cell_walkable(cell: Vector2i, blockers: Array) -> bool:
+	if blockers.is_empty() or cell.y < 0 or cell.y >= blockers.size():
+		return true
+	var row = blockers[cell.y]
+	if not row is Array or cell.x < 0 or cell.x >= row.size():
+		return true
+	return int(row[cell.x]) == 0
+
+
+func is_in_evac_zone(position: Vector2i) -> bool:
+	if not evac_cells.is_empty():
+		return position in evac_cells
+	return position == evac_point
 
 
 ## ===== 特殊规则查询 =====
@@ -277,7 +324,7 @@ func is_victory() -> bool:
 			return _enemies.filter(func(u): return u and u.is_alive).is_empty()
 
 
-## 撤离模式：所有存活玩家单位到达撤离点
+## 撤离模式：所有存活玩家单位到达撤离区域。
 func _check_extract_victory() -> bool:
 	if evac_point.x < 0:
 		return false
@@ -285,18 +332,18 @@ func _check_extract_victory() -> bool:
 	if alive.is_empty():
 		return false
 	for u in alive:
-		if u.grid_pos != evac_point:
+		if not is_in_evac_zone(u.grid_pos):
 			return false
 	return true
 
 
-## 护送模式：VIP 存活且到达撤离点
+## 护送模式：VIP 存活且到达撤离区域。
 func _check_escort_victory() -> bool:
 	if evac_point.x < 0:
 		return false
 	if escort_vip == null or not is_instance_valid(escort_vip) or not escort_vip.is_alive:
 		return false
-	return escort_vip.grid_pos == evac_point
+	return is_in_evac_zone(escort_vip.grid_pos)
 
 
 ## 窃取数据/潜入：先激活所有终端，再撤离
@@ -309,7 +356,7 @@ func _check_data_victory() -> bool:
 	if alive.is_empty():
 		return false
 	for u in alive:
-		if u.grid_pos != evac_point:
+		if not is_in_evac_zone(u.grid_pos):
 			return false
 	return true
 
@@ -323,7 +370,7 @@ func is_defeat() -> bool:
 func get_status_text() -> String:
 	match mission_type:
 		TYPE_EXTRACT:
-			return "目标：所有单位到达撤离点"
+			return "目标：所有单位到达撤离区域"
 		TYPE_DESTROY:
 			return "目标：摧毁 %d 个目标 (%d/%d)" % [targets_required, targets_destroyed, targets_required]
 		TYPE_ASSASSINATE:
@@ -332,10 +379,10 @@ func get_status_text() -> String:
 			return "目标：击杀敌方Boss"
 		TYPE_ESCORT:
 			if escort_vip and is_instance_valid(escort_vip):
-				return "目标：护送 VIP %s 到撤离点" % escort_vip.unit_name
-			return "目标：护送单位到撤离点"
+				return "目标：护送 VIP %s 到撤离区域" % escort_vip.unit_name
+			return "目标：护送单位到撤离区域"
 		TYPE_STEAL_DATA, TYPE_INFILTRATE:
-			return "目标：激活 %d 个终端 (%d/%d) 后撤离" % [terminals_required, terminals_activated, terminals_required]
+			return "目标：激活 %d 个终端 (%d/%d) 后撤离至区域" % [terminals_required, terminals_activated, terminals_required]
 		TYPE_DEFEND:
 			return "目标：坚守 %d 回合 (当前 %d)" % [defend_turns_required, _turn_number]
 		_:

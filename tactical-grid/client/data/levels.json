@@ -2,9 +2,10 @@
   "levels": {
     "ch1_m1": {
       "name": "初次接触", "chapter": 1, "mission": 1,
-      "size": "small", "theme": "warehouse", "mission_type": "extract",
+      "size": "medium", "theme": "echo_yard", "mission_type": "extract",
       "difficulty": 1, "seed": 1001,
       "player_units": 2, "enemy_count": 3,
+      "max_turns": 14, "three_star_turns": 8, "max_reinforcements": 1, "enemy_cap": 4,
       "intro_dialogue": "ch1_m1_intro", "outro_dialogue": "ch1_m1_outro",
       "tutorial_flags": ["teach_movement", "teach_attack", "teach_cover", "teach_evac"],
       "special_rules": {
@@ -16,9 +17,10 @@
     },
     "ch1_m2": {
       "name": "掩体战术", "chapter": 1, "mission": 2,
-      "size": "small", "theme": "warehouse", "mission_type": "destroy",
+      "size": "medium", "theme": "cooling_works", "mission_type": "destroy",
       "difficulty": 1, "seed": 1002,
       "player_units": 3, "enemy_count": 5,
+      "max_turns": 16, "three_star_turns": 10, "max_reinforcements": 1, "enemy_cap": 6,
       "intro_dialogue": "ch1_m2_intro", "outro_dialogue": "ch1_m2_outro",
       "new_unlocks": ["sniper_class", "highland_mechanic", "destructible_cover"],
       "tutorial_flags": ["teach_highground", "teach_destructible", "teach_resource"],
@@ -26,36 +28,40 @@
     },
     "ch1_m3": {
       "name": "高地优势", "chapter": 1, "mission": 3,
-      "size": "small", "theme": "warehouse", "mission_type": "extract",
+        "size": "medium", "theme": "transit_hub", "mission_type": "extract",
       "difficulty": 1, "seed": 1003,
       "player_units": 3, "enemy_count": 5,
+      "max_turns": 17, "three_star_turns": 11, "max_reinforcements": 1, "enemy_cap": 6,
       "intro_dialogue": "ch1_m3_intro", "outro_dialogue": "ch1_m3_outro",
       "tutorial_flags": ["teach_overwatch"],
       "rewards": { "credit": 250, "exp": 200, "first_clear": { "credit": 350, "intel": 15 } }
     },
     "ch1_m4": {
       "name": "交互点", "chapter": 1, "mission": 4,
-      "size": "small", "theme": "warehouse", "mission_type": "escort",
+        "size": "large", "theme": "transit_hub", "mission_type": "escort",
       "difficulty": 1, "seed": 1004,
       "player_units": 4, "enemy_count": 5,
+      "max_turns": 18, "three_star_turns": 12, "max_reinforcements": 1, "enemy_cap": 6,
       "intro_dialogue": "ch1_m4_intro", "outro_dialogue": "ch1_m4_outro",
       "tutorial_flags": ["teach_interaction", "teach_escort"],
       "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
     },
     "ch1_m5": {
       "name": "技能初探", "chapter": 1, "mission": 5,
-      "size": "small", "theme": "warehouse", "mission_type": "steal_data",
+        "size": "medium", "theme": "sentinel_core", "mission_type": "steal_data",
       "difficulty": 2, "seed": 1005,
-      "player_units": 4, "enemy_count": 6,
+      "player_units": 4, "enemy_count": 5,
+      "max_turns": 19, "three_star_turns": 13, "max_reinforcements": 1, "enemy_cap": 6,
       "intro_dialogue": "ch1_m5_intro", "outro_dialogue": "ch1_m5_outro",
       "tutorial_flags": ["teach_skills", "teach_items"],
       "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
     },
     "ch1_m6": {
       "name": "数据哨兵", "chapter": 1, "mission": 6,
-      "size": "medium", "theme": "warehouse", "mission_type": "assassinate",
+        "size": "large", "theme": "sentinel_core", "mission_type": "assassinate",
       "difficulty": 2, "seed": 1006,
-      "player_units": 4, "enemy_count": 7,
+      "player_units": 4, "enemy_count": 6,
+      "max_turns": 22, "three_star_turns": 16, "max_reinforcements": 4, "enemy_cap": 8,
       "is_boss": true, "boss_id": "data_sentinel",
       "intro_dialogue": "ch1_m6_intro", "outro_dialogue": "ch1_m6_outro",
       "rewards": { "credit": 1000, "exp": 500, "first_clear": { "credit": 1500, "intel": 50, "loot": "plasma_blade" } }

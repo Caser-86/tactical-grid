@@ -4,10 +4,10 @@
 
 ## 1. 总体声明
 
-- 本项目当前所有 AI 生成资源仅作为内部风格参考，**不直接计入正式发布资源**。
-- 所有 AI 生成图片均存在水印、缺少透明通道或拼贴问题，不能作为可交付的生产素材。
-- 正式发布前，所有美术资源必须由人工艺术家重制或经人工艺术家审核修改后才能进入游戏。
-- AI 生成资源的使用范围：开发期间的风格参考、原型验证、内部文档插图。
+- 2026-06-17 的 16 张遗留 SDXL 图片仅作为内部风格参考，不进入发行包。
+- `client/assets/generated/chapter1/` 下的新资源由项目工作流独立生成。只有完成去背、切图、尺寸校验、Godot 导入、资源登记和实机检查的文件才可进入运行时目录。
+- 未处理的风格板和生成拼版保存在 `client/assets/generated/chapter1/source/`，由导出预设排除。
+- 当前 Codex 图像生成工具未向项目暴露精确后端模型 ID，因此登记为“Codex 内置 Image Generation”，不虚构具体模型版本。
 
 ## 2. AI 生成图片清单
 
@@ -47,21 +47,39 @@
 | client/assets/ui/战术战棋游戏主菜单背景_废墟城市夜景_赛博朋克风格_蓝色和橙_2026-06-17T18-06-45.png | 主菜单背景 | 2026-06-17 | SDXL | 风格参考 |
 | client/assets/ui/游戏UI图标集_战术战棋游戏_包含移动_攻击_技能_物品_警_2026-06-17T18-05-49.png | UI 图标集 | 2026-06-17 | SDXL | 风格参考 |
 
-## 3. 已知问题
+### 2.5 已处理并接入的项目生成资源
 
-1. 所有 16 张图片均为 1024×1024、24 位 RGB，**无 Alpha 通道**，不能直接用于游戏精灵。
-2. 所有图片可观察到“图片由AI生成”水印。
-3. 地形图和 UI 图是展示拼版，不是规则网格化、可切片的生产素材。
-4. 标注“透明背景”的特效实际上没有透明通道，部分包含烘焙棋盘格或黑底。
-5. 现有图片**没有**在场景或脚本中被引用。
+| 文件路径 | 内容描述 | 生成日期 | 模型/工具 | 用途与处理 |
+|---|---|---|---|---|
+| `client/assets/generated/chapter1/backgrounds/*.png` | 主菜单、启动、基地和结算背景 | 2026-07-28 至 2026-07-29 | Codex 内置 Image Generation | 项目原创背景；检查无文字和水印后由场景或 `ArtCatalog` 加载 |
+| `client/assets/generated/chapter1/source/echo_yard_styleboard_v1.png` | 回声货场视觉与构图风格板 | 2026-07-30 | Codex 内置 Image Generation | 仅作内部参考；导出排除 |
+| `client/assets/generated/chapter1/source/echo_yard_props_sheet_*.png` | 六种货场掩体/道具生成拼版及去背中间文件 | 2026-07-30 | Codex 内置 Image Generation + 色键处理工具 | 源文件；导出排除 |
+| `client/assets/generated/chapter1/runtime/environment/echo_yard/prop/*.png` | 蓝/橙货箱、钢制路障、管束、电缆盘和控制箱 | 2026-07-30 | 上述拼版经 `process_echo_yard_prop_sheet.ps1` 切图 | 透明运行时资源；Godot 导入、目录契约和发布版实机画面已验证 |
+| `client/assets/generated/chapter1/source/echo_yard_landmarks_sheet_*.png` | 龙门吊与照明塔生成拼版及去背中间文件 | 2026-07-30 | Codex 内置 Image Generation + 色键处理工具 | 源文件；导出排除 |
+| `client/assets/generated/chapter1/runtime/environment/echo_yard/landmark/*.png` | 龙门吊与照明塔 | 2026-07-30 | 上述拼版经 `process_echo_yard_landmark_sheet.ps1` 切图 | 透明运行时资源；Godot 导入、目录契约和发布版实机画面已验证 |
+| `client/assets/generated/chapter1/runtime/environment/cooling_works/*.png` | 冷却工坊的地面、边缘、掩体、危险贴花和地标 | 2026-07-30 | `generate_cooling_works_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
+| `client/assets/generated/chapter1/runtime/environment/transit_hub/*.png` | 磁悬轨道枢纽的月台、导轨、站台掩体、贴花和地标 | 2026-07-30 | `generate_transit_hub_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
+| `client/assets/generated/chapter1/runtime/environment/sentinel_core/*.png` | 哨兵核心的环形地面、相位掩体、回路贴花和核心地标 | 2026-07-30 | `generate_sentinel_core_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
+
+## 3. 遗留参考图已知问题
+
+1. 上述 2.1 至 2.4 的 16 张遗留图片均为 1024×1024、24 位 RGB，无 Alpha 通道，不能直接用于游戏精灵。
+2. 这些遗留图片可观察到“图片由AI生成”水印。
+3. 遗留地形图和 UI 图是展示拼版，不是规则网格化、可切片的生产素材。
+4. 遗留特效图没有真实透明通道，部分包含烘焙棋盘格或黑底。
+5. 遗留图片没有运行时引用，并由 Windows 导出预设明确排除。
 
 ## 4. 后续处理要求
 
-- 正式发布前必须移除或替换所有 AI 生成资源。
-- 替换资源必须在 `THIRD_PARTY_NOTICES.md` 中登记新来源。
-- 任何新增 AI 生成资源必须在本文件中登记。
-- 商业发布前需确认 AI 模型服务条款允许相应用途。
+- 任何新增 AI 生成资源必须在本文件和 `client/data/RESOURCE_MANIFEST.md` 中登记。
+- 生成源图不得直接进入运行时；必须完成尺寸、透明通道、切图、Godot 导入和游戏内效果测试。
+- 外部第三方资源必须在 `THIRD_PARTY_NOTICES.md` 中登记来源和许可证；项目原创 AI 资源不得伪装成第三方开源资源。
+- 商业发布前需再次核对所用生成服务的届时条款与目标发行范围。
 
 ## 5. 修改记录
 
 - 2026-07-27：初次创建 AI 资源声明，登记 16 张现有 AI 生成图片
+- 2026-07-30：区分遗留参考图与新处理的项目生成资源，登记 Echo Yard 背景、道具、地标和源图排除策略
+- 2026-07-30：登记 Cooling Works 的程序化运行时环境套件；其不属于 AI 图像生成资源，但在此声明中保留与 AI 资源并列的完整可追溯记录
+- 2026-07-30：登记 Mag-Rail Transit Hub 的程序化运行时环境套件和其 `ch1_m3` 关卡接入
+- 2026-07-30：登记 Sentinel Core 的程序化运行时环境套件和其 `ch1_m5` 关卡接入

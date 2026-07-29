@@ -51,6 +51,8 @@ func _step_load_settings() -> void:
 	_apply_settings(settings)
 
 func _apply_settings(settings: Dictionary) -> void:
+	AccessibilitySettings.apply_settings(settings)
+	InputBindings.apply_settings(settings)
 	# 分辨率
 	var resolution = settings.get("resolution", "1280x720")
 	var parts = resolution.split("x")

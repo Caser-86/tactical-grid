@@ -52,10 +52,24 @@ function Invoke-GodotHeadless {
     }
 }
 
+## Parse the final two numeric summary lines without localized keywords.
+function Get-LocalizedTestSummary {
+    param([string]$Output)
+    $matches = [regex]::Matches($Output, '(?m)^\s*[^\[\r\n:]+:\s*(\d+)\s*$')
+    if ($matches.Count -lt 2) {
+        return @(-1, -1)
+    }
+    $passedValue = [int]($matches[($matches.Count - 2)].Groups[1].Value)
+    $failedValue = [int]($matches[($matches.Count - 1)].Groups[1].Value)
+    return @($passedValue, $failedValue)
+}
+
 # --- 1. Godot 无头导入（验证资源完整性） ---
 Write-Host "[1/3] Godot headless import..."
 try {
-    $importResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--import', '--path', $projectPath)
+    # --import keeps a fresh editor process alive in Godot 4.7. Explicit editor mode
+    # plus --quit validates imports without leaving the release gate blocked.
+    $importResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--editor', '--quit', '--path', $projectPath)
 } catch {
     Write-Host "IMPORT FAILED: $_" -ForegroundColor Red
     exit 1
@@ -67,6 +81,16 @@ if ($importResult.ExitCode -ne 0) {
     exit 1
 }
 Write-Host "  Import OK" -ForegroundColor Green
+
+# --- 1.5. 音频源文件技术质量 ---
+Write-Host "[1.5/3] Audio technical QA..."
+try {
+    & (Join-Path $PSScriptRoot '..\tools\test_audio_assets.ps1')
+    if (-not $?) { throw 'Audio QA returned a failed PowerShell status' }
+} catch {
+    Write-Host "AUDIO QA FAILED: $_" -ForegroundColor Red
+    exit 1
+}
 
 # --- 2. 烟雾测试 ---
 Write-Host "[2/3] Running smoke tests..."
@@ -85,11 +109,10 @@ Write-Host "  Exit code: $($testResult.ExitCode)"
 Write-Host "  Stdout bytes: $($testStr.Length)"
 Write-Host "  Stderr bytes: $($testErrStr.Length)"
 
-# 解析总结（从 stdout）
-$passMatch = [regex]::Match($testStr, '通过:\s*(\d+)')
-$failMatch = [regex]::Match($testStr, '失败:\s*(\d+)')
-$passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { -1 }
-$failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { -1 }
+# Parse test summary from stdout.
+$testSummary = Get-LocalizedTestSummary -Output $testStr
+$passed = [int]$testSummary[0]
+$failed = [int]$testSummary[1]
 
 Write-Host "  Passed: $passed"
 Write-Host "  Failed: $failed"
@@ -109,11 +132,138 @@ if ($failed -ne 0) {
     exit 1
 }
 
+# --- 2.5. 单位美术与动态表现合约 ---
+Write-Host "[2.5/3] Running unit presentation contract..."
+try {
+    $unitResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/unit_animation_contract_test.tscn')
+} catch {
+    Write-Host "UNIT PRESENTATION TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$unitPassMatch = [regex]::Match($unitResult.Stdout, 'Passed:\s*(\d+)')
+$unitFailMatch = [regex]::Match($unitResult.Stdout, 'Failed:\s*(\d+)')
+$unitPassed = if ($unitPassMatch.Success) { [int]$unitPassMatch.Groups[1].Value } else { -1 }
+$unitFailed = if ($unitFailMatch.Success) { [int]$unitFailMatch.Groups[1].Value } else { -1 }
+Write-Host "  Passed: $unitPassed"
+Write-Host "  Failed: $unitFailed"
+if ($unitResult.ExitCode -ne 0 -or $unitFailed -ne 0) {
+    Write-Host "UNIT PRESENTATION TEST FAILED (exit=$($unitResult.ExitCode), failed=$unitFailed)" -ForegroundColor Red
+    ($unitResult.Stdout -split "`r?`n") | Select-Object -Last 15 | ForEach-Object { Write-Host "  $_" }
+    ($unitResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.6. 基地展示与任务列表合约 ---
+Write-Host "[2.6/3] Running base presentation contract..."
+try {
+    $baseResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/base_mission_list_test.tscn')
+} catch {
+    Write-Host "BASE PRESENTATION TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$baseSummary = Get-LocalizedTestSummary -Output $baseResult.Stdout
+$basePassed = [int]$baseSummary[0]
+$baseFailed = [int]$baseSummary[1]
+Write-Host "  Passed: $basePassed"
+Write-Host "  Failed: $baseFailed"
+if ($baseResult.ExitCode -ne 0 -or $baseFailed -ne 0) {
+    Write-Host "BASE PRESENTATION TEST FAILED (exit=$($baseResult.ExitCode), failed=$baseFailed)" -ForegroundColor Red
+    ($baseResult.Stdout -split "`r?`n") | Select-Object -Last 15 | ForEach-Object { Write-Host "  $_" }
+    ($baseResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.65. Battle HUD and tutorial layout contract ---
+Write-Host "[2.65/3] Running battle HUD contract..."
+try {
+    $hudResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/battle_hud_contract_test.tscn')
+} catch {
+    Write-Host "BATTLE HUD TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$hudSummary = Get-LocalizedTestSummary -Output $hudResult.Stdout
+$hudPassed = [int]$hudSummary[0]
+$hudFailed = [int]$hudSummary[1]
+Write-Host "  Passed: $hudPassed"
+Write-Host "  Failed: $hudFailed"
+if ($hudResult.ExitCode -ne 0 -or $hudFailed -ne 0) {
+    Write-Host "BATTLE HUD TEST FAILED (exit=$($hudResult.ExitCode), failed=$hudFailed)" -ForegroundColor Red
+    ($hudResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($hudResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.7. Data Sentinel production contract ---
+Write-Host "[2.7/3] Running Data Sentinel production contract..."
+try {
+    $bossResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/data_sentinel_boss_test.tscn')
+} catch {
+    Write-Host "DATA SENTINEL TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$bossSummary = Get-LocalizedTestSummary -Output $bossResult.Stdout
+$bossPassed = [int]$bossSummary[0]
+$bossFailed = [int]$bossSummary[1]
+Write-Host "  Passed: $bossPassed"
+Write-Host "  Failed: $bossFailed"
+if ($bossResult.ExitCode -ne 0 -or $bossFailed -ne 0) {
+    Write-Host "DATA SENTINEL TEST FAILED (exit=$($bossResult.ExitCode), failed=$bossFailed)" -ForegroundColor Red
+    ($bossResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($bossResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.8. Chapter-one balance target contract ---
+Write-Host "[2.8/3] Running chapter-one balance contract..."
+try {
+    $balanceResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/chapter_one_balance_test.tscn')
+} catch {
+    Write-Host "CHAPTER-ONE BALANCE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$balanceSummary = Get-LocalizedTestSummary -Output $balanceResult.Stdout
+$balancePassed = [int]$balanceSummary[0]
+$balanceFailed = [int]$balanceSummary[1]
+Write-Host "  Passed: $balancePassed"
+Write-Host "  Failed: $balanceFailed"
+if ($balanceResult.ExitCode -ne 0 -or $balanceFailed -ne 0) {
+    Write-Host "CHAPTER-ONE BALANCE TEST FAILED (exit=$($balanceResult.ExitCode), failed=$balanceFailed)" -ForegroundColor Red
+    ($balanceResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($balanceResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.9. Chapter-one production E2E ---
+Write-Host "[2.9/3] Running chapter-one production E2E..."
+try {
+    $e2eResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/chapter_one_e2e_test.tscn') -TimeoutMs 600000
+} catch {
+    Write-Host "CHAPTER-ONE E2E FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$e2eSummary = Get-LocalizedTestSummary -Output $e2eResult.Stdout
+$e2ePassed = [int]$e2eSummary[0]
+$e2eFailed = [int]$e2eSummary[1]
+Write-Host "  Passed: $e2ePassed"
+Write-Host "  Failed: $e2eFailed"
+if ($e2eResult.ExitCode -ne 0 -or $e2eFailed -ne 0) {
+    Write-Host "CHAPTER-ONE E2E FAILED (exit=$($e2eResult.ExitCode), failed=$e2eFailed)" -ForegroundColor Red
+    ($e2eResult.Stdout -split "`r?`n") | Select-Object -Last 25 | ForEach-Object { Write-Host "  $_" }
+    ($e2eResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查非预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
-# 合并 stdout + stderr 用于日志门检查（Godot 的 push_warning/push_error 可能走 stderr）
-$combinedOut = $testOut + ($testErrStr -split "`r?`n")
+# Merge stdout and stderr for the log gate.
+$combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
+    ($unitResult.Stdout -split "`r?`n") + ($unitResult.Stderr -split "`r?`n") + `
+    ($baseResult.Stdout -split "`r?`n") + ($baseResult.Stderr -split "`r?`n") + `
+    ($hudResult.Stdout -split "`r?`n") + ($hudResult.Stderr -split "`r?`n") + `
+    ($bossResult.Stdout -split "`r?`n") + ($bossResult.Stderr -split "`r?`n") + `
+    ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
+    ($e2eResult.Stdout -split "`r?`n") + ($e2eResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 2 条）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -160,6 +310,12 @@ if ($expectedWarnings.Count -ne 2) {
 Write-Host ""
 Write-Host "=== Release Gate PASSED ===" -ForegroundColor Green
 Write-Host "  Stable assertion count: $passed"
+Write-Host "  Unit presentation assertions: $unitPassed"
+Write-Host "  Base presentation assertions: $basePassed"
+Write-Host "  Battle HUD assertions: $hudPassed"
+Write-Host "  Data Sentinel assertions: $bossPassed"
+Write-Host "  Balance assertions: $balancePassed"
+Write-Host "  Chapter-one E2E assertions: $e2ePassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "evidence_status": "automated_contract_targets",
+  "human_playtest_status": "pending_release_candidate_playthrough",
+  "methodology": "These are executable balance targets backed by production data and headless contracts. They are not represented as completed human playtest results.",
+  "boss_baseline_teams": [
+    {
+      "id": "direct_fire",
+      "weapons": ["shotgun", "sniper_rifle", "mg", "silenced_pistol"],
+      "dependency": "starter_common_weapons_only",
+      "critical_hits_required": false
+    },
+    {
+      "id": "mobile_fire",
+      "weapons": ["smg", "marksman_rifle", "grenade_launcher", "silenced_pistol"],
+      "dependency": "starter_common_weapons_only",
+      "critical_hits_required": false
+    }
+  ],
+  "mission_targets": [
+    {"level_id": "ch1_m1", "difficulty": "story", "turn_budget": 19, "target_turn_range": [5, 9], "target_survival_rate": 1.0},
+    {"level_id": "ch1_m2", "difficulty": "story", "turn_budget": 21, "target_turn_range": [7, 11], "target_survival_rate": 0.95},
+    {"level_id": "ch1_m3", "difficulty": "story", "turn_budget": 22, "target_turn_range": [8, 12], "target_survival_rate": 0.95},
+    {"level_id": "ch1_m4", "difficulty": "story", "turn_budget": 23, "target_turn_range": [9, 13], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m5", "difficulty": "story", "turn_budget": 24, "target_turn_range": [10, 14], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m6", "difficulty": "story", "turn_budget": 27, "target_turn_range": [12, 17], "target_survival_rate": 0.85},
+
+    {"level_id": "ch1_m1", "difficulty": "standard", "turn_budget": 14, "target_turn_range": [6, 10], "target_survival_rate": 1.0},
+    {"level_id": "ch1_m2", "difficulty": "standard", "turn_budget": 16, "target_turn_range": [8, 12], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m3", "difficulty": "standard", "turn_budget": 17, "target_turn_range": [9, 13], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m4", "difficulty": "standard", "turn_budget": 18, "target_turn_range": [10, 14], "target_survival_rate": 0.85},
+    {"level_id": "ch1_m5", "difficulty": "standard", "turn_budget": 19, "target_turn_range": [11, 15], "target_survival_rate": 0.8},
+    {"level_id": "ch1_m6", "difficulty": "standard", "turn_budget": 22, "target_turn_range": [14, 18], "target_survival_rate": 0.75},
+
+    {"level_id": "ch1_m1", "difficulty": "hard", "turn_budget": 11, "target_turn_range": [7, 11], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m2", "difficulty": "hard", "turn_budget": 13, "target_turn_range": [9, 13], "target_survival_rate": 0.8},
+    {"level_id": "ch1_m3", "difficulty": "hard", "turn_budget": 14, "target_turn_range": [10, 14], "target_survival_rate": 0.8},
+    {"level_id": "ch1_m4", "difficulty": "hard", "turn_budget": 15, "target_turn_range": [11, 15], "target_survival_rate": 0.7},
+    {"level_id": "ch1_m5", "difficulty": "hard", "turn_budget": 16, "target_turn_range": [12, 16], "target_survival_rate": 0.65},
+    {"level_id": "ch1_m6", "difficulty": "hard", "turn_budget": 19, "target_turn_range": [16, 19], "target_survival_rate": 0.55}
+  ]
+}

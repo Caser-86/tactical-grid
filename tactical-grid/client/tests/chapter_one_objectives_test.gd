@@ -33,6 +33,8 @@ func _ready() -> void:
 	_test_destroyed_target_rejects_damage()
 	# 数据契约：special_rules 兼容字典形式
 	_test_special_rules_dict_form()
+	# 正式地图撤离区容量：不能因多人队伍而要求单位重叠。
+	_test_locked_map_evac_capacity()
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
@@ -117,19 +119,21 @@ func _test_extract_victory() -> void:
 	print("\n--- 测试: extract 任务撤离胜利 ---")
 	var mos = _make_state()
 	var p1 = _make_unit("player", Vector2i(9, 0))
-	var p2 = _make_unit("player", Vector2i(9, 0))
+	var p2 = _make_unit("player", Vector2i(8, 0))
 	var players = [p1, p2]
 	var enemies = [_make_unit("enemy", Vector2i(0, 0))]
 	var map_data = _make_map_data("extract", [
-		{"type": "evac", "x": 9, "y": 0},
+		{"type": "evac", "x": 9, "y": 0, "radius": 1},
 	])
 	mos.setup({"mission_type": "extract"}, map_data, players, enemies)
 	_check(mos.mission_type == "extract", "mission_type=extract")
 	_check(mos.evac_point == Vector2i(9, 0), "evac_point=(9,0)")
-	# 所有玩家在撤离点 → 胜利
-	_check(mos.is_victory(), "所有玩家在撤离点 → 胜利")
-	# 一个玩家离开撤离点 → 未胜利
-	p1.grid_pos = Vector2i(8, 0)
+	var evac_cells = mos.get("evac_cells")
+	_check(evac_cells is Array and evac_cells.has(Vector2i(8, 0)) and evac_cells.has(Vector2i(9, 0)), "撤离区域包含相邻可站立格")
+	# 队员分别站在相邻撤离格，不能重叠也应能成功撤离。
+	_check(mos.is_victory(), "所有玩家位于撤离区域 → 胜利")
+	# 一个玩家离开撤离区域 → 未胜利
+	p1.grid_pos = Vector2i(7, 0)
 	_check(not mos.is_victory(), "一个玩家离开撤离点 → 未胜利")
 	# 所有玩家死亡 → 失败
 	p1.is_alive = false
@@ -237,7 +241,7 @@ func _test_steal_data_terminal_then_evac() -> void:
 	_check(not mos.is_victory(), "未激活终端 → 未胜利")
 	# 玩家在撤离点但未激活终端
 	p1.grid_pos = Vector2i(9, 0)
-	p2.grid_pos = Vector2i(9, 0)
+	p2.grid_pos = Vector2i(8, 0)
 	_check(not mos.is_victory(), "玩家在撤离点但未激活终端 → 未胜利")
 	# 激活第一个终端
 	var r1 = mos.on_terminal_interacted(p1, Vector2i(4, 2))
@@ -328,7 +332,7 @@ func _test_terminal_repeat_interact_rejected() -> void:
 	var enemies = []
 	var map_data = _make_map_data("steal_data", [
 		{"type": "terminal", "x": 4, "y": 2},
-		{"type": "evac", "x": 9, "y": 0},
+		{"type": "evac", "x": 9, "y": 0, "radius": 1},
 	])
 	mos.setup({"mission_type": "steal_data"}, map_data, players, enemies)
 	# 激活终端
@@ -388,6 +392,26 @@ func _test_special_rules_dict_form() -> void:
 	var reason = mos.get_rule_reason("no_overwatch")
 	_check(reason == "教学关：暂不开放警戒", "自定义原因正确: %s" % reason)
 	mos.queue_free()
+
+
+## ===== 测试 13: 正式地图撤离区域容量 =====
+func _test_locked_map_evac_capacity() -> void:
+	print("\n--- 测试: 第一章正式地图撤离区域容量 ---")
+	for level_id in ["ch1_m1", "ch1_m3", "ch1_m4", "ch1_m5"]:
+		var map_result := MapLoader.load_locked_map(level_id)
+		_check(bool(map_result.get("ok", false)), "%s 正式地图可加载" % level_id)
+		if not bool(map_result.get("ok", false)):
+			continue
+		var map_data: Dictionary = map_result.get("data", {})
+		var player_spawns: Array = map_data.get("objects", []).filter(func(object): return object.get("type", "") == "spawn_player")
+		var players: Array = []
+		for spawn in player_spawns:
+			players.append(_make_unit("player", Vector2i(int(spawn.get("x", 0)), int(spawn.get("y", 0)))))
+		var mos := _make_state()
+		mos.setup(CampaignRepository.get_level(level_id), map_data, players, [])
+		_check(mos.evac_cells.size() >= players.size(), "%s 撤离区域可容纳 %d 名队员" % [level_id, players.size()])
+		_check(mos.evac_cells.has(mos.evac_point), "%s 撤离锚点属于可站立区域" % level_id)
+		mos.queue_free()
 
 
 func _print_summary() -> void:

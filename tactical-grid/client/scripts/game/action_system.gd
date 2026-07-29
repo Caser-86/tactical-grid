@@ -3,6 +3,8 @@
 extends Node
 class_name ActionSystem
 
+signal ground_effects_changed
+
 var map_data: Dictionary = {}
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -49,13 +51,14 @@ func execute_move(unit: Node, target: Vector2i) -> bool:
 	if path.size() == 0:
 		return false
 
+	var previous_pos: Vector2i = unit.grid_pos
 	# 消耗移动点
 	var cost = reachable[target]
 	unit.move_points -= cost
 	unit.move_to(target)
 
 	# 检查路径上是否触发陷阱
-	_check_trap_trigger(unit, target)
+	_check_trap_trigger(unit, target, previous_pos)
 
 	return true
 
@@ -750,6 +753,7 @@ func _create_ground_effect(center: Vector2i, radius: int, type: String, duration
 				"duration": duration,
 				"data": data
 			})
+	ground_effects_changed.emit()
 
 ## 放置陷阱
 func _place_trap(unit: Node, item: Dictionary) -> Dictionary:
@@ -763,27 +767,27 @@ func _place_trap(unit: Node, item: Dictionary) -> Dictionary:
 	return {success = true, trap = item.get("name", ""), pos = trap_pos}
 
 ## 检查陷阱触发（单位移动到某格时调用）
-func _check_trap_trigger(unit: Node, pos: Vector2i) -> void:
+func _check_trap_trigger(unit: Node, pos: Vector2i, previous_pos: Vector2i = Vector2i.ZERO) -> void:
 	var triggered_indices: Array[int] = []
 	for i in range(traps.size()):
 		var trap = traps[i]
 		if trap.pos == pos and trap.owner_team != unit.team:
 			triggered_indices.append(i)
-			_apply_trap_effect(unit, trap)
+			_apply_trap_effect(unit, trap, previous_pos)
 	# 从后往前移除已触发陷阱，避免索引错位
 	for i in range(triggered_indices.size() - 1, -1, -1):
 		traps.remove_at(triggered_indices[i])
 
 ## 应用陷阱效果
-func _apply_trap_effect(unit: Node, trap: Dictionary) -> void:
+func _apply_trap_effect(unit: Node, trap: Dictionary, previous_pos: Vector2i = Vector2i.ZERO) -> void:
 	var item: Dictionary = trap.get("item", {})
 	var effect = item.get("effect", {})
 	# 伤害
 	if effect.has("damage"):
 		unit.take_damage(int(effect.get("damage", 0)))
-	# 击退（简化为不移位，只标记）
+	# 击退必须移动到合法格；不可移动时保持位置并由调用方显示陷阱命中反馈。
 	if effect.get("knockback", false):
-		unit.add_status("rooted", 1)  # 击退后定身1回合
+		_try_knockback(unit, previous_pos)
 	# 减速+出血
 	if effect.get("add_status_bleed", false):
 		unit.add_status("bleed", 2)
@@ -795,6 +799,16 @@ func _apply_trap_effect(unit: Node, trap: Dictionary) -> void:
 	# 添加慢速状态（铁丝网的 slow）
 	if effect.has("add_status_bleed") and not effect.has("add_status"):
 		unit.add_status("slow", 2)
+
+func _try_knockback(unit: Node, previous_pos: Vector2i) -> bool:
+	var direction: Vector2i = (unit.grid_pos - previous_pos).sign()
+	if direction == Vector2i.ZERO:
+		return false
+	var destination: Vector2i = unit.grid_pos + direction
+	if _is_blocked(destination) or _get_unit_at(destination) != null:
+		return false
+	unit.move_to(destination)
+	return true
 
 ## 获取某位置的地面效果
 func get_ground_effects_at(pos: Vector2i) -> Array:
@@ -831,6 +845,8 @@ func process_ground_effects_on_turn_start() -> void:
 	# 从后往前移除过期效果
 	for i in range(expired_indices.size() - 1, -1, -1):
 		ground_effects.remove_at(expired_indices[i])
+	if not ground_effects.is_empty() or not expired_indices.is_empty():
+		ground_effects_changed.emit()
 
 ## 设置地图数据
 func set_map_data(data: Dictionary) -> void:

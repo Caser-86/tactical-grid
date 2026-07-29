@@ -64,6 +64,18 @@ func show_result(data: Dictionary) -> void:
 		loot_label.text = "获得: " + item.get("name", "未知物品")
 		loot_container.add_child(loot_label)
 
+	# 首通新机制与职业解锁必须在结算页明确反馈给玩家。
+	var new_unlocks: Array = data.get("new_unlocks", [])
+	if not new_unlocks.is_empty():
+		var unlock_header := Label.new()
+		unlock_header.text = "新解锁"
+		unlock_header.modulate = Color("6dd6e5")
+		loot_container.add_child(unlock_header)
+		for unlock_id in new_unlocks:
+			var unlock_label := Label.new()
+			unlock_label.text = "解锁: " + str(unlock_id).replace("_", " ")
+			loot_container.add_child(unlock_label)
+
 	# 按钮可用性
 	next_button.visible = is_victory
 	retry_button.visible = true

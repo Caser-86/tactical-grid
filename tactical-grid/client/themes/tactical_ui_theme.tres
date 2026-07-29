@@ -1,0 +1,135 @@
+[gd_resource type="Theme" load_steps=9 format=3]
+
+[sub_resource type="StyleBoxFlat" id="StylePanel"]
+bg_color = Color(0.035, 0.065, 0.09, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.12, 0.58, 0.72, 0.82)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 8
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxFlat" id="StyleButtonNormal"]
+bg_color = Color(0.055, 0.14, 0.19, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.16, 0.55, 0.68, 0.9)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+content_margin_left = 12.0
+content_margin_top = 7.0
+content_margin_right = 12.0
+content_margin_bottom = 7.0
+
+[sub_resource type="StyleBoxFlat" id="StyleButtonHover"]
+bg_color = Color(0.08, 0.30, 0.38, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.88, 0.96, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+content_margin_left = 11.0
+content_margin_top = 6.0
+content_margin_right = 11.0
+content_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="StyleButtonPressed"]
+bg_color = Color(0.035, 0.42, 0.50, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.62, 1, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+content_margin_left = 11.0
+content_margin_top = 8.0
+content_margin_right = 11.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleButtonDisabled"]
+bg_color = Color(0.06, 0.07, 0.08, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.22, 0.25, 0.27, 0.65)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+content_margin_left = 12.0
+content_margin_top = 7.0
+content_margin_right = 12.0
+content_margin_bottom = 7.0
+
+[sub_resource type="StyleBoxFlat" id="StyleLineEdit"]
+bg_color = Color(0.02, 0.04, 0.06, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.14, 0.48, 0.60, 0.85)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 8.0
+content_margin_top = 5.0
+content_margin_right = 8.0
+content_margin_bottom = 5.0
+
+[sub_resource type="StyleBoxFlat" id="StyleScroll"]
+bg_color = Color(0.05, 0.12, 0.16, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleScrollHover"]
+bg_color = Color(0.16, 0.75, 0.86, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[resource]
+default_font_size = 16
+Button/colors/font_color = Color(0.82, 0.94, 0.98, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_pressed_color = Color(0.82, 1, 1, 1)
+Button/colors/font_disabled_color = Color(0.42, 0.47, 0.50, 1)
+Button/styles/normal = SubResource("StyleButtonNormal")
+Button/styles/hover = SubResource("StyleButtonHover")
+Button/styles/pressed = SubResource("StyleButtonPressed")
+Button/styles/disabled = SubResource("StyleButtonDisabled")
+CheckBox/colors/font_color = Color(0.82, 0.94, 0.98, 1)
+Label/colors/font_color = Color(0.88, 0.94, 0.96, 1)
+LineEdit/colors/font_color = Color(0.88, 0.94, 0.96, 1)
+LineEdit/styles/normal = SubResource("StyleLineEdit")
+OptionButton/styles/normal = SubResource("StyleButtonNormal")
+OptionButton/styles/hover = SubResource("StyleButtonHover")
+OptionButton/styles/pressed = SubResource("StyleButtonPressed")
+Panel/styles/panel = SubResource("StylePanel")
+ProgressBar/styles/background = SubResource("StyleLineEdit")
+ScrollBar/styles/scroll = SubResource("StyleScroll")
+ScrollBar/styles/scroll_hover = SubResource("StyleScrollHover")

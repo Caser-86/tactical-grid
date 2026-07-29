@@ -1,17 +1,23 @@
 ## 设置菜单
 extends Control
 
-@onready var resolution_option = $Panel/VBoxContainer/ResolutionOption
-@onready var fullscreen_check = $Panel/VBoxContainer/FullscreenCheck
-@onready var master_slider = $Panel/VBoxContainer/MasterSlider
-@onready var music_slider = $Panel/VBoxContainer/MusicSlider
-@onready var sfx_slider = $Panel/VBoxContainer/SFXSlider
-@onready var difficulty_option = $Panel/VBoxContainer/DifficultyOption
-@onready var large_text_check = $Panel/VBoxContainer/LargeTextCheck
-@onready var reduce_motion_check = $Panel/VBoxContainer/ReduceMotionCheck
-@onready var colorblind_option = $Panel/VBoxContainer/ColorblindOption
-@onready var subtitle_speed_slider = $Panel/VBoxContainer/SubtitleSpeedSlider
-@onready var back_button = $Panel/VBoxContainer/BackButton
+@onready var resolution_option = $Panel/ScrollContainer/VBoxContainer/ResolutionOption
+@onready var fullscreen_check = $Panel/ScrollContainer/VBoxContainer/FullscreenCheck
+@onready var master_slider = $Panel/ScrollContainer/VBoxContainer/MasterSlider
+@onready var music_slider = $Panel/ScrollContainer/VBoxContainer/MusicSlider
+@onready var sfx_slider = $Panel/ScrollContainer/VBoxContainer/SFXSlider
+@onready var difficulty_option = $Panel/ScrollContainer/VBoxContainer/DifficultyOption
+@onready var large_text_check = $Panel/ScrollContainer/VBoxContainer/LargeTextCheck
+@onready var reduce_motion_check = $Panel/ScrollContainer/VBoxContainer/ReduceMotionCheck
+@onready var colorblind_option = $Panel/ScrollContainer/VBoxContainer/ColorblindOption
+@onready var subtitle_speed_slider = $Panel/ScrollContainer/VBoxContainer/SubtitleSpeedSlider
+@onready var keybinding_button = $Panel/ScrollContainer/VBoxContainer/KeybindingButton
+@onready var back_button = $Panel/ScrollContainer/VBoxContainer/BackButton
+@onready var resolution_confirm_panel = $ResolutionConfirmPanel
+@onready var resolution_confirm_label = $ResolutionConfirmPanel/VBoxContainer/Message
+@onready var resolution_keep_button = $ResolutionConfirmPanel/VBoxContainer/Buttons/KeepButton
+@onready var resolution_revert_button = $ResolutionConfirmPanel/VBoxContainer/Buttons/RevertButton
+@onready var resolution_confirm_timer = $ResolutionConfirmTimer
 
 const RESOLUTIONS = ["1280x720", "1920x1080", "2560x1440"]
 const DIFFICULTIES = ["story", "standard", "hard"]
@@ -20,12 +26,29 @@ const COLORBLIND_LABELS = ["关闭", "红色盲", "绿色盲", "蓝色盲"]
 
 var _settings: Dictionary = {}
 var _caller: String = "main_menu"
+var _binding_dialog: PanelContainer
+var _binding_buttons: Dictionary = {}
+var _pending_binding_action := ""
+var _pending_resolution := ""
+var _previous_resolution := ""
+var _resolution_seconds_remaining := 0
+
+const BINDING_LABELS := {
+	"pause": "暂停/返回",
+	"end_turn": "结束回合",
+	"next_unit": "下一个单位",
+	"toggle_grid": "显示网格",
+}
 
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.SETTINGS
 	_settings = GameManager.get_settings().duplicate(true)
 	_setup_ui()
 	back_button.pressed.connect(_on_back)
+	keybinding_button.pressed.connect(_open_keybinding_dialog)
+	resolution_keep_button.pressed.connect(_keep_pending_resolution)
+	resolution_revert_button.pressed.connect(_revert_pending_resolution)
+	resolution_confirm_timer.timeout.connect(_on_resolution_confirm_tick)
 	back_button.grab_focus()
 
 func _setup_ui() -> void:
@@ -88,14 +111,17 @@ func _apply() -> void:
 
 func _apply_display() -> void:
 	var resolution = _settings.get("resolution", "1280x720")
-	var parts = resolution.split("x")
-	if parts.size() == 2:
-		DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
+	_set_window_resolution(resolution)
 
 	if _settings.get("fullscreen", false):
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+
+func _set_window_resolution(resolution: String) -> void:
+	var parts = resolution.split("x")
+	if parts.size() == 2:
+		DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
 
 func _apply_audio() -> void:
 	AudioManager.set_bus_volumes(
@@ -110,19 +136,10 @@ func _apply_audio() -> void:
 ## - colorblind_mode: 调整战场高亮配色（由BattleController读取）
 ## - subtitle_speed: 控制对话逐字显示速度（由DialogueSystem读取）
 func _apply_accessibility() -> void:
-	var window = get_tree().root
-	if _settings.get("large_text", false):
-		# 主题默认字体尺寸放大到 20，普通为 14-16
-		if not window.has_theme_font_size("font"):
-			window.set_theme_font_size("font", 20)
-	else:
-		window.set_theme_font_size("font", 0)  # 0 表示使用默认
-	# reduce_motion / colorblind_mode / subtitle_speed 由各业务系统读取 settings 自行处理
-	# 这里只负责触发设置变更，确保 GameManager 已经持久化
+	AccessibilitySettings.apply_settings(_settings)
 
 func _on_resolution_changed(index: int) -> void:
-	_settings["resolution"] = RESOLUTIONS[index]
-	_apply()
+	_begin_resolution_confirmation(RESOLUTIONS[index])
 
 func _on_fullscreen_changed(enabled: bool) -> void:
 	_settings["fullscreen"] = enabled
@@ -161,9 +178,127 @@ func _on_subtitle_speed_changed(value: float) -> void:
 	_apply()
 
 func _on_back() -> void:
+	if not _pending_resolution.is_empty():
+		_revert_pending_resolution()
 	_apply()
 	if _caller == "pause":
 		# 返回暂停菜单：由调用者决定
 		queue_free()
 	else:
 		GameManager.go_to_main_menu()
+
+func _begin_resolution_confirmation(resolution: String) -> void:
+	if resolution == _settings.get("resolution", "1280x720"):
+		return
+	if _pending_resolution.is_empty():
+		_previous_resolution = _settings.get("resolution", "1280x720")
+	_pending_resolution = resolution
+	_resolution_seconds_remaining = 15
+	_set_window_resolution(resolution)
+	resolution_confirm_panel.show()
+	resolution_keep_button.grab_focus()
+	_update_resolution_confirm_message()
+	resolution_confirm_timer.start()
+
+func _keep_pending_resolution() -> void:
+	if _pending_resolution.is_empty():
+		return
+	_settings["resolution"] = _pending_resolution
+	resolution_confirm_timer.stop()
+	_pending_resolution = ""
+	resolution_confirm_panel.hide()
+	_apply()
+
+func _revert_pending_resolution() -> void:
+	if _pending_resolution.is_empty():
+		return
+	_set_window_resolution(_previous_resolution)
+	resolution_option.select(RESOLUTIONS.find(_previous_resolution))
+	resolution_confirm_timer.stop()
+	_pending_resolution = ""
+	resolution_confirm_panel.hide()
+
+func _on_resolution_confirm_tick() -> void:
+	_resolution_seconds_remaining -= 1
+	if _resolution_seconds_remaining <= 0:
+		_revert_pending_resolution()
+		return
+	_update_resolution_confirm_message()
+
+func _update_resolution_confirm_message() -> void:
+	resolution_confirm_label.text = "正在预览 %s。将在 %d 秒后自动恢复。" % [_pending_resolution, _resolution_seconds_remaining]
+
+func _open_keybinding_dialog() -> void:
+	if _binding_dialog:
+		return
+	_binding_dialog = PanelContainer.new()
+	_binding_dialog.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_binding_dialog.position = Vector2(-220, -180)
+	_binding_dialog.size = Vector2(440, 360)
+	_binding_dialog.z_index = 10
+	add_child(_binding_dialog)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	_binding_dialog.add_child(content)
+	var title := Label.new()
+	title.text = "按键绑定"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	var help := Label.new()
+	help.text = "选择一项后按下新按键。Esc 取消当前修改。"
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(help)
+	for action in InputBindings.ACTIONS:
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(0, 38)
+		button.pressed.connect(_begin_rebind.bind(action, button))
+		content.add_child(button)
+		_binding_buttons[action] = button
+	_refresh_binding_buttons()
+	var restore := Button.new()
+	restore.text = "恢复默认按键"
+	restore.pressed.connect(_restore_default_bindings)
+	content.add_child(restore)
+	var close := Button.new()
+	close.text = "关闭"
+	close.pressed.connect(_close_keybinding_dialog)
+	content.add_child(close)
+	close.grab_focus()
+
+func _begin_rebind(action: String, button: Button) -> void:
+	_pending_binding_action = action
+	button.text = "%s：请按下新按键..." % BINDING_LABELS[action]
+	button.grab_focus()
+
+func _input(event: InputEvent) -> void:
+	if _pending_binding_action.is_empty() or not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_ESCAPE:
+		_pending_binding_action = ""
+		_refresh_binding_buttons()
+		get_viewport().set_input_as_handled()
+		return
+	var binding := {"keycode": event.keycode, "physical_keycode": event.physical_keycode}
+	_settings["keybindings"][_pending_binding_action] = binding
+	InputBindings.set_binding(_pending_binding_action, binding)
+	_pending_binding_action = ""
+	_apply()
+	_refresh_binding_buttons()
+	get_viewport().set_input_as_handled()
+
+func _restore_default_bindings() -> void:
+	_settings["keybindings"] = InputBindings.restore_defaults()
+	_apply()
+	_refresh_binding_buttons()
+
+func _refresh_binding_buttons() -> void:
+	for action in _binding_buttons:
+		var button: Button = _binding_buttons[action]
+		button.text = "%s：%s" % [BINDING_LABELS[action], InputBindings.get_binding_label(action)]
+
+func _close_keybinding_dialog() -> void:
+	_pending_binding_action = ""
+	_binding_buttons.clear()
+	_binding_dialog.queue_free()
+	_binding_dialog = null
+	keybinding_button.grab_focus()

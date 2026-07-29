@@ -7,6 +7,7 @@
 | 文档 | 用途 | 权威级别 |
 |---|---|---|
 | [PROJECT_TAKEOVER_ROADMAP.md](PROJECT_TAKEOVER_ROADMAP.md) | 开发任务、优先级、测试证据和发布门槛 | 最高 |
+| [qa/CHAPTER1_RELEASE_CANDIDATE_QA.md](qa/CHAPTER1_RELEASE_CANDIDATE_QA.md) | 第一章候选版自动化、窗口化操作、构建哈希与人工清单 | 高 |
 | [design/README.md](design/README.md) | 首发范围、玩法边界和非目标 | 高 |
 | [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) | 文档维护、资源记录和归档规则 | 高 |
 | [../tactical-grid/PROJECT_STATUS.md](../tactical-grid/PROJECT_STATUS.md) | 最近一次实测状态快照 | 中 |

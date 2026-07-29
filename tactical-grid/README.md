@@ -64,6 +64,13 @@ powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
 默认产物为 `export/TacticalGrid-Windows-x64.exe`。若 Godot 不在 `PATH`，可通过
 `GODOT_PATH` 环境变量或 `-GodotPath` 参数指定可执行文件。
 
+当前预设使用独立资源包，交付时必须把同目录生成的
+`TacticalGrid-Windows-x64.pck` 与 EXE 一并保留。发布候选版还应运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests/verify_windows_package.ps1
+```
+
 ## 目录
 
 ```text

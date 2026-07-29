@@ -12,6 +12,7 @@ func setup(kind: String) -> void:
 		"explosion", "destroy": duration = 0.55
 		"heal", "terminal": duration = 0.70
 		"miss": duration = 0.28
+	duration = AccessibilitySettings.get_effect_duration(duration)
 	queue_redraw()
 
 func _process(delta: float) -> void:

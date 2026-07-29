@@ -96,6 +96,22 @@ func _test_base_mission_list() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
+	var background = base.get_node_or_null("Background")
+	_check(background is TextureRect, "基地使用全屏 TextureRect 正式背景")
+	if background is TextureRect:
+		_check(background.texture is Texture2D, "基地正式背景纹理已接入")
+
+	var operation_frame = base.get_node_or_null("Center/OperationFrame")
+	_check(operation_frame is Panel, "基地行动序列面板存在")
+
+	var situation_panel = base.get_node_or_null("Center/SituationPanel")
+	_check(situation_panel is Panel, "基地战区态势面板存在")
+	if situation_panel:
+		var situation_title = situation_panel.get_node_or_null("Content/SituationTitle")
+		var situation_body = situation_panel.get_node_or_null("Content/SituationBody")
+		_check(situation_title is Label and not situation_title.text.is_empty(), "战区态势标题可读")
+		_check(situation_body is Label and not situation_body.text.is_empty(), "战区态势内容可读")
+
 	# 查找 MissionList
 	var mission_list = base.get_node_or_null("Center/ScrollContainer/MissionList")
 	_check(mission_list != null, "MissionList 节点存在")

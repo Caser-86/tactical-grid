@@ -12,6 +12,7 @@ const TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const AudioManagerScript = preload("res://scripts/game/audio_manager.gd")
 const ArtCatalogScript = preload("res://scripts/data/art_catalog.gd")
+const TacticalEffectScript = preload("res://scripts/game/tactical_effect.gd")
 
 func _ready() -> void:
 	print("=== Tactical Grid 无头冒烟测试 ===")
@@ -52,6 +53,8 @@ func _ready() -> void:
 	_test_map_validation()
 	await get_tree().process_frame
 	_test_difficulty_params()
+	await get_tree().process_frame
+	await _test_accessibility_settings()
 	await get_tree().process_frame
 	_test_boss_phase_system()
 	_print_summary()
@@ -98,6 +101,13 @@ func _test_audio_bus_contract() -> void:
 		"res://assets/audio/sfx/sfx_select_unit.wav",
 		"res://assets/audio/sfx/sfx_unit_land.wav",
 		"res://assets/audio/sfx/sfx_combat_pistol.wav",
+		"res://assets/audio/sfx/sfx_combat_shotgun.wav",
+		"res://assets/audio/sfx/sfx_combat_smg.wav",
+		"res://assets/audio/sfx/sfx_combat_blade.wav",
+		"res://assets/audio/sfx/sfx_combat_sniper.wav",
+		"res://assets/audio/sfx/sfx_combat_machine_gun.wav",
+		"res://assets/audio/sfx/sfx_combat_launcher.wav",
+		"res://assets/audio/sfx/sfx_combat_medical.wav",
 		"res://assets/audio/sfx/sfx_hit_flesh.wav",
 		"res://assets/audio/sfx/sfx_critical_hit.wav",
 		"res://assets/audio/sfx/sfx_unit_down.wav",
@@ -108,6 +118,9 @@ func _test_audio_bus_contract() -> void:
 		_check(FileAccess.file_exists(audio_path), "Audio: 正式资源存在 %s" % audio_path)
 		var stream = load(audio_path)
 		_check(stream is AudioStream, "Audio: Godot 可加载 %s" % audio_path)
+	_check(audio_manager.get_weapon_sfx_profile("double_tap") == "smg", "Audio: 冲锋枪使用独立音效类别")
+	_check(audio_manager.get_weapon_sfx_profile("suppressing_fire") == "machine_gun", "Audio: 机枪使用独立音效类别")
+	_check(audio_manager.get_weapon_sfx_profile("heal_40") == "medical", "Audio: 医疗枪使用独立音效类别")
 	_check(FileAccess.file_exists("res://data/RESOURCE_MANIFEST.md"), "Assets: 资源清单存在")
 	var base_background = load("res://assets/generated/chapter1/backgrounds/base_echo_command_room_v1.png")
 	_check(base_background is Texture2D, "Assets: 基地背景可由 Godot 加载")
@@ -544,11 +557,11 @@ func _test_locked_map_load_basic() -> void:
 	var data: Dictionary = res["data"]
 	_check(data.get("map_id", "") != "", "ch1_m1 map_id 非空")
 	_check(data.get("mission_type", "") == "extract", "ch1_m1 mission_type=extract")
-	_check(int(data.size.width) == 10, "ch1_m1 width=10")
-	_check(int(data.size.height) == 8, "ch1_m1 height=8")
+	_check(int(data.size.width) == 14, "ch1_m1 width=14")
+	_check(int(data.size.height) == 10, "ch1_m1 height=10")
 	_check(data.has("layers"), "ch1_m1 包含 layers")
-	_check(data.layers.base_terrain.size() == 8, "ch1_m1 base_terrain 行数=8")
-	_check(data.layers.base_terrain[0].size() == 10, "ch1_m1 base_terrain 列数=10")
+	_check(data.layers.base_terrain.size() == 10, "ch1_m1 base_terrain 行数=10")
+	_check(data.layers.base_terrain[0].size() == 14, "ch1_m1 base_terrain 列数=14")
 	# objects 应包含 spawn_player 和 evac
 	var objs = data.get("objects", [])
 	var has_player_spawn = objs.any(func(o): return o.get("type") == "spawn_player")
@@ -1050,6 +1063,7 @@ func _test_first_chapter_reward_and_unlock_flow() -> void:
 	_check("ch1_m1" in GameManager.current_save.campaign_progress.completed_missions, "Campaign: 第一关标记完成")
 	_check(CampaignRepository.is_unlocked("ch1_m2", GameManager.current_save.campaign_progress.completed_missions), "Campaign: 第一关首通解锁第二关")
 	_check(GameManager.current_save.characters[0].level == 2, "Campaign: 首通经验可使参战角色升级")
+	_check(GameManager.current_save.characters[0].xp == 50, "Campaign: 150 EXP 升至 2 级后精确保留 50 XP")
 
 	var loaded = SaveManager.load_game(slot)
 	_check(loaded.get("resources", {}).get("credit", 0) == 1000, "Campaign: 首通信用点重启后保持")
@@ -1070,6 +1084,21 @@ func _test_first_chapter_reward_and_unlock_flow() -> void:
 	resources = GameManager.current_save.resources
 	_check(resources.credit == 1200, "Campaign: 重复通关只发基础信用点")
 	_check(resources.intel == 10, "Campaign: 重复通关不重复发放首通情报")
+
+	# 第二关首通必须把配置中的新机制交给结算 UI，而不只是静默写入存档。
+	var mission_two_result = {
+		"result": "victory",
+		"level_id": "ch1_m2",
+		"rating": 3,
+		"turns": 7,
+		"survivor_count": 2,
+		"units_survived": 2,
+		"units_total": 2,
+		"rewards": {"credit": 250, "exp": 180, "intel": 0},
+	}
+	GameManager.complete_mission(mission_two_result)
+	var expected_unlocks: Array = CampaignRepository.get_level("ch1_m2").get("new_unlocks", [])
+	_check(mission_two_result.get("new_unlocks", []) == expected_unlocks, "Campaign: 首通结算携带配置的新解锁内容")
 
 	SaveManager.delete_save(slot)
 	GameManager.current_save = backup_save
@@ -1582,11 +1611,169 @@ func _test_ending_and_ng_plus() -> void:
 
 func _test_map_validation() -> void:
 	print("\n--- 锁定地图验证测试 ---")
+	_test_chapter_one_environment_sample()
+	_test_chapter_one_cooling_works_sample()
+	_test_chapter_one_transit_hub_sample()
+	_test_chapter_one_transit_escort_sample()
+	_test_chapter_one_sentinel_core_sample()
+	_test_chapter_one_sentinel_boss_sample()
 	_test_map_cover_balance()
 	_test_map_highland_density()
 	_test_map_connectivity()
 	_test_map_spawn_point_validation()
 	_test_map_unit_capacity()
+
+## ch1_m1 是第一章正式环境垂直切片；此契约阻止尺寸、路线和组件退回开发占位状态。
+func _test_chapter_one_environment_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m1")
+	_check(result.get("ok", false), "MapSample: ch1_m1 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 14, "height": 10}, "MapSample: ch1_m1 固定为 14x10")
+	_check(map.get("theme", "") == "echo_yard", "MapSample: ch1_m1 使用回声货场主题")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "echo_yard", "MapSample: 运行时保留 echo_yard 环境契约")
+	var route_anchors: Array = environment.get("route_anchors", [])
+	_check(route_anchors.size() >= 3, "MapSample: 至少声明三条战术路线")
+
+	var player_spawns: Array = MapLoader.get_player_spawns(map)
+	var enemy_spawns: Array = MapLoader.get_enemy_spawns(map)
+	var occupied: Dictionary = {}
+	var unique_spawns := true
+	for spawn in player_spawns + enemy_spawns:
+		var pos := Vector2i(int(spawn.get("x", -1)), int(spawn.get("y", -1)))
+		if occupied.has(pos):
+			unique_spawns = false
+		occupied[pos] = true
+	_check(unique_spawns, "MapSample: 玩家与敌人出生位置不重叠")
+
+	var terminal_objects: Array = map.objects.filter(func(object): return object.get("type") == "terminal")
+	var evac_objects: Array = map.objects.filter(func(object): return object.get("type") == "evac")
+	_check(not player_spawns.is_empty() and not terminal_objects.is_empty() and not evac_objects.is_empty(), "MapSample: 出生、终端和撤离目标完整")
+	if not player_spawns.is_empty() and not evac_objects.is_empty():
+		var start := Vector2i(int(player_spawns[0].x), int(player_spawns[0].y))
+		var evac := Vector2i(int(evac_objects[0].x), int(evac_objects[0].y))
+		for route in route_anchors:
+			var anchor := Vector2i(int(route[0]), int(route[1]))
+			_check(
+				_check_connectivity(map, start, anchor) and _check_connectivity(map, anchor, evac),
+				"MapSample: 路线锚点 (%d,%d) 连接出生区和撤离区" % [anchor.x, anchor.y]
+			)
+
+	var catalog = ArtCatalogScript.new()
+	if not catalog.has_method("get_environment_component_paths"):
+		_check(false, "MapSample: ArtCatalog 提供环境组件查询接口")
+		catalog.free()
+		return
+	var expected_counts := {"floor": 8, "edge": 8, "prop": 6, "decal": 3, "landmark": 2}
+	for component_type in expected_counts:
+		var paths: Array = catalog.get_environment_component_paths("echo_yard", component_type)
+		_check(paths.size() >= expected_counts[component_type], "MapSample: echo_yard %s 组件数量 >= %d" % [component_type, expected_counts[component_type]])
+		for path in paths:
+			_check(load(path) is Texture2D, "MapSample: 环境组件可加载 %s" % path)
+	catalog.free()
+
+## ch1_m2 是冷却工区批量生产的第一张地图；契约防止地图尺寸和环境资源退回仓库占位数据。
+func _test_chapter_one_cooling_works_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m2")
+	_check(result.get("ok", false), "CoolingWorks: ch1_m2 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 16, "height": 12}, "CoolingWorks: ch1_m2 固定为 16x12")
+	_check(map.get("theme", "") == "cooling_works", "CoolingWorks: ch1_m2 使用冷却工区主题")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "cooling_works", "CoolingWorks: 运行时保留 cooling_works 环境契约")
+	_check((environment.get("route_anchors", []) as Array).size() >= 3, "CoolingWorks: 至少声明三条战术路线")
+	_check((environment.get("hazard_cells", []) as Array).size() >= 6, "CoolingWorks: 冷却池危险区具有多个明确格位")
+
+	var player_spawns: Array = MapLoader.get_player_spawns(map)
+	var targets: Array = map.objects.filter(func(object): return object.get("type") == "destructible_target")
+	_check(not player_spawns.is_empty() and not targets.is_empty(), "CoolingWorks: 出生区与摧毁目标完整")
+
+	var catalog = ArtCatalogScript.new()
+	var expected_counts := {"floor": 8, "edge": 8, "prop": 6, "decal": 3, "landmark": 2}
+	for component_type in expected_counts:
+		var paths: Array = catalog.get_environment_component_paths("cooling_works", component_type)
+		_check(paths.size() >= expected_counts[component_type], "CoolingWorks: %s 组件数量 >= %d" % [component_type, expected_counts[component_type]])
+		for path in paths:
+			_check(load(path) is Texture2D, "CoolingWorks: 环境组件可加载 %s" % path)
+	catalog.free()
+
+## ch1_m3 establishes the Transit Hub production kit and must not regress to the legacy warehouse map.
+func _test_chapter_one_transit_hub_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m3")
+	_check(result.get("ok", false), "TransitHub: ch1_m3 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 16, "height": 12}, "TransitHub: ch1_m3 固定为 16x12")
+	_check(map.get("theme", "") == "transit_hub", "TransitHub: ch1_m3 使用轨道枢纽主题")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "transit_hub", "TransitHub: 运行时保留 transit_hub 环境契约")
+	_check((environment.get("route_anchors", []) as Array).size() >= 3, "TransitHub: 至少声明三条战术路线")
+	var evac: Array = map.objects.filter(func(object): return object.get("type") == "evac")
+	_check(not MapLoader.get_player_spawns(map).is_empty() and not evac.is_empty(), "TransitHub: 出生区与撤离点完整")
+
+	var catalog = ArtCatalogScript.new()
+	var expected_counts := {"floor": 8, "edge": 8, "prop": 6, "decal": 3, "landmark": 2}
+	for component_type in expected_counts:
+		var paths: Array = catalog.get_environment_component_paths("transit_hub", component_type)
+		_check(paths.size() >= expected_counts[component_type], "TransitHub: %s 组件数量 >= %d" % [component_type, expected_counts[component_type]])
+		for path in paths:
+			_check(load(path) is Texture2D, "TransitHub: 环境组件可加载 %s" % path)
+	catalog.free()
+
+## ch1_m4 reuses the Transit Hub art, but must remain a distinct large escort route.
+func _test_chapter_one_transit_escort_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m4")
+	_check(result.get("ok", false), "TransitEscort: ch1_m4 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 16, "height": 14}, "TransitEscort: ch1_m4 固定为 16x14")
+	_check(map.get("theme", "") == "transit_hub", "TransitEscort: ch1_m4 使用轨道枢纽主题")
+	_check(map.get("mission_type", "") == "escort", "TransitEscort: 任务类型为 escort")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "transit_hub", "TransitEscort: 运行时保留 transit_hub 环境契约")
+	_check((environment.get("route_anchors", []) as Array).size() >= 3, "TransitEscort: 至少声明三条护送路线")
+	var evac: Array = map.objects.filter(func(object): return object.get("type") == "evac")
+	_check(MapLoader.get_player_spawns(map).size() >= 4 and not evac.is_empty(), "TransitEscort: 四人部署与撤离点完整")
+
+## ch1_m5 establishes the Sentinel Core kit and the first inner-ring data objective.
+func _test_chapter_one_sentinel_core_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m5")
+	_check(result.get("ok", false), "SentinelCore: ch1_m5 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 16, "height": 12}, "SentinelCore: ch1_m5 固定为 16x12")
+	_check(map.get("theme", "") == "sentinel_core", "SentinelCore: ch1_m5 使用哨兵核心主题")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "sentinel_core", "SentinelCore: 运行时保留 sentinel_core 环境契约")
+	_check((environment.get("route_anchors", []) as Array).size() >= 3, "SentinelCore: 至少声明三条内环突破路线")
+	var terminals: Array = map.objects.filter(func(object): return object.get("type") == "terminal")
+	_check(not MapLoader.get_player_spawns(map).is_empty() and not terminals.is_empty(), "SentinelCore: 部署区与数据终端完整")
+	var catalog = ArtCatalogScript.new()
+	for component_type in {"floor":8,"edge":8,"prop":6,"decal":3,"landmark":2}:
+		_check(catalog.get_environment_component_paths("sentinel_core", component_type).size() >= int({"floor":8,"edge":8,"prop":6,"decal":3,"landmark":2}[component_type]), "SentinelCore: %s 组件完整" % component_type)
+	catalog.free()
+
+## ch1_m6 is the Chapter One boss arena and cannot remain a small warehouse assassination map.
+func _test_chapter_one_sentinel_boss_sample() -> void:
+	var result := MapLoader.load_locked_map("ch1_m6")
+	_check(result.get("ok", false), "SentinelBoss: ch1_m6 可加载")
+	if not result.get("ok", false):
+		return
+	var map: Dictionary = result["data"]
+	_check(map.size == {"width": 18, "height": 14}, "SentinelBoss: ch1_m6 固定为 18x14")
+	_check(map.get("theme", "") == "sentinel_core", "SentinelBoss: ch1_m6 使用哨兵核心主题")
+	var environment: Dictionary = map.get("environment", {})
+	_check(environment.get("kit", "") == "sentinel_core", "SentinelBoss: 运行时保留 sentinel_core 环境契约")
+	_check((environment.get("route_anchors", []) as Array).size() >= 3, "SentinelBoss: 至少保留三条首领破口")
+	var boss_spawns: Array = map.objects.filter(func(object): return object.get("type") == "spawn_enemy" and object.get("boss_id", "") == "data_sentinel")
+	_check(not MapLoader.get_player_spawns(map).is_empty() and not boss_spawns.is_empty(), "SentinelBoss: 部署区与 Data Sentinel 首领完整")
 
 ## 验证掩体分布：每张地图应有合理的掩体覆盖（不能全空也不能全挡）
 func _test_map_cover_balance() -> void:
@@ -1967,6 +2154,60 @@ func _set_difficulty_in_memory(diff_name: String) -> void:
 		GameManager.current_save["settings"] = SaveManager.create_default_save().settings
 	GameManager.current_save["settings"]["difficulty"] = diff_name
 
+## ===== 无障碍与设置契约 =====
+
+func _test_accessibility_settings() -> void:
+	print("\n--- 无障碍设置测试 ---")
+	var original_save := GameManager.current_save.duplicate(true)
+	var original_slot := GameManager.current_slot
+	var settings: Dictionary = SaveManager.create_default_save().get("settings", {}).duplicate(true)
+	settings["large_text"] = true
+	settings["reduce_motion"] = true
+	settings["colorblind_mode"] = "deuteranopia"
+	settings["subtitle_speed"] = 1.5
+	GameManager.current_slot = 0
+	GameManager.current_save = SaveManager.create_default_save()
+	GameManager.update_settings(settings)
+
+	var persisted: Dictionary = SaveManager.load_game(0).get("settings", {})
+	_check(persisted.get("large_text", false), "Settings: large text persists")
+	_check(persisted.get("reduce_motion", false), "Settings: reduce motion persists")
+	_check(persisted.get("colorblind_mode", "") == "deuteranopia", "Settings: colorblind mode persists")
+	_check(is_equal_approx(float(persisted.get("subtitle_speed", 0.0)), 1.5), "Settings: subtitle speed persists")
+	_check(persisted.get("keybindings", {}).has("end_turn"), "Settings: keybinding settings persist")
+	var original_end_turn := InputBindings.get_binding_data("end_turn")
+	InputBindings.set_binding("end_turn", {"keycode": KEY_ENTER, "physical_keycode": 0})
+	_check(InputBindings.get_binding_data("end_turn").get("keycode", 0) == KEY_ENTER, "Input: binding can be changed at runtime")
+	InputBindings.set_binding("end_turn", original_end_turn)
+
+	AccessibilitySettings.apply_settings(settings)
+	_check(AccessibilitySettings.get_effect_duration(0.70) < 0.70, "Accessibility: reduce motion shortens tactical effects")
+	_check(
+		AccessibilitySettings.get_highlight_color("attack", Color.RED) != Color(0.96, 0.26, 0.21, 0.35),
+		"Accessibility: colorblind palette replaces red attack highlight"
+	)
+	var effect := TacticalEffectScript.new()
+	effect.setup("terminal")
+	_check(effect.duration < 0.70, "Accessibility: spawned tactical effects use reduced duration")
+	effect.free()
+	var settings_menu := preload("res://scenes/settings_menu.tscn").instantiate()
+	add_child(settings_menu)
+	await get_tree().process_frame
+	_check(settings_menu.get_node_or_null("Panel/ScrollContainer/VBoxContainer/KeybindingButton") != null, "Settings: scrollable keybinding control is present")
+	settings_menu._open_keybinding_dialog()
+	_check(settings_menu._binding_dialog != null, "Settings: keybinding dialog opens at runtime")
+	settings_menu._close_keybinding_dialog()
+	settings_menu._begin_resolution_confirmation("1920x1080")
+	_check(settings_menu.resolution_confirm_panel.visible, "Settings: resolution preview asks for confirmation")
+	settings_menu._revert_pending_resolution()
+	_check(not settings_menu.resolution_confirm_panel.visible, "Settings: resolution preview can be reverted")
+	settings_menu.queue_free()
+	await get_tree().process_frame
+
+	AccessibilitySettings.apply_settings(original_save.get("settings", {}))
+	GameManager.current_slot = original_slot
+	GameManager.current_save = original_save
+
 ## ===== Boss 阶段系统测试 =====
 ## 验证 Boss 阶段数据完整性、阈值切换逻辑、武器解析和狂暴效果
 
@@ -2012,17 +2253,18 @@ func _test_boss_phase_threshold_logic() -> void:
 	var boss_data = GameData.get_boss("data_sentinel")
 	_check(not boss_data.is_empty(), "BossPhase: data_sentinel 数据存在")
 	var phases = boss_data.get("phases", [])
-	_check(phases.size() == 2, "BossPhase: data_sentinel 有 2 个阶段")
-	# data_sentinel: hp=300, phase0 threshold=0.6 (180HP), phase1 threshold=0.0 (0HP)
+	_check(phases.size() == 3, "BossPhase: data_sentinel 有 3 个阶段")
+	# data_sentinel: 68% / 34% / 0% 三阶段。
 	var max_hp = int(boss_data.get("hp", 300))
 	_check(max_hp == 300, "BossPhase: data_sentinel max_hp = 300")
 	# 模拟 HP 比率 → 应处阶段
 	_check(_calc_expected_phase(1.0, phases) == 0, "BossPhase: HP 100% → 阶段0")
 	_check(_calc_expected_phase(0.7, phases) == 0, "BossPhase: HP 70% → 阶段0")
-	_check(_calc_expected_phase(0.6, phases) == 0, "BossPhase: HP 60%（阈值边界）→ 阶段0")
-	_check(_calc_expected_phase(0.59, phases) == 1, "BossPhase: HP 59% → 阶段1")
-	_check(_calc_expected_phase(0.3, phases) == 1, "BossPhase: HP 30% → 阶段1")
-	_check(_calc_expected_phase(0.01, phases) == 1, "BossPhase: HP 1% → 阶段1")
+	_check(_calc_expected_phase(0.68, phases) == 0, "BossPhase: HP 68%（阈值边界）→ 阶段0")
+	_check(_calc_expected_phase(0.67, phases) == 1, "BossPhase: HP 67% → 阶段1")
+	_check(_calc_expected_phase(0.34, phases) == 1, "BossPhase: HP 34%（阈值边界）→ 阶段1")
+	_check(_calc_expected_phase(0.33, phases) == 2, "BossPhase: HP 33% → 阶段2")
+	_check(_calc_expected_phase(0.01, phases) == 2, "BossPhase: HP 1% → 阶段2")
 
 ## 辅助：根据 HP 比率和 phases 计算应处阶段索引
 func _calc_expected_phase(hp_ratio: float, phases: Array) -> int:
@@ -2087,7 +2329,7 @@ func _test_boss_enrage_effects() -> void:
 func _test_boss_phase_warning_flag() -> void:
 	print("  - Boss 阶段预警旗标")
 	# 模拟预警旗标逻辑
-	var phases_size = 2
+	var phases_size = 3
 	var warned: Array[bool] = []
 	warned.resize(phases_size)
 	for i in range(phases_size):
@@ -2096,6 +2338,8 @@ func _test_boss_phase_warning_flag() -> void:
 	_check(not warned[1], "BossWarning: 阶段1 初始未预警")
 	warned[1] = true
 	_check(warned[1], "BossWarning: 阶段1 标记为已预警")
+	warned[2] = true
+	_check(warned[2], "BossWarning: 阶段2 标记为已预警")
 	# 再次检查 → 应跳过（已预警）
 	var already_warned = warned[1]
 	_check(already_warned, "BossWarning: 阶段1 重复触发时跳过预警")
@@ -2626,10 +2870,23 @@ func _test_trap_system() -> void:
 	action_sys.enemy_units = [enemy]
 
 	var hp_before_trap = enemy.current_hp
-	# 模拟敌人移动到陷阱位置
-	action_sys._check_trap_trigger(enemy, Vector2i(2, 2))
+	# 模拟敌人从上方移动到陷阱位置
+	enemy.grid_pos = Vector2i(2, 2)
+	action_sys._check_trap_trigger(enemy, Vector2i(2, 2), Vector2i(2, 1))
 	_check(enemy.current_hp < hp_before_trap, "Trap: 敌人触发陷阱受到伤害")
+	_check(enemy.grid_pos == Vector2i(2, 3), "Trap: 地雷将敌人击退到合法的相邻格")
 	_check(action_sys.traps.size() == 0, "Trap: 触发后陷阱被移除")
+
+	# 墙体阻挡击退落点时，单位保持在触发格且不会获得伪造的定身状态。
+	trapper.grid_pos = Vector2i(4, 4)
+	action_sys.player_units = [trapper]
+	action_sys._place_trap(trapper, mine)
+	enemy.grid_pos = Vector2i(4, 4)
+	test_map.layers.blocker[5][4] = 6
+	action_sys._check_trap_trigger(enemy, Vector2i(4, 4), Vector2i(4, 3))
+	_check(enemy.grid_pos == Vector2i(4, 4), "Trap: 击退落点被墙阻挡时单位留在触发格")
+	_check(not enemy.has_status("rooted"), "Trap: 击退失败不以 rooted 状态替代位移")
+	test_map.layers.blocker[5][4] = 0
 
 	# 3. 验证陷阱不误伤友军
 	var trapper2 = _track(GameData.create_player_unit("scout", "Trapper2"))

@@ -5,8 +5,8 @@
       "name": "初次接触",
       "map_file": "data/generated_maps/ch1_m1.json",
       "seed": 1001,
-      "size": "small",
-      "theme": "warehouse",
+      "size": "medium",
+      "theme": "echo_yard",
       "mission_type": "extract"
     },
     {
@@ -14,8 +14,8 @@
       "name": "掩体战术",
       "map_file": "data/generated_maps/ch1_m2.json",
       "seed": 1002,
-      "size": "small",
-      "theme": "warehouse",
+      "size": "medium",
+      "theme": "cooling_works",
       "mission_type": "destroy"
     },
     {
@@ -23,8 +23,8 @@
       "name": "高地优势",
       "map_file": "data/generated_maps/ch1_m3.json",
       "seed": 1003,
-      "size": "small",
-      "theme": "warehouse",
+      "size": "medium",
+      "theme": "transit_hub",
       "mission_type": "extract"
     },
     {
@@ -32,8 +32,8 @@
       "name": "交互点",
       "map_file": "data/generated_maps/ch1_m4.json",
       "seed": 1004,
-      "size": "small",
-      "theme": "warehouse",
+      "size": "large",
+      "theme": "transit_hub",
       "mission_type": "escort"
     },
     {
@@ -41,8 +41,8 @@
       "name": "技能初探",
       "map_file": "data/generated_maps/ch1_m5.json",
       "seed": 1005,
-      "size": "small",
-      "theme": "warehouse",
+      "size": "medium",
+      "theme": "sentinel_core",
       "mission_type": "extract"
     },
     {
@@ -50,8 +50,8 @@
       "name": "数据哨兵",
       "map_file": "data/generated_maps/ch1_m6.json",
       "seed": 1006,
-      "size": "medium",
-      "theme": "warehouse",
+      "size": "large",
+      "theme": "sentinel_core",
       "mission_type": "assassinate"
     },
     {

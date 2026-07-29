@@ -9,11 +9,13 @@ signal unit_attacked(attacker, target, result: Dictionary)
 signal unit_damaged(unit, damage: int)
 signal unit_died(unit)
 signal ap_changed(unit, current_ap: int)
+signal shield_changed(unit, current_shield: int, max_shield: int)
 
 # 基础属性
 @export var unit_name: String = "Unit"
 @export var team: String = "player"  # player / enemy
 @export var job: String = "assault"
+var boss_art_key: StringName = &""
 
 # 六维属性
 var stats: Dictionary = {
@@ -32,6 +34,8 @@ var crit_chance: float = 0.05
 var crit_multiplier: float = 1.5
 var dodge: float = 0.05
 var armor: int = 0
+var max_shield: int = 0
+var current_shield: int = 0
 
 # 位置
 var grid_pos: Vector2i = Vector2i.ZERO
@@ -73,6 +77,8 @@ func setup(data: Dictionary) -> void:
 	move_points = data.get("move_points", 5)
 	vision_range = data.get("vision_range", 5)
 	armor = data.get("armor", 0)
+	max_shield = maxi(0, int(data.get("shield", 0)))
+	current_shield = max_shield
 
 ## 刷新 AP（回合开始时）
 func refresh_ap() -> void:
@@ -92,7 +98,13 @@ func spend_ap(amount: int) -> bool:
 func take_damage(amount: int) -> void:
 	if not is_alive:
 		return
-	current_hp -= amount
+	var remaining_damage := maxi(0, amount)
+	if current_shield > 0 and remaining_damage > 0:
+		var absorbed := mini(current_shield, remaining_damage)
+		current_shield -= absorbed
+		remaining_damage -= absorbed
+		shield_changed.emit(self, current_shield, max_shield)
+	current_hp -= remaining_damage
 	unit_damaged.emit(self, amount)
 	if current_hp <= 0:
 		current_hp = 0
@@ -103,6 +115,17 @@ func take_damage(amount: int) -> void:
 ## 恢复 HP
 func heal(amount: int) -> void:
 	current_hp = mini(current_hp + amount, max_hp)
+
+## 恢复独立护盾吸收层，返回实际恢复量
+func restore_shield(amount: int) -> int:
+	if amount <= 0 or max_shield <= 0 or not is_alive:
+		return 0
+	var before := current_shield
+	current_shield = mini(current_shield + amount, max_shield)
+	var restored := current_shield - before
+	if restored > 0:
+		shield_changed.emit(self, current_shield, max_shield)
+	return restored
 
 ## 移动到新位置
 func move_to(new_pos: Vector2i) -> void:

@@ -6,6 +6,13 @@ class_name BaseController
 @onready var chapter_label = $TopBar/ChapterLabel
 @onready var credit_label = $TopBar/CreditLabel
 @onready var mission_list = $Center/ScrollContainer/MissionList
+@onready var operation_title = $Center/OperationTitle
+@onready var situation_title = $Center/SituationPanel/Content/SituationTitle
+@onready var status_tag = $Center/SituationPanel/Content/StatusTag
+@onready var situation_body = $Center/SituationPanel/Content/SituationBody
+@onready var threat_label = $Center/SituationPanel/Content/ThreatLabel
+@onready var threat_bar = $Center/SituationPanel/Content/ThreatBar
+@onready var intel_hint = $Center/SituationPanel/Content/IntelHint
 @onready var barracks_btn = $BottomBar/HBox/BarracksBtn
 @onready var armory_btn = $BottomBar/HBox/ArmoryBtn
 @onready var shop_btn = $BottomBar/HBox/ShopBtn
@@ -14,6 +21,9 @@ class_name BaseController
 const CharacterPanelScene = preload("res://scenes/character_panel.tscn")
 const ShopPanelScene = preload("res://scenes/shop_panel.tscn")
 const ErrorDialogScene = preload("res://scenes/error_dialog.tscn")
+const COLOR_CYAN := Color("#37d7ff")
+const COLOR_AMBER := Color("#f3a44a")
+const COLOR_MUTED := Color("#8aa2a7")
 
 ## 是否正在显示成就弹窗（避免多个弹窗叠加）
 var _showing_achievement_popup: bool = false
@@ -46,29 +56,104 @@ func _load_campaign() -> void:
 	for child in mission_list.get_children():
 		child.queue_free()
 
+	var preview_set := false
 	# 只显示当前章节的任务，避免一次列出全部 30 关
 	for chapter in tree:
 		if int(chapter.get("chapter", 0)) != current_chapter:
 			continue
-		var chapter_label_node = Label.new()
-		chapter_label_node.text = "%s" % chapter.name
-		chapter_label_node.add_theme_font_size_override("font_size", 22)
-		chapter_label_node.modulate = Color(1.0, 0.85, 0.4)
-		mission_list.add_child(chapter_label_node)
+		operation_title.text = "%s行动链" % chapter.name
 
+		var mission_number := 0
 		for mission in chapter.missions:
+			mission_number += 1
 			var button = Button.new()
-			var prefix := "未解锁 · " if mission.locked else ("已完成 · " if mission.completed else "行动 · ")
-			button.text = prefix + mission.name
+			var status := "LOCKED" if mission.locked else ("CLEARED" if mission.completed else "READY")
+			button.text = "%02d   %-7s   %s" % [mission_number, status, mission.name]
 			button.icon = _get_mission_icon(mission)
-			button.add_theme_constant_override("icon_max_width", 30)
+			button.add_theme_constant_override("icon_max_width", 34)
+			button.add_theme_font_size_override("font_size", 16)
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			button.disabled = mission.locked
-			button.custom_minimum_size = Vector2(360, 48)
+			button.custom_minimum_size = Vector2(320, 54)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.tooltip_text = "%s · %s · 威胁 %d/5" % [
+				_get_mission_type_text(mission.mission_type),
+				_get_size_text(mission.size),
+				int(mission.difficulty),
+			]
 			if mission.get("is_boss", false):
-				button.modulate = Color(1.0, 0.5, 0.5)
+				button.modulate = Color(1.0, 0.62, 0.58)
 			if not mission.locked:
 				button.pressed.connect(_on_mission_selected.bind(mission.level_id))
+			button.mouse_entered.connect(_show_mission_brief.bind(mission))
+			button.focus_entered.connect(_show_mission_brief.bind(mission))
 			mission_list.add_child(button)
+			if not preview_set and not mission.locked:
+				_show_mission_brief(mission)
+				preview_set = true
+
+func _show_mission_brief(mission: Dictionary) -> void:
+	var level_id := String(mission.get("level_id", ""))
+	var level := CampaignRepository.get_level(level_id)
+	var difficulty := clampi(int(mission.get("difficulty", 1)), 0, 5)
+	var rewards: Dictionary = mission.get("rewards", {})
+	var first_clear: Dictionary = rewards.get("first_clear", {})
+
+	situation_title.text = String(mission.get("name", level_id))
+	threat_label.text = "威胁等级 %d / 5" % difficulty
+	threat_bar.value = difficulty * 20
+
+	if mission.get("locked", false):
+		status_tag.text = "● 链路锁定"
+		status_tag.modulate = COLOR_MUTED
+		intel_hint.text = "完成前序行动后解锁"
+	elif mission.get("completed", false):
+		status_tag.text = "● 已完成 · 可重复部署"
+		status_tag.modulate = COLOR_CYAN
+		intel_hint.text = "点击行动节点可再次部署"
+	else:
+		status_tag.text = "● 可部署"
+		status_tag.modulate = COLOR_AMBER
+		intel_hint.text = "点击行动节点查看部署确认"
+
+	var reward_text := "%d 信用点 / %d XP" % [
+		int(rewards.get("credit", 0)),
+		int(rewards.get("exp", 0)),
+	]
+	if not first_clear.is_empty():
+		reward_text += "\n首通 +%d 信用点 / +%d 情报" % [
+			int(first_clear.get("credit", 0)),
+			int(first_clear.get("intel", 0)),
+		]
+
+	situation_body.text = (
+		"行动目标\n%s\n\n"
+		+ "部署编制\n我方 %d 人  /  敌方约 %d 单位\n\n"
+		+ "战区参数\n%s地图  /  %s\n\n"
+		+ "行动报酬\n%s"
+	) % [
+		_get_mission_directive(String(mission.get("mission_type", "extract"))),
+		int(level.get("player_units", 0)),
+		int(level.get("enemy_count", 0)),
+		_get_size_text(String(mission.get("size", "small"))),
+		_get_mission_type_text(String(mission.get("mission_type", "extract"))),
+		reward_text,
+	]
+
+func _get_mission_directive(mission_type: String) -> String:
+	match mission_type:
+		"extract":
+			return "突破封锁并抵达指定撤离坐标。"
+		"destroy":
+			return "定位并摧毁敌方关键设施。"
+		"assassinate":
+			return "击破高威胁指挥单位。"
+		"escort":
+			return "护送关键目标穿越交战区。"
+		"steal_data":
+			return "接入终端，带回完整情报数据。"
+		_:
+			return "执行战术网络下达的行动目标。"
 
 func _get_mission_icon(mission: Dictionary) -> Texture2D:
 	var mission_type := String(mission.get("mission_type", "extract"))
@@ -214,7 +299,8 @@ func _show_achievement_popup(achievement_id: String, ach_data: Dictionary) -> vo
 
 func _on_achievement_popup_closed() -> void:
 	_showing_achievement_popup = false
-	_drain_pending_achievements()
+	# tree_exited 期间父节点仍在更新 children；延迟到下一帧再挂载后续通知。
+	call_deferred("_drain_pending_achievements")
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):

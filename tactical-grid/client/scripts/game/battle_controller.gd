@@ -4,6 +4,7 @@ extends Node2D
 class_name BattleController
 
 const CELL_SIZE = 64
+const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 
 ## 待展示的教程 flag 队列（来自 level_config.tutorial_flags，跳过已读）
@@ -13,13 +14,14 @@ var _active_tutorial_hint: Control = null
 
 ## 渲染层
 @onready var map_layer: Node2D = $MapLayer
+@onready var evac_zone_layer: Node2D = $EvacZoneLayer
 @onready var move_highlight: Node2D = $MoveHighlightLayer
 @onready var path_preview_layer: Node2D = $PathPreviewLayer
 @onready var attack_highlight: Node2D = $AttackHighlightLayer
 @onready var unit_layer: Node2D = $UnitLayer
 @onready var effect_layer: Node2D = $EffectLayer
 @onready var hud: HUD = $HUD
-@onready var camera: Camera2D = $Camera2D
+@onready var camera: BattleCameraController = $Camera2D
 
 ## 战斗状态
 var map_data: Dictionary = {}
@@ -54,6 +56,7 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## 胜利条件
 var mission_type: String = "extract"
 var evac_point: Vector2i = Vector2i(-1, -1)
+var evac_cells: Array[Vector2i] = []
 var destructible_targets: Array[Vector2i] = []
 var targets_destroyed: int = 0
 var targets_required: int = 0
@@ -189,6 +192,8 @@ func _ready() -> void:
 	_setup_victory_conditions()
 	_init_telemetry()
 	_render_map()
+	_configure_viewport_layout()
+	get_viewport().size_changed.connect(_configure_viewport_layout)
 	_render_units()
 	# 先播放 intro 对话，结束后再开始战斗
 	_play_intro_then_start()
@@ -208,6 +213,7 @@ func _setup_objective_state() -> void:
 func _sync_objective_state_from_mos() -> void:
 	mission_type = mission_objective_state.mission_type
 	evac_point = mission_objective_state.evac_point
+	evac_cells = mission_objective_state.evac_cells
 	destructible_targets = mission_objective_state.destructible_targets
 	destructible_target_states = mission_objective_state.destructible_target_states
 	targets_destroyed = mission_objective_state.targets_destroyed
@@ -235,10 +241,12 @@ func _exit_tree() -> void:
 func _cleanup_units() -> void:
 	for unit in player_units:
 		if unit and is_instance_valid(unit):
-			unit.queue_free()
+			# Units are data nodes, not scene-tree children; deferred deletion never
+			# reaches the queue for detached nodes during a scene transition.
+			unit.free()
 	for unit in enemy_units:
 		if unit and is_instance_valid(unit):
-			unit.queue_free()
+			unit.free()
 	player_units.clear()
 	enemy_units.clear()
 	selected_unit = null
@@ -284,7 +292,7 @@ func _show_tutorial_flag(flag: String) -> void:
 	if _active_tutorial_hint != null and is_instance_valid(_active_tutorial_hint):
 		_active_tutorial_hint.queue_free()
 	_active_tutorial_hint = TutorialHintScene.instantiate()
-	add_child(_active_tutorial_hint)
+	hud.add_child(_active_tutorial_hint)
 	_active_tutorial_hint.show_hint(flag, Callable(self, "_on_tutorial_hint_closed"))
 
 ## 教程提示关闭回调：跳过按钮请求时直接启动战斗，否则继续下一个教程
@@ -311,6 +319,7 @@ func _init_subsystems() -> void:
 
 	action_system = ActionSystem.new()
 	add_child(action_system)
+	action_system.ground_effects_changed.connect(_render_ground_effects)
 
 	enemy_director = EnemyDirector.new()
 	add_child(enemy_director)
@@ -563,6 +572,11 @@ func _spawn_units() -> void:
 			_apply_difficulty_to_enemy(unit)
 			enemy_units.append(unit)
 
+	# 阵容可能多于本关编制；释放未加入战场的临时 Unit，避免场景切换泄漏。
+	for roster_unit in roster_units:
+		if roster_unit not in player_units and roster_unit and is_instance_valid(roster_unit):
+			roster_unit.free()
+
 	# 根据任务类型标记特殊单位（Boss / VIP）
 	_designate_special_units()
 
@@ -607,10 +621,14 @@ func _designate_special_units() -> void:
 
 ## 应用 Boss 数据到单位（强化 HP/护甲/属性），并初始化阶段状态
 func _apply_boss_stats(unit: Unit, bdata: Dictionary) -> void:
-	var hp = int(bdata.get("hp", unit.max_hp))
+	var difficulty_params := GameManager.get_difficulty_params()
+	var hp_multiplier := float(difficulty_params.get("enemy_hp_multiplier", 1.0))
+	var hp = int(round(int(bdata.get("hp", unit.max_hp)) * hp_multiplier))
 	unit.max_hp = hp
 	unit.current_hp = hp
 	unit.armor = int(bdata.get("armor", unit.armor))
+	unit.max_shield = int(round(int(bdata.get("shield", 0)) * hp_multiplier))
+	unit.current_shield = unit.max_shield
 	var boss_name = bdata.get("name", "Boss")
 	unit.unit_name = boss_name
 	unit.boss_art_key = {
@@ -643,6 +661,13 @@ func _apply_boss_phase(unit: Unit, phase_idx: int) -> void:
 	var weapons = phase.get("weapons", [])
 	if not weapons.is_empty():
 		_apply_boss_weapon(unit, weapons[0])
+	var damage = phase.get("damage", [])
+	if damage is Array and damage.size() >= 2:
+		unit.weapon_damage = [int(damage[0]), int(damage[1])]
+		var damage_multiplier := float(GameManager.get_difficulty_params().get("enemy_damage_multiplier", 1.0))
+		if damage_multiplier != 1.0:
+			unit.weapon_damage[0] = int(round(unit.weapon_damage[0] * damage_multiplier))
+			unit.weapon_damage[1] = int(round(unit.weapon_damage[1] * damage_multiplier))
 	# 初始化该阶段的能力状态
 	var abilities = phase.get("abilities", [])
 	for ability_id in abilities:
@@ -686,6 +711,10 @@ func _apply_boss_weapon(unit: Unit, weapon_id: String) -> void:
 ## 应用 Boss 狂暴效果
 func _apply_boss_enrage(unit: Unit, enrage: String) -> void:
 	match enrage:
+		"attack_plus_25":
+			if unit.weapon_damage.size() >= 2:
+				unit.weapon_damage[0] = int(round(unit.weapon_damage[0] * 1.25))
+				unit.weapon_damage[1] = int(round(unit.weapon_damage[1] * 1.25))
 		"attack_plus_50":
 			# 伤害提升 50%（基于当前武器伤害）
 			if unit.weapon_damage.size() >= 2:
@@ -716,8 +745,10 @@ func _check_boss_phase_transition(unit: Unit) -> void:
 			break
 	# 如果阶段提升（HP 下降触发更高阶段索引）
 	if target_phase > boss_current_phase:
-		_show_boss_phase_warning(target_phase)
-		_apply_boss_phase(unit, target_phase)
+		for phase_idx in range(boss_current_phase + 1, target_phase + 1):
+			_apply_boss_phase(unit, phase_idx)
+			_show_boss_phase_warning(phase_idx)
+			camera.play_event_feedback(&"boss_phase", _get_cell_center(unit.grid_pos))
 
 ## 展示 Boss 阶段切换预警
 func _show_boss_phase_warning(new_phase_idx: int) -> void:
@@ -763,6 +794,8 @@ func _describe_boss_ability(ability_id: String) -> String:
 			return "生成分身"
 		"shield_regen_20":
 			return "每回合恢复20护盾"
+		"shield_regen_15":
+			return "每回合恢复15护盾"
 		"shield_regen_30":
 			return "每回合恢复30护盾"
 		"stealth_every_3":
@@ -787,6 +820,8 @@ func _describe_boss_ability(ability_id: String) -> String:
 ## 描述 Boss 狂暴效果
 func _describe_boss_enrage(enrage: String) -> String:
 	match enrage:
+		"attack_plus_25":
+			return "攻击力+25%"
 		"attack_plus_50":
 			return "攻击力+50%"
 		"move_plus_2":
@@ -830,6 +865,8 @@ func _execute_boss_ability(ability_id: String, current_turn: int) -> void:
 				_boss_summon_unit("heavy_gunner", "重机枪手")
 		"shield_regen_20":
 			_boss_regen_shield(20)
+		"shield_regen_15":
+			_boss_regen_shield(15)
 		"shield_regen_30":
 			_boss_regen_shield(30)
 		"heal_self_30":
@@ -854,6 +891,9 @@ func _execute_boss_ability(ability_id: String, current_turn: int) -> void:
 ## Boss 召唤增援单位
 func _boss_summon_unit(enemy_type: String, display_name: String) -> void:
 	if enemy_director:
+		if enemy_director.reinforcements_spawned >= enemy_director.max_reinforcements:
+			_log("Boss 召唤失败：全场增援预算已耗尽")
+			return
 		var alive_e = 0
 		for u in enemy_units:
 			if u and u.is_alive:
@@ -872,16 +912,26 @@ func _boss_summon_unit(enemy_type: String, display_name: String) -> void:
 	unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
 	_apply_difficulty_to_enemy(unit)
 	enemy_units.append(unit)
+	if enemy_director:
+		enemy_director.reinforcements_spawned += 1
 	_create_unit_sprite(unit)
 	_log("Boss 召唤了 %s (%d,%d)" % [display_name, spawn_pos.x, spawn_pos.y])
 
-## Boss 恢复护盾（护盾作为临时 HP 吸收层，简化为直接治疗上限的一部分）
+## Boss 恢复独立护盾吸收层
 func _boss_regen_shield(amount: int) -> void:
 	if boss_unit and boss_unit.is_alive:
-		# 护盾作为临时护甲层处理：恢复护甲到一定上限
-		var armor_cap = int(boss_data.get("armor", 0)) + amount
-		boss_unit.armor = mini(boss_unit.armor + amount, armor_cap)
-		_log("Boss %s 恢复 %d 护盾（当前护甲 %d）" % [boss_unit.unit_name, amount, boss_unit.armor])
+		var restored := boss_unit.restore_shield(amount)
+		if restored > 0:
+			_log("Boss %s 恢复 %d 护盾（%d/%d）" % [
+				boss_unit.unit_name,
+				restored,
+				boss_unit.current_shield,
+				boss_unit.max_shield,
+			])
+			_update_unit_sprite_pos(boss_unit)
+			if selected_unit == boss_unit:
+				hud.update_unit_info(boss_unit)
+			hud.update_objective(_get_objective_text())
 
 ## 应用难度调整到敌人单位（仅 HP/伤害，不修改命中率）
 ## 故事难度弱化敌人，困难难度强化敌人
@@ -920,12 +970,23 @@ func _render_map() -> void:
 
 	var base_terrain = map_data.layers.base_terrain
 	var blocker = map_data.layers.blocker
+	var environment: Dictionary = map_data.get("environment", {})
+	var environment_kit := String(environment.get("kit", ""))
+	var floor_overrides: Dictionary = {}
+	for override in environment.get("floor_variant_overrides", []):
+		floor_overrides[Vector2i(int(override.get("x", 0)), int(override.get("y", 0)))] = int(override.get("variant", 0))
 
 	for y in range(map_height):
 		for x in range(map_width):
 			var terrain = base_terrain[y][x]
 			var block = blocker[y][x]
-			_draw_tactical_tile(Vector2i(x, y), terrain, block)
+			var pos := Vector2i(x, y)
+			var floor_variant := int(floor_overrides.get(pos, _get_environment_variant(pos, "floor", 8)))
+			var blocker_variant := _get_blocker_variant(pos, block)
+			var edge_variants := _get_terrain_edge_variants(pos, int(terrain))
+			_draw_tactical_tile(pos, terrain, block, "", environment_kit, floor_variant, edge_variants, blocker_variant)
+
+	_render_environment_decorations(environment_kit, environment.get("decorations", []))
 
 	# 标记撤离点、目标和终端
 	for obj in map_data.objects:
@@ -935,9 +996,36 @@ func _render_map() -> void:
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "destructible_target")
 		elif obj.type == "terminal":
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "terminal")
+	_render_evac_zone()
 
-	# 调整相机
-	camera.position = Vector2(map_width * CELL_SIZE / 2.0, map_height * CELL_SIZE / 2.0)
+
+## 常驻撤离区域提示，既标出队伍可分散站立的位置，也不阻挡地图点击。
+func _render_evac_zone() -> void:
+	_clear_layer(evac_zone_layer)
+	if not mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
+		return
+	for cell in evac_cells:
+		if cell != evac_point:
+			_highlight_cell(evac_zone_layer, cell, Color(0.0, 0.88, 0.72, 0.18))
+
+
+## 同步战场可视区与 HUD，确保右侧单位面板不会遮住可操作区域。
+func _configure_viewport_layout() -> void:
+	var viewport_size := get_viewport().get_visible_rect().size
+	var top_hud_height := 50.0
+	var bottom_hud_height := 60.0
+	var right_panel_width := 250.0
+	hud.apply_viewport_layout(Vector2i(viewport_size))
+	var map_bounds := Rect2(
+		Vector2.ONE * -MAP_VISUAL_MARGIN,
+		Vector2(map_width * CELL_SIZE, map_height * CELL_SIZE) + Vector2.ONE * MAP_VISUAL_MARGIN * 2.0
+	)
+	var safe_viewport := Rect2(
+		Vector2(0.0, top_hud_height),
+		Vector2(maxf(1.0, viewport_size.x - right_panel_width), maxf(1.0, viewport_size.y - top_hud_height - bottom_hud_height))
+	)
+	camera.setup(map_bounds, safe_viewport)
+	RenderingServer.set_default_clear_color(Color(0.015, 0.028, 0.042))
 
 func _render_units() -> void:
 	for child in unit_layer.get_children():
@@ -950,9 +1038,10 @@ func _render_units() -> void:
 		_create_unit_sprite(unit)
 
 func _create_unit_sprite(unit: Unit) -> void:
-	var sprite = UnitSprite.new()
+	var sprite := UnitSprite.new()
+	sprite.name = "Unit_%s_%s" % [unit.team, unit.unit_name]
 	sprite.update_unit(unit)
-	sprite.position = GridSystem.grid_to_world(unit.grid_pos)
+	sprite.position = _get_cell_center(unit.grid_pos)
 	unit_layer.add_child(sprite)
 	unit.ap_changed.connect(_on_unit_ap_changed)
 	unit.unit_died.connect(_on_unit_died)
@@ -963,24 +1052,106 @@ func _draw_cell_on(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	rect.color = color
 	rect.size = Vector2(CELL_SIZE, CELL_SIZE)
 	rect.position = GridSystem.grid_to_world(pos)
+	# Tactical overlays are visual only. They must never consume map clicks.
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(rect)
 
-func _draw_tactical_tile(pos: Vector2i, terrain: int, block: int = 0, objective: String = "") -> void:
+func _draw_tactical_tile(
+	pos: Vector2i,
+	terrain: int,
+	block: int = 0,
+	objective: String = "",
+	environment_kit: String = "",
+	floor_variant: int = 0,
+	edge_variants: Array = [],
+	blocker_variant: int = 0
+) -> void:
 	var tile := TacticalTile.new()
+	tile.name = "Tile_%d_%d" % [pos.x, pos.y] if terrain >= 0 else "Objective_%s_%d_%d" % [objective, pos.x, pos.y]
 	tile.position = GridSystem.grid_to_world(pos)
-	tile.setup(terrain, block, objective)
+	tile.setup(terrain, block, objective, environment_kit, floor_variant, edge_variants, blocker_variant)
 	map_layer.add_child(tile)
+
+func _get_environment_variant(pos: Vector2i, component_type: String, count: int) -> int:
+	if count <= 0:
+		return 0
+	return posmod(hash("%s:%s:%d:%d:%d" % [GameManager.current_level_id, component_type, map_data.get("seed", 0), pos.x, pos.y]), count)
+
+func _get_blocker_variant(pos: Vector2i, blocker: int) -> int:
+	if blocker == 6:
+		return _get_environment_variant(pos, "full_cover", 2)
+	if blocker != 0:
+		return 2 + _get_environment_variant(pos, "half_cover", 4)
+	return 0
+
+func _get_terrain_edge_variants(pos: Vector2i, terrain: int) -> Array:
+	var edges: Array = []
+	var boundaries := [false, false, false, false]
+	var directions: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+	for index in range(directions.size()):
+		var neighbor: Vector2i = pos + directions[index]
+		boundaries[index] = not GridSystem.is_in_bounds(neighbor, map_width, map_height) or MapLoader.get_terrain_at(map_data, neighbor.x, neighbor.y) != terrain
+		if boundaries[index]:
+			edges.append(index)
+	if boundaries[0] and boundaries[3]: edges.append(4)
+	if boundaries[0] and boundaries[1]: edges.append(5)
+	if boundaries[2] and boundaries[1]: edges.append(6)
+	if boundaries[2] and boundaries[3]: edges.append(7)
+	return edges
+
+func _render_environment_decorations(environment_kit: String, decorations: Array) -> void:
+	if environment_kit.is_empty():
+		return
+	var type_counts: Dictionary = {}
+	for decoration in decorations:
+		var component_type := String(decoration.get("component_type", ""))
+		var variant := int(decoration.get("variant", 0))
+		var texture := ArtCatalog.get_environment_component_texture(environment_kit, component_type, variant)
+		if not texture:
+			continue
+		var instance_index := int(type_counts.get(component_type, 0))
+		type_counts[component_type] = instance_index + 1
+		var sprite := Sprite2D.new()
+		sprite.name = "Environment_%s_%d" % [component_type, instance_index]
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.position = GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
+		sprite.z_index = int(decoration.get("z", 0))
+		map_layer.add_child(sprite)
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	var rect = ColorRect.new()
 	rect.color = color
 	rect.size = Vector2(CELL_SIZE - 2, CELL_SIZE - 2)
 	rect.position = GridSystem.grid_to_world(pos) + Vector2(1, 1)
+	# Reachable/attack/path highlights sit above the map, so make them click-through.
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(rect)
 
 func _clear_layer(layer: Node2D) -> void:
 	for child in layer.get_children():
 		child.queue_free()
+
+## 将规则层的地面效果投影为战场格面，保留普通命中/爆炸特效节点。
+func _render_ground_effects() -> void:
+	for child in effect_layer.get_children():
+		if child.name.begins_with("GroundEffect_"):
+			child.queue_free()
+	for effect_data in action_system.ground_effects:
+		var pos: Vector2i = effect_data.get("pos", Vector2i.ZERO)
+		var kind := String(effect_data.get("type", ""))
+		var overlay := Polygon2D.new()
+		overlay.name = "GroundEffect_%d_%d_%s" % [pos.x, pos.y, kind]
+		overlay.position = GridSystem.grid_to_world(pos)
+		overlay.polygon = PackedVector2Array([
+			Vector2(4, 4), Vector2(CELL_SIZE - 4, 4),
+			Vector2(CELL_SIZE - 4, CELL_SIZE - 4), Vector2(4, CELL_SIZE - 4)
+		])
+		match kind:
+			"fire": overlay.color = Color(1.0, 0.27, 0.05, 0.46)
+			"heal_mist": overlay.color = Color(0.16, 0.92, 0.58, 0.36)
+			_: overlay.color = Color(0.58, 0.74, 0.84, 0.30)
+		effect_layer.add_child(overlay)
 
 ## ===== 战斗流程 =====
 
@@ -989,9 +1160,10 @@ func _start_battle() -> void:
 		AudioManager.bgm_boss()
 	else:
 		AudioManager.bgm_battle()
-	# 应用难度回合限制加成（故事难度+5回合，困难难度-3回合）
+	# 每关使用独立基础上限，再应用难度加成（故事+5，困难-3）。
 	var diff_params = GameManager.get_difficulty_params()
-	var turn_limit = 20 + int(diff_params.get("turn_limit_bonus", 0))
+	var base_turn_limit := mission_objective_state.max_turns if mission_objective_state else int(level_config.get("max_turns", 20))
+	var turn_limit = base_turn_limit + int(diff_params.get("turn_limit_bonus", 0))
 	turn_limit = max(5, turn_limit)  # 最低 5 回合
 	turn_manager.setup(player_units, enemy_units, turn_limit)
 	action_system.set_units(player_units, enemy_units)
@@ -1006,9 +1178,22 @@ func _start_battle() -> void:
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
 
 func _get_objective_text() -> String:
+	var objective_text := "目标：消灭所有敌人"
 	if mission_objective_state:
-		return mission_objective_state.get_status_text()
-	return "目标：消灭所有敌人"
+		objective_text = mission_objective_state.get_status_text()
+	if boss_unit and boss_unit.is_alive and not boss_phases.is_empty():
+		var phase_idx := clampi(boss_current_phase, 0, boss_phases.size() - 1)
+		var phase_name := String(boss_phases[phase_idx].get("name", "阶段%d" % (phase_idx + 1)))
+		return "Boss %s [%s] · HP %d/%d · 护盾 %d/%d | %s" % [
+			boss_unit.unit_name,
+			phase_name,
+			boss_unit.current_hp,
+			boss_unit.max_hp,
+			boss_unit.current_shield,
+			boss_unit.max_shield,
+			objective_text,
+		]
+	return objective_text
 
 func _check_victory() -> bool:
 	if mission_objective_state:
@@ -1028,6 +1213,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			hud.update_turn_display(turn_manager.turn_number, phase)
 			turn_manager.input_locked = false
 			hud.set_buttons_disabled(false)
+			action_system.process_ground_effects_on_turn_start()
 			if mission_objective_state:
 				mission_objective_state.on_turn_started(turn_manager.turn_number, "player")
 			hud.update_objective(_get_objective_text())
@@ -1136,7 +1322,7 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		stars = 1
 		if survived == total:
 			stars = 2
-		if turn_manager.turn_number <= 10:
+		if turn_manager.turn_number <= int(level_config.get("three_star_turns", 10)):
 			stars = 3
 
 	var level_rewards = level_config.get("rewards", {})
@@ -1281,7 +1467,7 @@ func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
 
 	if last_pos != enemy.grid_pos:
 		enemy.move_to(last_pos)
-		_update_unit_sprite_pos(enemy)
+		_update_unit_sprite_pos(enemy, true)
 		_log("%s 移动到 (%d,%d)" % [enemy.unit_name, last_pos.x, last_pos.y])
 
 ## ===== 玩家输入 =====
@@ -1314,6 +1500,12 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_left_click(world_pos: Vector2) -> void:
 	var grid_pos = GridSystem.world_to_grid(world_pos)
 	if not GridSystem.is_in_bounds(grid_pos, map_width, map_height):
+		return
+	# A teammate click is always a selection change outside explicit skill/item targeting.
+	# Without this, a stale move/attack mode silently eats the next unit click.
+	var clicked_unit = _get_unit_at(grid_pos)
+	if selected_action != "targeting" and clicked_unit and clicked_unit.team == "player" and clicked_unit != selected_unit:
+		_select_unit(clicked_unit)
 		return
 
 	match selected_action:
@@ -1399,6 +1591,9 @@ func _cancel_action() -> void:
 
 ## ===== 行动执行 =====
 
+func _highlight_color(role: String, fallback: Color) -> Color:
+	return AccessibilitySettings.get_highlight_color(role, fallback)
+
 func _show_move_range(unit: Unit) -> void:
 	_clear_layer(move_highlight)
 	reachable_cells = Pathfinding.get_reachable_cells(
@@ -1410,19 +1605,20 @@ func _show_move_range(unit: Unit) -> void:
 	for cell in reachable_cells:
 		if cell == unit.grid_pos:
 			continue
-		_highlight_cell(move_highlight, cell, COLOR_MOVE)
+		_highlight_cell(move_highlight, cell, _highlight_color("move", COLOR_MOVE))
 
-	# 标记撤离点
-	if mission_type in ["extract", "steal_data", "escort", "infiltrate"] and evac_point.x >= 0:
-		if reachable_cells.has(evac_point) or unit.grid_pos == evac_point:
-			_highlight_cell(move_highlight, evac_point, COLOR_EVAC)
+	# 标记选中单位本回合能进入的撤离区域格。
+	if mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
+		for cell in evac_cells:
+			if reachable_cells.has(cell) or unit.grid_pos == cell:
+				_highlight_cell(move_highlight, cell, _highlight_color("evac", COLOR_EVAC))
 
 	# 标记终端（steal_data/infiltrate 任务）
 	if mission_type in ["steal_data", "infiltrate"]:
 		for term_pos in terminals:
 			# 终端相邻格可达时高亮终端
 			if _is_adjacent_reachable(unit, term_pos):
-				_highlight_cell(move_highlight, term_pos, COLOR_TARGET)
+				_highlight_cell(move_highlight, term_pos, _highlight_color("target", COLOR_TARGET))
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
 ## 仅在 move 模式下、目标格可达时绘制路径线条和途径格子高亮
@@ -1451,7 +1647,7 @@ func _update_path_preview(world_pos: Vector2) -> void:
 	for i in range(1, path.size()):
 		var cell = path[i]
 		# 终点用更亮的高亮
-		var color = COLOR_PATH if i < path.size() - 1 else Color(0.1, 1.0, 0.2, 0.45)
+		var color = _highlight_color("path", COLOR_PATH) if i < path.size() - 1 else _highlight_color("selected", Color(0.1, 1.0, 0.2, 0.45))
 		_highlight_cell(path_preview_layer, cell, color)
 	# 绘制连接线
 	_draw_path_line(path)
@@ -1462,7 +1658,7 @@ func _draw_path_line(path: Array) -> void:
 		return
 	var line = Line2D.new()
 	line.width = 3.0
-	line.default_color = Color(0.2, 1.0, 0.3, 0.8)
+	line.default_color = _highlight_color("path", Color(0.2, 1.0, 0.3, 0.8))
 	line.joint_mode = Line2D.LINE_JOINT_ROUND
 	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
@@ -1486,7 +1682,7 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(enemy)
-				_highlight_cell(attack_highlight, enemy.grid_pos, COLOR_ATTACK)
+				_highlight_cell(attack_highlight, enemy.grid_pos, _highlight_color("attack", COLOR_ATTACK))
 	# 可破坏目标（destroy 任务）
 	for tpos in destructible_targets:
 		var state = destructible_target_states.get(tpos, {})
@@ -1500,7 +1696,7 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(tpos)  # 混合类型：Unit 和 Vector2i
-				_highlight_cell(attack_highlight, tpos, COLOR_TARGET)
+				_highlight_cell(attack_highlight, tpos, _highlight_color("target", COLOR_TARGET))
 
 ## 检查单位的可达格中是否有与目标格相邻的
 func _is_adjacent_reachable(unit: Unit, target_pos: Vector2i) -> bool:
@@ -1531,7 +1727,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 	var old_pos = selected_unit.grid_pos
 	selected_unit.move_points -= cost
 	selected_unit.move_to(grid_pos)
-	_update_unit_sprite_pos(selected_unit)
+	_update_unit_sprite_pos(selected_unit, true)
 	AudioManager.sfx_move()
 
 	# 检查警戒触发
@@ -1595,6 +1791,7 @@ func _attack_destructible(attacker: Unit, target_pos: Vector2i) -> void:
 	# 计算伤害（可破坏目标无护甲、无闪避，固定命中）
 	var avg_dmg = int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2)
 	state.hp = max(0, int(state.hp) - avg_dmg)
+	_play_unit_state(attacker, &"attack", Vector2(target_pos - attacker.grid_pos))
 	_spawn_effect("muzzle", attacker.grid_pos)
 	_spawn_effect("destroy" if state.hp <= 0 else "hit", target_pos)
 	# 记录遥测：可破坏目标算作命中
@@ -1626,6 +1823,7 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 		_log("AP 不足")
 		return false
 	terminals_activated += 1
+	_play_unit_state(unit, &"skill")
 	_spawn_effect("terminal", term_pos)
 	_log("%s 激活终端 (%d/%d)" % [unit.unit_name, terminals_activated, terminals_required])
 	hud.update_objective(_get_objective_text())
@@ -1635,7 +1833,8 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var result = action_system.execute_attack(attacker, target)
 	if result.get("success", false):
-		AudioManager.sfx_attack()
+		AudioManager.sfx_attack(AudioManager.get_weapon_sfx_profile(attacker.weapon_special))
+		_play_unit_state(attacker, &"attack", Vector2(target.grid_pos - attacker.grid_pos))
 		_spawn_effect("muzzle", attacker.grid_pos)
 		var r = result.get("result", {})
 		var hit = r.get("hit", false)
@@ -1645,6 +1844,7 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 			_spawn_effect("crit" if critical else "hit", target.grid_pos)
 			if critical:
 				AudioManager.sfx_critical()
+				camera.play_event_feedback(&"critical", _get_cell_center(target.grid_pos))
 			else:
 				AudioManager.sfx_hit()
 			if r.get("dodged", false):
@@ -1840,18 +2040,18 @@ func _on_targeting_started(spec: Dictionary) -> void:
 	_clear_layer(attack_highlight)
 	var valid_cells = targeting_controller.get_valid_cells()
 	var target_type = String(spec.get("target_type", ""))
-	var color = COLOR_ATTACK
+	var color = _highlight_color("attack", COLOR_ATTACK)
 	match target_type:
 		TargetingController.TARGET_ALLY:
-			color = Color(0.13, 0.59, 0.95, 0.35)
+			color = _highlight_color("ally", Color(0.13, 0.59, 0.95, 0.35))
 		TargetingController.TARGET_ENEMY:
-			color = COLOR_ATTACK
+			color = _highlight_color("attack", COLOR_ATTACK)
 		TargetingController.TARGET_POSITION:
-			color = COLOR_TARGET
+			color = _highlight_color("target", COLOR_TARGET)
 		TargetingController.TARGET_ANY_UNIT:
-			color = COLOR_TARGET
+			color = _highlight_color("target", COLOR_TARGET)
 		_:
-			color = COLOR_SELECTED
+			color = _highlight_color("selected", COLOR_SELECTED)
 	for cell in valid_cells:
 		_highlight_cell(attack_highlight, cell, color)
 	# 显示提示
@@ -1924,6 +2124,7 @@ func _execute_pending_action(target_data: Dictionary) -> void:
 		result = action_system.execute_skill(selected_unit, action_id, target_data)
 		if result.get("success", false):
 			AudioManager.sfx_skill()
+			_play_unit_state(selected_unit, &"skill")
 			_spawn_effect("heal" if action_id.contains("heal") else "terminal", selected_unit.grid_pos)
 			_log("%s 使用技能：%s" % [selected_unit.unit_name, action_name])
 			_record_skill_telemetry()
@@ -1975,7 +2176,10 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 func _on_unit_died(unit: Unit) -> void:
 	_log("%s 阵亡" % unit.unit_name)
 	AudioManager.sfx_unit_down()
-	_update_unit_sprite_pos(unit)
+	var sprite := _get_unit_sprite(unit)
+	if sprite:
+		sprite.update_unit(unit)
+		sprite.play_death()
 	_record_death_telemetry(unit)
 	# Boss 死亡时更新目标显示
 	if unit == boss_unit:
@@ -1984,15 +2188,19 @@ func _on_unit_died(unit: Unit) -> void:
 
 func _on_unit_damaged(unit: Unit, _amount: int) -> void:
 	_update_unit_sprite_pos(unit)
+	if unit.is_alive:
+		_play_unit_state(unit, &"hit")
 	# Boss 受伤时检查阶段切换
 	if unit == boss_unit and boss_unit and boss_unit.is_alive:
 		_check_boss_phase_transition(unit)
 
 func _spawn_effect(kind: String, grid_pos: Vector2i) -> void:
 	var effect := TacticalEffect.new()
-	effect.position = GridSystem.grid_to_world(grid_pos)
+	effect.position = _get_cell_center(grid_pos)
 	effect.setup(kind)
 	effect_layer.add_child(effect)
+	if kind == "explosion":
+		camera.play_event_feedback(&"explosion", effect.position)
 
 func _check_victory_instant() -> void:
 	if _check_victory():
@@ -2006,12 +2214,30 @@ func _get_unit_at(pos: Vector2i) -> Unit:
 			return unit
 	return null
 
-func _update_unit_sprite_pos(unit: Unit) -> void:
+func _update_unit_sprite_pos(unit: Unit, animate: bool = false) -> void:
+	var sprite := _get_unit_sprite(unit)
+	if not sprite:
+		return
+	sprite.update_unit(unit)
+	var target_position := _get_cell_center(unit.grid_pos)
+	if animate:
+		sprite.play_move_to(target_position)
+	else:
+		sprite.position = target_position
+
+func _play_unit_state(unit: Unit, state: StringName, direction: Vector2 = Vector2.RIGHT) -> void:
+	var sprite := _get_unit_sprite(unit)
+	if sprite:
+		sprite.play_state(state, direction)
+
+func _get_unit_sprite(unit: Unit) -> UnitSprite:
 	for sprite in unit_layer.get_children():
 		if sprite is UnitSprite and sprite.unit == unit:
-			sprite.position = GridSystem.grid_to_world(unit.grid_pos)
-			sprite.update_unit(unit)
-			return
+			return sprite
+	return null
+
+func _get_cell_center(pos: Vector2i) -> Vector2:
+	return GridSystem.grid_to_world(pos) + Vector2(CELL_SIZE, CELL_SIZE) * 0.5
 
 func _update_unit_sprite_selection(unit: Unit, selected: bool) -> void:
 	for sprite in unit_layer.get_children():

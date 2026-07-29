@@ -7,16 +7,26 @@
       "weakness": "emp_double_damage",
       "phases": [
         {
-          "name": "阶段1", "hp_threshold": 0.6,
+          "name": "警戒协议", "hp_threshold": 0.68,
           "weapons": ["laser_array_2_8", "missile_pod_3_7_aoe"],
+          "damage": [20, 26],
           "abilities": ["summon_drone_every_3"],
           "behavior": "ranged_pressure"
         },
         {
-          "name": "阶段2", "hp_threshold": 0.0,
+          "name": "封锁协议", "hp_threshold": 0.34,
+          "weapons": ["laser_array_2_9", "missile_pod_3_7_aoe"],
+          "damage": [24, 32],
+          "abilities": ["summon_drone_every_3", "shield_regen_15"],
+          "behavior": "area_denial"
+        },
+        {
+          "name": "过载协议", "hp_threshold": 0.0,
           "weapons": ["laser_array_2_10", "missile_barrage_aoe"],
-          "abilities": ["summon_drone_every_2", "shield_regen_20"],
-          "enrage": "attack_plus_50"
+          "damage": [28, 36],
+          "abilities": ["summon_drone_every_2"],
+          "enrage": "attack_plus_25",
+          "behavior": "aggressive_finisher"
         }
       ],
       "rewards": { "credit": 1000, "intel": 50, "loot": "plasma_blade" }
