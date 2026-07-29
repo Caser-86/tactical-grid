@@ -11,11 +11,17 @@ var _test_units: Array = []
 const TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const AudioManagerScript = preload("res://scripts/game/audio_manager.gd")
+const ArtCatalogScript = preload("res://scripts/data/art_catalog.gd")
 
 func _ready() -> void:
 	print("=== Tactical Grid 无头冒烟测试 ===")
+	# 测试前清理所有本地存档槽位，避免历史存档污染
+	for slot in range(SaveManager.MAX_LOCAL_SAVES):
+		SaveManager.delete_save(slot)
 	await get_tree().process_frame
 	_test_audio_bus_contract()
+	await get_tree().process_frame
+	_test_chapter1_art_catalog()
 	await get_tree().process_frame
 	_run_core_tests()
 	await get_tree().process_frame
@@ -50,6 +56,9 @@ func _ready() -> void:
 	_test_boss_phase_system()
 	_print_summary()
 	_free_test_units()
+	# 测试后清理所有本地存档槽位
+	for slot in range(SaveManager.MAX_LOCAL_SAVES):
+		SaveManager.delete_save(slot)
 	get_tree().quit(0 if _failed == 0 else 1)
 
 ## 释放测试中创建的 Unit 节点，避免资源泄漏报告
@@ -100,9 +109,57 @@ func _test_audio_bus_contract() -> void:
 		var stream = load(audio_path)
 		_check(stream is AudioStream, "Audio: Godot 可加载 %s" % audio_path)
 	_check(FileAccess.file_exists("res://data/RESOURCE_MANIFEST.md"), "Assets: 资源清单存在")
+	var base_background = load("res://assets/generated/chapter1/backgrounds/base_echo_command_room_v1.png")
+	_check(base_background is Texture2D, "Assets: 基地背景可由 Godot 加载")
+	var mission_background = load("res://assets/generated/chapter1/backgrounds/mission_debrief_data_city_v1.png")
+	_check(mission_background is Texture2D, "Assets: 任务结算背景可由 Godot 加载")
+	var boot_background = load("res://assets/generated/chapter1/backgrounds/boot_command_network_v1.png")
+	_check(boot_background is Texture2D, "Assets: 启动背景可由 Godot 加载")
+	for scene_path in [
+		"res://scenes/boot.tscn",
+		"res://scenes/main_menu.tscn",
+		"res://scenes/base.tscn",
+		"res://scenes/battle.tscn",
+		"res://scenes/dialogue.tscn",
+		"res://scenes/tutorial_hint.tscn",
+		"res://scenes/loading_overlay.tscn",
+		"res://scenes/mission_result.tscn",
+		"res://scenes/settings_menu.tscn",
+		"res://scenes/pause_menu.tscn",
+		"res://scenes/shop_panel.tscn",
+		"res://scenes/character_panel.tscn",
+		"res://scenes/error_dialog.tscn",
+	]:
+		_check(load(scene_path) is PackedScene, "Assets: 美术接入场景可由 Godot 加载 %s" % scene_path)
+	for legacy_root in ["res://assets/characters/", "res://assets/effects/", "res://assets/tiles/", "res://assets/ui/"]:
+		var legacy_referenced := false
+		for scene_path in [
+			"res://scenes/main_menu.tscn", "res://scenes/base.tscn", "res://scenes/battle.tscn",
+			"res://scenes/boot.tscn", "res://scenes/settings_menu.tscn", "res://scenes/mission_result.tscn",
+		]:
+			legacy_referenced = legacy_referenced or FileAccess.get_file_as_string(scene_path).contains(legacy_root)
+		_check(not legacy_referenced, "Assets: 玩家场景不引用历史目录 %s" % legacy_root)
 	var export_presets = FileAccess.get_file_as_string("res://export_presets.cfg")
 	for legacy_directory in ["assets/characters/*", "assets/effects/*", "assets/tiles/*", "assets/ui/*"]:
 		_check(export_presets.contains(legacy_directory), "Assets: 导出排除历史参考目录 %s" % legacy_directory)
+
+func _test_chapter1_art_catalog() -> void:
+	var catalog = ArtCatalogScript.new()
+	for entry in [[&"background", &"mission_debrief"], [&"background", &"boot_command_network"], [&"status", &"marked"], [&"status", &"barrier"], [&"status", &"stealth"], [&"status", &"overwatch"], [&"status", &"bleed"], [&"status", &"burn"], [&"status", &"poison"], [&"status", &"blind"], [&"status", &"suppress"], [&"status", &"jammed"], [&"status", &"rooted"], [&"status", &"silenced"], [&"hud", &"move"], [&"hud", &"attack"], [&"hud", &"skill"], [&"hud", &"item"], [&"hud", &"overwatch"], [&"hud", &"end_turn"], [&"item", &"assault_rifle"], [&"item", &"sniper_rifle"], [&"item", &"machine_gun"], [&"item", &"grenade_launcher"], [&"item", &"shotgun"], [&"item", &"suppressed_pistol"], [&"item", &"tactical_knife"], [&"item", &"medical_gun"], [&"item", &"med_kit"], [&"item", &"injector"], [&"item", &"frag_grenade"], [&"item", &"emp_grenade"], [&"item", &"smoke_grenade"], [&"item", &"incendiary"], [&"item", &"shield_generator"], [&"item", &"proximity_mine"], [&"terrain", &"data_floor"], [&"terrain", &"road"], [&"terrain", &"forest"], [&"terrain", &"sand"], [&"terrain", &"highland"], [&"terrain", &"water"], [&"terrain", &"toxic"], [&"unit", &"assault"], [&"unit", &"sniper"], [&"unit", &"heavy"], [&"unit", &"medic"], [&"unit", &"scout"], [&"unit", &"attack_drone"], [&"unit", &"cyber_guard"], [&"unit", &"shield_bot"], [&"unit", &"heavy_gunner"], [&"unit", &"rocket_trooper"], [&"unit", &"stealth_assassin"], [&"unit", &"flame_trooper"], [&"unit", &"poison_spitter"], [&"unit", &"combat_medic"], [&"unit", &"jammer"], [&"blocker", &"metal_barricade"], [&"blocker", &"steel_wall"], [&"blocker", &"supply_crate"], [&"objective", &"terminal"], [&"objective", &"evac"], [&"objective", &"reactor_target"], [&"effect", &"muzzle"], [&"effect", &"hit"], [&"effect", &"explosion"], [&"effect", &"heal"], [&"effect", &"terminal"], [&"effect", &"crit"], [&"effect", &"miss"], [&"portrait", &"alpha"], [&"portrait", &"commander"], [&"portrait", &"lila"], [&"portrait", &"doctor"], [&"portrait", &"sentinel"], [&"portrait", &"shadow"], [&"portrait", &"architect"]]:
+		_check(catalog.has_texture(entry[0], entry[1]), "Art: catalog contains %s/%s" % entry)
+		_check(catalog.get_texture(entry[0], entry[1]) is Texture2D, "Art: catalog loads %s/%s" % entry)
+	for key in [&"boss_data_sentinel", &"boss_heavy_judge", &"boss_shadow_mercenary", &"boss_matrix_general", &"boss_architect"]:
+		_check(catalog.has_texture(&"unit", key), "Art: catalog contains unit/%s" % key)
+		_check(catalog.get_texture(&"unit", key) is Texture2D, "Art: catalog loads unit/%s" % key)
+	for weapon_group in ["weapons", "rare_weapons"]:
+		for weapon_id in GameData.weapon_data.get(weapon_group, {}):
+			var weapon_icon_key := catalog.get_item_icon_key(weapon_id)
+			_check(catalog.get_texture(&"item", weapon_icon_key) is Texture2D, "Art: weapon %s has icon" % weapon_id)
+	for item_id in GameData.item_data.get("items", {}):
+		var item_icon_key := catalog.get_item_icon_key(item_id)
+		_check(catalog.get_texture(&"item", item_icon_key) is Texture2D, "Art: item %s has icon" % item_id)
+	_check(catalog.missing_keys().is_empty(), "Art: production catalog has no missing runtime files")
+	catalog.free()
 
 ## ===== 核心系统测试 =====
 
@@ -2356,8 +2413,7 @@ func _test_weapon_special_effects() -> void:
 	_check(atk_result.success, "WeaponSpecial: 消音攻击执行成功")
 	var noise = action_sys.get_noise_events()
 	_check(noise.size() > 0, "WeaponSpecial: 攻击产生噪声事件")
-	if noise.size() > 0:
-		_check(bool(noise[0].get("silent", false)), "WeaponSpecial: silent 武器产生静音事件")
+	_check(noise.size() > 0 and bool(noise[0].get("silent", false)), "WeaponSpecial: silent 武器产生静音事件")
 
 	# 5. 验证非消音武器产生有声噪声
 	var noisy_attacker = _track(GameData.create_player_unit("assault", "NoisyAttacker"))
@@ -2378,9 +2434,9 @@ func _test_weapon_special_effects() -> void:
 	var atk_result2 = action_sys.execute_attack(noisy_attacker, target2)
 	_check(atk_result2.success, "WeaponSpecial: 非消音攻击执行成功")
 	var noise2 = action_sys.get_noise_events()
-	if noise2.size() > 0:
-		_check(not bool(noise2[0].get("silent", true)), "WeaponSpecial: 非消音武器产生有声噪声")
-		_check(int(noise2[0].get("radius", 0)) > 0, "WeaponSpecial: 非消音武器噪声半径 > 0")
+	_check(noise2.size() > 0, "WeaponSpecial: 非消音攻击产生噪声事件")
+	_check(noise2.size() > 0 and not bool(noise2[0].get("silent", true)), "WeaponSpecial: 非消音武器产生有声噪声")
+	_check(noise2.size() > 0 and int(noise2[0].get("radius", 0)) > 0, "WeaponSpecial: 非消音武器噪声半径 > 0")
 
 	# 6. 验证 mark_target_3_turns 效果
 	var marker = _track(GameData.create_player_unit("scout", "Marker"))
@@ -2396,9 +2452,17 @@ func _test_weapon_special_effects() -> void:
 
 	action_sys.player_units = [marker]
 	action_sys.enemy_units = [mark_target]
-	var mark_result = action_sys.execute_attack(marker, mark_target)
-	if mark_result.success and mark_result.result.hit:
-		_check(mark_target.has_status("marked"), "WeaponSpecial: mark_target_3_turns 标记目标")
+	# 命中率上限 95%，重试至命中以保证 _check 固定执行（避免条件式断言导致计数波动）
+	var mark_hit = false
+	for _attempt in range(10):
+		mark_target.remove_status("marked")
+		marker.current_ap = 2
+		var mr = action_sys.execute_attack(marker, mark_target)
+		if mr.success and mr.result.get("hit", false):
+			mark_hit = true
+			break
+	_check(mark_hit, "WeaponSpecial: mark_target 攻击命中（重试至多10次）")
+	_check(mark_target.has_status("marked"), "WeaponSpecial: mark_target_3_turns 标记目标")
 
 	# 7. 验证 suppressing_fire 效果
 	var suppressor = _track(GameData.create_player_unit("heavy", "Suppressor"))
@@ -2414,9 +2478,17 @@ func _test_weapon_special_effects() -> void:
 
 	action_sys.player_units = [suppressor]
 	action_sys.enemy_units = [suppress_target]
-	var sup_result = action_sys.execute_attack(suppressor, suppress_target)
-	if sup_result.success and sup_result.result.hit:
-		_check(suppress_target.has_status("suppress"), "WeaponSpecial: suppressing_fire 施加压制状态")
+	# 同上：重试至命中以保证 _check 固定执行
+	var sup_hit = false
+	for _attempt in range(10):
+		suppress_target.remove_status("suppress")
+		suppressor.current_ap = 2
+		var sr = action_sys.execute_attack(suppressor, suppress_target)
+		if sr.success and sr.result.get("hit", false):
+			sup_hit = true
+			break
+	_check(sup_hit, "WeaponSpecial: suppressing_fire 攻击命中（重试至多10次）")
+	_check(suppress_target.has_status("suppress"), "WeaponSpecial: suppressing_fire 施加压制状态")
 
 	# 8. 验证所有第一章武器的 special 字段非空
 	var ch1_weapon_ids = ["shotgun", "smg", "knife", "sniper_rifle", "marksman_rifle", "mg", "grenade_launcher", "med_gun", "silenced_pistol", "marking_rifle"]
@@ -2495,8 +2567,7 @@ func _test_throwable_area_effects() -> void:
 	_check(bool(smoke_result.get("success", false)), "Throwable: 烟雾弹使用成功")
 	var smoke_effects = action_sys.get_ground_effects_at(Vector2i(3, 3))
 	_check(smoke_effects.size() > 0, "Throwable: 烟雾弹在目标位置创建地面效果")
-	if smoke_effects.size() > 0:
-		_check(String(smoke_effects[0].get("type", "")) == "smoke", "Throwable: 地面效果类型为 smoke")
+	_check(smoke_effects.size() > 0 and String(smoke_effects[0].get("type", "")) == "smoke", "Throwable: 地面效果类型为 smoke")
 
 	# 4. 验证所有投掷物物品都有 effect.area 字段
 	var throwable_ids = ["grenade", "flashbang", "smoke_grenade", "molotov", "emp_grenade", "heal_mist"]
@@ -2542,9 +2613,8 @@ func _test_trap_system() -> void:
 	var place_result = action_sys._place_trap(trapper, mine)
 	_check(bool(place_result.get("success", false)), "Trap: 放置陷阱成功")
 	_check(action_sys.traps.size() > 0, "Trap: 陷阱列表非空")
-	if action_sys.traps.size() > 0:
-		_check(action_sys.traps[0].pos == Vector2i(2, 2), "Trap: 陷阱位置正确")
-		_check(String(action_sys.traps[0].owner_team) == "player", "Trap: 陷阱归属玩家方")
+	_check(action_sys.traps.size() > 0 and action_sys.traps[0].pos == Vector2i(2, 2), "Trap: 陷阱位置正确")
+	_check(action_sys.traps.size() > 0 and String(action_sys.traps[0].owner_team) == "player", "Trap: 陷阱归属玩家方")
 
 	# 2. 验证敌人触发陷阱
 	var enemy = _track(GameData.create_enemy_unit("grunt"))
