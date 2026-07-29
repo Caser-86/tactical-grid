@@ -35,6 +35,9 @@ func _ready() -> void:
 	_test_special_rules_dict_form()
 	# 正式地图撤离区容量：不能因多人队伍而要求单位重叠。
 	_test_locked_map_evac_capacity()
+	_test_infiltrate_requires_terminal_upload_and_evac()
+	_test_upload_pauses_without_terminal_control()
+	_test_optional_resource_is_idempotent()
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
@@ -423,3 +426,116 @@ func _print_summary() -> void:
 		for e in _errors:
 			print("    - ", e)
 	print("  =================")
+
+## ===== Task 1: 阶段化任务状态机 fixture =====
+
+## 构建 infiltrate 任务的最小化状态机：3 玩家、1 终端、1 资源、1 撤离点。
+## map_data.mission_flow 提供上传回合、控制半径和可选资源奖励。
+func _make_infiltrate_state() -> Dictionary:
+	var mos := _make_state()
+	var players := [
+		_make_unit("player", Vector2i(8, 8)),
+		_make_unit("player", Vector2i(7, 8)),
+		_make_unit("player", Vector2i(6, 8)),
+	]
+	var map_data := _make_map_data("infiltrate", [
+		{"type": "terminal", "x": 8, "y": 7},
+		{"type": "resource", "x": 2, "y": 5, "reward": "credit_150"},
+		{"type": "evac", "x": 1, "y": 0, "radius": 1},
+	], 18, 14)
+	map_data["mission_flow"] = {
+		"terminal_required": true,
+		"upload_turns_required": 2,
+		"upload_hold_radius": 1,
+		"evac_locked_until_upload": true,
+		"optional_resource_credit": 150,
+	}
+	mos.setup({"mission_type": "infiltrate", "max_turns": 18}, map_data, players, [])
+	return {"state": mos, "players": players}
+
+
+## ===== 测试: infiltrate 需要终端→上传→撤离三阶段 =====
+func _test_infiltrate_requires_terminal_upload_and_evac() -> void:
+	print("\n--- 测试: infiltrate 三阶段流（接近→上传→撤离） ---")
+	var fixture := _make_infiltrate_state()
+	var mos: MissionObjectiveState = fixture.state
+	var players: Array = fixture.players
+	_check(mos.get_stage() == &"approach", "首阶段为 approach")
+	_check(not mos.is_victory(), "未激活终端时撤离不构成胜利")
+	# 任何玩家站在撤离点也不应胜利（evac 锁定）
+	players[0].grid_pos = Vector2i(1, 0)
+	players[1].grid_pos = Vector2i(0, 0)
+	players[2].grid_pos = Vector2i(2, 0)
+	_check(not mos.is_victory(), "上传未完成时撤离被锁定")
+	# 激活终端
+	players[0].grid_pos = Vector2i(8, 8)
+	var terminal_result := mos.on_terminal_interacted(players[0], Vector2i(8, 7))
+	_check(terminal_result.get("success", false), "终端激活成功")
+	_check(mos.get_stage() == &"upload", "终端激活后进入 upload 阶段")
+	# 上传 1/2
+	var up1 = mos.on_enemy_turn_completed()
+	_check(int(up1.get("progress", -1)) == 1, "上传推进至 1/2")
+	_check(mos.get_stage() == &"upload", "1/2 后仍处于 upload 阶段")
+	# 上传 2/2
+	var up2 = mos.on_enemy_turn_completed()
+	_check(int(up2.get("progress", -1)) == 2, "上传推进至 2/2")
+	_check(mos.get_stage() == &"evacuate", "上传完成后进入 evacuate 阶段")
+	# 全员撤离
+	for index in players.size():
+		players[index].grid_pos = Vector2i(index, 0)
+	_check(mos.is_victory(), "上传完成后全员撤离 → 胜利")
+	_check(mos.get_stage() == &"complete", "胜利后进入 complete 阶段")
+	mos.queue_free()
+	for p in players:
+		p.queue_free()
+
+
+## ===== 测试: 上传需要玩家在终端附近保持控制 =====
+func _test_upload_pauses_without_terminal_control() -> void:
+	print("\n--- 测试: 无玩家控制终端时上传暂停 ---")
+	var fixture := _make_infiltrate_state()
+	var mos: MissionObjectiveState = fixture.state
+	var players: Array = fixture.players
+	# 激活终端进入 upload
+	mos.on_terminal_interacted(players[0], Vector2i(8, 7))
+	_check(mos.get_stage() == &"upload", "进入 upload 阶段")
+	# 把所有玩家移到离终端曼哈顿距离 > 1 的位置
+	players[0].grid_pos = Vector2i(0, 0)
+	players[1].grid_pos = Vector2i(0, 1)
+	players[2].grid_pos = Vector2i(0, 2)
+	var result = mos.on_enemy_turn_completed()
+	_check(bool(result.get("paused", false)), "无控制时上传暂停")
+	_check(int(result.get("progress", -1)) == 0, "暂停时进度保持 0")
+	_check(mos.get_stage() == &"upload", "暂停时阶段不变")
+	# 玩家回到终端附近
+	players[0].grid_pos = Vector2i(8, 8)  # 距离 (8,7) = 1，在半径内
+	var result2 = mos.on_enemy_turn_completed()
+	_check(not bool(result2.get("paused", true)), "恢复控制后上传推进")
+	_check(int(result2.get("progress", -1)) == 1, "进度推进至 1/2")
+	mos.queue_free()
+	for p in players:
+		p.queue_free()
+
+
+## ===== 测试: 可选资源交互幂等 =====
+func _test_optional_resource_is_idempotent() -> void:
+	print("\n--- 测试: 可选资源交互幂等性 ---")
+	var fixture := _make_infiltrate_state()
+	var mos: MissionObjectiveState = fixture.state
+	var players: Array = fixture.players
+	var resource_pos := Vector2i(2, 5)
+	# 第一次交互
+	var r1 = mos.on_resource_interacted(players[0], resource_pos)
+	_check(r1.get("success", false), "首次资源交互成功")
+	_check(int(r1.get("credit_bonus", 0)) == 150, "首次奖励 150 信用点 (实际: %d)" % int(r1.get("credit_bonus", 0)))
+	# 第二次交互应拒绝
+	var r2 = mos.on_resource_interacted(players[0], resource_pos)
+	_check(not r2.get("success", true), "重复交互被拒绝")
+	_check(String(r2.get("reason", "")) == "already_collected", "拒绝原因=already_collected")
+	# 结果修饰符
+	var mods = mos.get_result_modifiers()
+	_check(bool(mods.get("optional_resource_collected", false)), "修饰符: optional_resource_collected=true")
+	_check(int(mods.get("optional_credit", 0)) == 150, "修饰符: optional_credit=150")
+	mos.queue_free()
+	for p in players:
+		p.queue_free()

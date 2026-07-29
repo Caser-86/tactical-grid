@@ -13,6 +13,8 @@ signal terminal_activated(position: Vector2i, activated: int, required: int)
 signal target_destroyed(position: Vector2i, destroyed: int, required: int)
 ## 特殊规则被违反时触发（玩家尝试被禁用操作）
 signal special_rule_violated(rule_id: String, reason: String)
+## 任务阶段事件，用于驱动增援、HUD 反馈等。name 如 terminal_activated / upload_completed。
+signal mission_event(name: StringName, payload: Dictionary)
 
 ## ===== 任务类型常量 =====
 const TYPE_EXTRACT := "extract"
@@ -27,6 +29,12 @@ const TYPE_DEFEND := "defend"
 const RULE_NO_OVERWATCH := "no_overwatch"
 const RULE_NO_ITEMS := "no_items"
 const RULE_ENEMY_PASSIVE_TURN_1 := "enemy_passive_turn_1"
+
+## ===== 任务阶段常量（infiltrate 三阶段流） =====
+const STAGE_APPROACH := &"approach"
+const STAGE_UPLOAD := &"upload"
+const STAGE_EVACUATE := &"evacuate"
+const STAGE_COMPLETE := &"complete"
 
 ## ===== 任务状态 =====
 var mission_type: String = TYPE_EXTRACT
@@ -57,6 +65,25 @@ var max_turns: int = 20
 ## 特殊规则：rule_id -> { "enabled": bool, "reason": String }
 var special_rules: Dictionary = {}
 
+## ===== 阶段化任务流（infiltrate） =====
+## 当前任务阶段
+var mission_stage: StringName = STAGE_APPROACH
+## mission_flow 数据契约（来自 map_data.mission_flow）
+var mission_flow: Dictionary = {}
+## 上传进度 / 所需回合
+var upload_progress: int = 0
+var upload_turns_required: int = 0
+## 上传控制半径（玩家单位到终端的曼哈顿距离阈值）
+var upload_hold_radius: int = 1
+## 可选资源位置列表
+var resource_positions: Array[Vector2i] = []
+## 已收集资源：pos -> true
+var collected_resources: Dictionary = {}
+## 已激活终端：pos -> true（防止重复激活）
+var activated_terminals: Dictionary = {}
+## 可选资源信用点奖励
+var optional_credit: int = 0
+
 ## 内部引用
 var _players: Array = []
 var _enemies: Array = []
@@ -84,6 +111,8 @@ func setup(level_config: Dictionary, map_data: Dictionary, players: Array, enemi
 	# 应用 enemy_passive_turn_1：首回合敌人待命
 	if is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_1):
 		_enemy_passive_until_turn = 1
+	# 初始化阶段化任务流（infiltrate）
+	_setup_mission_flow(map_data)
 
 
 ## 解析 special_rules，兼容两种形式：
@@ -144,6 +173,7 @@ func _extract_objectives_from_map(map_data: Dictionary, level_config: Dictionary
 	terminals_required = 0
 	evac_point = Vector2i(-1, -1)
 	evac_cells.clear()
+	resource_positions.clear()
 	for obj in map_data.get("objects", []):
 		var t = String(obj.get("type", ""))
 		if t == "evac":
@@ -163,6 +193,10 @@ func _extract_objectives_from_map(map_data: Dictionary, level_config: Dictionary
 			var pos = Vector2i(int(obj.x), int(obj.y))
 			if not pos in terminals:
 				terminals.append(pos)
+		elif t == "resource":
+			var pos = Vector2i(int(obj.x), int(obj.y))
+			if not pos in resource_positions:
+				resource_positions.append(pos)
 	# destroy 任务所需数量取自 objects 中实际目标数，最少 1
 	if mission_type == TYPE_DESTROY:
 		targets_required = max(destructible_targets.size(), 1)
@@ -262,8 +296,19 @@ func on_terminal_interacted(unit: Node, term_pos: Vector2i) -> Dictionary:
 		return {"success": false, "reason": "not_a_terminal"}
 	if not is_instance_valid(unit):
 		return {"success": false, "reason": "invalid_unit"}
+	# 拒绝重复激活同一终端
+	if activated_terminals.has(term_pos):
+		return {"success": false, "reason": "already_activated"}
+	activated_terminals[term_pos] = true
 	terminals_activated += 1
 	terminal_activated.emit(term_pos, terminals_activated, terminals_required)
+	# infiltrate 模式：首个终端激活后进入 upload 阶段
+	if mission_type == TYPE_INFILTRATE and mission_stage == STAGE_APPROACH:
+		mission_stage = STAGE_UPLOAD
+		mission_event.emit(&"terminal_activated", {
+			"position": term_pos,
+			"upload_required": upload_turns_required,
+		})
 	objective_updated.emit(get_status_text())
 	return {
 		"success": true,
@@ -300,6 +345,78 @@ func on_objective_damaged(position: Vector2i, damage: int) -> Dictionary:
 ## 回合开始时回调
 func on_turn_started(turn_number: int, _team: String) -> void:
 	_turn_number = turn_number
+
+
+## ===== 阶段化任务流方法 =====
+
+## 获取当前任务阶段
+func get_stage() -> StringName:
+	return mission_stage
+
+
+## 初始化 mission_flow 数据契约
+func _setup_mission_flow(map_data: Dictionary) -> void:
+	mission_flow = (map_data.get("mission_flow", {}) as Dictionary).duplicate(true)
+	upload_turns_required = int(mission_flow.get("upload_turns_required", 0))
+	upload_hold_radius = int(mission_flow.get("upload_hold_radius", 1))
+	optional_credit = int(mission_flow.get("optional_resource_credit", 0))
+	# 非 infiltrate 任务或无 mission_flow 时保持 APPROACH 阶段（不影响传统胜负判断）
+	mission_stage = STAGE_APPROACH
+	upload_progress = 0
+	collected_resources.clear()
+	activated_terminals.clear()
+
+
+## 检查是否有玩家单位在终端附近保持上传控制
+func _has_upload_control() -> bool:
+	for player in _players:
+		if player and player.is_alive:
+			for terminal_pos in terminals:
+				if GridSystem.manhattan_distance(player.grid_pos, terminal_pos) <= upload_hold_radius:
+					return true
+	return false
+
+
+## 敌人回合结束回调：推进上传进度。返回 {progress, paused, changed, stage}
+func on_enemy_turn_completed() -> Dictionary:
+	if mission_stage != STAGE_UPLOAD:
+		return {"progress": upload_progress, "paused": false, "changed": false, "stage": mission_stage}
+	# 检查上传控制
+	if not _has_upload_control():
+		objective_updated.emit(get_status_text())
+		return {"progress": upload_progress, "paused": true, "changed": false, "stage": mission_stage}
+	upload_progress += 1
+	if upload_progress >= upload_turns_required:
+		mission_stage = STAGE_EVACUATE
+		mission_event.emit(&"upload_completed", {"progress": upload_progress})
+		objective_updated.emit(get_status_text())
+		return {"progress": upload_progress, "paused": false, "changed": true, "stage": mission_stage}
+	objective_updated.emit(get_status_text())
+	return {"progress": upload_progress, "paused": false, "changed": true, "stage": mission_stage}
+
+
+## 玩家单位交互可选资源。返回 {success, credit_bonus?, reason?}
+func on_resource_interacted(unit: Node, resource_pos: Vector2i) -> Dictionary:
+	if not resource_pos in resource_positions:
+		return {"success": false, "reason": "not_a_resource"}
+	if not is_instance_valid(unit):
+		return {"success": false, "reason": "invalid_unit"}
+	if collected_resources.has(resource_pos):
+		return {"success": false, "reason": "already_collected"}
+	collected_resources[resource_pos] = true
+	objective_updated.emit(get_status_text())
+	return {
+		"success": true,
+		"credit_bonus": optional_credit,
+	}
+
+
+## 获取结果修饰符（用于星级评分和奖励）
+func get_result_modifiers() -> Dictionary:
+	return {
+		"optional_resource_collected": not collected_resources.is_empty(),
+		"optional_credit": optional_credit if not collected_resources.is_empty() else 0,
+	}
 
 
 ## ===== 胜负判断 =====
@@ -347,10 +464,14 @@ func _check_escort_victory() -> bool:
 
 
 ## 窃取数据/潜入：先激活所有终端，再撤离
+## infiltrate 模式额外要求上传完成（STAGE_EVACUATE）才能撤离。
 func _check_data_victory() -> bool:
 	if evac_point.x < 0:
 		return false
 	if terminals_activated < terminals_required:
+		return false
+	# infiltrate 模式：上传未完成时撤离被锁定
+	if mission_type == TYPE_INFILTRATE and mission_stage != STAGE_EVACUATE and mission_stage != STAGE_COMPLETE:
 		return false
 	var alive = _players.filter(func(u): return u and u.is_alive)
 	if alive.is_empty():
@@ -358,6 +479,9 @@ func _check_data_victory() -> bool:
 	for u in alive:
 		if not is_in_evac_zone(u.grid_pos):
 			return false
+	# 胜利时进入 COMPLETE 阶段
+	if mission_type == TYPE_INFILTRATE and mission_stage != STAGE_COMPLETE:
+		mission_stage = STAGE_COMPLETE
 	return true
 
 
@@ -381,8 +505,19 @@ func get_status_text() -> String:
 			if escort_vip and is_instance_valid(escort_vip):
 				return "目标：护送 VIP %s 到撤离区域" % escort_vip.unit_name
 			return "目标：护送单位到撤离区域"
-		TYPE_STEAL_DATA, TYPE_INFILTRATE:
+		TYPE_STEAL_DATA:
 			return "目标：激活 %d 个终端 (%d/%d) 后撤离至区域" % [terminals_required, terminals_activated, terminals_required]
+		TYPE_INFILTRATE:
+			match mission_stage:
+				STAGE_APPROACH:
+					return "阶段 1/3：接近并激活数据终端"
+				STAGE_UPLOAD:
+					var control := "控制稳定" if _has_upload_control() else "无人控制，上传暂停"
+					return "阶段 2/3：上传数据 %d/%d（%s）" % [upload_progress, upload_turns_required, control]
+				STAGE_EVACUATE:
+					return "阶段 3/3：全员转移至西北撤离区域"
+				_:
+					return "任务完成"
 		TYPE_DEFEND:
 			return "目标：坚守 %d 回合 (当前 %d)" % [defend_turns_required, _turn_number]
 		_:
