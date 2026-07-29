@@ -40,12 +40,16 @@ func _ready() -> void:
 func _load_campaign() -> void:
 	var progress = GameManager.current_save.get("campaign_progress", {})
 	var completed = progress.get("completed_missions", [])
+	var current_chapter = int(progress.get("current_chapter", 1))
 	var tree = CampaignRepository.build_campaign_tree(completed)
 
 	for child in mission_list.get_children():
 		child.queue_free()
 
+	# 只显示当前章节的任务，避免一次列出全部 30 关
 	for chapter in tree:
+		if int(chapter.get("chapter", 0)) != current_chapter:
+			continue
 		var chapter_label_node = Label.new()
 		chapter_label_node.text = "%s" % chapter.name
 		chapter_label_node.add_theme_font_size_override("font_size", 22)
@@ -54,17 +58,32 @@ func _load_campaign() -> void:
 
 		for mission in chapter.missions:
 			var button = Button.new()
-			button.text = "%s%s" % [
-				"🔒 " if mission.locked else ("✓ " if mission.completed else ""),
-				mission.name
-			]
+			var prefix := "未解锁 · " if mission.locked else ("已完成 · " if mission.completed else "行动 · ")
+			button.text = prefix + mission.name
+			button.icon = _get_mission_icon(mission)
+			button.add_theme_constant_override("icon_max_width", 30)
 			button.disabled = mission.locked
-			button.custom_minimum_size = Vector2(360, 40)
+			button.custom_minimum_size = Vector2(360, 48)
 			if mission.get("is_boss", false):
 				button.modulate = Color(1.0, 0.5, 0.5)
 			if not mission.locked:
 				button.pressed.connect(_on_mission_selected.bind(mission.level_id))
 			mission_list.add_child(button)
+
+func _get_mission_icon(mission: Dictionary) -> Texture2D:
+	var mission_type := String(mission.get("mission_type", "extract"))
+	match mission_type:
+		"extract":
+			return ArtCatalog.get_texture(&"objective", &"evac")
+		"destroy":
+			return ArtCatalog.get_texture(&"objective", &"reactor_target")
+		"steal_data":
+			return ArtCatalog.get_texture(&"objective", &"terminal")
+		"escort":
+			return ArtCatalog.get_texture(&"unit", &"medic")
+		"assassinate":
+			return ArtCatalog.get_texture(&"unit", &"boss_data_sentinel")
+	return ArtCatalog.get_texture(&"objective", &"terminal")
 
 func _update_top_bar() -> void:
 	var progress = GameManager.current_save.get("campaign_progress", {})
@@ -74,7 +93,7 @@ func _update_top_bar() -> void:
 	var resources = GameManager.current_save.get("resources", {})
 	var credit = resources.get("credit", 0)
 	var intel = resources.get("intel", 0)
-	credit_label.text = "💰 %d | 情报 %d" % [credit, intel]
+	credit_label.text = "信用点 %d | 情报 %d" % [credit, intel]
 
 ## 选择任务后弹出确认对话框
 func _on_mission_selected(level_id: String) -> void:
@@ -97,10 +116,10 @@ func _on_mission_selected(level_id: String) -> void:
 	var summary = "%s%s\n" % ["[Boss战] " if is_boss else "", mission_name]
 	summary += "类型：%s | 地图：%s\n" % [type_text, size_text]
 	summary += "我方单位：%d | 敌方数量：%d\n" % [player_units, enemy_count]
-	summary += "奖励：%d 💰 / %d XP" % [rewards.get("credit", 0), rewards.get("exp", 0)]
+	summary += "奖励：%d 信用点 / %d XP" % [rewards.get("credit", 0), rewards.get("exp", 0)]
 	var first_clear = rewards.get("first_clear", {})
 	if not first_clear.is_empty():
-		summary += "\n首通奖励：%d 💰 / %d 情报" % [first_clear.get("credit", 0), first_clear.get("intel", 0)]
+		summary += "\n首通奖励：%d 信用点 / %d 情报" % [first_clear.get("credit", 0), first_clear.get("intel", 0)]
 
 	var dialog = ErrorDialogScene.instantiate()
 	dialog.setup("任务确认", summary, Callable(self, "_confirm_start_mission").bind(level_id))

@@ -118,9 +118,13 @@ func build_campaign_tree(completed_missions: Array) -> Array:
 			mission_entries.append({
 				"level_id": m.id,
 				"name": m.data.get("name", m.id),
+				"mission_type": m.data.get("mission_type", "extract"),
+				"size": m.data.get("size", "small"),
+				"difficulty": m.data.get("difficulty", 1),
 				"locked": not is_unlocked(m.id, completed_missions),
 				"completed": m.id in completed_missions,
 				"is_boss": m.data.get("is_boss", false),
+				"rewards": m.data.get("rewards", {}),
 			})
 		result.append({
 			"chapter": chapter,
