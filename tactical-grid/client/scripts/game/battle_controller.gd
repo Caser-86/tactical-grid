@@ -34,18 +34,21 @@ var enemy_units: Array = []
 
 ## 选择和交互状态
 var selected_unit: Unit = null
-var selected_action: String = ""  # "", "move", "attack", "skill", "item"
+var selected_action: String = ""  # "", "move", "attack", "skill", "item", "targeting"
 var reachable_cells: Dictionary = {}
 var attack_targets: Array = []
 var path_preview: Array[Vector2i] = []
-# 技能/物品循环选择索引（配置驱动：每次按按钮切换到下一个）
-var _skill_cycle_index: int = -1
-var _item_cycle_index: int = -1
+# 当前正在选择目标的技能/物品 ID（由 HUD 行动选择面板设置）
+var _pending_action_id: String = ""
+# 当前正在选择目标的行动类型："skill" / "item"
+var _pending_action_kind: String = ""
 
 ## 子系统
 var turn_manager: TurnManager
 var action_system: ActionSystem
 var enemy_director: EnemyDirector
+var targeting_controller: TargetingController
+var mission_objective_state: MissionObjectiveState
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 ## 胜利条件
@@ -182,6 +185,7 @@ func _ready() -> void:
 	_init_subsystems()
 	_generate_map()
 	_spawn_units()
+	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
 	_render_map()
@@ -189,8 +193,41 @@ func _ready() -> void:
 	# 先播放 intro 对话，结束后再开始战斗
 	_play_intro_then_start()
 
+## 初始化任务目标状态机，并把 battle_controller 的目标变量同步为 mos 的权威状态。
+## mos 持有任务目标的真实状态；battle_controller 的同名变量作为只读镜像供渲染和旧代码使用。
+func _setup_objective_state() -> void:
+	var designations := {
+		"boss_unit": boss_unit,
+		"escort_vip": escort_vip,
+	}
+	mission_objective_state.setup(level_config, map_data, player_units, enemy_units, designations)
+	_sync_objective_state_from_mos()
+
+## 从 mos 同步目标状态到 battle_controller 的镜像变量。
+## Dictionary/Array 为引用类型，同步后双方共享同一份数据；基本类型需在写操作后重新同步。
+func _sync_objective_state_from_mos() -> void:
+	mission_type = mission_objective_state.mission_type
+	evac_point = mission_objective_state.evac_point
+	destructible_targets = mission_objective_state.destructible_targets
+	destructible_target_states = mission_objective_state.destructible_target_states
+	targets_destroyed = mission_objective_state.targets_destroyed
+	targets_required = mission_objective_state.targets_required
+	terminals = mission_objective_state.terminals
+	terminals_activated = mission_objective_state.terminals_activated
+	terminals_required = mission_objective_state.terminals_required
+	defend_turns_required = mission_objective_state.defend_turns_required
+	boss_unit = mission_objective_state.boss_unit
+	escort_vip = mission_objective_state.escort_vip
+
+## mos 目标文本更新回调：刷新 HUD
+func _on_objective_updated(_text: String) -> void:
+	hud.update_objective(mission_objective_state.get_status_text())
+
 ## 退出场景树时释放未挂载的单位节点，避免资源泄漏
 func _exit_tree() -> void:
+	# 取消任何进行中的目标选择，避免信号回调悬空
+	if targeting_controller and targeting_controller.is_active:
+		targeting_controller.cancel()
 	_cleanup_units()
 
 ## 释放所有单位节点（player_units 和 enemy_units 中的 Unit 实例）
@@ -277,6 +314,16 @@ func _init_subsystems() -> void:
 
 	enemy_director = EnemyDirector.new()
 	add_child(enemy_director)
+
+	targeting_controller = TargetingController.new()
+	add_child(targeting_controller)
+	targeting_controller.targeting_started.connect(_on_targeting_started)
+	targeting_controller.target_confirmed.connect(_on_target_confirmed)
+	targeting_controller.targeting_cancelled.connect(_on_targeting_cancelled)
+
+	mission_objective_state = MissionObjectiveState.new()
+	add_child(mission_objective_state)
+	mission_objective_state.objective_updated.connect(_on_objective_updated)
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。
@@ -566,6 +613,13 @@ func _apply_boss_stats(unit: Unit, bdata: Dictionary) -> void:
 	unit.armor = int(bdata.get("armor", unit.armor))
 	var boss_name = bdata.get("name", "Boss")
 	unit.unit_name = boss_name
+	unit.boss_art_key = {
+		"数据哨兵": &"boss_data_sentinel",
+		"重装审判者": &"boss_heavy_judge",
+		"影子佣兵": &"boss_shadow_mercenary",
+		"矩阵将军": &"boss_matrix_general",
+		"架构师": &"boss_architect",
+	}.get(boss_name, &"")
 	# 初始化 Boss 阶段状态
 	boss_data = bdata.duplicate(true)
 	boss_phases = bdata.get("phases", [])
@@ -850,11 +904,11 @@ func _get_job_display_name(job: String) -> String:
 	return job_info.get("name", job)
 
 func _setup_victory_conditions() -> void:
-	# defend 任务使用 level_config 的 max_turns；其他默认 20
-	if mission_type == "defend":
-		turn_manager.max_turns = int(level_config.get("max_turns", 10))
+	# 回合上限由 mos 根据 level_config 和 mission_type 计算
+	if mission_objective_state:
+		turn_manager.max_turns = mission_objective_state.max_turns
 	else:
-		turn_manager.max_turns = 20
+		turn_manager.max_turns = int(level_config.get("max_turns", 20))
 	# 胜利和失败检查通过 Callable 设置
 
 ## ===== 渲染 =====
@@ -952,91 +1006,18 @@ func _start_battle() -> void:
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
 
 func _get_objective_text() -> String:
-	match mission_type:
-		"extract": return "目标：所有单位到达撤离点"
-		"destroy": return "目标：摧毁 %d 个目标 (%d/%d)" % [targets_required, targets_destroyed, targets_required]
-		"assassinate":
-			if boss_unit:
-				return "目标：击杀 Boss %s" % boss_unit.unit_name
-			return "目标：击杀敌方Boss"
-		"escort":
-			if escort_vip:
-				return "目标：护送 VIP %s 到撤离点" % escort_vip.unit_name
-			return "目标：护送单位到撤离点"
-		"steal_data", "infiltrate":
-			return "目标：激活 %d 个终端 (%d/%d) 后撤离" % [terminals_required, terminals_activated, terminals_required]
-		"defend":
-			return "目标：坚守 %d 回合 (当前 %d)" % [defend_turns_required, turn_manager.turn_number]
-		_: return "目标：消灭所有敌人"
+	if mission_objective_state:
+		return mission_objective_state.get_status_text()
+	return "目标：消灭所有敌人"
 
 func _check_victory() -> bool:
-	match mission_type:
-		"extract":
-			return _check_extract_victory()
-		"destroy":
-			return targets_destroyed >= targets_required and targets_required > 0
-		"assassinate":
-			return _check_assassinate_victory()
-		"escort":
-			return _check_escort_victory()
-		"steal_data", "infiltrate":
-			return _check_data_victory()
-		"defend":
-			return _check_defend_victory()
-		_:
-			# 默认歼灭
-			return enemy_units.filter(func(u): return u.is_alive).is_empty()
-
-## 撤离模式：所有存活玩家单位到达撤离点
-func _check_extract_victory() -> bool:
-	if evac_point.x < 0:
-		return false
-	var alive_players = player_units.filter(func(u): return u.is_alive)
-	if alive_players.is_empty():
-		return false
-	for u in alive_players:
-		if u.grid_pos != evac_point:
-			return false
-	return true
-
-## 暗杀模式：Boss 单位死亡
-func _check_assassinate_victory() -> bool:
-	if boss_unit:
-		return not boss_unit.is_alive
-	# 无 Boss 指定时退化为歼灭
+	if mission_objective_state:
+		return mission_objective_state.is_victory()
 	return enemy_units.filter(func(u): return u.is_alive).is_empty()
 
-## 护送模式：VIP 存活且到达撤离点
-func _check_escort_victory() -> bool:
-	if evac_point.x < 0:
-		return false
-	if escort_vip == null or not escort_vip.is_alive:
-		return false
-	return escort_vip.grid_pos == evac_point
-
-## 窃取数据/潜入：先激活所有终端，再撤离
-func _check_data_victory() -> bool:
-	if evac_point.x < 0:
-		return false
-	# 必须先激活所有终端
-	if terminals_activated < terminals_required:
-		return false
-	var alive_players = player_units.filter(func(u): return u.is_alive)
-	if alive_players.is_empty():
-		return false
-	for u in alive_players:
-		if u.grid_pos != evac_point:
-			return false
-	return true
-
-## 防守模式：存活到指定回合数
-func _check_defend_victory() -> bool:
-	if defend_turns_required <= 0:
-		return false
-	return turn_manager.turn_number >= defend_turns_required
-
 func _check_defeat() -> bool:
-	# 所有玩家单位死亡
+	if mission_objective_state:
+		return mission_objective_state.is_defeat()
 	return player_units.filter(func(u): return u.is_alive).is_empty()
 
 ## ===== 回合回调 =====
@@ -1047,6 +1028,8 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			hud.update_turn_display(turn_manager.turn_number, phase)
 			turn_manager.input_locked = false
 			hud.set_buttons_disabled(false)
+			if mission_objective_state:
+				mission_objective_state.on_turn_started(turn_manager.turn_number, "player")
 			hud.update_objective(_get_objective_text())
 			_log("第 %d 回合 - 玩家行动" % turn_manager.turn_number)
 
@@ -1054,6 +1037,8 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			hud.update_turn_display(turn_manager.turn_number, phase)
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
+			if mission_objective_state:
+				mission_objective_state.on_turn_started(turn_manager.turn_number, "enemy")
 			_log("第 %d 回合 - 敌人行动" % turn_manager.turn_number)
 			# 敌人回合开始时检查增援触发
 			_process_reinforcements(turn_manager.turn_number)
@@ -1214,6 +1199,12 @@ func _trigger_ending() -> void:
 ## ===== 敌人回合 =====
 
 func _run_enemy_turn() -> void:
+	# 特殊规则：首回合敌人被动（enemy_passive_turn_1）
+	if mission_objective_state and mission_objective_state.is_enemy_passive(turn_manager.turn_number):
+		_log("敌人本回合待命（特殊规则）")
+		if not turn_manager.battle_over:
+			turn_manager.end_enemy_turn()
+		return
 	# 敌人回合开始时处理 Boss 专属能力（召唤、护盾恢复等）
 	_process_boss_abilities()
 	for enemy in enemy_units:
@@ -1326,6 +1317,13 @@ func _handle_left_click(world_pos: Vector2) -> void:
 		return
 
 	match selected_action:
+		"targeting":
+			# 目标选择模式：转发给 TargetingController
+			if targeting_controller and targeting_controller.is_active:
+				var result = targeting_controller.try_confirm(grid_pos)
+				if not result.get("success", false):
+					_log("无效目标：%s" % result.get("reason", "unknown"))
+			return
 		"move":
 			# 先检查是否点击了终端（steal_data/infiltrate 任务交互）
 			if mission_type in ["steal_data", "infiltrate"] and grid_pos in terminals:
@@ -1353,10 +1351,15 @@ func _select_unit(unit: Unit) -> void:
 	_show_move_range(unit)
 
 func _deselect_unit() -> void:
+	# 取消任何进行中的目标选择
+	_cancel_targeting_if_active()
+	hud.hide_action_picker()
 	if selected_unit:
 		_update_unit_sprite_selection(selected_unit, false)
 	selected_unit = null
 	selected_action = ""
+	_pending_action_id = ""
+	_pending_action_kind = ""
 	reachable_cells.clear()
 	attack_targets.clear()
 	path_preview.clear()
@@ -1365,15 +1368,32 @@ func _deselect_unit() -> void:
 	_clear_layer(attack_highlight)
 	hud.update_unit_info(null)
 	hud.set_action_buttons_visible(false)
+	hud.set_targeting_hint("")
+	hud.update_objective(_get_objective_text())
 
 func _cancel_action() -> void:
+	# 优先取消目标选择模式
+	if targeting_controller and targeting_controller.is_active:
+		targeting_controller.cancel()
+		return
+	# 取消行动选择面板
+	if hud._action_picker != null and is_instance_valid(hud._action_picker):
+		hud.hide_action_picker()
+		_pending_action_id = ""
+		_pending_action_kind = ""
+		return
 	if selected_action != "":
 		selected_action = ""
+		_pending_action_id = ""
+		_pending_action_kind = ""
 		_clear_layer(attack_highlight)
 		_clear_layer(path_preview_layer)
 		path_preview.clear()
 		if selected_unit:
 			_show_move_range(selected_unit)
+			hud.update_unit_info(selected_unit)
+		hud.set_targeting_hint("")
+		hud.update_objective(_get_objective_text())
 	else:
 		_deselect_unit()
 
@@ -1662,59 +1682,281 @@ func on_attack_button() -> void:
 func on_skill_button() -> void:
 	if not selected_unit or selected_unit.team != "player" or selected_unit.current_ap <= 0:
 		return
+	# 取消任何正在进行的行动选择/目标选择
+	_cancel_targeting_if_active()
+	hud.hide_action_picker()
 	# 配置驱动：使用单位已学技能列表
 	var skills = selected_unit.learned_skills
 	if skills.is_empty():
-		# 回退：该职业第一个可用技能
+		# 回退：该职业所有可学技能的第一个
 		var job_skills = GameData.get_job_skills(selected_unit.job)
 		if job_skills.is_empty():
 			_log("%s 没有可用技能" % selected_unit.unit_name)
 			return
 		skills = [job_skills[0].id]
-	# 循环选择技能（每次按按钮切换到下一个技能）
-	_skill_cycle_index = (_skill_cycle_index + 1) % skills.size()
-	var skill_id = skills[_skill_cycle_index]
+	# 构建技能选择面板项
+	var items: Array = []
+	for skill_id in skills:
+		var skill_data = GameData.get_skill(skill_id)
+		if skill_data.is_empty():
+			continue
+		# 跳过被动技能（type == "passive"）
+		if String(skill_data.get("type", "active")) == "passive":
+			continue
+		var skill_name = String(skill_data.get("name", skill_id))
+		var ap_cost = int(skill_data.get("ap_cost", 1))
+		var cooldown = int(skill_data.get("cooldown", 0))
+		var desc = String(skill_data.get("description", ""))
+		var disabled = false
+		var disabled_reason = ""
+		if ap_cost > selected_unit.current_ap:
+			disabled = true
+			disabled_reason = "AP 不足（需要 %d）" % ap_cost
+		if cooldown > 0 and int(skill_data.get("cooldown_remaining", 0)) > 0:
+			disabled = true
+			disabled_reason = "冷却中（剩余 %d 回合）" % int(skill_data.get("cooldown_remaining", 0))
+		items.append({
+			"id": skill_id,
+			"name": "%s (%dAP)" % [skill_name, ap_cost],
+			"description": desc,
+			"disabled": disabled,
+			"disabled_reason": disabled_reason,
+		})
+	if items.is_empty():
+		_log("%s 没有可用主动技能" % selected_unit.unit_name)
+		return
+	hud.show_action_picker("选择技能", items, Callable(self, "_on_skill_selected"))
+
+## 技能选择面板回调：选中技能后启动目标选择
+func _on_skill_selected(skill_id: String) -> void:
+	if not selected_unit or not selected_unit.is_alive:
+		return
 	var skill_data = GameData.get_skill(skill_id)
-	var skill_name = skill_data.get("name", skill_id)
-	# 需要目标的技能：先提示选择目标（简化为直接施放自身/无目标）
-	var target_data := {}
-	if skill_data.get("target") == "enemy" or skill_data.get("target") == "position":
-		# 需要目标的技能暂用自身位置作为回退（真实实现应进入目标选择模式）
-		target_data = {"position": selected_unit.grid_pos}
-	var skill_result = action_system.execute_skill(selected_unit, skill_id, target_data)
-	if skill_result.get("success", false):
-		AudioManager.sfx_skill()
-		_spawn_effect("heal" if skill_id.contains("heal") else "terminal", selected_unit.grid_pos)
-		_log("%s 使用技能：%s" % [selected_unit.unit_name, skill_name])
-		_record_skill_telemetry()
-		hud.update_unit_info(selected_unit)
-	else:
-		_log("%s 技能 %s 失败：%s" % [selected_unit.unit_name, skill_name, skill_result.get("reason", "")])
+	if skill_data.is_empty():
+		_log("技能数据缺失：%s" % skill_id)
+		return
+	_pending_action_id = skill_id
+	_pending_action_kind = "skill"
+	# 推断目标选择规格
+	var spec = TargetingController.infer_skill_spec(skill_id, skill_data, selected_unit)
+	# 如果目标是自身，直接执行，无需进入目标选择模式
+	if spec.get("target_type") == TargetingController.TARGET_SELF:
+		_execute_pending_action({"position": selected_unit.grid_pos, "target_unit": selected_unit})
+		return
+	# 进入目标选择模式
+	_begin_targeting(spec)
 
 func on_item_button() -> void:
 	if not selected_unit or selected_unit.team != "player":
 		return
+	# 特殊规则：no_items 禁用物品使用
+	if mission_objective_state and not mission_objective_state.is_item_use_allowed():
+		var reason = mission_objective_state.get_rule_reason(MissionObjectiveState.RULE_NO_ITEMS)
+		_log("物品被禁用：%s" % reason)
+		mission_objective_state.special_rule_violated.emit(MissionObjectiveState.RULE_NO_ITEMS, reason)
+		return
+	_cancel_targeting_if_active()
+	hud.hide_action_picker()
 	# 配置驱动：使用单位可用物品列表
-	var items = selected_unit.available_items
+	var items_ids = selected_unit.available_items
+	if items_ids.is_empty():
+		items_ids = ["med_kit"]  # 回退
+	# 构建物品选择面板项
+	var items: Array = []
+	for item_id in items_ids:
+		var item_data = GameData.get_item(item_id)
+		if item_data.is_empty():
+			continue
+		var item_name = String(item_data.get("name", item_id))
+		var ap_cost = int(item_data.get("ap_cost", 1))
+		var desc = String(item_data.get("description", ""))
+		var disabled = false
+		var disabled_reason = ""
+		if ap_cost > selected_unit.current_ap:
+			disabled = true
+			disabled_reason = "AP 不足（需要 %d）" % ap_cost
+		items.append({
+			"id": item_id,
+			"name": "%s (%dAP)" % [item_name, ap_cost],
+			"description": desc,
+			"disabled": disabled,
+			"disabled_reason": disabled_reason,
+		})
 	if items.is_empty():
-		items = ["med_kit"]  # 回退
-	# 循环选择物品
-	_item_cycle_index = (_item_cycle_index + 1) % items.size()
-	var item_id = items[_item_cycle_index]
+		_log("%s 没有可用物品" % selected_unit.unit_name)
+		return
+	hud.show_action_picker("选择物品", items, Callable(self, "_on_item_selected"))
+
+## 物品选择面板回调：选中物品后启动目标选择
+func _on_item_selected(item_id: String) -> void:
+	if not selected_unit or not selected_unit.is_alive:
+		return
 	var item_data = GameData.get_item(item_id)
-	var item_name = item_data.get("name", item_id)
-	var item_result = action_system.use_item(selected_unit, item_id, selected_unit, {})
-	if item_result.get("success", false):
-		AudioManager.sfx_heal()
-		_spawn_effect("heal", selected_unit.grid_pos)
-		_log("%s 使用物品：%s" % [selected_unit.unit_name, item_name])
-		_record_item_telemetry()
+	if item_data.is_empty():
+		_log("物品数据缺失：%s" % item_id)
+		return
+	_pending_action_id = item_id
+	_pending_action_kind = "item"
+	# 推断目标选择规格
+	var spec = TargetingController.infer_item_spec(item_id, item_data, selected_unit)
+	# 如果目标是自身，直接执行
+	if spec.get("target_type") == TargetingController.TARGET_SELF:
+		_execute_pending_action({"position": selected_unit.grid_pos, "target_unit": selected_unit})
+		return
+	# 进入目标选择模式
+	_begin_targeting(spec)
+
+## 启动目标选择模式
+func _begin_targeting(spec: Dictionary) -> void:
+	if not selected_unit or targeting_controller == null:
+		return
+	# 清除移动/攻击高亮，进入目标选择专属状态
+	_clear_layer(move_highlight)
+	_clear_layer(attack_highlight)
+	_clear_layer(path_preview_layer)
+	path_preview.clear()
+	reachable_cells.clear()
+	attack_targets.clear()
+	selected_action = "targeting"
+	# 构建上下文
+	var context := {
+		"map_width": map_width,
+		"map_height": map_height,
+		"players": player_units,
+		"enemies": enemy_units,
+		"los_check": Callable(self, "_has_los_for_targeting"),
+	}
+	targeting_controller.begin(selected_unit, _pending_action_id, spec, context)
+
+## 视线检查适配器（供 TargetingController 使用）
+func _has_los_for_targeting(from: Vector2i, to: Vector2i) -> bool:
+	return VisionSystem.has_line_of_sight(
+		from, to,
+		map_width, map_height, _is_vision_blocking
+	)
+
+## 目标选择开始回调：高亮合法目标格
+func _on_targeting_started(spec: Dictionary) -> void:
+	_clear_layer(attack_highlight)
+	var valid_cells = targeting_controller.get_valid_cells()
+	var target_type = String(spec.get("target_type", ""))
+	var color = COLOR_ATTACK
+	match target_type:
+		TargetingController.TARGET_ALLY:
+			color = Color(0.13, 0.59, 0.95, 0.35)
+		TargetingController.TARGET_ENEMY:
+			color = COLOR_ATTACK
+		TargetingController.TARGET_POSITION:
+			color = COLOR_TARGET
+		TargetingController.TARGET_ANY_UNIT:
+			color = COLOR_TARGET
+		_:
+			color = COLOR_SELECTED
+	for cell in valid_cells:
+		_highlight_cell(attack_highlight, cell, color)
+	# 显示提示
+	var hint_text = _get_targeting_hint_text(spec)
+	hud.set_targeting_hint(hint_text)
+	hud.update_objective(hint_text)
+
+## 生成目标选择提示文本
+func _get_targeting_hint_text(spec: Dictionary) -> String:
+	var target_type = String(spec.get("target_type", ""))
+	var range = int(spec.get("range", 0))
+	var action_label = "技能" if _pending_action_kind == "skill" else "物品"
+	var action_data = GameData.get_skill(_pending_action_id) if _pending_action_kind == "skill" else GameData.get_item(_pending_action_id)
+	var action_name = String(action_data.get("name", _pending_action_id))
+	match target_type:
+		TargetingController.TARGET_ALLY:
+			return "选择友方目标 (%s, 范围%d) - 右键取消" % [action_name, range]
+		TargetingController.TARGET_ENEMY:
+			return "选择敌方目标 (%s, 范围%d) - 右键取消" % [action_name, range]
+		TargetingController.TARGET_POSITION:
+			return "选择目标位置 (%s, 范围%d) - 右键取消" % [action_name, range]
+		TargetingController.TARGET_ANY_UNIT:
+			return "选择目标单位 (%s, 范围%d) - 右键取消" % [action_name, range]
+		_:
+			return "选择目标 - 右键取消"
+
+## 目标确认回调：执行技能/物品
+func _on_target_confirmed(target_data: Dictionary) -> void:
+	_clear_layer(attack_highlight)
+	hud.set_targeting_hint("")
+	hud.update_objective(_get_objective_text())
+	_execute_pending_action(target_data)
+
+## 目标取消回调：恢复移动范围显示
+func _on_targeting_cancelled() -> void:
+	_clear_layer(attack_highlight)
+	hud.set_targeting_hint("")
+	hud.update_objective(_get_objective_text())
+	_pending_action_id = ""
+	_pending_action_kind = ""
+	if selected_unit:
+		selected_action = ""
+		_show_move_range(selected_unit)
 		hud.update_unit_info(selected_unit)
 	else:
-		_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, item_name, item_result.get("reason", "")])
+		selected_action = ""
+
+## 取消正在进行的目标选择
+func _cancel_targeting_if_active() -> void:
+	if targeting_controller and targeting_controller.is_active:
+		targeting_controller.cancel()
+
+## 执行待定的技能/物品行动
+func _execute_pending_action(target_data: Dictionary) -> void:
+	if not selected_unit or not selected_unit.is_alive:
+		_pending_action_id = ""
+		_pending_action_kind = ""
+		return
+	var action_id = _pending_action_id
+	var action_kind = _pending_action_kind
+	# 清理待定状态
+	_pending_action_id = ""
+	_pending_action_kind = ""
+	selected_action = ""
+	var result: Dictionary
+	var action_name = action_id
+	if action_kind == "skill":
+		var skill_data = GameData.get_skill(action_id)
+		action_name = String(skill_data.get("name", action_id))
+		result = action_system.execute_skill(selected_unit, action_id, target_data)
+		if result.get("success", false):
+			AudioManager.sfx_skill()
+			_spawn_effect("heal" if action_id.contains("heal") else "terminal", selected_unit.grid_pos)
+			_log("%s 使用技能：%s" % [selected_unit.unit_name, action_name])
+			_record_skill_telemetry()
+		else:
+			_log("%s 技能 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
+	elif action_kind == "item":
+		var item_data = GameData.get_item(action_id)
+		action_name = String(item_data.get("name", action_id))
+		var target_unit = target_data.get("target_unit", selected_unit)
+		result = action_system.use_item(selected_unit, action_id, target_unit, target_data)
+		if result.get("success", false):
+			AudioManager.sfx_heal()
+			_spawn_effect("heal", selected_unit.grid_pos)
+			_log("%s 使用物品：%s" % [selected_unit.unit_name, action_name])
+			_record_item_telemetry()
+		else:
+			_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
+	# 刷新单位信息和移动范围
+	hud.update_unit_info(selected_unit)
+	if selected_unit.current_ap > 0:
+		_show_move_range(selected_unit)
+	else:
+		_clear_layer(move_highlight)
+	_check_victory_instant()
 
 func on_overwatch_button() -> void:
 	if selected_unit and selected_unit.team == "player" and selected_unit.current_ap > 0:
+		# 特殊规则：no_overwatch 禁用警戒
+		if mission_objective_state and not mission_objective_state.is_overwatch_allowed():
+			var reason = mission_objective_state.get_rule_reason(MissionObjectiveState.RULE_NO_OVERWATCH)
+			_log("警戒被禁用：%s" % reason)
+			mission_objective_state.special_rule_violated.emit(MissionObjectiveState.RULE_NO_OVERWATCH, reason)
+			return
 		if action_system.enter_overwatch(selected_unit):
 			AudioManager.sfx_overwatch()
 			_log("%s 进入警戒" % selected_unit.unit_name)

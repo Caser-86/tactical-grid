@@ -20,6 +20,14 @@ var _battle_controller: Node = null
 var _log_lines: Array[String] = []
 const MAX_LOG_LINES = 8
 
+## 当前目标选择提示文本（由 battle_controller 设置）
+var targeting_hint: String = ""
+
+## 当前活跃的行动选择面板（技能/物品列表）
+var _action_picker: PopupPanel = null
+## 行动选择面板的回调（选中后调用）
+var _action_picker_callback: Callable = Callable()
+
 func _ready() -> void:
 	_apply_visual_theme()
 	move_button.pressed.connect(_on_move_pressed)
@@ -70,6 +78,14 @@ func _style_button(button: Button) -> void:
 	button.add_theme_color_override("font_color", Color(0.82, 0.95, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.94, 1.0, 1.0))
 	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.48, 0.52))
+
+## 为 PopupPanel 应用与战场一致的高对比样式
+func _style_popup_panel(panel: PopupPanel) -> void:
+	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.04, 0.06, 0.08, 0.98), Color(0.18, 0.72, 0.82, 0.85)))
+	panel.add_theme_constant_override("margin_left", 12)
+	panel.add_theme_constant_override("margin_right", 12)
+	panel.add_theme_constant_override("margin_top", 10)
+	panel.add_theme_constant_override("margin_bottom", 10)
 
 func set_battle_controller(controller: Node) -> void:
 	_battle_controller = controller
@@ -156,6 +172,91 @@ func add_log(msg: String) -> void:
 	if _log_lines.size() > MAX_LOG_LINES:
 		_log_lines.pop_front()
 	battle_log.text = "\n".join(_log_lines)
+
+## 显示技能/物品选择面板
+## items: Array[Dictionary]，每个字典包含 {id, name, description, disabled, disabled_reason}
+## on_selected: Callable，签名为 (String id) -> void
+func show_action_picker(title: String, items: Array, on_selected: Callable) -> void:
+	hide_action_picker()
+	_action_picker_callback = on_selected
+	var popup := PopupPanel.new()
+	popup.name = "ActionPicker"
+	_style_popup_panel(popup)
+	var vbox := VBoxContainer.new()
+	vbox.name = "VBox"
+	vbox.add_theme_constant_override("separation", 4)
+	popup.add_child(vbox)
+
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.add_theme_font_size_override("font_size", 18)
+	title_label.add_theme_color_override("font_color", Color(0.95, 0.84, 0.55))
+	vbox.add_child(title_label)
+
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	for item in items:
+		var id = String(item.get("id", ""))
+		var name = String(item.get("name", id))
+		var desc = String(item.get("description", ""))
+		var disabled = bool(item.get("disabled", false))
+		var disabled_reason = String(item.get("disabled_reason", ""))
+		var btn := Button.new()
+		btn.text = name
+		btn.custom_minimum_size = Vector2(280, 36)
+		_style_button(btn)
+		if disabled:
+			btn.disabled = true
+			btn.tooltip_text = disabled_reason if disabled_reason != "" else "不可用"
+		elif desc != "":
+			btn.tooltip_text = desc
+		btn.pressed.connect(_on_action_picker_item.bind(id))
+		vbox.add_child(btn)
+
+	# 取消按钮
+	var cancel_btn := Button.new()
+	cancel_btn.text = "取消"
+	cancel_btn.custom_minimum_size = Vector2(280, 36)
+	_style_button(cancel_btn)
+	cancel_btn.add_theme_color_override("font_color", Color(0.82, 0.78, 0.78))
+	cancel_btn.pressed.connect(_on_action_picker_cancel)
+	vbox.add_child(cancel_btn)
+
+	add_child(popup)
+	_action_picker = popup
+	# 弹出在屏幕中下方
+	popup.popup_centered_clamped(Vector2i(360, 0), 0.85)
+	# 调整垂直位置到底部偏上
+	await get_tree().process_frame
+	if is_instance_valid(popup):
+		var vp_size = get_viewport().get_visible_rect().size
+		popup.position = Vector2i(int((vp_size.x - popup.size.x) * 0.5), int(vp_size.y - popup.size.y - 90))
+
+## 隐藏行动选择面板
+func hide_action_picker() -> void:
+	if _action_picker != null and is_instance_valid(_action_picker):
+		_action_picker.queue_free()
+	_action_picker = null
+	_action_picker_callback = Callable()
+
+func _on_action_picker_item(id: String) -> void:
+	var cb = _action_picker_callback
+	hide_action_picker()
+	if cb.is_valid():
+		cb.call(id)
+
+func _on_action_picker_cancel() -> void:
+	hide_action_picker()
+
+## 设置目标选择提示文本（显示在 TopBar 下方）
+func set_targeting_hint(text: String) -> void:
+	targeting_hint = text
+	# 复用 objective_label 显示提示，或追加到 objective
+	# 这里简单地将提示加入战斗日志，便于测试观测
+	if text != "":
+		add_log(">> " + text)
+
 
 func _on_move_pressed() -> void:
 	if _battle_controller:

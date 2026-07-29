@@ -7,7 +7,11 @@
       "player_units": 2, "enemy_count": 3,
       "intro_dialogue": "ch1_m1_intro", "outro_dialogue": "ch1_m1_outro",
       "tutorial_flags": ["teach_movement", "teach_attack", "teach_cover", "teach_evac"],
-      "special_rules": ["no_overwatch", "no_items", "enemy_passive_turn_1"],
+      "special_rules": {
+        "no_overwatch": { "enabled": true, "reason": "教学关：警戒暂未开放，先掌握移动与攻击基础" },
+        "no_items": { "enabled": true, "reason": "教学关：物品暂未开放，先掌握基础战斗" },
+        "enemy_passive_turn_1": { "enabled": true, "reason": "教学关：首回合敌人待命，便于观察" }
+      },
       "rewards": { "credit": 200, "exp": 150, "first_clear": { "credit": 300, "intel": 10 } }
     },
     "ch1_m2": {
