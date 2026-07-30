@@ -1,4 +1,4 @@
-﻿## 战斗 HUD 契约测试
+## 战斗 HUD 契约测试
 ## 验证选中玩家单位时显示五个行动按钮，选中敌人时不显示
 ## 验证按钮图标尺寸受限，不挤压 HUD
 extends Node
@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_mission_event_reinforcement_bridge()
 	await _test_viewport_fills_at_22x16()
 	await _test_input_actions()
+	await _test_network_toggle_and_alert_display()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -404,6 +405,72 @@ func _test_input_actions() -> void:
 	_check(HUDScript.ContextState.MOVE_PREVIEW == 2, "ContextState.MOVE_PREVIEW 存在")
 	_check(HUDScript.ContextState.ATTACK_PREVIEW == 3, "ContextState.ATTACK_PREVIEW 存在")
 	_check(HUDScript.ContextState.FACILITY_PREVIEW == 4, "ContextState.FACILITY_PREVIEW 存在")
+
+
+func _test_network_toggle_and_alert_display() -> void:
+	print("\n--- 测试: G 键切换网络覆盖层与警报显示 ---")
+	_battle = BattleScene.instantiate()
+	add_child(_battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _battle.get_script() == null:
+		_check(false, "战斗脚本加载")
+		_battle.queue_free()
+		await get_tree().process_frame
+		return
+
+	var hud = _battle.get_node_or_null("HUD")
+	_check(hud != null, "HUD 节点存在")
+	if hud == null:
+		await _dispose_battle()
+		return
+
+	# 验证警报标签和网络覆盖层节点存在
+	_check(hud.get_node_or_null("AlertLabel") != null, "HUD 创建 AlertLabel 节点")
+	_check(hud.get_node_or_null("NetworkOverlay") != null, "HUD 创建 NetworkOverlay 节点")
+	_check(not hud.is_network_overlay_visible(), "网络覆盖层初始隐藏")
+
+	# 验证 G 键切换只影响可视化，不改变游戏状态
+	var unit: Unit = _battle.player_units[0]
+	var ap_before: int = unit.current_ap
+	var hp_before: int = unit.current_hp
+	var pos_before: Vector2i = unit.grid_pos
+
+	# 第一次切换：显示
+	_battle._on_toggle_network()
+	_check(hud.is_network_overlay_visible(), "第一次 G 切换后网络覆盖层显示")
+	_check(_battle.tactical_network_state.overlay_visible == true, "tactical_network_state.overlay_visible 为 true")
+
+	# 第二次切换：隐藏
+	_battle._on_toggle_network()
+	_check(not hud.is_network_overlay_visible(), "第二次 G 切换后网络覆盖层隐藏")
+	_check(_battle.tactical_network_state.overlay_visible == false, "tactical_network_state.overlay_visible 为 false")
+
+	# 验证游戏状态未改变
+	_check(unit.current_ap == ap_before, "G 切换不改变单位 AP")
+	_check(unit.current_hp == hp_before, "G 切换不改变单位 HP")
+	_check(unit.grid_pos == pos_before, "G 切换不改变单位位置")
+
+	# 验证警报显示更新
+	_check(_battle.alert_state != null, "alert_state 已初始化")
+	_check(_battle.alert_state.get_alert_level() == AlertState.LEVEL_CALM, "初始警报等级为 calm")
+
+	# 触发警报事件
+	_battle.alert_state.apply_event("noise_detected")
+	_check(_battle.alert_state.get_alert_level() == AlertState.LEVEL_SUSPICIOUS, "noise_detected 提升警报至 suspicious")
+	hud.update_alert_display(_battle.alert_state)
+	var alert_label: Label = hud.get_node_or_null("AlertLabel")
+	_check(alert_label != null and alert_label.visible, "警报标签可见")
+	_check(alert_label != null and alert_label.text.contains("可疑"), "警报标签显示当前等级")
+	_check(alert_label != null and alert_label.text.contains("下一步"), "警报标签显示下一步后果")
+
+	# 验证警报后果数据
+	var consequence: Dictionary = _battle.alert_state.get_consequence()
+	_check(int(consequence.get("reinforcement_bonus", 0)) == 1, "suspicious 警报提供 1 点增援加成")
+	var next_consequence: Dictionary = _battle.alert_state.get_next_consequence()
+	_check(String(next_consequence.get("description", "")).contains("hunt"), "下一步后果描述战斗级行为")
+
+	await _dispose_battle()
 
 func _dispose_battle() -> void:
 	if _battle and is_instance_valid(_battle):

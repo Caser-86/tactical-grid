@@ -392,6 +392,46 @@ if ($intentResult.ExitCode -ne 0 -or $intentFailed -ne 0) {
     exit 1
 }
 
+# --- 2.98. Tactical network state contract ---
+Write-Host "[2.98/3] Running tactical network state contract..."
+try {
+    $tnsResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/tactical_network_state_test.tscn')
+} catch {
+    Write-Host "TACTICAL NETWORK STATE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$tnsSummary = Get-LocalizedTestSummary -Output $tnsResult.Stdout
+$tnsPassed = [int]$tnsSummary[0]
+$tnsFailed = [int]$tnsSummary[1]
+Write-Host "  Passed: $tnsPassed"
+Write-Host "  Failed: $tnsFailed"
+if ($tnsResult.ExitCode -ne 0 -or $tnsFailed -ne 0) {
+    Write-Host "TACTICAL NETWORK STATE TEST FAILED (exit=$($tnsResult.ExitCode), failed=$tnsFailed)" -ForegroundColor Red
+    ($tnsResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($tnsResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.99. Alert state contract ---
+Write-Host "[2.99/3] Running alert state contract..."
+try {
+    $alertResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/alert_state_test.tscn')
+} catch {
+    Write-Host "ALERT STATE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$alertSummary = Get-LocalizedTestSummary -Output $alertResult.Stdout
+$alertPassed = [int]$alertSummary[0]
+$alertFailed = [int]$alertSummary[1]
+Write-Host "  Passed: $alertPassed"
+Write-Host "  Failed: $alertFailed"
+if ($alertResult.ExitCode -ne 0 -or $alertFailed -ne 0) {
+    Write-Host "ALERT STATE TEST FAILED (exit=$($alertResult.ExitCode), failed=$alertFailed)" -ForegroundColor Red
+    ($alertResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($alertResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -409,7 +449,9 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($actionResult.Stdout -split "`r?`n") + ($actionResult.Stderr -split "`r?`n") + `
     ($validatorResult.Stdout -split "`r?`n") + ($validatorResult.Stderr -split "`r?`n") + `
     ($visibilityResult.Stdout -split "`r?`n") + ($visibilityResult.Stderr -split "`r?`n") + `
-    ($intentResult.Stdout -split "`r?`n") + ($intentResult.Stderr -split "`r?`n")
+    ($intentResult.Stdout -split "`r?`n") + ($intentResult.Stderr -split "`r?`n") + `
+    ($tnsResult.Stdout -split "`r?`n") + ($tnsResult.Stderr -split "`r?`n") + `
+    ($alertResult.Stdout -split "`r?`n") + ($alertResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -476,6 +518,8 @@ Write-Host "  Action system assertions: $actionPassed"
 Write-Host "  Locked map validator assertions: $validatorPassed"
 Write-Host "  Visibility state assertions: $visibilityPassed"
 Write-Host "  Enemy intent state assertions: $intentPassed"
+Write-Host "  Tactical network state assertions: $tnsPassed"
+Write-Host "  Alert state assertions: $alertPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

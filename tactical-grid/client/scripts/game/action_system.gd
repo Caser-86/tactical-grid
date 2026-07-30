@@ -1,4 +1,4 @@
-﻿## 行动系统
+## 行动系统
 ## 处理单位的移动、攻击、技能、物品、警戒等所有行动
 extends Node
 class_name ActionSystem
@@ -13,6 +13,9 @@ var _rng_seed: int = -1
 ## 单位列表（由 BattleController 设置）
 var player_units: Array = []
 var enemy_units: Array = []
+
+## CODE-P2-02: 战术网络状态引用（由 BattleController 设置）
+var tactical_network_state: Node = null
 
 ## 陷阱列表（运行时状态）：[{pos, owner_team, item}]
 var traps: Array[Dictionary] = []
@@ -867,6 +870,10 @@ func set_units(players: Array, enemies: Array) -> void:
 	player_units = players
 	enemy_units = enemies
 
+## CODE-P2-02: 设置战术网络状态引用
+func set_tactical_network_state(tns: Node) -> void:
+	tactical_network_state = tns
+
 ## ===== CODE-P1-01: 统一动作契约 =====
 
 var _next_preview_id: int = 0
@@ -892,6 +899,8 @@ func query_action(request: Dictionary) -> Dictionary:
 			return _query_item(unit, request)
 		&"overwatch":
 			return _query_overwatch(unit, request)
+		&"network":
+			return _query_network(unit, request)
 		_:
 			return {"valid": false, "reason": "unknown_action", "action": String(action)}
 
@@ -972,6 +981,29 @@ func _query_overwatch(unit: Node, request: Dictionary) -> Dictionary:
 		"cost": {"ap": 1, "move": 0},
 	})
 
+## CODE-P2-02: 查询网络操作（takeover/disable/overload，各 1AP）
+func _query_network(unit: Node, request: Dictionary) -> Dictionary:
+	if not unit.can_act():
+		return {"valid": false, "reason": "cannot_act", "action": &"network"}
+	if tactical_network_state == null or not is_instance_valid(tactical_network_state):
+		return {"valid": false, "reason": "no_network_state", "action": &"network"}
+	var node_id: String = String(request.get("node_id", ""))
+	var operation: String = String(request.get("operation", ""))
+	if node_id == "" or operation == "":
+		return {"valid": false, "reason": "missing_params", "action": &"network"}
+	if unit.current_ap < 1:
+		return {"valid": false, "reason": "insufficient_ap", "action": &"network"}
+	var node_state: String = tactical_network_state.get_node_state(node_id)
+	if node_state == "damaged":
+		return {"valid": false, "reason": "node_damaged", "action": &"network"}
+	if node_state == "":
+		return {"valid": false, "reason": "node_not_found", "action": &"network"}
+	return _register_preview({
+		"valid": true, "action": &"network", "unit": unit,
+		"node_id": node_id, "operation": operation,
+		"cost": {"ap": 1, "move": 0},
+	})
+
 func _register_preview(preview: Dictionary) -> Dictionary:
 	_next_preview_id += 1
 	preview["preview_id"] = _next_preview_id
@@ -1005,6 +1037,19 @@ func validate_action(preview: Dictionary) -> Dictionary:
 			var target: Node = stored.get("target", null)
 			if not is_instance_valid(target) or not target.is_alive:
 				return {"valid": false, "reason": "target_invalid"}
+		&"network":
+			if not unit.can_act():
+				return {"valid": false, "reason": "cannot_act"}
+			if unit.current_ap < 1:
+				return {"valid": false, "reason": "insufficient_ap"}
+			if tactical_network_state == null or not is_instance_valid(tactical_network_state):
+				return {"valid": false, "reason": "no_network_state"}
+			var node_id: String = String(stored.get("node_id", ""))
+			var node_state: String = tactical_network_state.get_node_state(node_id)
+			if node_state == "damaged":
+				return {"valid": false, "reason": "node_damaged"}
+			if node_state == "":
+				return {"valid": false, "reason": "node_not_found"}
 	return {"valid": true, "preview": stored}
 
 ## CODE-P1-01: 提交动作执行。预览必须先通过 validate_action。
@@ -1042,6 +1087,15 @@ func commit_action(preview: Dictionary) -> Dictionary:
 		&"overwatch":
 			var success = enter_overwatch(unit)
 			return {"success": success, "action": &"overwatch"}
+		&"network":
+			var node_id: String = String(stored.get("node_id", ""))
+			var operation: String = String(stored.get("operation", ""))
+			var actor_id: String = unit.entity_id if unit.entity_id != "" else unit.unit_name
+			var net_result: Dictionary = tactical_network_state.perform_operation(node_id, operation, actor_id, unit.current_ap)
+			if bool(net_result.get("success", false)):
+				unit.spend_ap(1)
+			net_result["action"] = &"network"
+			return net_result
 		_:
 			return {"success": false, "reason": "unknown_action"}
 

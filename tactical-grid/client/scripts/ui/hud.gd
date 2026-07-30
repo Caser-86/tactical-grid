@@ -1,4 +1,4 @@
-﻿## HUD 控制器
+## HUD 控制器
 ## 管理战斗界面的所有 UI 元素
 extends CanvasLayer
 class_name HUD
@@ -32,6 +32,10 @@ var _action_picker_callback: Callable = Callable()
 enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
 var _context_state: ContextState = ContextState.NONE
 var _context_prompt: Label = null
+## CODE-P2-02: 警报显示标签和网络覆盖层
+var _alert_label: Label = null
+var _network_overlay: Control = null
+var _network_overlay_visible: bool = false
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -56,6 +60,27 @@ func _ready() -> void:
 	_context_prompt.visible = false
 	add_child(_context_prompt)
 	set_context_state(ContextState.NONE)
+	# CODE-P2-02: Alert display label (top-left, below turn info)
+	_alert_label = Label.new()
+	_alert_label.name = "AlertLabel"
+	_alert_label.text = ""
+	_alert_label.add_theme_font_size_override("font_size", 14)
+	_alert_label.add_theme_color_override("font_color", Color(0.95, 0.75, 0.45))
+	_alert_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_alert_label.offset_left = 8.0
+	_alert_label.offset_top = 28.0
+	_alert_label.offset_right = 400.0
+	_alert_label.offset_bottom = 48.0
+	_alert_label.visible = false
+	add_child(_alert_label)
+
+	# CODE-P2-02: Network overlay (hidden by default, G toggles; visualization only)
+	_network_overlay = Control.new()
+	_network_overlay.name = "NetworkOverlay"
+	_network_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_network_overlay.visible = false
+	_network_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_network_overlay)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -339,3 +364,39 @@ func _on_end_turn_pressed() -> void:
 func _on_pause_pressed() -> void:
 	if _battle_controller:
 		_battle_controller._show_pause_menu()
+## CODE-P2-02: Update alert display from AlertState
+func update_alert_display(alert_state: Node) -> void:
+	if not _alert_label:
+		return
+	if not alert_state or not is_instance_valid(alert_state):
+		_alert_label.visible = false
+		return
+	var level_names := ["平静", "可疑", "警戒", "战斗"]
+	var level: int = alert_state.get_alert_level()
+	var consequence: Dictionary = alert_state.get_consequence()
+	var next: Dictionary = alert_state.get_next_consequence()
+	var level_name: String = level_names[level] if level >= 0 and level < level_names.size() else "未知"
+	var desc: String = String(consequence.get("description", ""))
+	var next_desc: String = String(next.get("description", ""))
+	_alert_label.text = "警报: %s - %s | 下一步: %s" % [level_name, desc, next_desc]
+	_alert_label.visible = true
+
+
+## CODE-P2-02: Toggle network overlay visibility (G key). Only visualization, never gameplay.
+func toggle_network_overlay() -> void:
+	_network_overlay_visible = not _network_overlay_visible
+	if _network_overlay:
+		_network_overlay.visible = _network_overlay_visible
+
+
+## CODE-P2-02: Set network overlay visibility directly
+func set_network_overlay_visible(vis: bool) -> void:
+	_network_overlay_visible = vis
+	if _network_overlay:
+		_network_overlay.visible = vis
+
+
+## CODE-P2-02: Check if network overlay is visible
+func is_network_overlay_visible() -> bool:
+	return _network_overlay_visible
+

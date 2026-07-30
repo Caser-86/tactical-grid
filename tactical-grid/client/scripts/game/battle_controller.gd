@@ -1,4 +1,4 @@
-﻿## 战斗场景控制器
+## 战斗场景控制器
 ## 单一战斗状态源：管理地图、单位、回合、行动和渲染
 extends Node2D
 class_name BattleController
@@ -55,6 +55,9 @@ var mission_objective_state: MissionObjectiveState
 var visibility_state: VisibilityState
 var enemy_intent_state: EnemyIntentState
 var enemy_planner: EnemyPlanner
+## CODE-P2-02: Tactical network and alert state
+var tactical_network_state: TacticalNetworkState
+var alert_state: AlertState
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 ## 胜利条件
@@ -347,6 +350,15 @@ func _init_subsystems() -> void:
 	add_child(enemy_intent_state)
 	enemy_planner = EnemyPlanner.new()
 	add_child(enemy_planner)
+
+	# CODE-P2-02: Tactical network and alert state
+	tactical_network_state = TacticalNetworkState.new()
+	add_child(tactical_network_state)
+	alert_state = AlertState.new()
+	add_child(alert_state)
+	alert_state.setup()
+	tactical_network_state.alert_requested.connect(_on_network_alert_requested)
+	action_system.set_tactical_network_state(tactical_network_state)
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。
@@ -1195,6 +1207,10 @@ func _start_battle() -> void:
 	turn_limit = max(5, turn_limit)  # 最低 5 回合
 	turn_manager.setup(player_units, enemy_units, turn_limit)
 	action_system.set_units(player_units, enemy_units)
+	# CODE-P2-02: Setup tactical network from map data
+	if tactical_network_state and not map_data.is_empty():
+		var nodes: Array = map_data.get("nodes", [])
+		tactical_network_state.setup(nodes)
 	# 根据关卡配置设置增援上限（防止无限刷怪）
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
@@ -1241,6 +1257,10 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			turn_manager.input_locked = false
 			hud.set_buttons_disabled(false)
 			action_system.process_ground_effects_on_turn_start()
+			# CODE-P2-02: Decay alert at turn boundary
+			if alert_state:
+				alert_state.on_turn_end()
+			hud.update_alert_display(alert_state)
 			_update_visibility()
 			if mission_objective_state:
 				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "player"})
@@ -1310,6 +1330,21 @@ func _on_reinforcement_spawned(units_data: Array, message: String) -> void:
 	_spawn_reinforcement_units(units_data)
 	if message != "":
 		_log(message)
+
+## CODE-P2-02: 网络操作触发的警报请求
+func _on_network_alert_requested(amount: int, reason: String) -> void:
+	if alert_state:
+		alert_state.apply_event(reason)
+		hud.update_alert_display(alert_state)
+		_log("警报事件: %s (amount=%d)" % [reason, amount])
+
+## CODE-P2-02: G 键切换网络覆盖层可视化，不影响任何游戏状态
+func _on_toggle_network() -> void:
+	if tactical_network_state:
+		tactical_network_state.toggle_overlay()
+	if hud:
+		hud.toggle_network_overlay()
+		_log("网络覆盖层: %s" % ("显示" if hud.is_network_overlay_visible() else "隐藏"))
 
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
 ## 单位生成由 reinforcement_spawned 信号统一驱动，这里不直接 spawn
@@ -1557,6 +1592,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("next_unit"):
 		_on_next_unit()
+		return
+
+	if event.is_action_pressed("toggle_network"):
+		_on_toggle_network()
 		return
 
 	# 鼠标移动时实时预览移动路径
