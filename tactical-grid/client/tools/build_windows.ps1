@@ -28,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($GodotPath) -or -not (Test-Path -LiteralPath $G
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $projectRoot '..\export\TacticalGrid-Windows-x64.exe'
+    $OutputPath = Join-Path $projectRoot 'build\TacticalGrid.exe'
 }
 
 $outputDirectory = Split-Path -Parent $OutputPath

@@ -84,7 +84,9 @@ func load_game(slot: int = 0) -> Dictionary:
 		push_warning("Save file corrupted or missing, trying backup: " + backup_path)
 		data = _read_and_validate(backup_path)
 		if not data.is_empty():
-			# 恢复主存档
+			# CODE-P0-04: 先删除损坏的主存档，避免 save_game 把损坏数据备份为 .bak
+			if FileAccess.file_exists(final_path):
+				DirAccess.remove_absolute(final_path)
 			save_game(data, slot)
 			return data
 
@@ -213,7 +215,11 @@ func create_default_save() -> Dictionary:
 
 ## 版本迁移（占位，未来扩展）
 func migrate_if_needed(data: Dictionary) -> Dictionary:
-	var version = data.get("save_version", "0.0.0")
+	var version = String(data.get("save_version", "0.0.0"))
+	# CODE-P0-04: 拒绝未来版本的存档
+	if _is_newer_version(version, SAVE_VERSION):
+		push_error("Save version %s is newer than supported %s; refusing to load" % [version, SAVE_VERSION])
+		return {}
 	# 即使版本号相同，也补全 stats_tracking 内部字段（开发期间字段会新增）
 	_migrate_stats_tracking(data)
 	_migrate_campaign_progress(data)
@@ -227,6 +233,19 @@ func migrate_if_needed(data: Dictionary) -> Dictionary:
 			data[key] = defaults[key]
 	data["save_version"] = SAVE_VERSION
 	return data
+
+## 比较语义版本号：如果 save_ver 比 supported_ver 新返回 true
+func _is_newer_version(save_ver: String, supported_ver: String) -> bool:
+	var save_parts = save_ver.split(".")
+	var supp_parts = supported_ver.split(".")
+	for i in range(maxi(save_parts.size(), supp_parts.size())):
+		var s = int(save_parts[i]) if i < save_parts.size() else 0
+		var v = int(supp_parts[i]) if i < supp_parts.size() else 0
+		if s > v:
+			return true
+		if s < v:
+			return false
+	return false
 
 ## 补全 settings 内部字段（可访问性等开发期间新增字段）
 func _migrate_settings(data: Dictionary) -> void:

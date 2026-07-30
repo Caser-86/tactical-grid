@@ -293,6 +293,26 @@ if ($targetingResult.ExitCode -ne 0 -or $targetingFailed -ne 0) {
     exit 1
 }
 
+# --- 2.93. Save recovery contract ---
+Write-Host "[2.93/3] Running save recovery contract..."
+try {
+    $saveRecoveryResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/save_recovery_test.tscn')
+} catch {
+    Write-Host "SAVE RECOVERY TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$saveRecoverySummary = Get-LocalizedTestSummary -Output $saveRecoveryResult.Stdout
+$saveRecoveryPassed = [int]$saveRecoverySummary[0]
+$saveRecoveryFailed = [int]$saveRecoverySummary[1]
+Write-Host "  Passed: $saveRecoveryPassed"
+Write-Host "  Failed: $saveRecoveryFailed"
+if ($saveRecoveryResult.ExitCode -ne 0 -or $saveRecoveryFailed -ne 0) {
+    Write-Host "SAVE RECOVERY TEST FAILED (exit=$($saveRecoveryResult.ExitCode), failed=$saveRecoveryFailed)" -ForegroundColor Red
+    ($saveRecoveryResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($saveRecoveryResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查非预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -305,9 +325,10 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
     ($e2eResult.Stdout -split "`r?`n") + ($e2eResult.Stderr -split "`r?`n") + `
     ($objResult.Stdout -split "`r?`n") + ($objResult.Stderr -split "`r?`n") + `
-    ($targetingResult.Stdout -split "`r?`n") + ($targetingResult.Stderr -split "`r?`n")
+    ($targetingResult.Stdout -split "`r?`n") + ($targetingResult.Stderr -split "`r?`n") + `
+    ($saveRecoveryResult.Stdout -split "`r?`n") + ($saveRecoveryResult.Stderr -split "`r?`n")
 
-# 预期的 WARNING（存档损坏恢复测试产生，共 2 条）
+# 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
 
 # 收集所有 WARNING 行（区分大小写：Godot 输出 "WARNING:"，避免匹配测试输出中的 "BossWarning:" 等）
@@ -326,12 +347,14 @@ Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"
 $errorLines = $combinedOut | Where-Object {
     $_ -match 'ERROR:' -or $_ -match 'SCRIPT ERROR' -or $_ -match 'Parse Error'
 }
-# 过滤掉 JSON 解析的预期错误（来自存档损坏测试）和日志文件写入错误
+# 过滤掉 JSON 解析的预期错误（来自存档损坏测试）、日志文件写入错误，
+# 以及未来版本存档拒绝错误（来自 save_recovery_test 的 _test_future_version_refusal）
 $unexpectedErrors = $errorLines | Where-Object {
     $_ -notmatch 'JSON parse error' -and `
     $_ -notmatch 'Parse JSON failed' -and `
     $_ -notmatch "Failed to open 'user://logs/" -and `
-    $_ -notmatch 'resources still in use at exit'
+    $_ -notmatch 'resources still in use at exit' -and `
+    $_ -notmatch 'Save version .* is newer than supported'
 }
 
 Write-Host "  Unexpected errors: $($unexpectedErrors.Count)"
@@ -348,8 +371,8 @@ if ($unexpectedErrors.Count -gt 0) {
     exit 1
 }
 
-if ($expectedWarnings.Count -ne 2) {
-    Write-Host "Expected exactly 2 corruption recovery warnings, got $($expectedWarnings.Count)" -ForegroundColor Yellow
+if ($expectedWarnings.Count -ne 3) {
+    Write-Host "Expected exactly 3 corruption recovery warnings, got $($expectedWarnings.Count)" -ForegroundColor Yellow
     $expectedWarnings | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
@@ -365,6 +388,7 @@ Write-Host "  Balance assertions: $balancePassed"
 Write-Host "  Chapter-one E2E assertions: $e2ePassed"
 Write-Host "  Chapter-one objectives assertions: $objPassed"
 Write-Host "  Targeting controller assertions: $targetingPassed"
+Write-Host "  Save recovery assertions: $saveRecoveryPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

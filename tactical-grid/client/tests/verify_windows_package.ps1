@@ -2,6 +2,21 @@ param(
     [string]$BuildDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build')
 )
 
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $projectRoot)
+
+# Required documentation must exist before packaging.
+$requiredDocs = @(
+    (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md'),
+    (Join-Path $repoRoot 'PRIVACY.md'),
+    (Join-Path $projectRoot 'data\RESOURCE_MANIFEST.md')
+)
+foreach ($doc in $requiredDocs) {
+    if (-not (Test-Path -LiteralPath $doc -PathType Leaf)) {
+        throw "Required documentation missing: $doc"
+    }
+}
+
 $exePath = Join-Path $BuildDirectory 'TacticalGrid.exe'
 $pckPath = Join-Path $BuildDirectory 'TacticalGrid.pck'
 $consoleWrapper = Join-Path $BuildDirectory 'TacticalGrid.console.exe'
