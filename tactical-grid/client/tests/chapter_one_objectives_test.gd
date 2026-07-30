@@ -101,7 +101,7 @@ func _make_map_data(mission_type: String, objects: Array, width: int = 10, heigh
 func _test_chapter_one_mission_types() -> void:
 	print("\n--- 测试: 第一章六关任务类型配置 ---")
 	var expected = {
-		"ch1_m1": "extract",
+		"ch1_m1": "infiltrate",
 		"ch1_m2": "destroy",
 		"ch1_m3": "extract",
 		"ch1_m4": "escort",

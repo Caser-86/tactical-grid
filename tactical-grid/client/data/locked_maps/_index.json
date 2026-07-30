@@ -5,9 +5,9 @@
       "name": "初次接触",
       "map_file": "data/generated_maps/ch1_m1.json",
       "seed": 1001,
-      "size": "medium",
+      "size": "large",
       "theme": "echo_yard",
-      "mission_type": "extract"
+      "mission_type": "infiltrate"
     },
     {
       "level_id": "ch1_m2",

@@ -2,12 +2,12 @@
   "levels": {
     "ch1_m1": {
       "name": "初次接触", "chapter": 1, "mission": 1,
-      "size": "medium", "theme": "echo_yard", "mission_type": "extract",
+      "size": "large", "theme": "echo_yard", "mission_type": "infiltrate",
       "difficulty": 1, "seed": 1001,
-      "player_units": 2, "enemy_count": 3,
-      "max_turns": 14, "three_star_turns": 8, "max_reinforcements": 1, "enemy_cap": 4,
+      "player_units": 3, "enemy_count": 5,
+      "max_turns": 18, "three_star_turns": 11, "three_star_requires_optional": true, "max_reinforcements": 3, "enemy_cap": 7,
       "intro_dialogue": "ch1_m1_intro", "outro_dialogue": "ch1_m1_outro",
-      "tutorial_flags": ["teach_movement", "teach_attack", "teach_cover", "teach_evac"],
+      "tutorial_flags": ["teach_camera", "teach_movement", "teach_attack", "teach_cover", "teach_interaction", "teach_upload_hold", "teach_evac"],
       "special_rules": {
         "no_overwatch": { "enabled": true, "reason": "教学关：警戒暂未开放，先掌握移动与攻击基础" },
         "no_items": { "enabled": true, "reason": "教学关：物品暂未开放，先掌握基础战斗" },

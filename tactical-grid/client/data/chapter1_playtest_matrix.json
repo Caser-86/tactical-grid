@@ -18,21 +18,21 @@
     }
   ],
   "mission_targets": [
-    {"level_id": "ch1_m1", "difficulty": "story", "turn_budget": 19, "target_turn_range": [5, 9], "target_survival_rate": 1.0},
+    {"level_id": "ch1_m1", "difficulty": "story", "turn_budget": 23, "target_turn_range": [8, 13], "target_survival_rate": 1.0},
     {"level_id": "ch1_m2", "difficulty": "story", "turn_budget": 21, "target_turn_range": [7, 11], "target_survival_rate": 0.95},
     {"level_id": "ch1_m3", "difficulty": "story", "turn_budget": 22, "target_turn_range": [8, 12], "target_survival_rate": 0.95},
     {"level_id": "ch1_m4", "difficulty": "story", "turn_budget": 23, "target_turn_range": [9, 13], "target_survival_rate": 0.9},
     {"level_id": "ch1_m5", "difficulty": "story", "turn_budget": 24, "target_turn_range": [10, 14], "target_survival_rate": 0.9},
     {"level_id": "ch1_m6", "difficulty": "story", "turn_budget": 27, "target_turn_range": [12, 17], "target_survival_rate": 0.85},
 
-    {"level_id": "ch1_m1", "difficulty": "standard", "turn_budget": 14, "target_turn_range": [6, 10], "target_survival_rate": 1.0},
+    {"level_id": "ch1_m1", "difficulty": "standard", "turn_budget": 18, "target_turn_range": [10, 15], "target_survival_rate": 1.0},
     {"level_id": "ch1_m2", "difficulty": "standard", "turn_budget": 16, "target_turn_range": [8, 12], "target_survival_rate": 0.9},
     {"level_id": "ch1_m3", "difficulty": "standard", "turn_budget": 17, "target_turn_range": [9, 13], "target_survival_rate": 0.9},
     {"level_id": "ch1_m4", "difficulty": "standard", "turn_budget": 18, "target_turn_range": [10, 14], "target_survival_rate": 0.85},
     {"level_id": "ch1_m5", "difficulty": "standard", "turn_budget": 19, "target_turn_range": [11, 15], "target_survival_rate": 0.8},
     {"level_id": "ch1_m6", "difficulty": "standard", "turn_budget": 22, "target_turn_range": [14, 18], "target_survival_rate": 0.75},
 
-    {"level_id": "ch1_m1", "difficulty": "hard", "turn_budget": 11, "target_turn_range": [7, 11], "target_survival_rate": 0.9},
+    {"level_id": "ch1_m1", "difficulty": "hard", "turn_budget": 15, "target_turn_range": [11, 15], "target_survival_rate": 0.9},
     {"level_id": "ch1_m2", "difficulty": "hard", "turn_budget": 13, "target_turn_range": [9, 13], "target_survival_rate": 0.8},
     {"level_id": "ch1_m3", "difficulty": "hard", "turn_budget": 14, "target_turn_range": [10, 14], "target_survival_rate": 0.8},
     {"level_id": "ch1_m4", "difficulty": "hard", "turn_budget": 15, "target_turn_range": [11, 15], "target_survival_rate": 0.7},

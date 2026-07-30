@@ -408,7 +408,7 @@ func _run_e2e_battle_test() -> void:
 	GameManager.current_level_id = "ch1_m1"
 	var level_config = CampaignRepository.get_level("ch1_m1")
 	_check(not level_config.is_empty(), "E2E: 关卡配置 ch1_m1 存在")
-	_check(level_config.get("mission_type") == "extract", "E2E: 关卡类型为撤离")
+	_check(level_config.get("mission_type") == "infiltrate", "E2E: 关卡类型为撤离")
 
 	# 验证种子和数据流（不创建 BattleController，因为它依赖场景节点）
 	var seed_val = int(level_config.get("seed", 1001))
@@ -556,12 +556,12 @@ func _test_locked_map_load_basic() -> void:
 		return
 	var data: Dictionary = res["data"]
 	_check(data.get("map_id", "") != "", "ch1_m1 map_id 非空")
-	_check(data.get("mission_type", "") == "extract", "ch1_m1 mission_type=extract")
-	_check(int(data.size.width) == 14, "ch1_m1 width=14")
-	_check(int(data.size.height) == 10, "ch1_m1 height=10")
+	_check(data.get("mission_type", "") == "infiltrate", "ch1_m1 mission_type=infiltrate")
+	_check(int(data.size.width) == 18, "ch1_m1 width=18")
+	_check(int(data.size.height) == 14, "ch1_m1 height=14")
 	_check(data.has("layers"), "ch1_m1 包含 layers")
-	_check(data.layers.base_terrain.size() == 10, "ch1_m1 base_terrain 行数=10")
-	_check(data.layers.base_terrain[0].size() == 14, "ch1_m1 base_terrain 列数=14")
+	_check(data.layers.base_terrain.size() == 14, "ch1_m1 base_terrain 行数=14")
+	_check(data.layers.base_terrain[0].size() == 18, "ch1_m1 base_terrain 列数=18")
 	# objects 应包含 spawn_player 和 evac
 	var objs = data.get("objects", [])
 	var has_player_spawn = objs.any(func(o): return o.get("type") == "spawn_player")
@@ -1630,7 +1630,13 @@ func _test_chapter_one_environment_sample() -> void:
 	if not result.get("ok", false):
 		return
 	var map: Dictionary = result["data"]
-	_check(map.size == {"width": 14, "height": 10}, "MapSample: ch1_m1 固定为 14x10")
+	_check(map.size == {"width": 18, "height": 14}, "MapSample: ch1_m1 固定为 18x14")
+	var level := CampaignRepository.get_level("ch1_m1")
+	_check(int(level.get("player_units", 0)) == 3 and int(level.get("enemy_count", 0)) == 5, "ch1_m1 force size is 3v5")
+	_check(int(level.get("max_turns", 0)) == 18 and int(level.get("three_star_turns", 0)) == 11, "ch1_m1 standard turn contract")
+	_check(int(level.get("max_reinforcements", 0)) == 3 and int(level.get("enemy_cap", 0)) == 7, "ch1_m1 pressure caps")
+	_check(level.get("mission_type", "") == "infiltrate", "ch1_m1 uses staged infiltrate objective")
+	_check(bool(level.get("three_star_requires_optional", false)) == true, "ch1_m1 cache is required for three stars")
 	_check(map.get("theme", "") == "echo_yard", "MapSample: ch1_m1 使用回声货场主题")
 	var environment: Dictionary = map.get("environment", {})
 	_check(environment.get("kit", "") == "echo_yard", "MapSample: 运行时保留 echo_yard 环境契约")
@@ -1639,6 +1645,8 @@ func _test_chapter_one_environment_sample() -> void:
 
 	var player_spawns: Array = MapLoader.get_player_spawns(map)
 	var enemy_spawns: Array = MapLoader.get_enemy_spawns(map)
+	_check(player_spawns.size() == 3, "MapSample: three-player deployment")
+	_check(enemy_spawns.size() == 5, "MapSample: five initial enemies")
 	var occupied: Dictionary = {}
 	var unique_spawns := true
 	for spawn in player_spawns + enemy_spawns:
@@ -1650,6 +1658,11 @@ func _test_chapter_one_environment_sample() -> void:
 
 	var terminal_objects: Array = map.objects.filter(func(object): return object.get("type") == "terminal")
 	var evac_objects: Array = map.objects.filter(func(object): return object.get("type") == "evac")
+	_check(terminal_objects.size() == 1, "MapSample: one upload terminal")
+	var resource_objects: Array = map.objects.filter(func(object): return object.get("type") == "resource")
+	_check(resource_objects.size() == 1, "MapSample: one optional cache")
+	_check(evac_objects.size() == 1, "MapSample: one locked evacuation anchor")
+	_check(map.scripts.filter(func(s): return s.trigger.get("type") == "event").size() == 2, "MapSample: two event waves")
 	_check(not player_spawns.is_empty() and not terminal_objects.is_empty() and not evac_objects.is_empty(), "MapSample: 出生、终端和撤离目标完整")
 	if not player_spawns.is_empty() and not evac_objects.is_empty():
 		var start := Vector2i(int(player_spawns[0].x), int(player_spawns[0].y))
@@ -2952,7 +2965,7 @@ func _test_first_chapter_data_consistency() -> void:
 	print("\n--- 第一章关卡数据一致性测试 ---")
 	var ch1_levels = ["ch1_m1", "ch1_m2", "ch1_m3", "ch1_m4", "ch1_m5", "ch1_m6"]
 	# 第一章六关期望类型序列（内容契约）
-	var expected_types := ["extract", "destroy", "extract", "escort", "steal_data", "assassinate"]
+	var expected_types := ["infiltrate", "destroy", "extract", "escort", "steal_data", "assassinate"]
 	# 期望字段（教学、奖励、对话引用一致）
 	for i in range(ch1_levels.size()):
 		var lid = ch1_levels[i]

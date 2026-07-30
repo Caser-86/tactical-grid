@@ -1,115 +1,144 @@
 {
-  "map_id": "ch1_m1_echo_yard_v1",
+  "map_id": "ch1_m1_echo_yard_v2",
   "seed": 1001,
-  "size": {"width": 14, "height": 10},
+  "size": {"width": 18, "height": 14},
   "theme": "echo_yard",
-  "mission_type": "extract",
+  "mission_type": "infiltrate",
   "difficulty": 1,
   "environment": {
     "kit": "echo_yard",
-    "route_anchors": [[2, 5], [7, 5], [11, 5]],
+    "route_anchors": [[3, 9], [9, 8], [14, 7], [12, 4], [5, 3]],
     "floor_variant_overrides": [
-      {"x": 6, "y": 0, "variant": 2}, {"x": 7, "y": 0, "variant": 2},
-      {"x": 6, "y": 1, "variant": 2}, {"x": 7, "y": 1, "variant": 2},
-      {"x": 6, "y": 2, "variant": 2}, {"x": 7, "y": 2, "variant": 2},
-      {"x": 6, "y": 3, "variant": 2}, {"x": 7, "y": 3, "variant": 2},
-      {"x": 6, "y": 4, "variant": 2}, {"x": 7, "y": 4, "variant": 2},
-      {"x": 6, "y": 5, "variant": 2}, {"x": 7, "y": 5, "variant": 2},
-      {"x": 6, "y": 6, "variant": 2}, {"x": 7, "y": 6, "variant": 2},
       {"x": 6, "y": 7, "variant": 2}, {"x": 7, "y": 7, "variant": 2},
+      {"x": 8, "y": 7, "variant": 2}, {"x": 9, "y": 7, "variant": 2},
+      {"x": 10, "y": 7, "variant": 2}, {"x": 11, "y": 7, "variant": 2},
       {"x": 6, "y": 8, "variant": 2}, {"x": 7, "y": 8, "variant": 2},
-      {"x": 6, "y": 9, "variant": 2}, {"x": 7, "y": 9, "variant": 2}
+      {"x": 8, "y": 8, "variant": 2}, {"x": 9, "y": 8, "variant": 2},
+      {"x": 10, "y": 8, "variant": 2}, {"x": 11, "y": 8, "variant": 2}
     ],
     "decorations": [
-      {"component_type": "landmark", "variant": 0, "x": 5, "y": 0, "z": 1},
-      {"component_type": "landmark", "variant": 1, "x": 12, "y": 0, "z": 1},
-      {"component_type": "decal", "variant": 0, "x": 5, "y": 8, "z": 0},
-      {"component_type": "decal", "variant": 1, "x": 3, "y": 5, "z": 0},
-      {"component_type": "decal", "variant": 2, "x": 10, "y": 6, "z": 0}
+      {"component_type": "landmark", "variant": 0, "x": 0, "y": 0, "z": 1},
+      {"component_type": "landmark", "variant": 1, "x": 17, "y": 5, "z": 1},
+      {"component_type": "landmark", "variant": 0, "x": 9, "y": 12, "z": 1},
+      {"component_type": "decal", "variant": 0, "x": 5, "y": 10, "z": 0},
+      {"component_type": "decal", "variant": 1, "x": 13, "y": 9, "z": 0},
+      {"component_type": "decal", "variant": 2, "x": 9, "y": 5, "z": 0}
     ]
+  },
+  "mission_flow": {
+    "terminal_required": true,
+    "upload_turns_required": 2,
+    "upload_hold_radius": 1,
+    "evac_locked_until_upload": true,
+    "optional_resource_credit": 150
   },
   "layers": {
     "base_terrain": [
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,4,4,4,4,0],
-      [0,0,0,0,0,1,1,1,1,1,1,1,1,0],
-      [0,0,0,0,0,1,1,1,1,0,0,0,0,0]
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
     "blocker": [
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,6,6,0,7,0,0,0,0,6,0,0,7,0],
-      [0,6,6,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,7,0,0,7,0,0,0,7,0],
-      [0,6,6,0,7,0,0,0,0,7,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,6,6,0,7,7,0,0,7,0,0,0,7,0],
-      [0,0,0,0,0,0,0,0,0,6,0,0,0,0],
-      [0,0,0,0,7,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,7,0,0,0,0,0,0,0,7,0,0,0,0,0],
+      [0,6,0,0,0,0,0,0,0,0,0,0,0,0,7,0,7,0],
+      [0,6,0,0,7,0,0,0,0,0,7,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,7,0,0,0,0,0,0,0,0,7,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0],
+      [0,7,0,0,6,0,0,0,7,0,0,0,6,0,0,7,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
     "vision": [
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,2,2,0,2,0,0,0,0,2,0,0,2,0],
-      [0,2,2,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,2,0,0,2,0,0,0,2,0],
-      [0,2,2,0,2,0,0,0,0,2,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,2,2,0,2,2,0,0,2,0,0,0,2,0],
-      [0,0,0,0,0,0,0,0,0,2,0,0,0,0],
-      [0,0,0,0,2,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2,0],
+      [0,0,0,0,2,0,0,0,0,0,2,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,2,0,0,0,0,0,0,0,0,2,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
     "height": [
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   },
   "objects": [
-    {"id": "player_alpha", "type": "spawn_player", "x": 6, "y": 9, "team": "player"},
-    {"id": "player_bravo", "type": "spawn_player", "x": 7, "y": 9, "team": "player"},
-    {"id": "enemy_west", "type": "spawn_enemy", "x": 3, "y": 4, "team": "enemy", "job": "sentry_basic", "ai": "guard_point"},
-    {"id": "enemy_center", "type": "spawn_enemy", "x": 7, "y": 4, "team": "enemy", "job": "drone_scout", "ai": "patrol"},
-    {"id": "enemy_east", "type": "spawn_enemy", "x": 11, "y": 4, "team": "enemy", "job": "sentry_basic", "ai": "guard_point"},
-    {"id": "crane_terminal", "type": "terminal", "x": 7, "y": 2, "state": "inactive"},
-    {"id": "north_evac", "type": "evac", "x": 7, "y": 0, "turnsToActivate": 3},
-    {"id": "west_salvage", "type": "resource", "x": 3, "y": 2, "reward": "credit_100"}
+    {"id": "player_alpha", "type": "spawn_player", "x": 8, "y": 13, "team": "player"},
+    {"id": "player_bravo", "type": "spawn_player", "x": 9, "y": 13, "team": "player"},
+    {"id": "player_charlie", "type": "spawn_player", "x": 10, "y": 13, "team": "player"},
+    {"id": "enemy_west", "type": "spawn_enemy", "x": 4, "y": 8, "team": "enemy", "job": "sentry_basic", "ai": "guard_point"},
+    {"id": "enemy_center", "type": "spawn_enemy", "x": 9, "y": 7, "team": "enemy", "job": "drone_scout", "ai": "patrol"},
+    {"id": "enemy_terminal", "type": "spawn_enemy", "x": 14, "y": 6, "team": "enemy", "job": "sentry_basic", "ai": "guard_point"},
+    {"id": "enemy_sniper", "type": "spawn_enemy", "x": 15, "y": 3, "team": "enemy", "job": "sentry_sniper", "ai": "guard_point"},
+    {"id": "enemy_assault", "type": "spawn_enemy", "x": 12, "y": 8, "team": "enemy", "job": "drone_assault", "ai": "patrol"},
+    {"id": "east_terminal", "type": "terminal", "x": 15, "y": 6, "state": "inactive"},
+    {"id": "northwest_evac", "type": "evac", "x": 2, "y": 1, "radius": 1},
+    {"id": "west_salvage", "type": "resource", "x": 2, "y": 8, "reward": "credit_150"}
   ],
   "scripts": [
     {
-      "trigger_id": "tutorial_reinforcement",
-      "trigger": {"type": "turn", "condition": ">= 6"},
+      "trigger_id": "terminal_counterattack",
+      "trigger": {"type": "event", "name": "terminal_activated"},
       "action": "spawn_reinforcement",
       "data": {
-        "units": [{"type": "drone_assault", "position": [13, 8]}],
-        "message": "货场侧门开启：一架突击无人机正在接近。"
+        "units": [
+          {"type": "sentry_basic", "position": [16, 12]},
+          {"type": "drone_assault", "position": [17, 11]}
+        ],
+        "message": "警报升级：敌军从东南侧切断退路。"
       },
       "repeat": false
     },
     {
-      "trigger_id": "evac_activate",
-      "trigger": {"type": "all_objectives_complete"},
-      "action": "activate_evac",
-      "data": {"turns_to_evac": 3, "message": "龙门吊数据已上传，北侧撤离台开放。"},
+      "trigger_id": "evac_intercept",
+      "trigger": {"type": "event", "name": "upload_completed"},
+      "action": "spawn_reinforcement",
+      "data": {
+        "units": [{"type": "sentry_sniper", "position": [4, 1]}],
+        "message": "上传完成，但北侧拦截手已就位。"
+      },
       "repeat": false
     }
   ],
   "victory": {
     "primary": "activate_terminal + reach_evac",
-    "secondary": ["zero_casualty", "turns <= 12", "loot >= 1"],
+    "secondary": ["zero_casualty", "turns <= 11", "loot >= 1"],
     "bonus": 0.2
   },
   "validation": {
