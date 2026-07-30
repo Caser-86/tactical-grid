@@ -1,4 +1,4 @@
-## 行动系统
+﻿## 行动系统
 ## 处理单位的移动、攻击、技能、物品、警戒等所有行动
 extends Node
 class_name ActionSystem
@@ -856,3 +856,224 @@ func set_map_data(data: Dictionary) -> void:
 func set_units(players: Array, enemies: Array) -> void:
 	player_units = players
 	enemy_units = enemies
+
+## ===== CODE-P1-01: 统一动作契约 =====
+
+var _next_preview_id: int = 0
+var _active_previews: Dictionary = {}  # preview_id -> preview data
+
+## CODE-P1-01: 统一动作查询。返回动作预览数据，不执行任何变更。
+## request 格式：{action: StringName, unit: Node, target?: Vector2i/Node, action_id?: String}
+## 返回：{valid: bool, action: StringName, cost?: {ap: int, move: int}, targets?: Array,
+##        damage?: int, hit_chance?: float, reason?: String, preview_id: int}
+func query_action(request: Dictionary) -> Dictionary:
+	var action: StringName = request.get("action", &"")
+	var unit: Node = request.get("unit", null)
+	if not is_instance_valid(unit):
+		return {"valid": false, "reason": "invalid_unit"}
+	match action:
+		&"move":
+			return _query_move(unit, request)
+		&"attack":
+			return _query_attack(unit, request)
+		&"skill":
+			return _query_skill(unit, request)
+		&"item":
+			return _query_item(unit, request)
+		&"overwatch":
+			return _query_overwatch(unit, request)
+		_:
+			return {"valid": false, "reason": "unknown_action", "action": String(action)}
+
+func _query_move(unit: Node, request: Dictionary) -> Dictionary:
+	if not unit.can_move():
+		return {"valid": false, "reason": "cannot_move", "action": &"move"}
+	var target: Vector2i = request.get("target", Vector2i(-1, -1))
+	var reachable = Pathfinding.get_reachable_cells(
+		unit.grid_pos, unit.move_points,
+		map_data.size.width, map_data.size.height,
+		_get_move_cost.bind(unit.job), _is_blocked
+	)
+	if target.x < 0:
+		# 无目标时返回可达范围
+		return {"valid": true, "action": &"move", "reachable": reachable}
+	if not reachable.has(target):
+		return {"valid": false, "reason": "unreachable", "action": &"move"}
+	var cost: int = reachable[target]
+	return _register_preview({
+		"valid": true, "action": &"move", "unit": unit,
+		"target": target, "cost": {"move": cost, "ap": 0},
+	})
+
+func _query_attack(unit: Node, request: Dictionary) -> Dictionary:
+	if not unit.can_act():
+		return {"valid": false, "reason": "cannot_act", "action": &"attack"}
+	var target: Node = request.get("target", null)
+	if not is_instance_valid(target) or not target.is_alive:
+		return {"valid": false, "reason": "invalid_target", "action": &"attack"}
+	var dist = GridSystem.manhattan_distance(unit.grid_pos, target.grid_pos)
+	if dist < unit.weapon_range[0] or dist > unit.weapon_range[1]:
+		return {"valid": false, "reason": "out_of_range", "action": &"attack"}
+	var has_los = VisionSystem.has_line_of_sight(
+		unit.grid_pos, target.grid_pos,
+		map_data.size.width, map_data.size.height, _is_vision_blocking
+	)
+	if not has_los:
+		return {"valid": false, "reason": "no_los", "action": &"attack"}
+	var hit_chance = _calculate_hit_chance(unit, target)
+	var damage = _calculate_damage(unit, target)
+	return _register_preview({
+		"valid": true, "action": &"attack", "unit": unit,
+		"target": target, "cost": {"ap": 1, "move": 0},
+		"hit_chance": hit_chance, "damage": damage,
+	})
+
+func _query_skill(unit: Node, request: Dictionary) -> Dictionary:
+	if not unit.can_act():
+		return {"valid": false, "reason": "cannot_act", "action": &"skill"}
+	var action_id: String = request.get("action_id", "")
+	var skill = _get_skill_data(action_id)
+	if skill.is_empty():
+		return {"valid": false, "reason": "unknown_skill", "action": &"skill"}
+	var ap_cost: int = int(skill.get("ap_cost", 1))
+	if unit.current_ap < ap_cost:
+		return {"valid": false, "reason": "insufficient_ap", "action": &"skill"}
+	return _register_preview({
+		"valid": true, "action": &"skill", "unit": unit,
+		"action_id": action_id, "cost": {"ap": ap_cost, "move": 0},
+		"targeting_type": String(skill.get("targeting_type", "enemy")),
+	})
+
+func _query_item(unit: Node, request: Dictionary) -> Dictionary:
+	var action_id: String = request.get("action_id", "")
+	var item = GameData.get_item(action_id) if GameData else {}
+	if item.is_empty():
+		return {"valid": false, "reason": "unknown_item", "action": &"item"}
+	return _register_preview({
+		"valid": true, "action": &"item", "unit": unit,
+		"action_id": action_id, "cost": {"ap": 0, "move": 0},
+	})
+
+func _query_overwatch(unit: Node, request: Dictionary) -> Dictionary:
+	if not unit.can_act():
+		return {"valid": false, "reason": "cannot_act", "action": &"overwatch"}
+	return _register_preview({
+		"valid": true, "action": &"overwatch", "unit": unit,
+		"cost": {"ap": 1, "move": 0},
+	})
+
+func _register_preview(preview: Dictionary) -> Dictionary:
+	_next_preview_id += 1
+	preview["preview_id"] = _next_preview_id
+	_active_previews[_next_preview_id] = preview.duplicate(true)
+	return preview
+
+## CODE-P1-01: 验证预览仍然有效（未被过期或状态改变失效）
+func validate_action(preview: Dictionary) -> Dictionary:
+	var preview_id: int = int(preview.get("preview_id", 0))
+	if preview_id == 0 or not _active_previews.has(preview_id):
+		return {"valid": false, "reason": "stale_preview"}
+	var stored = _active_previews[preview_id]
+	var unit: Node = stored.get("unit", null)
+	if not is_instance_valid(unit) or not unit.is_alive:
+		return {"valid": false, "reason": "unit_invalid"}
+	match stored.get("action", &""):
+		&"move":
+			if not unit.can_move():
+				return {"valid": false, "reason": "cannot_move"}
+			var target: Vector2i = stored.get("target", Vector2i(-1, -1))
+			var reachable = Pathfinding.get_reachable_cells(
+				unit.grid_pos, unit.move_points,
+				map_data.size.width, map_data.size.height,
+				_get_move_cost.bind(unit.job), _is_blocked
+			)
+			if not reachable.has(target):
+				return {"valid": false, "reason": "unreachable"}
+		&"attack":
+			if not unit.can_act():
+				return {"valid": false, "reason": "cannot_act"}
+			var target: Node = stored.get("target", null)
+			if not is_instance_valid(target) or not target.is_alive:
+				return {"valid": false, "reason": "target_invalid"}
+	return {"valid": true, "preview": stored}
+
+## CODE-P1-01: 提交动作执行。预览必须先通过 validate_action。
+func commit_action(preview: Dictionary) -> Dictionary:
+	var validation := validate_action(preview)
+	if not bool(validation.get("valid", false)):
+		return {"success": false, "reason": String(validation.get("reason", "invalid_preview"))}
+	var preview_id: int = int(preview.get("preview_id", 0))
+	var stored = _active_previews.get(preview_id, {})
+	_active_previews.erase(preview_id)
+	var unit: Node = stored.get("unit", null)
+	match stored.get("action", &""):
+		&"move":
+			var target: Vector2i = stored.get("target", Vector2i(-1, -1))
+			var success = execute_move(unit, target)
+			return {"success": success, "action": &"move"}
+		&"attack":
+			var target: Node = stored.get("target", null)
+			var result = execute_attack(unit, target)
+			result["action"] = &"attack"
+			return result
+		&"skill":
+			var action_id: String = stored.get("action_id", "")
+			var target_data: Dictionary = preview.get("target_data", {})
+			var result = execute_skill(unit, action_id, target_data)
+			result["action"] = &"skill"
+			return result
+		&"item":
+			var action_id: String = stored.get("action_id", "")
+			var target_data: Dictionary = preview.get("target_data", {})
+			var target_unit: Node = preview.get("target_unit", null)
+			var result = use_item(unit, action_id, target_unit, target_data)
+			result["action"] = &"item"
+			return result
+		&"overwatch":
+			var success = enter_overwatch(unit)
+			return {"success": success, "action": &"overwatch"}
+		_:
+			return {"success": false, "reason": "unknown_action"}
+
+## 预览用命中概率（不含随机结算，仅返回期望命中率 0.0-1.0）
+func _calculate_hit_chance(attacker: Node, target: Node) -> float:
+	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
+	var cover = VisionSystem.calculate_cover(
+		target.grid_pos, attacker.grid_pos,
+		func(pos): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+	)
+	var special: String = attacker.weapon_special
+	var effective_hit = attacker.base_hit
+	if special == "pierce_50_ignore_half_cover":
+		if cover == "half":
+			cover = "none"
+	elif special == "pierce_all_charge_1_turn":
+		cover = "none"
+	elif special == "setup_bonus_30_hit":
+		effective_hit += 30
+	elif special == "setup_2_turns_guaranteed_hit_crit":
+		return 1.0
+	return CombatFormulas.calculate_hit(
+		effective_hit, attacker.height, target.height,
+		cover, dist, attacker.weapon_optimal_range
+	)
+
+## 预览用期望伤害（非暴击，已扣护甲）
+func _calculate_damage(attacker: Node, target: Node) -> int:
+	var dist = GridSystem.manhattan_distance(attacker.grid_pos, target.grid_pos)
+	var special: String = attacker.weapon_special
+	var effective_armor = target.armor
+	var effective_damage = int((attacker.weapon_damage[0] + attacker.weapon_damage[1]) / 2)
+	if special == "pierce_50_ignore_half_cover":
+		effective_armor = int(target.armor * 0.5)
+	elif special == "pierce_all_charge_1_turn":
+		effective_armor = 0
+	elif special == "silent_ignore_armor":
+		effective_armor = 0
+	elif special == "close_range_bonus_1.3x_at_2_tiles" and dist == 2:
+		effective_damage = int(effective_damage * 1.3)
+	elif special == "close_range_bonus_1.4x" and dist <= 2:
+		effective_damage = int(effective_damage * 1.4)
+	return CombatFormulas.calculate_damage(
+		effective_damage, effective_armor, false, attacker.crit_multiplier
+	)

@@ -313,7 +313,26 @@ if ($saveRecoveryResult.ExitCode -ne 0 -or $saveRecoveryFailed -ne 0) {
     exit 1
 }
 
-# --- 3. 日志门：检查非预期 ERROR/WARNING ---
+# --- 2.94. Action system contract ---
+Write-Host "[2.94/3] Running action system contract..."
+try {
+    $actionResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/action_system_test.tscn')
+} catch {
+    Write-Host "ACTION SYSTEM TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$actionSummary = Get-LocalizedTestSummary -Output $actionResult.Stdout
+$actionPassed = [int]$actionSummary[0]
+$actionFailed = [int]$actionSummary[1]
+Write-Host "  Passed: $actionPassed"
+Write-Host "  Failed: $actionFailed"
+if ($actionResult.ExitCode -ne 0 -or $actionFailed -ne 0) {
+    Write-Host "ACTION SYSTEM TEST FAILED (exit=$($actionResult.ExitCode), failed=$actionFailed)" -ForegroundColor Red
+    ($actionResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($actionResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+# --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
 # Merge stdout and stderr for the log gate.
@@ -326,7 +345,8 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($e2eResult.Stdout -split "`r?`n") + ($e2eResult.Stderr -split "`r?`n") + `
     ($objResult.Stdout -split "`r?`n") + ($objResult.Stderr -split "`r?`n") + `
     ($targetingResult.Stdout -split "`r?`n") + ($targetingResult.Stderr -split "`r?`n") + `
-    ($saveRecoveryResult.Stdout -split "`r?`n") + ($saveRecoveryResult.Stderr -split "`r?`n")
+    ($saveRecoveryResult.Stdout -split "`r?`n") + ($saveRecoveryResult.Stderr -split "`r?`n") + `
+    ($actionResult.Stdout -split "`r?`n") + ($actionResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -389,6 +409,7 @@ Write-Host "  Chapter-one E2E assertions: $e2ePassed"
 Write-Host "  Chapter-one objectives assertions: $objPassed"
 Write-Host "  Targeting controller assertions: $targetingPassed"
 Write-Host "  Save recovery assertions: $saveRecoveryPassed"
+Write-Host "  Action system assertions: $actionPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"
