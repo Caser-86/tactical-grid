@@ -66,12 +66,35 @@ func _test_hud_contract() -> void:
 		_check(camera._map_bounds.size == expected_bounds_size, "相机边界包含地图和单位视觉安全边")
 		_check(camera._safe_viewport.size.x < get_viewport().get_visible_rect().size.x, "相机安全区为右侧单位面板预留空间")
 		_check(camera._safe_viewport.position.y >= 50.0, "相机安全区避开顶部 HUD")
-		var safe_center = camera._safe_viewport.get_center()
-		var viewport_center = get_viewport().get_visible_rect().size * 0.5
-		var map_screen_center = viewport_center + (camera._map_bounds.get_center() - camera.position) * camera.zoom
-		_check(map_screen_center.is_equal_approx(safe_center), "相机将地图中心对齐到无 HUD 遮挡的安全区")
-		var safe_fit_zoom = minf(camera._safe_viewport.size.x / camera._map_bounds.size.x, camera._safe_viewport.size.y / camera._map_bounds.size.y)
-		_check(camera.zoom.x <= minf(1.0, safe_fit_zoom) + 0.001, "相机缩放确保完整地图和部署行避开 HUD")
+		# Task 5: readable camera opens at 1.0 zoom on the deployment
+		_check(is_equal_approx(camera.zoom.x, 1.0), "large map starts at readable 1.0 zoom")
+		var deployment_center: Vector2 = _battle.get_player_deployment_center()
+		_check(camera.position.distance_to(deployment_center + camera._get_safe_viewport_offset()) < 2.0,
+			"camera opens on the three-unit deployment")
+		# drag pans the battlefield
+		var before_drag: Vector2 = camera.position
+		camera.begin_drag(Vector2(500, 350))
+		camera.drag_to(Vector2(420, 300))
+		camera.end_drag()
+		_check(camera.position.distance_to(before_drag) > 1.0, "middle-drag pans the battlefield")
+		# overview fits more of the map, second toggle restores
+		var readable_zoom: Vector2 = camera.zoom
+		camera.toggle_overview()
+		_check(camera.zoom.x < readable_zoom.x, "Tab overview fits more of the map")
+		camera.toggle_overview()
+		_check(camera.zoom.is_equal_approx(readable_zoom), "second Tab restores readable zoom")
+		# all four map corners are reachable
+		for corner in [
+			camera._map_bounds.position,
+			camera._map_bounds.position + Vector2(camera._map_bounds.size.x, 0),
+			camera._map_bounds.position + Vector2(0, camera._map_bounds.size.y),
+			camera._map_bounds.end,
+		]:
+			camera.focus_home(corner)
+			var safe_world_center: Vector2 = camera.position - camera._get_safe_viewport_offset()
+			var safe_world_size: Vector2 = camera._safe_viewport.size / camera.zoom
+			var visible_world := Rect2(safe_world_center - safe_world_size * 0.5, safe_world_size)
+			_check(visible_world.grow(1.0).has_point(corner), "camera can reach map corner %s" % corner)
 	var action_bar = hud.get_node_or_null("BottomBar/ActionBar")
 	_check(action_bar != null and action_bar.offset_right > 0.0, "HUD 在启动时应用视口布局")
 	var objective_label: Label = hud.get_node_or_null("TopBar/ObjectiveLabel")
@@ -114,7 +137,7 @@ func _test_hud_contract() -> void:
 	if first_tile:
 		_check(first_tile.get("environment_kit") == "echo_yard", "ch1_m1 格子使用 echo_yard 环境套件")
 		_check(first_tile.get("floor_texture") is Texture2D, "环境格加载正式地板纹理")
-	var blocker_tile = map_layer.get_node_or_null("Tile_1_1") if map_layer else null
+	var blocker_tile = map_layer.get_node_or_null("Tile_4_3") if map_layer else null
 	_check(blocker_tile != null and blocker_tile.get("blocker_texture") is Texture2D, "阻挡格加载独立货场道具纹理")
 	var threshold_tile = map_layer.get_node_or_null("Tile_5_0") if map_layer else null
 	var edge_variants = threshold_tile.get("edge_variants") if threshold_tile else null
@@ -170,7 +193,7 @@ func _test_hud_contract() -> void:
 				evac_overlays_ignore_mouse = false
 				break
 	_check(evac_overlays_ignore_mouse, "撤离区域提示不拦截地图点击")
-	_check(objective_label != null and objective_label.text.contains("撤离区域"), "顶部目标明确要求到达撤离区域")
+	_check(objective_label != null and objective_label.text.contains("终端"), "顶部目标明确要求当前阶段目标")
 
 	# 地面效果不能只存在于规则数据中，必须在战场上生成并在到期后移除视觉节点。
 	_battle.action_system._create_ground_effect(Vector2i(2, 2), 0, "smoke", 1)

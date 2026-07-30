@@ -20,6 +20,8 @@ const HINT_COPY := {
 	"teach_escort": "护送 VIP 到撤离点。VIP 阵亡则任务失败，注意保护。",
 	"teach_skills": "技能消耗 AP，提供强力战术选项。不同职业有不同技能树。",
 	"teach_items": "物品如医疗包可在战斗中使用，不消耗 AP，注意补给。",
+	"teach_camera": "战场大于屏幕。按住鼠标中键拖动画面，滚轮缩放，WASD 或方向键平移；Tab 查看全图，Home 返回当前单位。",
+	"teach_upload_hold": "终端上传需要连续控制 2 个敌方回合。至少一名队员留在终端一格范围内，否则上传暂停。",
 }
 
 @onready var _text_label: Label = $Panel/TextLabel

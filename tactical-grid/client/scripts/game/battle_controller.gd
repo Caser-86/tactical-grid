@@ -1033,8 +1033,16 @@ func _configure_viewport_layout() -> void:
 		Vector2(0.0, top_hud_height),
 		Vector2(maxf(1.0, viewport_size.x - right_panel_width), maxf(1.0, viewport_size.y - top_hud_height - bottom_hud_height))
 	)
-	camera.setup(map_bounds, safe_viewport)
+	camera.setup(map_bounds, safe_viewport, get_player_deployment_center())
 	RenderingServer.set_default_clear_color(Color(0.015, 0.028, 0.042))
+## Task 5: 杩斿洖鐜╁閮ㄧ讲涓績鐨勪笘鐣屽潗鏍囷紝鐢ㄤ簬鐩告満鍒濆鑱氱劍
+func get_player_deployment_center() -> Vector2:
+	if player_units.is_empty():
+		return Rect2(Vector2.ZERO, Vector2(map_width, map_height) * CELL_SIZE).get_center()
+	var total := Vector2.ZERO
+	for unit in player_units:
+		total += _get_cell_center(unit.grid_pos)
+	return total / float(player_units.size())
 
 func _render_units() -> void:
 	for child in unit_layer.get_children():

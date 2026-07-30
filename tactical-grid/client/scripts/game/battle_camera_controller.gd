@@ -6,6 +6,7 @@ class_name BattleCameraController
 signal event_feedback_started(kind: StringName)
 
 ## 相机缩放范围
+const DEFAULT_ZOOM := 1.0
 const MIN_ZOOM := 0.65
 const MAX_ZOOM := 1.5
 ## 平移速度（像素/秒）
@@ -14,6 +15,8 @@ const PAN_SPEED := 600.0
 const ZOOM_STEP := 1.1
 ## 平滑跟随插值系数
 const FOLLOW_LERP := 8.0
+## 边缘平移触发边距（像素）
+const EDGE_PAN_MARGIN := 16.0
 const FEEDBACK_EVENTS: Array[StringName] = [&"critical", &"explosion", &"boss_phase"]
 
 ## 地图边界（世界坐标）
@@ -27,11 +30,22 @@ var _edge_pan: Vector2 = Vector2.ZERO
 ## 是否启用键盘平移
 var _keyboard_pan: Vector2 = Vector2.ZERO
 var _feedback_tween: Tween
+## 中键拖拽状态
+var _dragging: bool = false
+var _last_drag_screen_pos: Vector2 = Vector2.ZERO
+## 全图概览状态
+var _in_overview: bool = false
+var _saved_zoom: Vector2 = Vector2.ONE
+var _saved_position: Vector2 = Vector2.ZERO
+## Home 键目标
+var _home_target: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	enabled = true
 
 func _process(delta: float) -> void:
+	# 鼠标边缘平移
+	_update_edge_pan()
 	# 合并边缘平移和键盘平移
 	var pan_dir = _edge_pan + _keyboard_pan
 	if pan_dir.length() > 0.01:
@@ -52,31 +66,83 @@ func _input(event: InputEvent) -> void:
 			_zoom_at(event.position, 1.0 / ZOOM_STEP)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_zoom_at(event.position, ZOOM_STEP)
+		elif event.button_index == MOUSE_BUTTON_MIDDLE:
+			if event.pressed:
+				begin_drag(event.position)
+			else:
+				end_drag()
 
-	# 键盘平移
+	# 鼠标移动拖拽
+	if event is InputEventMouseMotion and _dragging:
+		drag_to(event.position)
+
+	# 键盘平移与快捷键
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_W, KEY_UP: _keyboard_pan.y = -1.0
 			KEY_S, KEY_DOWN: _keyboard_pan.y = 1.0
 			KEY_A, KEY_LEFT: _keyboard_pan.x = -1.0
 			KEY_D, KEY_RIGHT: _keyboard_pan.x = 1.0
+			KEY_HOME: focus_home(_home_target)
+			KEY_TAB: toggle_overview()
 	elif event is InputEventKey and not event.pressed:
 		match event.keycode:
 			KEY_W, KEY_UP, KEY_S, KEY_DOWN: _keyboard_pan.y = 0.0
 			KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT: _keyboard_pan.x = 0.0
 
 ## 设置地图边界和安全视口
-func setup(map_bounds: Rect2, safe_viewport: Rect2) -> void:
+func setup(map_bounds: Rect2, safe_viewport: Rect2, initial_focus: Vector2 = Vector2(INF, INF)) -> void:
 	_map_bounds = map_bounds
 	_safe_viewport = safe_viewport
-	# Fit the complete playable map inside the portion of the screen not covered by HUD.
-	# The safe area's center differs from the physical viewport center when a side panel is open.
-	var safe_size := _get_safe_viewport().size
-	var fit_zoom := minf(safe_size.x / map_bounds.size.x, safe_size.y / map_bounds.size.y)
-	var zoom_value := clampf(minf(1.0, fit_zoom), MIN_ZOOM, MAX_ZOOM)
-	zoom = Vector2.ONE * zoom_value
-	position = map_bounds.get_center() + _get_safe_viewport_offset()
+	zoom = Vector2.ONE * DEFAULT_ZOOM
+	var focus_point := initial_focus
+	if not is_finite(focus_point.x) or not is_finite(focus_point.y):
+		focus_point = map_bounds.get_center()
+	_home_target = focus_point
+	position = focus_point + _get_safe_viewport_offset()
+
+## 切换全图概览
+func toggle_overview() -> void:
+	if _in_overview:
+		zoom = _saved_zoom
+		position = _saved_position
+		_in_overview = false
+	else:
+		_saved_zoom = zoom
+		_saved_position = position
+		var safe_size := _get_safe_viewport().size
+		var fit_zoom := minf(safe_size.x / _map_bounds.size.x, safe_size.y / _map_bounds.size.y)
+		zoom = Vector2.ONE * clampf(fit_zoom, MIN_ZOOM, MAX_ZOOM)
+		position = _map_bounds.get_center() + _get_safe_viewport_offset()
+		_in_overview = true
 	_clamp_to_bounds()
+
+## 聚焦到目标位置（Home 键）
+func focus_home(target: Vector2) -> void:
+	_home_target = target
+	position = target + _get_safe_viewport_offset()
+	_clamp_to_bounds()
+
+## 设置 Home 目标（不移动相机）
+func set_home_target(target: Vector2) -> void:
+	_home_target = target
+
+## 开始中键拖拽
+func begin_drag(screen_pos: Vector2) -> void:
+	_dragging = true
+	_last_drag_screen_pos = screen_pos
+
+## 拖拽移动
+func drag_to(screen_pos: Vector2) -> void:
+	if not _dragging:
+		return
+	position -= (screen_pos - _last_drag_screen_pos) / zoom
+	_last_drag_screen_pos = screen_pos
+	_clamp_to_bounds()
+
+## 结束拖拽
+func end_drag() -> void:
+	_dragging = false
 
 ## 平滑定位到指定格子（世界坐标）
 func focus_position(world_pos: Vector2) -> void:
@@ -117,6 +183,25 @@ func play_event_feedback(kind: StringName, world_pos: Vector2, duration_override
 	_feedback_tween.tween_property(self, "position", origin + direction.orthogonal() * intensity * 0.35, duration * 0.22)
 	_feedback_tween.tween_property(self, "position", origin, duration * 0.30)
 	_feedback_tween.finished.connect(_clamp_to_bounds)
+
+## 更新鼠标边缘平移方向
+func _update_edge_pan() -> void:
+	var viewport_size := get_viewport_rect().size
+	var mouse_pos := get_viewport().get_mouse_position()
+	_edge_pan = Vector2.ZERO
+	# Skip edge pan when cursor is at origin (headless) or outside the viewport
+	if mouse_pos.x <= 0.0 or mouse_pos.y <= 0.0:
+		return
+	if mouse_pos.x >= viewport_size.x or mouse_pos.y >= viewport_size.y:
+		return
+	if mouse_pos.x < EDGE_PAN_MARGIN:
+		_edge_pan.x = -1.0
+	elif mouse_pos.x > viewport_size.x - EDGE_PAN_MARGIN:
+		_edge_pan.x = 1.0
+	if mouse_pos.y < EDGE_PAN_MARGIN:
+		_edge_pan.y = -1.0
+	elif mouse_pos.y > viewport_size.y - EDGE_PAN_MARGIN:
+		_edge_pan.y = 1.0
 
 ## 在指定屏幕坐标处缩放
 func _zoom_at(screen_pos: Vector2, factor: float) -> void:
