@@ -6,7 +6,9 @@ class_name ActionSystem
 signal ground_effects_changed
 
 var map_data: Dictionary = {}
+## CODE-P1-02: 可注入的战斗 RNG。设置 seed 后确定性可复现。
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _rng_seed: int = -1
 
 ## 单位列表（由 BattleController 设置）
 var player_units: Array = []
@@ -22,7 +24,15 @@ var noise_events: Array[Dictionary] = []
 var ground_effects: Array[Dictionary] = []
 
 func _ready() -> void:
-	rng.randomize()
+	if _rng_seed >= 0:
+		rng.seed = _rng_seed
+	else:
+		rng.randomize()
+
+## CODE-P1-02: 设置确定性种子（测试用）
+func set_seed(seed: int) -> void:
+	_rng_seed = seed
+	rng.seed = seed
 
 ## 执行移动
 func execute_move(unit: Node, target: Vector2i) -> bool:

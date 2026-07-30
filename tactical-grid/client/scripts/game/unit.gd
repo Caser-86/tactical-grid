@@ -1,4 +1,4 @@
-## 单位基类
+﻿## 单位基类
 ## 所有战斗单位（玩家/敌人）的公共属性和行为
 extends Node2D
 class_name Unit
@@ -16,6 +16,9 @@ signal shield_changed(unit, current_shield: int, max_shield: int)
 @export var team: String = "player"  # player / enemy
 @export var job: String = "assault"
 var boss_art_key: StringName = &""
+
+## CODE-P1-02: 稳定实体 ID，地图加载时分配，不依赖数组索引
+var entity_id: String = ""
 
 # 六维属性
 var stats: Dictionary = {

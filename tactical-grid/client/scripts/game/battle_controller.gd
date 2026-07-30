@@ -566,6 +566,7 @@ func _spawn_units() -> void:
 				unit = GameData.create_player_unit("assault", _get_job_display_name("assault"))
 			unit.grid_pos = Vector2i(obj.x, obj.y)
 			unit.height = MapLoader.get_height_at(map_data, obj.x, obj.y)
+			unit.entity_id = "%s_%d" % [unit.team, player_units.size()]
 			player_units.append(unit)
 
 		elif obj.type == "spawn_enemy":
@@ -573,6 +574,7 @@ func _spawn_units() -> void:
 			var unit = GameData.create_enemy_unit(enemy_type)
 			unit.grid_pos = Vector2i(obj.x, obj.y)
 			unit.height = MapLoader.get_height_at(map_data, obj.x, obj.y)
+			unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
 			_apply_difficulty_to_enemy(unit)
 			enemy_units.append(unit)
 
@@ -914,6 +916,7 @@ func _boss_summon_unit(enemy_type: String, display_name: String) -> void:
 		return
 	unit.grid_pos = spawn_pos
 	unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
+	unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
 	_apply_difficulty_to_enemy(unit)
 	enemy_units.append(unit)
 	if enemy_director:
@@ -1282,6 +1285,7 @@ func _spawn_reinforcement_units(units_data: Array) -> void:
 		var unit = GameData.create_enemy_unit(enemy_type)
 		unit.grid_pos = spawn_pos
 		unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
+		unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
 		_apply_difficulty_to_enemy(unit)
 		enemy_units.append(unit)
 		# 渲染新单位精灵

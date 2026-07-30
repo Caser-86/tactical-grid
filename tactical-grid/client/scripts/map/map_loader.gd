@@ -1,4 +1,4 @@
-## 地图加载器
+﻿## 地图加载器
 ## 从后端 API 或本地 JSON 加载地图数据
 class_name MapLoader
 
@@ -28,6 +28,9 @@ static func load_locked_map(level_id: String) -> Dictionary:
 		return {"ok": false, "error": "root is not an object"}
 	# 规范化字段，补全运行时所需结构
 	var normalized := _normalize_locked_map(raw, level_id)
+	var validation := LockedMapValidator.validate(normalized)
+	if not bool(validation.get("valid", true)):
+		push_warning("Locked map validation errors for %s: %s" % [level_id, str(validation.get("errors", []))])
 	return {"ok": true, "data": normalized}
 
 ## 将服务端锁定地图格式归一化为客户端运行时使用的 map_data 结构。
@@ -64,6 +67,10 @@ static func _normalize_locked_map(raw: Dictionary, level_id: String) -> Dictiona
 		"victory": raw.get("victory", {}),
 		"environment": raw.get("environment", {}),
 		"mission_flow": raw.get("mission_flow", {}),
+		"schema_version": int(raw.get("schema_version", 1)),
+		"nodes": raw.get("nodes", []),
+		"facilities": raw.get("facilities", []),
+		"connections": raw.get("connections", []),
 	}
 	return result
 
