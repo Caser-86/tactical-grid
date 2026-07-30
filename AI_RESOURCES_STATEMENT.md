@@ -60,6 +60,8 @@
 | `client/assets/generated/chapter1/runtime/environment/cooling_works/*.png` | 冷却工坊的地面、边缘、掩体、危险贴花和地标 | 2026-07-30 | `generate_cooling_works_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
 | `client/assets/generated/chapter1/runtime/environment/transit_hub/*.png` | 磁悬轨道枢纽的月台、导轨、站台掩体、贴花和地标 | 2026-07-30 | `generate_transit_hub_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
 | `client/assets/generated/chapter1/runtime/environment/sentinel_core/*.png` | 哨兵核心的环形地面、相位掩体、回路贴花和核心地标 | 2026-07-30 | `generate_sentinel_core_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
+| `client/assets/generated/chapter1/source/ch1_m1_units/*_source_v1.png` | 七名第一章首发单位（突击兵、狙击手、重装兵、基础哨兵、侦察无人机、狙击哨兵、突击无人机）的三视四分之三俯视源插画 | 2026-07-30 | Codex 内置 Image Generation | 源文件；纯绿幕背景；导出排除 |
+| `client/assets/generated/chapter1/runtime/units/assault_96.png` 等 7 张 | 上述七名单位的透明 96×96 运行时精灵 | 2026-07-30 | 上述源图经 `process_chapter1_unit_art.ps1` 绿色主导色键去背、裁剪、缩放合成 | 透明运行时资源；已完成 Godot 导入、`ArtCatalog` 加载、尺寸/透明度/剪影差异契约和烟雾测试验证 |
 
 ## 3. 遗留参考图已知问题
 
@@ -83,3 +85,4 @@
 - 2026-07-30：登记 Cooling Works 的程序化运行时环境套件；其不属于 AI 图像生成资源，但在此声明中保留与 AI 资源并列的完整可追溯记录
 - 2026-07-30：登记 Mag-Rail Transit Hub 的程序化运行时环境套件和其 `ch1_m3` 关卡接入
 - 2026-07-30：登记 Sentinel Core 的程序化运行时环境套件和其 `ch1_m5` 关卡接入
+- 2026-07-30：登记第一章首发七名单位（突击兵、狙击手、重装兵、基础哨兵、侦察无人机、狙击哨兵、突击无人机）的 96×96 运行时精灵；源图由 Codex Image Generation 生成，经 `process_chapter1_unit_art.ps1` 绿色主导色键去背并确定性合成

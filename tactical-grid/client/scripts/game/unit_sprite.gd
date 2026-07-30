@@ -6,7 +6,8 @@ class_name UnitSprite
 const SUPPORTED_STATES: Array[StringName] = [
 	&"idle", &"move", &"attack", &"hit", &"skill", &"death",
 ]
-const ART_MAX_SIZE := 56.0
+const ART_MAX_SIZE := 76.0
+const HEAVY_ART_MAX_SIZE := 82.0
 const BOSS_ART_MAX_SIZE := 80.0
 const STANDARD_RADIUS := 25
 const BOSS_RADIUS := 31
@@ -43,8 +44,11 @@ func _draw() -> void:
 	var radius := BOSS_RADIUS if _is_boss_unit() else STANDARD_RADIUS
 
 	_draw_ellipse(Vector2(0, 5), Vector2(23, 13), Color(0, 0, 0, 0.42))
-	draw_circle(Vector2.ZERO, radius, color.darkened(0.62))
-	draw_circle(Vector2.ZERO, radius - 3, color.darkened(0.30))
+	# Normal units no longer use a filled circular token base (design 9.2).
+	# Boss units retain the filled base for visual weight.
+	if _is_boss_unit():
+		draw_circle(Vector2.ZERO, radius, color.darkened(0.62))
+		draw_circle(Vector2.ZERO, radius - 3, color.darkened(0.30))
 	if not art_sprite or not art_sprite.texture:
 		_draw_tactical_silhouette(color)
 
@@ -91,7 +95,7 @@ func _refresh_art_texture() -> void:
 	if art_sprite.texture:
 		var texture_size := art_sprite.texture.get_size()
 		var longest_side := maxf(texture_size.x, texture_size.y)
-		var target_size := BOSS_ART_MAX_SIZE if _is_boss_unit() else ART_MAX_SIZE
+		var target_size := BOSS_ART_MAX_SIZE if _is_boss_unit() else _get_normal_art_max_size()
 		var scale_factor := minf(1.0, target_size / maxf(1.0, longest_side))
 		_base_art_scale = Vector2.ONE * scale_factor
 	else:
@@ -100,6 +104,19 @@ func _refresh_art_texture() -> void:
 
 func _is_boss_unit() -> bool:
 	return unit != null and not unit.boss_art_key.is_empty()
+
+func _get_normal_art_max_size() -> float:
+	if unit != null and unit.job == "heavy":
+		return HEAVY_ART_MAX_SIZE
+	return ART_MAX_SIZE
+
+func get_rendered_art_size() -> float:
+	if not art_sprite or not art_sprite.texture:
+		return 0.0
+	return maxf(art_sprite.texture.get_width(), art_sprite.texture.get_height()) * art_sprite.scale.x
+
+func uses_filled_token_base() -> bool:
+	return false
 
 func get_supported_states() -> Array[StringName]:
 	return SUPPORTED_STATES.duplicate()
@@ -147,6 +164,8 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
 
 func play_move_to(target_position: Vector2, duration_override: float = -1.0) -> void:
 	_begin_state(&"move")
+	if unit:
+		z_index = 100 + unit.grid_pos.y
 	var distance := position.distance_to(target_position)
 	var base_duration := duration_override if duration_override > 0.0 else clampf(distance / 420.0, 0.14, 0.42)
 	var duration := AccessibilitySettings.get_effect_duration(base_duration)
@@ -273,4 +292,6 @@ func update_unit(value: Node) -> void:
 	if next_unit and not next_unit.shield_changed.is_connected(_on_shield_changed):
 		next_unit.shield_changed.connect(_on_shield_changed)
 	_refresh_art_texture()
+	if unit:
+		z_index = 100 + unit.grid_pos.y
 	queue_redraw()

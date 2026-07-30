@@ -13,6 +13,7 @@ var _observed_camera_event: StringName = &""
 func _ready() -> void:
 	print("=== Unit animation contract test ===")
 	await _test_runtime_art_and_states()
+	await _test_unit_art_contract()
 	await _test_camera_event_feedback()
 	await _cleanup()
 	_print_summary()
@@ -96,6 +97,47 @@ func _test_runtime_art_and_states() -> void:
 		await get_tree().create_timer(0.12).timeout
 		_check(drone_view.get_current_state() == &"death", "death state remains terminal")
 
+func _test_unit_art_contract() -> void:
+	print("\n--- Test: 96px unit art contract ---")
+	var required_keys: Array[StringName] = [
+		&"assault", &"sniper", &"heavy", &"sentry_basic",
+		&"drone_scout", &"sentry_sniper", &"drone_assault",
+	]
+	var textures: Dictionary = {}
+	for key in required_keys:
+		var texture := ArtCatalog.get_texture(&"unit", key)
+		_check(texture is Texture2D, "%s loads through ArtCatalog" % key)
+		if texture:
+			_check(texture.get_size() == Vector2(96, 96), "%s is a 96x96 runtime sprite" % key)
+			_check(_has_real_alpha(texture), "%s has transparent background" % key)
+			textures[key] = texture
+	# Player trio silhouettes must differ in alpha mask and grayscale.
+	var player_pairs: Array = [[&"assault", &"sniper"], [&"assault", &"heavy"], [&"sniper", &"heavy"]]
+	for pair in player_pairs:
+		if textures.has(pair[0]) and textures.has(pair[1]):
+			var diff := _alpha_mask_difference(textures[pair[0]], textures[pair[1]])
+			_check(diff >= 0.12, "%s and %s alpha silhouettes differ by at least 0.12" % [pair[0], pair[1]])
+			var gray_diff := _grayscale_silhouette_difference(textures[pair[0]], textures[pair[1]])
+			_check(gray_diff >= 0.12, "%s and %s grayscale silhouettes differ by at least 0.12" % [pair[0], pair[1]])
+	# Enemy trio silhouettes must differ in alpha mask and grayscale.
+	var enemy_pairs: Array = [[&"sentry_basic", &"drone_scout"], [&"sentry_basic", &"sentry_sniper"], [&"drone_scout", &"sentry_sniper"]]
+	for pair in enemy_pairs:
+		if textures.has(pair[0]) and textures.has(pair[1]):
+			var diff := _alpha_mask_difference(textures[pair[0]], textures[pair[1]])
+			_check(diff >= 0.12, "%s and %s alpha silhouettes differ by at least 0.12" % [pair[0], pair[1]])
+			var gray_diff := _grayscale_silhouette_difference(textures[pair[0]], textures[pair[1]])
+			_check(gray_diff >= 0.12, "%s and %s grayscale silhouettes differ by at least 0.12" % [pair[0], pair[1]])
+	# Runtime presentation contract: readable art size and no filled token base.
+	var assault_unit := _create_unit("assault", "AssaultArt")
+	var assault_view := await _create_view(assault_unit)
+	_check(assault_view.has_method("get_rendered_art_size"), "UnitSprite exposes rendered art size")
+	if assault_view.has_method("get_rendered_art_size"):
+		_check(assault_view.get_rendered_art_size() >= 76.0, "normal unit art renders at least 76px")
+	_check(assault_view.has_method("uses_filled_token_base"), "UnitSprite exposes token-base query")
+	if assault_view.has_method("uses_filled_token_base"):
+		_check(not assault_view.uses_filled_token_base(), "normal units do not use a filled token base")
+	assault_view.queue_free()
+
 func _test_camera_event_feedback() -> void:
 	var camera := BattleCameraController.new()
 	add_child(camera)
@@ -141,6 +183,44 @@ func _alpha_mask_difference(first: Texture2D, second: Texture2D) -> float:
 				union_count += 1
 				if alpha_a != alpha_b:
 					changed += 1
+	return float(changed) / float(maxi(1, union_count))
+
+func _has_real_alpha(texture: Texture2D) -> bool:
+	var image := texture.get_image()
+	if image == null:
+		return false
+	var transparent := 0
+	var opaque := 0
+	for y in image.get_height():
+		for x in image.get_width():
+			if image.get_pixel(x, y).a < 0.05:
+				transparent += 1
+			elif image.get_pixel(x, y).a > 0.90:
+				opaque += 1
+	return transparent > 0 and opaque > 0
+
+func _grayscale_silhouette_difference(first: Texture2D, second: Texture2D) -> float:
+	var image_a := first.get_image()
+	var image_b := second.get_image()
+	if image_a == null or image_b == null or image_a.get_size() != image_b.get_size():
+		return 1.0
+	var changed := 0
+	var union_count := 0
+	for y in range(image_a.get_height()):
+		for x in range(image_a.get_width()):
+			var pixel_a := image_a.get_pixel(x, y)
+			var pixel_b := image_b.get_pixel(x, y)
+			var alpha_a := pixel_a.a >= 0.15
+			var alpha_b := pixel_b.a >= 0.15
+			if alpha_a or alpha_b:
+				union_count += 1
+				if alpha_a != alpha_b:
+					changed += 1
+				else:
+					var gray_a := pixel_a.r * 0.299 + pixel_a.g * 0.587 + pixel_a.b * 0.114
+					var gray_b := pixel_b.r * 0.299 + pixel_b.g * 0.587 + pixel_b.b * 0.114
+					if absf(gray_a - gray_b) > 0.18:
+						changed += 1
 	return float(changed) / float(maxi(1, union_count))
 
 func _cleanup() -> void:
