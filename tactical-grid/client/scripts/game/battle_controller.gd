@@ -1,4 +1,4 @@
-## 战斗场景控制器
+﻿## 战斗场景控制器
 ## 单一战斗状态源：管理地图、单位、回合、行动和渲染
 extends Node2D
 class_name BattleController
@@ -1608,6 +1608,8 @@ func _select_unit(unit: Unit) -> void:
 	selected_unit = unit
 	_update_unit_sprite_selection(unit, true)
 	hud.update_unit_info(unit)
+	if unit.team == "player":
+		hud.set_context_state(HUD.ContextState.UNIT_SELECTED)
 	_show_move_range(unit)
 
 func _deselect_unit() -> void:
@@ -1628,6 +1630,7 @@ func _deselect_unit() -> void:
 	_clear_layer(attack_highlight)
 	hud.update_unit_info(null)
 	hud.set_action_buttons_visible(false)
+	hud.set_context_state(HUD.ContextState.NONE)
 	hud.set_targeting_hint("")
 	hud.update_objective(_get_objective_text())
 
@@ -1994,12 +1997,14 @@ func _on_next_unit() -> void:
 func on_move_button() -> void:
 	if selected_unit and selected_unit.team == "player":
 		selected_action = "move"
+		hud.set_context_state(HUD.ContextState.MOVE_PREVIEW)
 		_clear_layer(attack_highlight)
 		_show_move_range(selected_unit)
 
 func on_attack_button() -> void:
 	if selected_unit and selected_unit.team == "player" and selected_unit.current_ap > 0:
 		selected_action = "attack"
+		hud.set_context_state(HUD.ContextState.ATTACK_PREVIEW)
 		_show_attack_range(selected_unit)
 
 func on_skill_button() -> void:

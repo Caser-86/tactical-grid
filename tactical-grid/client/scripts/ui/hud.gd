@@ -1,4 +1,4 @@
-## HUD 控制器
+﻿## HUD 控制器
 ## 管理战斗界面的所有 UI 元素
 extends CanvasLayer
 class_name HUD
@@ -28,6 +28,11 @@ var _action_picker: PopupPanel = null
 ## 行动选择面板的回调（选中后调用）
 var _action_picker_callback: Callable = Callable()
 
+## CODE-P0-02: 上下文状态枚举，驱动 HUD 提示与按钮可见性
+enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
+var _context_state: ContextState = ContextState.NONE
+var _context_prompt: Label = null
+
 func _ready() -> void:
 	_apply_visual_theme()
 	move_button.pressed.connect(_on_move_pressed)
@@ -38,6 +43,19 @@ func _ready() -> void:
 	end_turn_button.pressed.connect(_on_end_turn_pressed)
 	pause_button.pressed.connect(_on_pause_pressed)
 	set_action_buttons_visible(false)
+	# CODE-P0-02: context prompt label
+	_context_prompt = Label.new()
+	_context_prompt.name = "ContextPrompt"
+	_context_prompt.text = "选择一个单位开始行动"
+	_context_prompt.add_theme_font_size_override("font_size", 16)
+	_context_prompt.add_theme_color_override("font_color", Color(0.72, 0.95, 1.0, 0.85))
+	_context_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_context_prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_context_prompt.offset_top = -80.0
+	_context_prompt.offset_bottom = -60.0
+	_context_prompt.visible = false
+	add_child(_context_prompt)
+	set_context_state(ContextState.NONE)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -109,6 +127,7 @@ func update_unit_info(unit: Node) -> void:
 	if not unit or not unit.is_alive:
 		unit_info_label.text = ""
 		set_action_buttons_visible(false)
+		set_context_state(ContextState.NONE)
 		return
 
 	var team_label = "玩家" if unit.team == "player" else "敌人"
@@ -128,6 +147,7 @@ func update_unit_info(unit: Node) -> void:
 	# 只有玩家单位且在玩家回合时显示操作按钮
 	if unit.team == "player":
 		set_action_buttons_visible(true)
+		set_context_state(ContextState.UNIT_SELECTED)
 		var can_act = unit.current_ap > 0
 		attack_button.disabled = not can_act
 		skill_button.disabled = not can_act
@@ -153,6 +173,32 @@ func set_action_buttons_visible(visible: bool) -> void:
 	skill_button.visible = visible
 	item_button.visible = visible
 	overwatch_button.visible = visible
+
+## CODE-P0-02: 上下文状态控制 HUD 显示
+func set_context_state(state: ContextState) -> void:
+	_context_state = state
+	match state:
+		ContextState.NONE:
+			set_action_buttons_visible(false)
+			end_turn_button.visible = true
+			if _context_prompt:
+				_context_prompt.visible = true
+				_context_prompt.text = "选择一个单位开始行动"
+		ContextState.UNIT_SELECTED:
+			if _context_prompt:
+				_context_prompt.visible = false
+		ContextState.MOVE_PREVIEW:
+			if _context_prompt:
+				_context_prompt.visible = true
+				_context_prompt.text = "点击蓝色高亮格移动，右键取消"
+		ContextState.ATTACK_PREVIEW:
+			if _context_prompt:
+				_context_prompt.visible = true
+				_context_prompt.text = "点击红色目标攻击，右键取消"
+		ContextState.FACILITY_PREVIEW:
+			if _context_prompt:
+				_context_prompt.visible = true
+				_context_prompt.text = "点击设施节点交互，右键取消"
 
 ## 在窗口尺寸变化时更新 HUD 安全区域，避免裁切或大面积空白
 func apply_viewport_layout(viewport_size: Vector2i) -> void:

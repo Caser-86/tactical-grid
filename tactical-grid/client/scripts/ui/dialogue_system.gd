@@ -1,10 +1,22 @@
-## 剧情对话系统
+﻿## 剧情对话系统
 ## 管理剧情对话的显示和玩家选择
 extends Control
 class_name DialogueSystem
 
 signal dialogue_finished()
 signal choice_made(flag: String)
+
+## CODE-P0-02: speaker ID 到本地化名称的映射
+const SPEAKER_NAMES := {
+	"alpha": "阿尔法",
+	"commander": "指挥官",
+	"lila": "莉拉",
+	"sentinel": "哨兵",
+	"doctor": "博士",
+	"shadow": "影刃",
+	"architect": "架构师",
+	"system": "系统",
+}
 
 @onready var portrait_left = $Panel/PortraitLeft
 @onready var portrait_right = $Panel/PortraitRight
@@ -19,6 +31,8 @@ var current_index: int = 0
 var is_typing: bool = false
 var type_speed: float = 0.03
 var current_choices: Array = []
+## CODE-P0-02: speaker -> 立绘位置（left/right），由 characters 数组填充
+var _speaker_positions: Dictionary = {}
 
 func _ready() -> void:
 	hide()
@@ -55,6 +69,9 @@ func start_dialogue(dialogue_id: String) -> void:
 		dialogue_finished.emit()
 		queue_free()
 		return
+	_speaker_positions.clear()
+	for character in dialogue_data.get("characters", []):
+		_speaker_positions[character.get("id", "")] = character.get("position", "left")
 	current_index = 0
 	show()
 	_show_line(current_lines[current_index])
@@ -65,8 +82,8 @@ func _show_line(line: Dictionary) -> void:
 	for child in choices_container.get_children():
 		child.queue_free()
 
-	# 设置角色名
-	name_label.text = line.get("speaker", "???")
+	var speaker_id: String = line.get("speaker", "")
+	name_label.text = SPEAKER_NAMES.get(speaker_id, speaker_id if speaker_id != "" else "???")
 
 	# 设置文字（打字机效果）
 	text_label.text = ""
@@ -74,12 +91,27 @@ func _show_line(line: Dictionary) -> void:
 	continue_hint.visible = false
 	_type_text(line.get("text", ""))
 
-	# 设置头像
-	# TODO: 根据 speaker 加载对应立绘
+	_show_speaker_portrait(speaker_id)
 
 	# 如果有选项
 	if line.get("choices", false):
 		_show_choices()
+
+func _show_speaker_portrait(speaker: String) -> void:
+	portrait_left.visible = false
+	portrait_right.visible = false
+	if speaker == "":
+		return
+	var texture: Texture2D = null
+	var art_catalog = get_node_or_null(^"/root/ArtCatalog")
+	if art_catalog and art_catalog.has_method("get_texture"):
+		texture = art_catalog.get_texture(&"portrait", StringName(speaker))
+	if texture == null:
+		return
+	var position: String = _speaker_positions.get(speaker, "left")
+	var target: TextureRect = portrait_right if position == "right" else portrait_left
+	target.texture = texture
+	target.visible = true
 
 ## 打字机效果
 func _type_text(text: String) -> void:

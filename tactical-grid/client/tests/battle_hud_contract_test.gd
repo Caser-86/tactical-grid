@@ -1,4 +1,4 @@
-## 战斗 HUD 契约测试
+﻿## 战斗 HUD 契约测试
 ## 验证选中玩家单位时显示五个行动按钮，选中敌人时不显示
 ## 验证按钮图标尺寸受限，不挤压 HUD
 extends Node
@@ -6,6 +6,8 @@ extends Node
 const BattleScene = preload("res://scenes/battle.tscn")
 const GameDataScript = preload("res://scripts/data/game_data.gd")
 const TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
+const HUDScript = preload("res://scripts/ui/hud.gd")
+const DialogueSystemScript = preload("res://scripts/ui/dialogue_system.gd")
 
 var _passed: int = 0
 var _failed: int = 0
@@ -24,6 +26,7 @@ func _ready() -> void:
 	await _test_cooling_works_render_contract()
 	await _test_mission_event_reinforcement_bridge()
 	await _test_viewport_fills_at_22x16()
+	await _test_input_actions()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -383,6 +386,25 @@ func _test_viewport_fills_at_22x16() -> void:
 		var visible_world := Rect2(safe_world_center - safe_world_size * 0.5, safe_world_size)
 		_check(visible_world.grow(1.0).has_point(corner), "22x16 角落可达: %s" % corner)
 	test_camera.queue_free()
+func _test_input_actions() -> void:
+	print("\n--- 测试: 输入动作契约 ---")
+	# Space 结束回合
+	_check(InputMap.has_action("end_turn"), "end_turn 动作存在")
+	_check(InputMap.has_action("next_unit"), "next_unit 动作存在")
+	_check(InputMap.has_action("pause"), "pause 动作存在")
+	_check(InputMap.has_action("toggle_overview"), "toggle_overview 动作存在")
+	_check(InputMap.has_action("toggle_network"), "toggle_network 动作存在")
+	# 对话名称本地化（直接检查类常量，避免实例化 CanvasLayer）
+	_check(DialogueSystemScript.SPEAKER_NAMES.get("alpha", "") == "阿尔法", "alpha 映射为阿尔法")
+	_check(DialogueSystemScript.SPEAKER_NAMES.get("commander", "") == "指挥官", "commander 映射为指挥官")
+	_check(DialogueSystemScript.SPEAKER_NAMES.get("lila", "") == "莉拉", "lila 映射为莉拉")
+	# HUD 上下文状态枚举
+	_check(HUDScript.ContextState.NONE == 0, "ContextState.NONE 存在")
+	_check(HUDScript.ContextState.UNIT_SELECTED == 1, "ContextState.UNIT_SELECTED 存在")
+	_check(HUDScript.ContextState.MOVE_PREVIEW == 2, "ContextState.MOVE_PREVIEW 存在")
+	_check(HUDScript.ContextState.ATTACK_PREVIEW == 3, "ContextState.ATTACK_PREVIEW 存在")
+	_check(HUDScript.ContextState.FACILITY_PREVIEW == 4, "ContextState.FACILITY_PREVIEW 存在")
+
 func _dispose_battle() -> void:
 	if _battle and is_instance_valid(_battle):
 		# Units are detached data nodes. Tear this fixture down synchronously so the
