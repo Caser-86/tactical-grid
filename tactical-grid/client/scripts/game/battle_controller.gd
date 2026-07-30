@@ -51,6 +51,10 @@ var action_system: ActionSystem
 var enemy_director: EnemyDirector
 var targeting_controller: TargetingController
 var mission_objective_state: MissionObjectiveState
+## CODE-P2-01: Visibility memory and enemy intent
+var visibility_state: VisibilityState
+var enemy_intent_state: EnemyIntentState
+var enemy_planner: EnemyPlanner
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 ## 胜利条件
@@ -336,6 +340,13 @@ func _init_subsystems() -> void:
 	mission_objective_state = MissionObjectiveState.new()
 	add_child(mission_objective_state)
 	mission_objective_state.objective_updated.connect(_on_objective_updated)
+
+	visibility_state = VisibilityState.new()
+	add_child(visibility_state)
+	enemy_intent_state = EnemyIntentState.new()
+	add_child(enemy_intent_state)
+	enemy_planner = EnemyPlanner.new()
+	add_child(enemy_planner)
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。
@@ -1230,6 +1241,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			turn_manager.input_locked = false
 			hud.set_buttons_disabled(false)
 			action_system.process_ground_effects_on_turn_start()
+			_update_visibility()
 			if mission_objective_state:
 				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "player"})
 			hud.update_objective(_get_objective_text())
@@ -2373,6 +2385,50 @@ func _update_unit_sprite_selection(unit: Unit, selected: bool) -> void:
 
 func _get_move_cost(pos: Vector2i, job: String) -> int:
 	return GameData.get_move_cost(job, MapLoader.get_terrain_at(map_data, pos.x, pos.y))
+
+## CODE-P2-01: Update visibility from all alive player units.
+## Computes visible cells, updates VisibilityState, and refreshes enemy sprite visibility.
+func _update_visibility() -> void:
+	if not visibility_state:
+		return
+	var visible_cells: Array[Vector2i] = []
+	for unit in player_units:
+		if not unit or not unit.is_alive:
+			continue
+		var cells = VisionSystem.get_visible_cells(
+			unit.grid_pos, unit.vision_range,
+			map_width, map_height,
+			_is_vision_blocking
+		)
+		for cell in cells:
+			if not visible_cells.has(cell):
+				visible_cells.append(cell)
+	# Collect visible enemy data
+	var visible_enemies: Array = []
+	for enemy in enemy_units:
+		if not enemy or not enemy.is_alive:
+			continue
+		if visible_cells.has(enemy.grid_pos):
+			visible_enemies.append({
+				"entity_id": enemy.entity_id,
+				"pos": enemy.grid_pos,
+				"hp": enemy.current_hp,
+			})
+	visibility_state.update_visibility(visible_cells, visible_enemies)
+	_refresh_enemy_sprite_visibility()
+
+## CODE-P2-01: Hide enemy sprites not currently observed; show observed ones.
+func _refresh_enemy_sprite_visibility() -> void:
+	for child in unit_layer.get_children():
+		if not child is UnitSprite:
+			continue
+		var sprite = child as UnitSprite
+		if not sprite or not sprite.unit:
+			continue
+		if sprite.unit.team != "enemy":
+			continue
+		var observed = visibility_state.is_enemy_observed(sprite.unit.entity_id)
+		sprite.visible = observed
 
 func _is_blocked(pos: Vector2i) -> bool:
 	if not MapLoader.is_passable(map_data, pos.x, pos.y):

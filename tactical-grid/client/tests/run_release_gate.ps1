@@ -352,6 +352,46 @@ if ($validatorResult.ExitCode -ne 0 -or $validatorFailed -ne 0) {
     exit 1
 }
 
+# --- 2.96. Visibility state contract ---
+Write-Host "[2.96/3] Running visibility state contract..."
+try {
+    $visibilityResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/visibility_state_test.tscn')
+} catch {
+    Write-Host "VISIBILITY STATE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$visibilitySummary = Get-LocalizedTestSummary -Output $visibilityResult.Stdout
+$visibilityPassed = [int]$visibilitySummary[0]
+$visibilityFailed = [int]$visibilitySummary[1]
+Write-Host "  Passed: $visibilityPassed"
+Write-Host "  Failed: $visibilityFailed"
+if ($visibilityResult.ExitCode -ne 0 -or $visibilityFailed -ne 0) {
+    Write-Host "VISIBILITY STATE TEST FAILED (exit=$($visibilityResult.ExitCode), failed=$visibilityFailed)" -ForegroundColor Red
+    ($visibilityResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($visibilityResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.97. Enemy intent state contract ---
+Write-Host "[2.97/3] Running enemy intent state contract..."
+try {
+    $intentResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/enemy_intent_state_test.tscn')
+} catch {
+    Write-Host "ENEMY INTENT STATE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$intentSummary = Get-LocalizedTestSummary -Output $intentResult.Stdout
+$intentPassed = [int]$intentSummary[0]
+$intentFailed = [int]$intentSummary[1]
+Write-Host "  Passed: $intentPassed"
+Write-Host "  Failed: $intentFailed"
+if ($intentResult.ExitCode -ne 0 -or $intentFailed -ne 0) {
+    Write-Host "ENEMY INTENT STATE TEST FAILED (exit=$($intentResult.ExitCode), failed=$intentFailed)" -ForegroundColor Red
+    ($intentResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($intentResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -367,7 +407,9 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($targetingResult.Stdout -split "`r?`n") + ($targetingResult.Stderr -split "`r?`n") + `
     ($saveRecoveryResult.Stdout -split "`r?`n") + ($saveRecoveryResult.Stderr -split "`r?`n") + `
     ($actionResult.Stdout -split "`r?`n") + ($actionResult.Stderr -split "`r?`n") + `
-    ($validatorResult.Stdout -split "`r?`n") + ($validatorResult.Stderr -split "`r?`n")
+    ($validatorResult.Stdout -split "`r?`n") + ($validatorResult.Stderr -split "`r?`n") + `
+    ($visibilityResult.Stdout -split "`r?`n") + ($visibilityResult.Stderr -split "`r?`n") + `
+    ($intentResult.Stdout -split "`r?`n") + ($intentResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -432,6 +474,8 @@ Write-Host "  Targeting controller assertions: $targetingPassed"
 Write-Host "  Save recovery assertions: $saveRecoveryPassed"
 Write-Host "  Action system assertions: $actionPassed"
 Write-Host "  Locked map validator assertions: $validatorPassed"
+Write-Host "  Visibility state assertions: $visibilityPassed"
+Write-Host "  Enemy intent state assertions: $intentPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"
