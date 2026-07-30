@@ -24,6 +24,7 @@ func _run() -> void:
 	# Task 3: star rating and optional resource reward tests
 	await _test_calculate_stars_contract()
 	await _test_optional_reward_first_clear_one_time()
+	await _test_m1_infiltrate_stages()
 
 	# Clean saves again so the main loop starts fresh
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -65,11 +66,6 @@ func _run() -> void:
 			if battle == null or battle.name != "Battle":
 				continue
 			await _prepare_battle(battle)
-
-		# Task 3: ch1_m1 inject optional resource collection state
-		if mission_number == 1:
-			battle.mission_objective_state.optional_credit = 150
-			battle.mission_objective_state.collected_resources[Vector2i(99, 99)] = true
 
 		_satisfy_objective(battle)
 		_check(battle._check_victory(), "%s 正式目标状态达到胜利" % level_id)
@@ -221,6 +217,19 @@ func _satisfy_objective(battle: BattleController) -> void:
 			for unit in battle.player_units:
 				unit.grid_pos = battle.mission_objective_state.evac_point
 			battle._sync_objective_state_from_mos()
+		"infiltrate":
+			var inf_actor: Unit = battle.player_units[0]
+			for terminal_pos in battle.mission_objective_state.terminals:
+				battle.mission_objective_state.on_terminal_interacted(inf_actor, terminal_pos)
+			for terminal_pos in battle.mission_objective_state.terminals:
+				inf_actor.grid_pos = terminal_pos
+			battle.mission_objective_state.on_enemy_turn_completed()
+			battle.mission_objective_state.on_enemy_turn_completed()
+			for resource_pos in battle.mission_objective_state.resource_positions:
+				battle.mission_objective_state.on_resource_interacted(inf_actor, resource_pos)
+			for unit in battle.player_units:
+				unit.grid_pos = battle.mission_objective_state.evac_point
+			battle._sync_objective_state_from_mos()
 		"assassinate":
 			battle.boss_unit.take_damage(battle.boss_unit.max_hp + battle.boss_unit.max_shield + 1)
 
@@ -286,6 +295,88 @@ func _print_summary() -> void:
 		for error in _errors:
 			print("    - ", error)
 	print("  =================")
+
+
+## ===== Task 7: M1 infiltrate production path =====
+func _test_m1_infiltrate_stages() -> void:
+	print("\n--- Task 7 test: M1 infiltrate production path ---")
+	GameManager.begin_new_game_for_test(0)
+	GameManager.current_level_id = "ch1_m1"
+	var battle := BattleScene.instantiate()
+	add_child(battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if battle.get_script() == null:
+		_check(false, "battle script loaded for M1 infiltrate test")
+		if is_instance_valid(battle):
+			battle.queue_free()
+		return
+
+	# Initial production state
+	_check(battle.map_width == 18 and battle.map_height == 14, "M1 production map is expanded")
+	_check(battle.player_units.size() == 3, "M1 deploys three distinct player jobs")
+	_check(battle.enemy_units.size() == 5, "M1 starts with five authored enemies")
+	_check(battle.mission_objective_state.get_stage() == &"approach", "M1 begins in approach")
+
+	var initial_enemies: int = battle.enemy_units.size()
+	var actor: Unit = battle.player_units[0]
+	var terminal_pos: Vector2i = battle.mission_objective_state.terminals[0]
+
+	# Terminal activation -> UPLOAD stage, terminal_activated reinforcement event
+	battle.mission_objective_state.on_terminal_interacted(actor, terminal_pos)
+	_check(battle.mission_objective_state.get_stage() == &"upload", "terminal activation enters upload stage")
+	_check(battle.enemy_units.size() >= initial_enemies + 2, "terminal_activated event spawned reinforcements")
+
+	# One paused upload round: move all players away from terminal
+	for unit in battle.player_units:
+		unit.grid_pos = Vector2i(0, 0)
+	var paused_result: Dictionary = battle.mission_objective_state.on_enemy_turn_completed()
+	_check(bool(paused_result.get("paused", false)), "upload pauses without terminal control")
+	_check(int(paused_result.get("progress", -1)) == 0, "paused round does not advance progress")
+
+	# Free one enemy slot under the cap so upload_completed reinforcement can spawn
+	if battle.enemy_units.size() >= 7:
+		battle.enemy_units[0].current_hp = 0
+		battle.enemy_units[0].is_alive = false
+
+	# Two controlled upload rounds: move actor adjacent to terminal
+	actor.grid_pos = terminal_pos
+	var r1: Dictionary = battle.mission_objective_state.on_enemy_turn_completed()
+	_check(not bool(r1.get("paused", true)) and int(r1.get("progress", -1)) == 1, "controlled upload advances to 1/2")
+	var before_evac: int = battle.enemy_units.size()
+	var r2: Dictionary = battle.mission_objective_state.on_enemy_turn_completed()
+	_check(battle.mission_objective_state.get_stage() == &"evacuate", "completed upload unlocks evacuation")
+	_check(battle.enemy_units.size() >= before_evac, "upload_completed event spawned reinforcement")
+
+	# Resource collection
+	var resource_pos: Vector2i = battle.mission_objective_state.resource_positions[0]
+	var res_result: Dictionary = battle.mission_objective_state.on_resource_interacted(actor, resource_pos)
+	_check(int(res_result.get("credit_bonus", 0)) == 150, "optional resource grants 150 credit bonus")
+
+	# Evacuation
+	for unit in battle.player_units:
+		unit.grid_pos = battle.mission_objective_state.evac_point
+	battle._sync_objective_state_from_mos()
+	_check(battle.mission_objective_state.is_victory(), "all survivors evacuate after upload")
+
+	# Star rating and optional credit
+	var modifiers: Dictionary = battle.mission_objective_state.get_result_modifiers()
+	var optional_complete := bool(modifiers.get("optional_resource_collected", false))
+	var stars: int = battle._calculate_stars(true, 3, 3, 10, optional_complete)
+	_check(stars == 3, "fast no-casualty clear with cache yields three stars")
+	_check(int(modifiers.get("optional_credit", 0)) == 150, "optional credit recorded as 150")
+
+	# Three-star requires optional; without cache it is two stars
+	var stars_no_cache: int = battle._calculate_stars(true, 3, 3, 10, false)
+	_check(stars_no_cache == 2, "no-cache clear yields two stars")
+
+	# Casualty drops to one star
+	var stars_casualty: int = battle._calculate_stars(true, 2, 3, 10, true)
+	_check(stars_casualty == 1, "casualty clear yields one star")
+
+	battle._cleanup_units()
+	battle.queue_free()
+	await get_tree().process_frame
 
 
 ## ===== Task 3: _calculate_stars contract test =====

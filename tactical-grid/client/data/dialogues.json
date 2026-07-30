@@ -8,15 +8,32 @@
         { "id": "commander", "name": "指挥官", "portrait": "commander_neutral", "position": "right" }
       ],
       "lines": [
-        { "speaker": "alpha", "text": "指挥官，前方是矩阵协议的数据中心。", "emotion": "serious" },
-        { "speaker": "alpha", "text": "根据情报，里面有个终端存储着关键数据。", "emotion": "serious" },
-        { "speaker": "commander", "text": "只有我们两个人？", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "指挥官，前方是矩阵协议的回声货场。", "emotion": "serious" },
+        { "speaker": "alpha", "text": "东侧终端存储着关键数据，我们需要潜入激活它。", "emotion": "serious" },
+        { "speaker": "commander", "text": "激活后呢？", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "上传需要连续控制两个敌方回合——至少一名队员留在终端一格范围内，否则上传暂停。", "emotion": "neutral" },
+        { "speaker": "alpha", "text": "上传完成后，全员转移至西北侧撤离点撤离。", "emotion": "serious" },
+        { "speaker": "commander", "text": "只有我们三个人？", "emotion": "neutral" },
         { "speaker": "alpha", "text": "莉拉和哨兵在外围策应。博士在基地待命。", "emotion": "neutral" },
         { "speaker": "commander", "text": "明白。行动方针？", "emotion": "neutral", "choices": true }
       ],
       "choices": [
         { "text": "稳扎稳打，逐步推进。", "next": "ch1_m1_intro_b", "flag": "cautious_approach", "response": { "speaker": "alpha", "text": "收到。我们慢慢来，不冒险。", "emotion": "neutral" } },
         { "text": "速战速决，冲进去。", "next": "ch1_m1_intro_c", "flag": "aggressive_approach", "response": { "speaker": "alpha", "text": "哈，我就喜欢这种风格！", "emotion": "happy" } }
+      ]
+    },
+    "ch1_m1_intro_b": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "稳扎稳打。先接近东侧终端，再守住上传，最后撤往西北。", "emotion": "neutral" },
+        { "speaker": "commander", "text": "很好。注意西侧有补给箱，情况允许时可以收集。", "emotion": "neutral" }
+      ]
+    },
+    "ch1_m1_intro_c": {
+      "trigger": "mission_start",
+      "lines": [
+        { "speaker": "alpha", "text": "直接冲向东侧终端，两轮上传后撤往西北撤离点。", "emotion": "happy" },
+        { "speaker": "commander", "text": "别大意。西侧有补给箱，路过时顺手拿了。", "emotion": "neutral" }
       ]
     },
     "ch1_m1_outro": {

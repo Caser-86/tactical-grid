@@ -208,6 +208,9 @@ func _setup_objective_state() -> void:
 	}
 	mission_objective_state.setup(level_config, map_data, player_units, enemy_units, designations)
 	mission_objective_state.mission_event.connect(_on_mission_event)
+	# Configure reinforcement triggers early so mission events can spawn waves
+	# before _start_battle() completes (e.g. during E2E integration tests).
+	enemy_director.setup(map_data.get("scripts", []))
 	_sync_objective_state_from_mos()
 
 ## 从 mos 同步目标状态到 battle_controller 的镜像变量。
@@ -1184,7 +1187,6 @@ func _start_battle() -> void:
 	turn_limit = max(5, turn_limit)  # 最低 5 回合
 	turn_manager.setup(player_units, enemy_units, turn_limit)
 	action_system.set_units(player_units, enemy_units)
-	enemy_director.setup(map_data.get("scripts", []))
 	# 根据关卡配置设置增援上限（防止无限刷怪）
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))

@@ -16,7 +16,7 @@ const HINT_COPY := {
 	"teach_destructible": "部分掩体可被破坏。破坏后失去掩护效果，可开辟新路线。",
 	"teach_resource": "情报是关键资源，首通奖励提供更多情报，用于解锁装备与角色。",
 	"teach_overwatch": "守望模式消耗 AP，在敌人移动进入射程时触发反应射击。",
-	"teach_interaction": "点击终端等交互对象激活目标。steal_data 任务需要激活所有终端。",
+	"teach_interaction": "点击终端等交互对象激活目标。潜入任务需要激活终端并完成上传。",
 	"teach_escort": "护送 VIP 到撤离点。VIP 阵亡则任务失败，注意保护。",
 	"teach_skills": "技能消耗 AP，提供强力战术选项。不同职业有不同技能树。",
 	"teach_items": "物品如医疗包可在战斗中使用，不消耗 AP，注意补给。",

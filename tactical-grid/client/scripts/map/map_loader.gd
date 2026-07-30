@@ -63,6 +63,7 @@ static func _normalize_locked_map(raw: Dictionary, level_id: String) -> Dictiona
 		"scripts": raw.get("scripts", []),
 		"victory": raw.get("victory", {}),
 		"environment": raw.get("environment", {}),
+		"mission_flow": raw.get("mission_flow", {}),
 	}
 	return result
 
@@ -81,6 +82,7 @@ static func load_from_dict(data: Dictionary) -> Dictionary:
 		"scripts": map_data.get("scripts", []),
 		"victory": map_data.get("victory", {}),
 		"environment": map_data.get("environment", {}),
+		"mission_flow": map_data.get("mission_flow", {}),
 	}
 
 	return result
