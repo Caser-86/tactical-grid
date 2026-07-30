@@ -84,20 +84,34 @@ func _input(event: InputEvent) -> void:
 			KEY_A, KEY_LEFT: _keyboard_pan.x = -1.0
 			KEY_D, KEY_RIGHT: _keyboard_pan.x = 1.0
 			KEY_HOME: focus_home(_home_target)
-			KEY_TAB: toggle_overview()
 	elif event is InputEventKey and not event.pressed:
 		match event.keycode:
 			KEY_W, KEY_UP, KEY_S, KEY_DOWN: _keyboard_pan.y = 0.0
 			KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT: _keyboard_pan.x = 0.0
+	# InputMap-driven actions (CODE-P0-01: replaced hardcoded KEY_TAB)
+	if event.is_action_pressed("toggle_overview"):
+		toggle_overview()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("toggle_network"):
+		# CODE-P2-02 will wire the network overlay; camera just prevents default.
+		get_viewport().set_input_as_handled()
 
 ## 设置地图边界和安全视口
+## CODE-P0-01: configure_bounds is the canonical entry point.
+func configure_bounds(map_pixel_rect: Rect2, hud_safe_rect: Rect2, initial_focus: Vector2 = Vector2(INF, INF)) -> void:
+	_setup_internal(map_pixel_rect, hud_safe_rect, initial_focus)
+
+## Backward-compatible alias; new code should call configure_bounds.
 func setup(map_bounds: Rect2, safe_viewport: Rect2, initial_focus: Vector2 = Vector2(INF, INF)) -> void:
-	_map_bounds = map_bounds
-	_safe_viewport = safe_viewport
+	_setup_internal(map_bounds, safe_viewport, initial_focus)
+
+func _setup_internal(p_map_bounds: Rect2, p_safe_viewport: Rect2, p_initial_focus: Vector2) -> void:
+	_map_bounds = p_map_bounds
+	_safe_viewport = p_safe_viewport
 	zoom = Vector2.ONE * DEFAULT_ZOOM
-	var focus_point := initial_focus
+	var focus_point := p_initial_focus
 	if not is_finite(focus_point.x) or not is_finite(focus_point.y):
-		focus_point = map_bounds.get_center()
+		focus_point = p_map_bounds.get_center()
 	_home_target = focus_point
 	position = focus_point + _get_safe_viewport_offset()
 

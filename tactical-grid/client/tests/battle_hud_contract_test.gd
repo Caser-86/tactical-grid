@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _test_hud_contract()
 	await _test_cooling_works_render_contract()
 	await _test_mission_event_reinforcement_bridge()
+	await _test_viewport_fills_at_22x16()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -80,9 +81,9 @@ func _test_hud_contract() -> void:
 		# overview fits more of the map, second toggle restores
 		var readable_zoom: Vector2 = camera.zoom
 		camera.toggle_overview()
-		_check(camera.zoom.x < readable_zoom.x, "Tab overview fits more of the map")
+		_check(camera.zoom.x < readable_zoom.x, "toggle_overview action fits more of the map")
 		camera.toggle_overview()
-		_check(camera.zoom.is_equal_approx(readable_zoom), "second Tab restores readable zoom")
+		_check(camera.zoom.is_equal_approx(readable_zoom), "second toggle_overview restores readable zoom")
 		# all four map corners are reachable
 		for corner in [
 			camera._map_bounds.position,
@@ -346,6 +347,42 @@ func _test_mission_event_reinforcement_bridge() -> void:
 	_check(after == before + 2, "terminal_activated 事件生成 2 个增援单位 (before=%d after=%d)" % [before, after])
 
 	await _dispose_battle()
+func _test_viewport_fills_at_22x16() -> void:
+	print("\n--- 测试: 22x16 地图视口填充 ---")
+	# 模拟 22x16 地图的边界
+	var map_w := 22
+	var map_h := 16
+	var cell_size := 64.0
+	var viewport_size := Vector2(1280, 720)
+	var top_hud := 50.0
+	var bottom_hud := 60.0
+	var right_panel := 250.0
+	var map_bounds := Rect2(
+		Vector2.ONE * -40.0,
+		Vector2(map_w * cell_size, map_h * cell_size) + Vector2.ONE * 80.0
+	)
+	var safe_viewport := Rect2(
+		Vector2(0.0, top_hud),
+		Vector2(maxf(1.0, viewport_size.x - right_panel), maxf(1.0, viewport_size.y - top_hud - bottom_hud))
+	)
+	# 创建临时相机测试
+	var test_camera := BattleCameraController.new()
+	add_child(test_camera)
+	test_camera.configure_bounds(map_bounds, safe_viewport)
+	# 断言：22x16 地图在 1.0 缩放时，安全视口高度不小于地图的可视部分
+	var safe_height := safe_viewport.size.y
+	var map_pixel_height := map_h * cell_size
+	_check(test_camera.zoom.is_equal_approx(Vector2.ONE * 1.0), "22x16 默认 1.0 缩放")
+	if map_pixel_height < safe_height:
+		var visible_world_height := safe_height / test_camera.zoom.x
+		_check(visible_world_height <= map_pixel_height + 80.0, "22x16 视口不产生下半空白区")
+	for corner in [map_bounds.position, map_bounds.position + Vector2(map_bounds.size.x, 0), map_bounds.position + Vector2(0, map_bounds.size.y), map_bounds.end]:
+		test_camera.focus_home(corner)
+		var safe_world_center: Vector2 = test_camera.position - test_camera._get_safe_viewport_offset()
+		var safe_world_size: Vector2 = test_camera._safe_viewport.size / test_camera.zoom
+		var visible_world := Rect2(safe_world_center - safe_world_size * 0.5, safe_world_size)
+		_check(visible_world.grow(1.0).has_point(corner), "22x16 角落可达: %s" % corner)
+	test_camera.queue_free()
 func _dispose_battle() -> void:
 	if _battle and is_instance_valid(_battle):
 		# Units are detached data nodes. Tear this fixture down synchronously so the

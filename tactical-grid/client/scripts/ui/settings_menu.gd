@@ -37,7 +37,8 @@ const BINDING_LABELS := {
 	"pause": "暂停/返回",
 	"end_turn": "结束回合",
 	"next_unit": "下一个单位",
-	"toggle_grid": "显示网格",
+	"toggle_overview": "概览",
+	"toggle_network": "切换网络",
 }
 
 func _ready() -> void:

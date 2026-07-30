@@ -200,7 +200,8 @@ func create_default_save() -> Dictionary:
 				"pause": {"keycode": 0, "physical_keycode": 4194305},
 				"end_turn": {"keycode": 0, "physical_keycode": 32},
 				"next_unit": {"keycode": 0, "physical_keycode": 4194306},
-				"toggle_grid": {"keycode": 0, "physical_keycode": 71},
+				"toggle_overview": {"keycode": 0, "physical_keycode": 4194333},
+				"toggle_network": {"keycode": 0, "physical_keycode": 71},
 			},
 		},
 		"stats_tracking": {

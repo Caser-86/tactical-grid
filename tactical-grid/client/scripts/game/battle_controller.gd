@@ -1036,7 +1036,7 @@ func _configure_viewport_layout() -> void:
 		Vector2(0.0, top_hud_height),
 		Vector2(maxf(1.0, viewport_size.x - right_panel_width), maxf(1.0, viewport_size.y - top_hud_height - bottom_hud_height))
 	)
-	camera.setup(map_bounds, safe_viewport, get_player_deployment_center())
+	camera.configure_bounds(map_bounds, safe_viewport, get_player_deployment_center())
 	RenderingServer.set_default_clear_color(Color(0.015, 0.028, 0.042))
 ## Task 5: 杩斿洖鐜╁閮ㄧ讲涓績鐨勪笘鐣屽潗鏍囷紝鐢ㄤ簬鐩告満鍒濆鑱氱劍
 func get_player_deployment_center() -> Vector2:
@@ -1545,6 +1545,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_end_player_turn()
 		return
 
+	if event.is_action_pressed("next_unit"):
+		_on_next_unit()
+		return
+
 	# 鼠标移动时实时预览移动路径
 	if event is InputEventMouseMotion and selected_action == "move" and selected_unit:
 		_update_path_preview(get_global_mouse_position())
@@ -1968,6 +1972,22 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 func _end_player_turn() -> void:
 	_deselect_unit()
 	turn_manager.end_player_turn()
+
+## Tab switches to the next player unit that still has AP.
+func _on_next_unit() -> void:
+	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION or player_units.is_empty():
+		return
+	var alive_units = player_units.filter(func(u): return u != null and u.is_alive and u.current_ap > 0)
+	if alive_units.is_empty():
+		alive_units = player_units.filter(func(u): return u != null and u.is_alive)
+	if alive_units.is_empty():
+		return
+	if selected_unit == null or not selected_unit in alive_units:
+		_select_unit(alive_units[0])
+	else:
+		var idx = alive_units.find(selected_unit)
+		var next_idx = (idx + 1) % alive_units.size()
+		_select_unit(alive_units[next_idx])
 
 ## ===== HUD 按钮回调 =====
 
