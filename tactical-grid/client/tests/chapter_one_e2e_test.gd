@@ -2,6 +2,8 @@
 ## 不使用 begin_new_game_for_test；通过正式 UI、场景切换、目标状态机和存档接口跑通第一章。
 extends Node
 
+const BattleScene = preload("res://scenes/battle.tscn")
+
 var _passed: int = 0
 var _failed: int = 0
 var _errors: Array[String] = []
@@ -14,6 +16,16 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("=== 第一章生产流程 E2E ===")
+	for slot in range(SaveManager.MAX_LOCAL_SAVES):
+		SaveManager.delete_save(slot)
+	await get_tree().process_frame
+
+
+	# Task 3: star rating and optional resource reward tests
+	await _test_calculate_stars_contract()
+	await _test_optional_reward_first_clear_one_time()
+
+	# Clean saves again so the main loop starts fresh
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
 	await get_tree().process_frame
@@ -54,6 +66,11 @@ func _run() -> void:
 				continue
 			await _prepare_battle(battle)
 
+		# Task 3: ch1_m1 inject optional resource collection state
+		if mission_number == 1:
+			battle.mission_objective_state.optional_credit = 150
+			battle.mission_objective_state.collected_resources[Vector2i(99, 99)] = true
+
 		_satisfy_objective(battle)
 		_check(battle._check_victory(), "%s 正式目标状态达到胜利" % level_id)
 		battle._check_victory_instant()
@@ -65,6 +82,13 @@ func _run() -> void:
 		_check(GameManager.battle_result.get("result", "") == "victory", "%s 结算结果为胜利" % level_id)
 		_check(level_id in GameManager.current_save.campaign_progress.completed_missions, "%s 写入完成进度" % level_id)
 		_check(result_scene.title_label.text == "任务完成", "%s 结算 UI 显示任务完成" % level_id)
+
+		# Task 3: ch1_m1 verify optional resource reward wiring
+		if mission_number == 1:
+			_check(int(GameManager.battle_result.get("optional_credit", 0)) == 150,
+				"ch1_m1 optional credit recorded in battle_result")
+			_check(bool(GameManager.battle_result.get("optional_resource_collected", false)),
+				"ch1_m1 optional resource collected flag recorded in battle_result")
 
 		if mission_number == 3:
 			_check(GameManager.save_current(), "第三关后生产存档写入成功")
@@ -262,3 +286,91 @@ func _print_summary() -> void:
 		for error in _errors:
 			print("    - ", error)
 	print("  =================")
+
+
+## ===== Task 3: _calculate_stars contract test =====
+func _test_calculate_stars_contract() -> void:
+	print("\n--- Task 3 test: _calculate_stars rating contract ---")
+	GameManager.begin_new_game_for_test(0)
+	# ch1_m3 has three_star_turns=11, so 11 turns can achieve three stars
+	GameManager.current_level_id = "ch1_m3"
+	var battle := BattleScene.instantiate()
+	add_child(battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if battle.get_script() == null:
+		_check(false, "battle script loaded for star rating test")
+		if is_instance_valid(battle):
+			battle.queue_free()
+		return
+	_check(battle._calculate_stars(true, 3, 3, 11, false) == 2,
+		"fast no-casualty clear without cache is two stars")
+	_check(battle._calculate_stars(true, 3, 3, 11, true) == 3,
+		"cache completes the three-star contract")
+	_check(battle._calculate_stars(true, 2, 3, 9, true) == 1,
+		"a casualty prevents the second and third stars")
+	_check(battle._calculate_stars(false, 0, 3, 5, true) == 0,
+		"defeat yields zero stars")
+	battle._cleanup_units()
+	battle.queue_free()
+	await get_tree().process_frame
+
+
+## ===== Task 3: optional reward first-clear one-time test =====
+func _test_optional_reward_first_clear_one_time() -> void:
+	print("\n--- Task 3 test: optional reward persistence and first-clear one-time ---")
+	GameManager.begin_new_game_for_test(0)
+	GameManager.current_level_id = "ch1_m1"
+	var level_config := CampaignRepository.get_level("ch1_m1")
+	var base_credit := int(level_config.get("rewards", {}).get("credit", 200))
+	var first_clear_credit := int(level_config.get("rewards", {}).get("first_clear", {}).get("credit", 0))
+	var opt_credit := 150
+	var start_credits := int(GameManager.current_save.get("resources", {}).get("credit", 0))
+
+	# First clear with optional resource collected
+	var result1 := {
+		"result": "victory",
+		"level_id": "ch1_m1",
+		"stars": 3,
+		"turns": 10,
+		"units_survived": 3,
+		"units_total": 3,
+		"survivor_count": 3,
+		"rating": 3,
+		"rewards": {
+			"credit": base_credit + opt_credit,
+			"exp": 150,
+			"intel": 0,
+		},
+		"optional_credit": opt_credit,
+		"optional_resource_collected": true,
+	}
+	GameManager.complete_mission(result1)
+	var after_first := int(GameManager.current_save.get("resources", {}).get("credit", 0))
+	var expected_first := start_credits + base_credit + first_clear_credit + opt_credit
+	_check(after_first == expected_first,
+		"first clear + optional: credits increase by base+first_clear+optional (got %d expected %d)" % [after_first, expected_first])
+
+	# Replay with optional resource collected (first-clear bonus should NOT repeat)
+	var result2 := {
+		"result": "victory",
+		"level_id": "ch1_m1",
+		"stars": 3,
+		"turns": 10,
+		"units_survived": 3,
+		"units_total": 3,
+		"survivor_count": 3,
+		"rating": 3,
+		"rewards": {
+			"credit": base_credit + opt_credit,
+			"exp": 150,
+			"intel": 0,
+		},
+		"optional_credit": opt_credit,
+		"optional_resource_collected": true,
+	}
+	GameManager.complete_mission(result2)
+	var after_second := int(GameManager.current_save.get("resources", {}).get("credit", 0))
+	var expected_second := after_first + base_credit + opt_credit
+	_check(after_second == expected_second,
+		"replay + optional: credits increase by base+optional only (got %d expected %d)" % [after_second, expected_second])

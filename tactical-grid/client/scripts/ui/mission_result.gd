@@ -58,6 +58,13 @@ func show_result(data: Dictionary) -> void:
 		loot_container.add_child(fc_label)
 
 	# 显示掉落物品
+	# Task 3: optional resource reward
+	if int(data.get("optional_credit", 0)) > 0:
+		var opt_label = Label.new()
+		opt_label.text = "optional resource  +%d credit" % int(data.get("optional_credit", 0))
+		opt_label.modulate = Color.GOLD
+		loot_container.add_child(opt_label)
+
 	var loot = data.get("loot", [])
 	for item in loot:
 		var loot_label = Label.new()

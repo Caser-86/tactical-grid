@@ -110,3 +110,7 @@ func _draw_objective() -> void:
 			draw_rect(Rect2(20, 16, 24, 32), Color(0.20, 0.94, 0.96, 0.92), false, 2.0)
 			draw_line(Vector2(25, 26), Vector2(39, 26), Color(0.70, 1.0, 1.0), 2.0)
 			draw_line(Vector2(25, 33), Vector2(35, 33), Color(0.34, 0.90, 0.96), 2.0)
+		"resource":
+			draw_circle(Vector2(32, 32), 18, Color(1.0, 0.84, 0.0, 0.35))
+			draw_arc(Vector2(32, 32), 20, 0, TAU, 24, Color(1.0, 0.84, 0.0, 0.90), 2.0)
+			draw_string(ThemeDB.fallback_font, Vector2(25, 38), "$", HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1.0, 0.95, 0.50))

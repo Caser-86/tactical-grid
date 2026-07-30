@@ -68,6 +68,7 @@ var destructible_target_states: Dictionary = {}
 var terminals: Array[Vector2i] = []
 var terminals_activated: int = 0
 var terminals_required: int = 0
+var resource_positions: Array[Vector2i] = []
 ## Boss 单位引用（assassinate 任务）
 var boss_unit: Unit = null
 ## Boss 阶段状态（由 bosses.json 的 phases 驱动）
@@ -397,6 +398,10 @@ func _extract_objectives_from_map() -> void:
 			var pos = Vector2i(int(obj.x), int(obj.y))
 			if not pos in terminals:
 				terminals.append(pos)
+		elif t == "resource":
+			var pos = Vector2i(int(obj.x), int(obj.y))
+			if not pos in resource_positions:
+				resource_positions.append(pos)
 	# destroy 任务所需数量取自 objects 中实际目标数，最少 1
 	if mission_type == "destroy":
 		targets_required = max(destructible_targets.size(), 1)
@@ -998,6 +1003,8 @@ func _render_map() -> void:
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "destructible_target")
 		elif obj.type == "terminal":
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "terminal")
+		elif obj.type == "resource":
+			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "resource")
 	_render_evac_zone()
 
 
@@ -1345,22 +1352,29 @@ func _on_battle_lost(result: Dictionary) -> void:
 func _finish_battle(victory: bool, result: Dictionary) -> void:
 	await get_tree().create_timer(1.5).timeout
 
-	var stars = 0
 	var survived = player_units.filter(func(u): return u.is_alive).size()
 	var total = player_units.size()
 
-	if victory:
-		stars = 1
-		if survived == total:
-			stars = 2
-		if turn_manager.turn_number <= int(level_config.get("three_star_turns", 10)):
-			stars = 3
+	# Task 3: use mission_objective_state modifiers and unified star calculation
+	var modifiers := {}
+	if mission_objective_state:
+		modifiers = mission_objective_state.get_result_modifiers()
+	var optional_required := bool(level_config.get("three_star_requires_optional", false))
+	var optional_complete := not optional_required or bool(modifiers.get("optional_resource_collected", false))
+	var stars = _calculate_stars(
+		victory,
+		survived,
+		total,
+		turn_manager.turn_number,
+		optional_complete
+	)
 
+	var optional_credit := int(modifiers.get("optional_credit", 0))
 	var level_rewards = level_config.get("rewards", {})
 	var diff_params = GameManager.get_difficulty_params()
 	var reward_mult = float(diff_params.get("reward_multiplier", 1.0))
 	var rewards = {
-		"credit": int(round(level_rewards.get("credit", 200) * reward_mult)),
+		"credit": int(round(level_rewards.get("credit", 200) * reward_mult)) + (optional_credit if victory else 0),
 		"exp": int(round(level_rewards.get("exp", 150) * reward_mult)),
 		"intel": 0,
 	}
@@ -1375,6 +1389,8 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"survivor_count": survived,
 		"rewards": rewards if victory else {},
 		"rating": stars,
+		"optional_credit": optional_credit if victory else 0,
+		"optional_resource_collected": bool(modifiers.get("optional_resource_collected", false)),
 	}
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
@@ -1557,6 +1573,11 @@ func _handle_left_click(world_pos: Vector2) -> void:
 						_show_move_range(selected_unit)
 						hud.update_unit_info(selected_unit)
 						return
+			if grid_pos in resource_positions and selected_unit and selected_unit.team == "player":
+				if _try_interact_resource(selected_unit, grid_pos):
+					_show_move_range(selected_unit)
+					hud.update_unit_info(selected_unit)
+					return
 			_try_move(grid_pos)
 		"attack":
 			_try_attack(grid_pos)
@@ -1861,6 +1882,45 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 	_log("%s 激活终端 (%d/%d)" % [unit.unit_name, terminals_activated, terminals_required])
 	hud.update_objective(_get_objective_text())
 	_check_victory_instant()
+	return true
+
+## Task 3: calculate star rating (0=defeat, 1=victory, 2=no casualty, 3=fast+optional)
+func _calculate_stars(
+	victory: bool,
+	survived: int,
+	total: int,
+	turns: int,
+	optional_complete: bool
+) -> int:
+	if not victory:
+		return 0
+	if survived != total:
+		return 1
+	if turns > int(level_config.get("three_star_turns", 10)) or not optional_complete:
+		return 2
+	return 3
+
+## Task 3: collect optional resource (player unit adjacent, costs 1 AP)
+func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
+	if not resource_pos in resource_positions:
+		return false
+	if not _is_adjacent_reachable(unit, resource_pos) and unit.grid_pos != resource_pos:
+		_log("resource out of reach")
+		return false
+	if not unit.can_act():
+		_log("cannot act")
+		return false
+	if not unit.spend_ap(1):
+		_log("not enough AP")
+		return false
+	var result = mission_objective_state.on_resource_interacted(unit, resource_pos)
+	if not result.get("success", false):
+		_log("resource collect failed: %s" % result.get("reason", "unknown"))
+		return false
+	_play_unit_state(unit, &"skill")
+	_spawn_effect("heal", resource_pos)
+	_log("%s collected optional resource (+%d credit)" % [unit.unit_name, int(result.get("credit_bonus", 0))])
+	hud.update_objective(_get_objective_text())
 	return true
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
