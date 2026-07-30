@@ -1,4 +1,4 @@
-## 第一章任务目标与特殊规则契约测试
+﻿## 第一章任务目标与特殊规则契约测试
 ## 覆盖六关任务类型（extract/destroy/extract/escort/steal_data/assassinate）
 ## 和 ch1_m1 的三条特殊规则（no_overwatch/no_items/enemy_passive_turn_1）
 extends Node
@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_infiltrate_requires_terminal_upload_and_evac()
 	_test_upload_pauses_without_terminal_control()
 	_test_optional_resource_is_idempotent()
+	_test_apply_event_authority()
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
@@ -539,3 +540,52 @@ func _test_optional_resource_is_idempotent() -> void:
 	mos.queue_free()
 	for p in players:
 		p.queue_free()
+
+
+## ===== 测试: apply_event 权威入口 =====
+func _test_apply_event_authority() -> void:
+	print("\n--- CODE-P0-03: apply_event 权威入口测试 ---")
+	var mos := MissionObjectiveState.new()
+	add_child(mos)
+
+	# 初始化最小化测试数据
+	var level_config := {"mission_type": "infiltrate", "max_turns": 20}
+	var map_data := {
+		"mission_type": "infiltrate",
+		"size": {"width": 10, "height": 10},
+		"layers": {"base_terrain": [], "blocker": []},
+		"objects": [
+			{"type": "terminal", "x": 5, "y": 5},
+			{"type": "evac", "x": 0, "y": 0, "radius": 1},
+		],
+		"mission_flow": {"upload_turns_required": 2, "upload_hold_radius": 1, "optional_resource_credit": 150},
+	}
+	mos.setup(level_config, map_data, [], [])
+
+	# 未知事件返回错误
+	var unknown_result := mos.apply_event(&"nonexistent_event", {})
+	_check(not bool(unknown_result.get("success", true)), "未知事件返回失败")
+	_check(String(unknown_result.get("reason", "")) == "unknown_event", "未知事件原因正确")
+
+	# 不可能的状态转换：COMPLETE 阶段不能激活终端
+	mos.mission_stage = MissionObjectiveState.STAGE_COMPLETE
+	var blocked_result := mos.apply_event(&"terminal_interacted", {"unit": null, "position": Vector2i(5, 5)})
+	_check(not bool(blocked_result.get("success", true)), "COMPLETE 阶段拒绝终端激活")
+	# 恢复阶段
+	mos.mission_stage = MissionObjectiveState.STAGE_APPROACH
+
+	# 有效事件正常路由
+	var turn_result := mos.apply_event(&"turn_started", {"turn": 1, "team": "player"})
+	_check(bool(turn_result.get("success", false)), "turn_started 通过 apply_event 路由")
+
+	# check_victory 事件
+	var vic_result := mos.apply_event(&"check_victory", {})
+	_check(bool(vic_result.get("success", false)), "check_victory 通过 apply_event 路由")
+	_check(vic_result.has("victory"), "check_victory 返回 victory 字段")
+
+	# check_defeat 事件
+	var def_result := mos.apply_event(&"check_defeat", {})
+	_check(bool(def_result.get("success", false)), "check_defeat 通过 apply_event 路由")
+	_check(def_result.has("defeat"), "check_defeat 返回 defeat 字段")
+
+	mos.queue_free()

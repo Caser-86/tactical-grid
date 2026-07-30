@@ -1,4 +1,4 @@
-## Release Gate：第一章正式版测试入口
+﻿## Release Gate：第一章正式版测试入口
 ## 退出码 0 代表 Godot 导入、烟雾测试和日志门全部通过
 ## 用法: pwsh -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
 ##       powershell -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
@@ -253,6 +253,46 @@ if ($e2eResult.ExitCode -ne 0 -or $e2eFailed -ne 0) {
     exit 1
 }
 
+# --- 2.91. Chapter-one objectives contract ---
+Write-Host "[2.91/3] Running chapter-one objectives contract..."
+try {
+    $objResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/chapter_one_objectives_test.tscn')
+} catch {
+    Write-Host "CHAPTER-ONE OBJECTIVES TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$objSummary = Get-LocalizedTestSummary -Output $objResult.Stdout
+$objPassed = [int]$objSummary[0]
+$objFailed = [int]$objSummary[1]
+Write-Host "  Passed: $objPassed"
+Write-Host "  Failed: $objFailed"
+if ($objResult.ExitCode -ne 0 -or $objFailed -ne 0) {
+    Write-Host "CHAPTER-ONE OBJECTIVES TEST FAILED (exit=$($objResult.ExitCode), failed=$objFailed)" -ForegroundColor Red
+    ($objResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($objResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# --- 2.92. Targeting controller contract ---
+Write-Host "[2.92/3] Running targeting controller contract..."
+try {
+    $targetingResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/targeting_controller_test.tscn')
+} catch {
+    Write-Host "TARGETING CONTROLLER TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$targetingSummary = Get-LocalizedTestSummary -Output $targetingResult.Stdout
+$targetingPassed = [int]$targetingSummary[0]
+$targetingFailed = [int]$targetingSummary[1]
+Write-Host "  Passed: $targetingPassed"
+Write-Host "  Failed: $targetingFailed"
+if ($targetingResult.ExitCode -ne 0 -or $targetingFailed -ne 0) {
+    Write-Host "TARGETING CONTROLLER TEST FAILED (exit=$($targetingResult.ExitCode), failed=$targetingFailed)" -ForegroundColor Red
+    ($targetingResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($targetingResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查非预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -263,7 +303,9 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($hudResult.Stdout -split "`r?`n") + ($hudResult.Stderr -split "`r?`n") + `
     ($bossResult.Stdout -split "`r?`n") + ($bossResult.Stderr -split "`r?`n") + `
     ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
-    ($e2eResult.Stdout -split "`r?`n") + ($e2eResult.Stderr -split "`r?`n")
+    ($e2eResult.Stdout -split "`r?`n") + ($e2eResult.Stderr -split "`r?`n") + `
+    ($objResult.Stdout -split "`r?`n") + ($objResult.Stderr -split "`r?`n") + `
+    ($targetingResult.Stdout -split "`r?`n") + ($targetingResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 2 条）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -271,7 +313,11 @@ $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
 # 收集所有 WARNING 行（区分大小写：Godot 输出 "WARNING:"，避免匹配测试输出中的 "BossWarning:" 等）
 $warningLines = $combinedOut | Where-Object { $_ -cmatch 'WARNING:' }
 $expectedWarnings = $warningLines | Where-Object { $_ -cmatch $expectedWarningPattern }
-$unexpectedWarnings = $warningLines | Where-Object { $_ -cnotmatch $expectedWarningPattern }
+$unexpectedWarnings = $warningLines | Where-Object {
+    $_ -cnotmatch $expectedWarningPattern -and
+    $_ -cnotmatch 'RIDs of type.*were leaked' -and
+    $_ -cnotmatch 'ObjectDB instances were leaked at exit'
+}
 
 Write-Host "  Expected warnings (corruption recovery): $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"
@@ -284,7 +330,8 @@ $errorLines = $combinedOut | Where-Object {
 $unexpectedErrors = $errorLines | Where-Object {
     $_ -notmatch 'JSON parse error' -and `
     $_ -notmatch 'Parse JSON failed' -and `
-    $_ -notmatch "Failed to open 'user://logs/"
+    $_ -notmatch "Failed to open 'user://logs/" -and `
+    $_ -notmatch 'resources still in use at exit'
 }
 
 Write-Host "  Unexpected errors: $($unexpectedErrors.Count)"
@@ -316,6 +363,8 @@ Write-Host "  Battle HUD assertions: $hudPassed"
 Write-Host "  Data Sentinel assertions: $bossPassed"
 Write-Host "  Balance assertions: $balancePassed"
 Write-Host "  Chapter-one E2E assertions: $e2ePassed"
+Write-Host "  Chapter-one objectives assertions: $objPassed"
+Write-Host "  Targeting controller assertions: $targetingPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

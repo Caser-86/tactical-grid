@@ -82,8 +82,6 @@ var boss_ability_state: Dictionary = {}
 var boss_phase_warned: Array[bool] = []
 ## 护送 VIP 单位引用（escort 任务）
 var escort_vip: Unit = null
-## 防守任务回合限制（defend 任务）
-var defend_turns_required: int = 0
 
 ## 战斗遥测数据（本场战斗累计）
 ## 记录攻击次数、命中、伤害、击杀等，用于平衡分析
@@ -226,7 +224,6 @@ func _sync_objective_state_from_mos() -> void:
 	terminals = mission_objective_state.terminals
 	terminals_activated = mission_objective_state.terminals_activated
 	terminals_required = mission_objective_state.terminals_required
-	defend_turns_required = mission_objective_state.defend_turns_required
 	boss_unit = mission_objective_state.boss_unit
 	escort_vip = mission_objective_state.escort_vip
 
@@ -411,9 +408,6 @@ func _extract_objectives_from_map() -> void:
 	# steal_data / infiltrate 需要激活所有终端
 	if mission_type in ["steal_data", "infiltrate"]:
 		terminals_required = terminals.size()
-	# defend 任务：使用 level_config 的 max_turns 或默认 10
-	if mission_type == "defend":
-		defend_turns_required = int(level_config.get("max_turns", 10))
 
 ## 运行时程序化生成地图（开发回退路径，不依赖锁定地图）
 func _generate_runtime_map() -> void:
@@ -1234,7 +1228,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			hud.set_buttons_disabled(false)
 			action_system.process_ground_effects_on_turn_start()
 			if mission_objective_state:
-				mission_objective_state.on_turn_started(turn_manager.turn_number, "player")
+				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "player"})
 			hud.update_objective(_get_objective_text())
 			_log("第 %d 回合 - 玩家行动" % turn_manager.turn_number)
 
@@ -1243,7 +1237,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
 			if mission_objective_state:
-				mission_objective_state.on_turn_started(turn_manager.turn_number, "enemy")
+				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "enemy"})
 			_log("第 %d 回合 - 敌人行动" % turn_manager.turn_number)
 			# 敌人回合开始时检查增援触发
 			_process_reinforcements(turn_manager.turn_number)
@@ -1326,7 +1320,7 @@ func _on_mission_event(event_name: StringName, payload: Dictionary) -> void:
 func _advance_upload_progress() -> void:
 	if not mission_objective_state:
 		return
-	var upload_result := mission_objective_state.on_enemy_turn_completed()
+	var upload_result := mission_objective_state.apply_event(&"enemy_turn_completed", {})
 	if upload_result.get("changed", false):
 		hud.update_objective(mission_objective_state.get_status_text())
 ## 在地图边缘（敌人侧）寻找可用的增援出生点
@@ -1930,7 +1924,7 @@ func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
 	if not unit.spend_ap(1):
 		_log("not enough AP")
 		return false
-	var result = mission_objective_state.on_resource_interacted(unit, resource_pos)
+	var result = mission_objective_state.apply_event(&"resource_interacted", {"unit": unit, "position": resource_pos})
 	if not result.get("success", false):
 		_log("resource collect failed: %s" % result.get("reason", "unknown"))
 		return false

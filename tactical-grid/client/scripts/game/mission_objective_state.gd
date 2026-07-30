@@ -1,4 +1,4 @@
-## 任务目标状态机
+﻿## 任务目标状态机
 ## 统一管理六类任务目标（extract/destroy/assassinate/escort/steal_data/infiltrate/defend）
 ## 的计数、HUD 文本、胜负判断，以及关卡特殊规则的执行。
 ## battle_controller 通过此模块访问目标状态，不再自行维护胜负逻辑。
@@ -285,6 +285,46 @@ func is_enemy_passive(turn_number: int) -> bool:
 
 ## ===== 事件回调 =====
 
+## CODE-P0-03: apply_event 是任务状态变更的唯一入口。
+## 所有任务事件（终端激活、目标伤害、上传进度、资源收集、回合推进、单位移动、胜利/失败检查）
+## 都必须通过此方法路由，不允许直接调用 on_* 方法。
+## 返回 Dictionary：成功包含 {success: true, ...}，失败包含 {success: false, reason: String}
+func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	match event_name:
+		&"terminal_interacted":
+			var unit: Node = payload.get("unit", null)
+			var term_pos: Vector2i = payload.get("position", Vector2i(-1, -1))
+			return on_terminal_interacted(unit, term_pos)
+		&"objective_damaged":
+			var pos: Vector2i = payload.get("position", Vector2i(-1, -1))
+			var damage: int = int(payload.get("damage", 0))
+			return on_objective_damaged(pos, damage)
+		&"enemy_turn_completed":
+			return on_enemy_turn_completed()
+		&"resource_interacted":
+			var unit: Node = payload.get("unit", null)
+			var res_pos: Vector2i = payload.get("position", Vector2i(-1, -1))
+			return on_resource_interacted(unit, res_pos)
+		&"turn_started":
+			var turn: int = int(payload.get("turn", 0))
+			var team: String = String(payload.get("team", ""))
+			on_turn_started(turn, team)
+			return {"success": true}
+		&"unit_moved":
+			var unit: Node = payload.get("unit", null)
+			var from: Vector2i = payload.get("from", Vector2i(-1, -1))
+			var to: Vector2i = payload.get("to", Vector2i(-1, -1))
+			on_unit_moved(unit, from, to)
+			return {"success": true}
+		&"check_victory":
+			var victory: bool = is_victory()
+			return {"success": true, "victory": victory}
+		&"check_defeat":
+			var defeat: bool = is_defeat()
+			return {"success": true, "defeat": defeat}
+		_:
+			return {"success": false, "reason": "unknown_event", "event": String(event_name)}
+
 ## 单位移动后回调（当前不直接改变目标状态，预留用于 escort 路线检查）
 func on_unit_moved(_unit: Node, _from: Vector2i, _to: Vector2i) -> void:
 	pass
@@ -292,6 +332,9 @@ func on_unit_moved(_unit: Node, _from: Vector2i, _to: Vector2i) -> void:
 
 ## 玩家单位激活终端。成功返回 {success=true, activated, required}，失败返回 {success=false, reason}
 func on_terminal_interacted(unit: Node, term_pos: Vector2i) -> Dictionary:
+	# 不可能的状态转换：COMPLETE 阶段不能再激活终端
+	if mission_stage == STAGE_COMPLETE:
+		return {"success": false, "reason": "mission_already_complete"}
 	if not term_pos in terminals:
 		return {"success": false, "reason": "not_a_terminal"}
 	if not is_instance_valid(unit):
