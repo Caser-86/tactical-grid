@@ -499,6 +499,10 @@ func go_to_battle(level_id: String) -> void:
 	current_level_id = level_id
 	get_tree().change_scene_to_file("res://scenes/battle.tscn")
 
+## CH1-080: 从遭遇检查点重试战斗（当前实现为重开关卡，完整状态恢复见 CH1-020）
+func go_to_battle_from_encounter(level_id: String) -> void:
+	go_to_battle(level_id)
+
 func go_to_settings(caller: String = "main_menu") -> void:
 	current_state = GameState.SETTINGS
 	get_tree().change_scene_to_file("res://scenes/settings_menu.tscn")

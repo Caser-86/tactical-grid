@@ -8,11 +8,15 @@ const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
+## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
 const CONTEXT_HINT_ACTION := {
+	"teach_selection": "select",
 	"teach_movement": "move",
 	"teach_attack": "attack",
+	"teach_observe": "observe",
 	"teach_interaction": "interact",
 	"teach_network_scan": "network",
+	"teach_network_takeover": "network",
 	"teach_end_turn": "end_turn",
 }
 
@@ -91,6 +95,8 @@ var _network_connection_lines: Array = []
 var _network_shape_nodes: Dictionary = {}
 var alert_state: AlertState
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## CH1-080: 当前遭遇区 ID（用于失败重试时定位最近检查点）
+var current_encounter_id: String = ""
 
 ## 胜利条件
 var mission_type: String = "extract"
@@ -1463,6 +1469,8 @@ func _start_battle() -> void:
 		AudioManager.bgm_boss()
 	else:
 		AudioManager.bgm_battle()
+	# CH1-080: 初始化遭遇区为 zone_a（玩家出生点所在的第一个区域）
+	current_encounter_id = "zone_a"
 	# 每关使用独立基础上限，再应用难度加成（故事+5，困难-3）。
 	var diff_params = GameManager.get_difficulty_params()
 	var base_turn_limit := mission_objective_state.max_turns if mission_objective_state else int(level_config.get("max_turns", 20))
@@ -1476,6 +1484,7 @@ func _start_battle() -> void:
 		var nodes: Array = map_data.get("nodes", [])
 		var connections: Array = map_data.get("connections", [])
 		tactical_network_state.setup(nodes, connections)
+		_render_network_nodes()
 	# 根据关卡配置设置增援上限（防止无限刷怪）
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
@@ -1857,6 +1866,10 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"intel": 0,
 	}
 
+	# CH1-080: 失败原因和遭遇检查点可用性
+	var defeat_reason := String(result.get("reason", ""))
+	var has_encounter_checkpoint := not victory and current_encounter_id != "" and current_encounter_id != "zone_a"
+
 	var battle_result = {
 		"result": "victory" if victory else "defeat",
 		"level_id": level_id,
@@ -1869,6 +1882,9 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"rating": stars,
 		"optional_credit": optional_credit if victory else 0,
 		"optional_resource_collected": bool(modifiers.get("optional_resource_collected", false)),
+		"defeat_reason": defeat_reason,
+		"has_encounter_checkpoint": has_encounter_checkpoint,
+		"encounter_id": current_encounter_id,
 	}
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
@@ -2167,6 +2183,9 @@ func _select_unit(unit: Unit) -> void:
 	hud.update_unit_info(unit)
 	if unit.team == "player":
 		hud.set_context_state(HUD.ContextState.UNIT_SELECTED)
+		_advance_context_hint("select")
+	else:
+		_advance_context_hint("observe")
 	_show_move_range(unit)
 
 func _deselect_unit() -> void:
@@ -2388,6 +2407,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 	_show_move_range(selected_unit)
 	hud.update_unit_info(selected_unit)
 
+	_check_encounter_zone(selected_unit.grid_pos)
 	_check_victory_instant()
 	_advance_context_hint("move")
 
@@ -2483,6 +2503,24 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 	_check_victory_instant()
 	_advance_context_hint("interact")
 	return true
+
+## CH1-080: 检测玩家单位是否进入新遭遇区，更新当前遭遇 ID。
+func _check_encounter_zone(grid_pos: Vector2i) -> void:
+	var encounters: Array = map_data.get("encounters", [])
+	if encounters.is_empty():
+		return
+	for encounter in encounters:
+		var trigger_cells: Array = encounter.get("trigger_cells", [])
+		var eid: String = String(encounter.get("id", ""))
+		if eid == "":
+			continue
+		for cell in trigger_cells:
+			if typeof(cell) == TYPE_ARRAY and cell.size() == 2:
+				var trigger_pos := Vector2i(int(cell[0]), int(cell[1]))
+				if trigger_pos == grid_pos and current_encounter_id != eid:
+					current_encounter_id = eid
+					_log("进入遭遇区：%s" % String(encounter.get("name", eid)))
+					return
 
 ## Task 3: calculate star rating (0=defeat, 1=victory, 2=no casualty, 3=fast+optional)
 func _calculate_stars(

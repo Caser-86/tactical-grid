@@ -111,18 +111,25 @@ theme_override_constants/separation = 4
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 40.0
+offset_left = 20.0
 offset_top = 500.0
-offset_right = -40.0
+offset_right = -20.0
 offset_bottom = 560.0
 grow_horizontal = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
+
+[node name="EncounterRetryButton" type="Button" parent="Panel/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(100, 40)
+text = "从遭遇重试"
+visible = false
 
 [node name="RetryButton" type="Button" parent="Panel/Buttons"]
 layout_mode = 2
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(100, 40)
-text = "重试"
+text = "重新开始"
 
 [node name="BaseButton" type="Button" parent="Panel/Buttons"]
 layout_mode = 2

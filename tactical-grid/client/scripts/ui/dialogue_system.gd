@@ -49,11 +49,23 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# CH1-080: 标记输入已处理，防止点击穿透到战场控制器吞掉下一次地图点击
+			get_viewport().set_input_as_handled()
 			if is_typing:
 				# 跳过打字动画
 				_show_full_text()
 			elif choices_container.get_child_count() == 0:
 				# 继续下一句
+				_next_line()
+		return
+
+	# CH1-080: 短句可快速跳过——Space/Enter 与左键同等效果
+	if event is InputEventKey and event.pressed:
+		if event.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
+			get_viewport().set_input_as_handled()
+			if is_typing:
+				_show_full_text()
+			elif choices_container.get_child_count() == 0:
 				_next_line()
 
 ## 开始对话

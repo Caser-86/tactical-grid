@@ -77,13 +77,13 @@ func set_phase(phase: TurnPhase) -> void:
 		TurnPhase.CHECK_VICTORY:
 			turn_ended.emit(turn_number)
 			if _check_defeat_fn.is_valid() and _check_defeat_fn.call():
-				_end_battle(false)
+				_end_battle(false, "all_units_down")
 				return
 			if _check_victory_fn.is_valid() and _check_victory_fn.call():
 				_end_battle(true)
 				return
 			if turn_number >= max_turns:
-				_end_battle(false)
+				_end_battle(false, "turn_limit")
 				return
 			turn_number += 1
 			set_phase(TurnPhase.PLAYER_START)
@@ -103,13 +103,14 @@ func _refresh_units(units: Array) -> void:
 		unit.refresh_ap()
 		unit.on_turn_start()
 
-func _end_battle(victory: bool) -> void:
+func _end_battle(victory: bool, reason: String = "") -> void:
 	battle_over = true
 	current_phase = TurnPhase.BATTLE_OVER
 	turn_phase_changed.emit(current_phase)
 	var result = {
 		"victory": victory,
 		"turns": turn_number,
+		"reason": reason,
 	}
 	if victory:
 		battle_won.emit(result)

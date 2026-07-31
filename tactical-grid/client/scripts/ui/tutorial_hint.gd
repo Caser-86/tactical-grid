@@ -7,9 +7,14 @@ class_name TutorialHint
 signal hint_closed(flag: String)
 
 ## 第一章教程文案表（flag -> 提示文本）
+## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项，其余 flag 供 M2-M6 复用
 const HINT_COPY := {
+	"teach_selection": "左键点击队员选中。Tab 可在多名队员间快速切换，右键取消选择。",
 	"teach_movement": "选中队员后，先点下方【移动】，再点蓝色高亮格移动。每回合的移动会消耗移动点数。",
 	"teach_attack": "选中队员后，先点下方【攻击】，再点红色目标攻击。注意武器射程、命中率与掩体影响。",
+	"teach_observe": "结束回合前，观察敌方意图箭头：红色为攻击，虚线为移动，三角为警戒，感叹号为致命。点击敌方单位可查看详情。",
+	"teach_network_takeover": "按 G 查看网络层。选中队员后点【接管】消耗 1AP：相机揭示区域，门改变路线，炮塔翻转阵营。",
+	"teach_end_turn": "完成本回合操作后，按 Space 结束回合，敌人开始行动。",
 	"teach_cover": "站在掩体后方可降低被命中率。森林、墙体和高地都能提供掩护。",
 	"teach_evac": "完成目标后，所有存活单位需到达撤离点撤离。回合数越少评级越高。",
 	"teach_highground": "高地提供命中与视野加成，占据高处获得战术优势。",
@@ -23,10 +28,8 @@ const HINT_COPY := {
 	"teach_camera": "战场大于屏幕。按住鼠标中键拖动画面，滚轮缩放，WASD 或方向键平移；Tab 查看全图，Home 返回当前单位。",
 	"teach_upload_hold": "终端上传需要连续控制 2 个敌方回合。至少一名队员留在终端一格范围内，否则上传暂停。",
 	"teach_network_scan": "按 G 键查看战术网络覆盖层。敌方控制的节点以红色显示，可操作的节点会高亮。",
-	"teach_network_takeover": "接管敌方设施消耗 1AP：相机揭示区域，门改变路线，炮塔翻转阵营。",
 	"teach_network_disable": "禁用设施消耗 1AP，使其暂时失效但不改变归属。适合安静通过。",
 	"teach_network_overload": "过载设施消耗 1AP，永久损坏但产生强力效果。会触发警报升级。",
-	"teach_end_turn": "完成本回合操作后，按 Space 结束回合，敌人开始行动。",
 }
 
 @onready var _text_label: Label = $Panel/TextLabel

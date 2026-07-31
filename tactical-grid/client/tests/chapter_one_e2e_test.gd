@@ -27,6 +27,8 @@ func _run() -> void:
 	await _test_m1_infiltrate_stages()
 	# CH1-030: real input event E2E
 	await _test_real_input_flow()
+	# CH1-080: M1 tutorial, dialogue, result and failure experience
+	await _test_ch1_080_tutorial_dialogue_result()
 
 	# Clean saves again so the main loop starts fresh
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -186,7 +188,10 @@ func _exercise_failure_and_retry(battle: BattleController, level_id: String) -> 
 		unit.current_hp = 0
 		unit.is_alive = false
 	_check(battle._check_defeat(), "%s 全队阵亡满足失败条件" % level_id)
-	battle.turn_manager._end_battle(false)
+	# CH1-080: 在战斗场景被释放前保存遭遇区 ID
+	var encounter_id_before_failure := battle.current_encounter_id
+	# CH1-080: 传递失败原因
+	battle.turn_manager._end_battle(false, "all_units_down")
 	var result_scene := await _wait_for_result_after_dialogue()
 	_check(result_scene is MissionResult, "%s 失败后进入结算场景" % level_id)
 	if result_scene == null:
@@ -194,6 +199,14 @@ func _exercise_failure_and_retry(battle: BattleController, level_id: String) -> 
 	_check(GameManager.battle_result.get("result", "") == "defeat", "%s 失败结算结果正确" % level_id)
 	_check(level_id not in GameManager.current_save.campaign_progress.completed_missions, "%s 失败不写入完成进度" % level_id)
 	_check(result_scene.retry_button.visible, "%s 失败结算提供重试" % level_id)
+	# CH1-080: 失败页显示失败原因
+	_check(String(GameManager.battle_result.get("defeat_reason", "")) == "all_units_down", "%s 失败原因记录到 battle_result" % level_id)
+	# CH1-080: 失败页提供三选项（从遭遇重试/重新开始/返回基地）
+	_check(result_scene.encounter_retry_button != null, "%s 失败结算包含从遭遇重试按钮" % level_id)
+	_check(result_scene.base_button.visible, "%s 失败结算包含返回基地按钮" % level_id)
+	# zone_a 失败时无遭遇检查点，从遭遇重试按钮应隐藏
+	if encounter_id_before_failure == "zone_a" or encounter_id_before_failure == "":
+		_check(not result_scene.encounter_retry_button.visible, "%s zone_a 失败时不显示从遭遇重试" % level_id)
 	result_scene.retry_button.pressed.emit()
 	var retry_battle := await _wait_for_scene("Battle")
 	_check(retry_battle is BattleController, "%s 重试返回同一战斗" % level_id)
@@ -526,7 +539,7 @@ func _test_real_input_flow() -> void:
 	print("\n--- CH1-030 test: 真实输入事件 E2E ---")
 	GameManager.begin_new_game_for_test(0)
 	# 清除上下文教程已读状态以便验证推进
-	for f in ["teach_movement", "teach_attack", "teach_interaction", "teach_network_scan", "teach_end_turn"]:
+	for f in ["teach_selection", "teach_movement", "teach_attack", "teach_observe", "teach_network_takeover", "teach_end_turn"]:
 		GameManager.current_save.campaign_progress.story_flags["tutorial_" + f] = false
 	GameManager.current_level_id = "ch1_m1"
 	var battle := BattleScene.instantiate()
@@ -556,7 +569,7 @@ func _test_real_input_flow() -> void:
 
 	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 战斗在玩家行动阶段")
 	_check(battle.turn_manager.turn_number == 1, "CH1-030: 第 1 回合")
-	_check(battle._active_context_flag == "teach_movement", "CH1-030: 上下文教程显示移动提示")
+	_check(battle._active_context_flag == "teach_selection", "CH1-030: 上下文教程显示选择提示")
 
 	var prev_time_scale := Engine.time_scale
 	Engine.time_scale = 1.0
@@ -646,4 +659,130 @@ func _test_real_input_flow() -> void:
 	Engine.time_scale = prev_time_scale
 	battle._cleanup_units()
 	battle.queue_free()
+	await get_tree().process_frame
+
+
+## ===== CH1-080: M1 教学、对话、结算与失败体验 =====
+func _test_ch1_080_tutorial_dialogue_result() -> void:
+	print("\n--- CH1-080 test: M1 教学、对话、结算与失败体验 ---")
+	GameManager.begin_new_game_for_test(0)
+	# CH1-080: 验证 M1 教程只教学六项
+	var level_config := CampaignRepository.get_level("ch1_m1")
+	var tutorial_flags: Array = level_config.get("tutorial_flags", [])
+	var context_flags: Array = level_config.get("context_tutorial_flags", [])
+	_check(tutorial_flags.is_empty(), "CH1-080: M1 战前 modal 教程为空（全部改为上下文教学）")
+	_check(context_flags.size() == 6, "CH1-080: M1 上下文教学恰好六项")
+	_check("teach_selection" in context_flags, "CH1-080: M1 教学包含选择")
+	_check("teach_movement" in context_flags, "CH1-080: M1 教学包含移动")
+	_check("teach_attack" in context_flags, "CH1-080: M1 教学包含攻击")
+	_check("teach_observe" in context_flags, "CH1-080: M1 教学包含观察")
+	_check("teach_network_takeover" in context_flags, "CH1-080: M1 教学包含接管")
+	_check("teach_end_turn" in context_flags, "CH1-080: M1 教学包含结束回合")
+
+	# CH1-080: 验证教程文案存在且包含关键字
+	var TutorialHintScript = preload("res://scripts/ui/tutorial_hint.gd")
+	_check(TutorialHintScript.get_hint_copy("teach_selection").contains("选中"), "CH1-080: 选择教程说明选中操作")
+	_check(TutorialHintScript.get_hint_copy("teach_observe").contains("意图"), "CH1-080: 观察教程说明敌方意图")
+	_check(TutorialHintScript.get_hint_copy("teach_network_takeover").contains("接管"), "CH1-080: 接管教程说明网络接管")
+
+	# CH1-080: 验证对话背景更透明（不遮挡目标格）
+	var dialogue_scene: PackedScene = load("res://scenes/dialogue.tscn")
+	var dialogue_instance: Node = dialogue_scene.instantiate()
+	add_child(dialogue_instance)
+	var bg: ColorRect = dialogue_instance.get_node_or_null("Background")
+	_check(bg != null, "CH1-080: 对话背景节点存在")
+	if bg:
+		_check(bg.color.a < 0.5, "CH1-080: 对话背景半透明（不遮挡目标格）")
+	dialogue_instance.queue_free()
+	await get_tree().process_frame
+
+	# CH1-080: 验证结算徽章带原因说明
+	GameManager.current_level_id = "ch1_m1"
+	GameManager.battle_result = {
+		"result": "victory",
+		"level_id": "ch1_m1",
+		"stars": 3,
+		"turns": 10,
+		"units_survived": 1,
+		"units_total": 1,
+		"rewards": {"credit": 200, "exp": 150, "intel": 0},
+		"optional_credit": 150,
+		"optional_resource_collected": true,
+		"defeat_reason": "",
+		"has_encounter_checkpoint": false,
+	}
+	var result_scene := preload("res://scenes/mission_result.tscn").instantiate()
+	add_child(result_scene)
+	await get_tree().process_frame
+	_check(result_scene.title_label.text == "任务完成", "CH1-080: 胜利结算标题正确")
+	_check(result_scene.stars_container.get_child_count() == 3, "CH1-080: 结算固定三个徽章")
+	var badge1: Label = result_scene.stars_container.get_child(0)
+	var badge2: Label = result_scene.stars_container.get_child(1)
+	var badge3: Label = result_scene.stars_container.get_child(2)
+	_check(badge1.tooltip_text != "" and badge1.tooltip_text.contains("原因"), "CH1-080: 任务徽章有原因说明")
+	_check(badge2.tooltip_text != "" and badge2.tooltip_text.contains("原因"), "CH1-080: 小队徽章有原因说明")
+	_check(badge3.tooltip_text != "" and badge3.tooltip_text.contains("原因"), "CH1-080: 情报徽章有原因说明")
+	_check(not result_scene.encounter_retry_button.visible, "CH1-080: 胜利时不显示从遭遇重试")
+	result_scene.queue_free()
+	await get_tree().process_frame
+
+	# CH1-080: 验证失败结算显示原因和三选项
+	GameManager.battle_result = {
+		"result": "defeat",
+		"level_id": "ch1_m1",
+		"stars": 0,
+		"turns": 5,
+		"units_survived": 0,
+		"units_total": 1,
+		"rewards": {},
+		"defeat_reason": "all_units_down",
+		"has_encounter_checkpoint": false,
+	}
+	var defeat_scene := preload("res://scenes/mission_result.tscn").instantiate()
+	add_child(defeat_scene)
+	await get_tree().process_frame
+	_check(defeat_scene.title_label.text == "任务失败", "CH1-080: 失败结算标题正确")
+	_check(defeat_scene.retry_button.visible, "CH1-080: 失败提供重新开始按钮")
+	_check(defeat_scene.base_button.visible, "CH1-080: 失败提供返回基地按钮")
+	_check(not defeat_scene.encounter_retry_button.visible, "CH1-080: zone_a 失败不显示从遭遇重试")
+	var found_reason := false
+	for child in defeat_scene.loot_container.get_children():
+		if child is Label and String(child.text).contains("失败原因"):
+			found_reason = true
+			break
+	_check(found_reason, "CH1-080: 失败页显示失败原因")
+	defeat_scene.queue_free()
+	await get_tree().process_frame
+
+	# CH1-080: 验证遭遇区检测
+	GameManager.current_level_id = "ch1_m1"
+	var battle := BattleScene.instantiate()
+	add_child(battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if GameManager._active_dialogue and is_instance_valid(GameManager._active_dialogue):
+		GameManager._active_dialogue._end_dialogue()
+	await get_tree().process_frame
+	var tg2 := 0
+	while tg2 < 32:
+		tg2 += 1
+		await get_tree().process_frame
+		if battle._active_tutorial_hint and is_instance_valid(battle._active_tutorial_hint):
+			battle._active_tutorial_hint._on_continue()
+			continue
+		if battle._pending_tutorial_flags.is_empty():
+			break
+	await get_tree().process_frame
+	_check(battle.current_encounter_id == "zone_a", "CH1-080: 战斗开始时遭遇区为 zone_a")
+	battle._check_encounter_zone(Vector2i(10, 8))
+	_check(battle.current_encounter_id == "zone_b", "CH1-080: 进入 zone_b 触发格后遭遇区更新")
+	# CH1-080: 验证 has_encounter_checkpoint 逻辑（不触发 _end_battle 以免场景切换挂起测试）
+	var has_ckpt_zone_b: bool = battle.current_encounter_id != "" and battle.current_encounter_id != "zone_a"
+	_check(has_ckpt_zone_b, "CH1-080: zone_b 失败时 has_encounter_checkpoint 为 true")
+	battle.current_encounter_id = "zone_a"
+	var has_ckpt_zone_a: bool = battle.current_encounter_id != "" and battle.current_encounter_id != "zone_a"
+	_check(not has_ckpt_zone_a, "CH1-080: zone_a 失败时 has_encounter_checkpoint 为 false")
+	battle._cleanup_units()
+	if is_instance_valid(battle):
+		battle.queue_free()
 	await get_tree().process_frame

@@ -1,4 +1,5 @@
 ## 关卡结算界面
+## CH1-080: 失败页明确说明最近失败原因，并提供"从遭遇重试/重新开始/返回基地"
 extends Control
 class_name MissionResult
 
@@ -14,12 +15,14 @@ class_name MissionResult
 @onready var retry_button = $Panel/Buttons/RetryButton
 @onready var base_button = $Panel/Buttons/BaseButton
 @onready var next_button = $Panel/Buttons/NextButton
+@onready var encounter_retry_button = $Panel/Buttons/EncounterRetryButton
 
 func _ready() -> void:
 	_apply_visual_theme()
 	retry_button.pressed.connect(_on_retry)
 	base_button.pressed.connect(_on_base)
 	next_button.pressed.connect(_on_next)
+	encounter_retry_button.pressed.connect(_on_encounter_retry)
 	# 显示战斗结果（GameManager 在切换场景前已存入 battle_result）
 	show_result(GameManager.battle_result)
 
@@ -33,6 +36,14 @@ func show_result(data: Dictionary) -> void:
 	else:
 		title_label.text = "任务失败"
 		title_label.modulate = Color.RED
+		# CH1-080: 失败页明确说明最近失败原因
+		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")))
+		var reason_label := Label.new()
+		reason_label.text = reason_text
+		reason_label.add_theme_font_size_override("font_size", 18)
+		reason_label.modulate = Color("f4b45a")
+		reason_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		loot_container.add_child(reason_label)
 
 	# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
 	_show_badges(data)
@@ -84,9 +95,13 @@ func show_result(data: Dictionary) -> void:
 			loot_container.add_child(unlock_label)
 
 	# 按钮可用性
+	# CH1-080: 失败时提供"从遭遇重试/重新开始/返回基地"三选项
 	next_button.visible = is_victory
 	retry_button.visible = true
 	retry_button.modulate = Color("f4b45a") if not is_victory else Color.WHITE
+	# "从遭遇重试"仅在失败且有遭遇检查点时显示（不在 zone_a 失败）
+	var has_checkpoint: bool = bool(data.get("has_encounter_checkpoint", false))
+	encounter_retry_button.visible = not is_victory and has_checkpoint
 
 func _apply_visual_theme() -> void:
 	var panel_style := StyleBoxFlat.new()
@@ -105,7 +120,7 @@ func _apply_visual_theme() -> void:
 		label.add_theme_font_size_override("font_size", 18)
 		label.modulate = Color("d7ebef")
 
-	for button in [retry_button, base_button, next_button]:
+	for button in [retry_button, base_button, next_button, encounter_retry_button]:
 		_style_button(button)
 
 func _style_button(button: Button) -> void:
@@ -129,30 +144,56 @@ func _style_button(button: Button) -> void:
 	button.add_theme_font_size_override("font_size", 17)
 
 ## 显示任务徽章：任务完成 / 小队完整 / 情报收集
+## CH1-080: 每个徽章说明取得或失去原因
 ## 替代原星级系统，保留 battle_result["stars"] 整数用于存档 rating 字段
 func _show_badges(data: Dictionary) -> void:
 	for child in stars_container.get_children():
 		child.queue_free()
 	var is_victory: bool = data.get("result", "defeat") == "victory"
 	var stars: int = int(data.get("stars", 0))
+	var survived: int = int(data.get("units_survived", 0))
+	var total: int = int(data.get("units_total", 0))
+	var turns: int = int(data.get("turns", 0))
+	var optional_collected: bool = bool(data.get("optional_resource_collected", false))
 	# Badge 1: Mission — awarded on any victory
 	var mission_earned: bool = is_victory
+	var mission_reason := "完成任务目标" if mission_earned else "未完成任务目标"
 	# Badge 2: Squad — awarded when all units survive (stars >= 2)
 	var squad_earned: bool = stars >= 2
+	var squad_reason := "全员存活 (%d/%d)" % [survived, total] if squad_earned else "有单位阵亡 (%d/%d)" % [survived, total]
 	# Badge 3: Intel — awarded on full clear (stars == 3: fast + optional)
 	var intel_earned: bool = stars >= 3
-	_add_badge("任务", mission_earned, Color("6dd6e5"))
-	_add_badge("小队", squad_earned, Color("7ee68a"))
-	_add_badge("情报", intel_earned, Color.GOLD)
+	var intel_reason: String
+	if intel_earned:
+		intel_reason = "速通并收集可选资源"
+	else:
+		var parts: Array[String] = []
+		if not optional_collected:
+			parts.append("未收集可选资源")
+		if turns > int(level_config_three_star_turns()):
+			parts.append("回合数 %d 超过三星上限" % turns)
+		intel_reason = "、".join(parts) if not parts.is_empty() else "未达成速通条件"
+	_add_badge("任务", mission_earned, Color("6dd6e5"), mission_reason)
+	_add_badge("小队", squad_earned, Color("7ee68a"), squad_reason)
+	_add_badge("情报", intel_earned, Color.GOLD, intel_reason)
 
-func _add_badge(label_text: String, earned: bool, color: Color) -> void:
+## 从 GameManager.battle_result 获取三星回合上限
+func level_config_three_star_turns() -> int:
+	var level_id: String = String(GameManager.battle_result.get("level_id", ""))
+	var level: Dictionary = CampaignRepository.get_level(level_id)
+	return int(level.get("three_star_turns", 10))
+
+## CH1-080: 徽章带原因说明，鼠标悬停显示 tooltip
+func _add_badge(label_text: String, earned: bool, color: Color, reason: String = "") -> void:
 	var badge = Label.new()
 	badge.text = label_text
 	badge.add_theme_font_size_override("font_size", 22)
 	if earned:
 		badge.modulate = color
+		badge.tooltip_text = "取得原因：" + reason
 	else:
 		badge.modulate = Color(0.3, 0.3, 0.3, 0.5)
+		badge.tooltip_text = "未取得原因：" + reason
 	stars_container.add_child(badge)
 
 func _format_time(seconds: int) -> String:
@@ -163,6 +204,10 @@ func _format_time(seconds: int) -> String:
 func _on_retry() -> void:
 	GameManager.go_to_battle(GameManager.current_level_id)
 
+## CH1-080: 从遭遇检查点重试（当前为重开关卡，完整状态恢复见 CH1-020）
+func _on_encounter_retry() -> void:
+	GameManager.go_to_battle_from_encounter(GameManager.current_level_id)
+
 func _on_base() -> void:
 	GameManager.go_to_base()
 
@@ -172,3 +217,15 @@ func _on_next() -> void:
 		GameManager.go_to_battle(next_id)
 	else:
 		GameManager.go_to_base()
+
+## CH1-080: 失败原因文案
+func _get_defeat_reason_text(reason: String) -> String:
+	match reason:
+		"all_units_down":
+			return "失败原因：全队阵亡。注意利用掩体和网络节点减少伤害。"
+		"turn_limit":
+			return "失败原因：回合上限耗尽。尝试更积极的推进路线或利用设施改变战局。"
+		"":
+			return "失败原因：未满足任务目标。"
+		_:
+			return "失败原因：%s" % reason

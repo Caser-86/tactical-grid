@@ -18,20 +18,13 @@
       "enemy_cap": 3,
       "intro_dialogue": "ch1_m1_intro",
       "outro_dialogue": "ch1_m1_outro",
-      "tutorial_flags": [
-        "teach_camera",
-        "teach_cover",
-        "teach_upload_hold",
-        "teach_evac",
-        "teach_network_takeover",
-        "teach_network_disable",
-        "teach_network_overload"
-      ],
+      "tutorial_flags": [],
       "context_tutorial_flags": [
+        "teach_selection",
         "teach_movement",
         "teach_attack",
-        "teach_interaction",
-        "teach_network_scan",
+        "teach_observe",
+        "teach_network_takeover",
         "teach_end_turn"
       ],
       "special_rules": {
