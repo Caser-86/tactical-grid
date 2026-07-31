@@ -1945,9 +1945,16 @@ func _try_move(grid_pos: Vector2i) -> void:
 		_log("移动点不足")
 		return
 
+	# CODE-CH1-010: 玩家移动通过统一动作契约提交
 	var old_pos = selected_unit.grid_pos
-	selected_unit.move_points -= cost
-	selected_unit.move_to(grid_pos)
+	var preview = action_system.query_action({"action": &"move", "unit": selected_unit, "target": grid_pos})
+	if not bool(preview.get("valid", false)):
+		_log("移动失败：%s" % preview.get("reason", "unknown"))
+		return
+	var result = action_system.commit_action(preview)
+	if not bool(result.get("success", false)):
+		_log("移动失败：%s" % result.get("reason", "unknown"))
+		return
 	_update_unit_sprite_pos(selected_unit, true)
 	AudioManager.sfx_move()
 
@@ -1989,7 +1996,7 @@ func _try_attack(grid_pos: Vector2i) -> void:
 		_log("目标不在攻击范围")
 		return
 
-	_do_attack(selected_unit, target)
+	_do_player_attack(selected_unit, target)
 	# 刷新攻击范围显示
 	if selected_unit and selected_unit.current_ap > 0:
 		_show_attack_range(selected_unit)
@@ -2089,6 +2096,44 @@ func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
 	_log("%s collected optional resource (+%d credit)" % [unit.unit_name, int(result.get("credit_bonus", 0))])
 	hud.update_objective(_get_objective_text())
 	return true
+
+## CODE-CH1-010: 玩家攻击通过统一动作契约提交（query→commit）
+## 敌人 AI 和警戒射击触发仍使用 _do_attack 的直接 execute_attack 路径
+func _do_player_attack(attacker: Unit, target: Unit) -> void:
+	var preview = action_system.query_action({"action": &"attack", "unit": attacker, "target": target})
+	if not bool(preview.get("valid", false)):
+		_log("攻击失败：%s" % preview.get("reason", "unknown"))
+		return
+	var result = action_system.commit_action(preview)
+	if result.get("success", false):
+		AudioManager.sfx_attack(AudioManager.get_weapon_sfx_profile(attacker.weapon_special))
+		_play_unit_state(attacker, &"attack", Vector2(target.grid_pos - attacker.grid_pos))
+		_spawn_effect("muzzle", attacker.grid_pos)
+		var r = result.get("result", {})
+		var hit = r.get("hit", false)
+		var damage = int(r.get("damage", 0))
+		var critical = r.get("critical", false)
+		if hit:
+			_spawn_effect("crit" if critical else "hit", target.grid_pos)
+			if critical:
+				AudioManager.sfx_critical()
+				camera.play_event_feedback(&"critical", _get_cell_center(target.grid_pos))
+			else:
+				AudioManager.sfx_hit()
+			if r.get("dodged", false):
+				_log("%s 攻击 %s - 闪避!" % [attacker.unit_name, target.unit_name])
+			elif critical:
+				_log("%s 暴击 %s - %d伤害!" % [attacker.unit_name, target.unit_name, damage])
+			else:
+				_log("%s 命中 %s - %d伤害" % [attacker.unit_name, target.unit_name, damage])
+		else:
+			_spawn_effect("miss", target.grid_pos)
+			_log("%s 攻击 %s - 未命中" % [attacker.unit_name, target.unit_name])
+		# 记录遥测：闪避算作命中（攻击命中判定通过，但被闪避）
+		_record_attack_telemetry(attacker, target, hit, damage, critical)
+		_update_unit_sprite_pos(target)
+	else:
+		_log("攻击失败: %s" % result.get("reason", "unknown"))
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var result = action_system.execute_attack(attacker, target)
@@ -2303,6 +2348,7 @@ func _begin_targeting(spec: Dictionary) -> void:
 		"players": player_units,
 		"enemies": enemy_units,
 		"los_check": Callable(self, "_has_los_for_targeting"),
+		"action_system": action_system,
 	}
 	targeting_controller.begin(selected_unit, _pending_action_id, spec, context)
 
@@ -2399,27 +2445,40 @@ func _execute_pending_action(target_data: Dictionary) -> void:
 	if action_kind == "skill":
 		var skill_data = GameData.get_skill(action_id)
 		action_name = String(skill_data.get("name", action_id))
-		result = action_system.execute_skill(selected_unit, action_id, target_data)
-		if result.get("success", false):
-			AudioManager.sfx_skill()
-			_play_unit_state(selected_unit, &"skill")
-			_spawn_effect("heal" if action_id.contains("heal") else "terminal", selected_unit.grid_pos)
-			_log("%s 使用技能：%s" % [selected_unit.unit_name, action_name])
-			_record_skill_telemetry()
+		# CODE-CH1-010: 技能通过统一动作契约提交
+		var preview = action_system.query_action({"action": &"skill", "unit": selected_unit, "action_id": action_id})
+		if not bool(preview.get("valid", false)):
+			_log("%s 技能 %s 失败：%s" % [selected_unit.unit_name, action_name, preview.get("reason", "")])
 		else:
-			_log("%s 技能 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
+			preview["target_data"] = target_data
+			result = action_system.commit_action(preview)
+			if result.get("success", false):
+				AudioManager.sfx_skill()
+				_play_unit_state(selected_unit, &"skill")
+				_spawn_effect("heal" if action_id.contains("heal") else "terminal", selected_unit.grid_pos)
+				_log("%s 使用技能：%s" % [selected_unit.unit_name, action_name])
+				_record_skill_telemetry()
+			else:
+				_log("%s 技能 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
 	elif action_kind == "item":
 		var item_data = GameData.get_item(action_id)
 		action_name = String(item_data.get("name", action_id))
 		var target_unit = target_data.get("target_unit", selected_unit)
-		result = action_system.use_item(selected_unit, action_id, target_unit, target_data)
-		if result.get("success", false):
-			AudioManager.sfx_heal()
-			_spawn_effect("heal", selected_unit.grid_pos)
-			_log("%s 使用物品：%s" % [selected_unit.unit_name, action_name])
-			_record_item_telemetry()
+		# CODE-CH1-010: 物品通过统一动作契约提交
+		var preview = action_system.query_action({"action": &"item", "unit": selected_unit, "action_id": action_id})
+		if not bool(preview.get("valid", false)):
+			_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, action_name, preview.get("reason", "")])
 		else:
-			_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
+			preview["target_data"] = target_data
+			preview["target_unit"] = target_unit
+			result = action_system.commit_action(preview)
+			if result.get("success", false):
+				AudioManager.sfx_heal()
+				_spawn_effect("heal", selected_unit.grid_pos)
+				_log("%s 使用物品：%s" % [selected_unit.unit_name, action_name])
+				_record_item_telemetry()
+			else:
+				_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
 	# 刷新单位信息和移动范围
 	hud.update_unit_info(selected_unit)
 	if selected_unit.current_ap > 0:
@@ -2436,7 +2495,13 @@ func on_overwatch_button() -> void:
 			_log("警戒被禁用：%s" % reason)
 			mission_objective_state.special_rule_violated.emit(MissionObjectiveState.RULE_NO_OVERWATCH, reason)
 			return
-		if action_system.enter_overwatch(selected_unit):
+		# CODE-CH1-010: 警戒通过统一动作契约提交
+		var preview = action_system.query_action({"action": &"overwatch", "unit": selected_unit})
+		if not bool(preview.get("valid", false)):
+			_log("警戒失败：%s" % preview.get("reason", "unknown"))
+			return
+		var result = action_system.commit_action(preview)
+		if bool(result.get("success", false)):
 			AudioManager.sfx_overwatch()
 			_log("%s 进入警戒" % selected_unit.unit_name)
 			_record_overwatch_telemetry()

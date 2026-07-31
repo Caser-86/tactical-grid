@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_invalid_cell_rejected()
 	_test_infer_skill_spec_static()
 	_test_infer_item_spec_static()
+	_test_query_preview_attached_to_target_data()
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
 		SaveManager.delete_save(slot)
@@ -330,6 +331,52 @@ func _test_infer_item_spec_static() -> void:
 	var mine := {"type": "trap", "effect": {"damage": 60}}
 	var spec_trap = TargetingControllerScript.infer_item_spec("mine", mine, user)
 	_check(spec_trap.get("target_type") == TargetingControllerScript.TARGET_SELF, "地雷推断为 SELF")
+
+## CODE-CH1-010: 目标选择通过 query_action 获取预览，target_data 包含 cost 和 hit_chance
+func _test_query_preview_attached_to_target_data() -> void:
+	print("\n--- 测试: 目标选择返回的预览数据包含 cost 和 hit_chance ---")
+	var tc = _make_controller()
+	var caster = _make_unit("player", Vector2i(1, 1), "caster")
+	var enemy = _make_unit("enemy", Vector2i(2, 2), "enemy")
+	var spec := {
+		"target_type": TargetingControllerScript.TARGET_ENEMY,
+		"range": 5,
+		"team_filter": TargetingControllerScript.TEAM_ENEMY,
+		"requires_los": false,
+		"area_radius": 0,
+		"action_kind": "skill",
+	}
+	var stub = _StubActionSystem.new()
+	stub.query_result = {
+		"valid": true,
+		"cost": {"ap": 2, "move": 0},
+		"hit_chance": 0.85,
+		"damage": 25,
+	}
+	var ctx = _make_context([caster], [enemy], Callable(self, "_always_true_los"))
+	ctx["action_system"] = stub
+	tc.begin(caster, "snip_precise", spec, ctx)
+	var result = tc.try_confirm(Vector2i(2, 2))
+	_check(result.get("success", false), "确认敌方目标成功")
+	var data = result.get("target_data", {})
+	_check(data.has("cost"), "target_data 包含 cost (来自 query_action 预览)")
+	_check(int(data.get("cost", {}).get("ap", 0)) == 2, "cost.ap=2 (实际: %d)" % int(data.get("cost", {}).get("ap", 0)))
+	_check(data.has("hit_chance"), "target_data 包含 hit_chance (来自 query_action 预览)")
+	_check(abs(float(data.get("hit_chance", 0.0)) - 0.85) < 0.001, "hit_chance=0.85 (实际: %s)" % str(data.get("hit_chance")))
+	# 验证 stub 收到了 query 请求
+	_check(stub.last_request.get("action") == &"skill", "stub 收到 action=skill 的 query 请求")
+	_check(stub.last_request.get("action_id") == "snip_precise", "stub 收到正确的 action_id")
+	_check(stub.last_request.get("target") == enemy, "stub 收到 target=敌方单位")
+	tc.queue_free()
+
+## CODE-CH1-010: 用于测试的 action_system 桩件，模拟 query_action 返回预览数据
+class _StubActionSystem:
+	extends RefCounted
+	var query_result: Dictionary = {}
+	var last_request: Dictionary = {}
+	func query_action(request: Dictionary) -> Dictionary:
+		last_request = request.duplicate(true)
+		return query_result
 
 func _print_summary() -> void:
 	print("\n=== 测试汇总 ===")

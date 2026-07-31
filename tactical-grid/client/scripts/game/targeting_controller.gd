@@ -82,11 +82,36 @@ func try_confirm(cell: Vector2i) -> Dictionary:
 	if not _is_cell_valid(cell):
 		return {success = false, reason = "invalid_cell"}
 	var target_data := _build_target_data(cell)
+	# CODE-CH1-010: 通过 query_action 获取预览，附加 cost/hit_chance 到 target_data
+	_attach_query_preview(target_data)
 	# 确认成功后清理状态（不触发 targeting_cancelled），然后触发 target_confirmed
 	var data = target_data
 	_clear_state()
 	target_confirmed.emit(data)
 	return {success = true, target_data = data}
+
+## CODE-CH1-010: 若上下文提供 action_system，则通过 query_action 获取预览，
+## 将 cost 和 hit_chance（若存在）附加到 target_data，使目标选择经过统一动作契约
+func _attach_query_preview(target_data: Dictionary) -> void:
+	var action_system = _context.get("action_system", null)
+	if action_system == null:
+		return
+	var query_request := {
+		"action": StringName(_action_kind),
+		"unit": _actor,
+		"action_id": _action_id,
+	}
+	if target_data.has("target_unit"):
+		query_request["target"] = target_data["target_unit"]
+	elif target_data.has("position"):
+		query_request["target"] = target_data["position"]
+	var preview = action_system.query_action(query_request)
+	if not bool(preview.get("valid", false)):
+		return
+	if preview.has("cost"):
+		target_data["cost"] = preview["cost"]
+	if preview.has("hit_chance"):
+		target_data["hit_chance"] = preview["hit_chance"]
 
 ## 取消目标选择
 func cancel() -> void:

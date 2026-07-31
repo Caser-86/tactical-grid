@@ -28,6 +28,7 @@ func _ready() -> void:
 	await _test_viewport_fills_at_22x16()
 	await _test_input_actions()
 	await _test_network_toggle_and_alert_display()
+	await _test_player_move_uses_commit_action()
 	await get_tree().process_frame
 
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -470,6 +471,46 @@ func _test_network_toggle_and_alert_display() -> void:
 	var next_consequence: Dictionary = _battle.alert_state.get_next_consequence()
 	_check(String(next_consequence.get("description", "")).contains("hunt"), "下一步后果描述战斗级行为")
 
+	await _dispose_battle()
+
+## CODE-CH1-010: 玩家移动通过 commit_action 提交，预览被消费
+func _test_player_move_uses_commit_action() -> void:
+	print("\n--- 测试: 玩家移动通过 commit_action 提交 ---")
+	GameManager.current_level_id = "ch1_m1"
+	_battle = BattleScene.instantiate()
+	add_child(_battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _battle.get_script() == null:
+		_check(false, "战斗脚本加载")
+		await _dispose_battle()
+		return
+	var unit: Unit = _battle.player_units[0]
+	unit.current_ap = 2
+	_battle._select_unit(unit)
+	await get_tree().process_frame
+	var reachable: Dictionary = _battle.reachable_cells
+	if reachable.is_empty():
+		_check(false, "单位有可达移动格")
+		await _dispose_battle()
+		return
+	var target_cell: Vector2i = Vector2i(-1, -1)
+	for cell in reachable.keys():
+		if cell != unit.grid_pos:
+			target_cell = cell
+			break
+	if target_cell.x < 0:
+		_check(false, "找到非起点可达格")
+		await _dispose_battle()
+		return
+	var previews_before: int = _battle.action_system._active_previews.size()
+	# 直接调用 _try_move（内部走 query_action → commit_action 路径）
+	_battle._try_move(target_cell)
+	await get_tree().process_frame
+	_check(unit.grid_pos == target_cell, "玩家单位移动到目标格 (期望 %s 实际 %s)" % [target_cell, unit.grid_pos])
+	# commit_action 消费了 query_action 注册的预览，_active_previews 不应增长
+	var previews_after: int = _battle.action_system._active_previews.size()
+	_check(previews_after <= previews_before, "移动后 _active_previews 未增长 (commit_action 消费了预览, before=%d after=%d)" % [previews_before, previews_after])
 	await _dispose_battle()
 
 func _dispose_battle() -> void:
