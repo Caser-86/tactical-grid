@@ -315,7 +315,7 @@ func _test_m1_infiltrate_stages() -> void:
 		return
 
 	# Initial production state
-	_check(battle.map_width == 18 and battle.map_height == 14, "M1 production map is expanded")
+	_check(battle.map_width == 22 and battle.map_height == 16, "M1 production map is expanded to 22x16 three-zone layout")
 	_check(battle.player_units.size() == 1, "M1 deploys one player unit (assault) at start")
 	_check(battle.enemy_units.size() == 3, "M1 starts with three authored enemies")
 	_check(battle.mission_objective_state.get_stage() == &"approach", "M1 begins in approach")

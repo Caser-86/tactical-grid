@@ -557,11 +557,11 @@ func _test_locked_map_load_basic() -> void:
 	var data: Dictionary = res["data"]
 	_check(data.get("map_id", "") != "", "ch1_m1 map_id 非空")
 	_check(data.get("mission_type", "") == "infiltrate", "ch1_m1 mission_type=infiltrate")
-	_check(int(data.size.width) == 18, "ch1_m1 width=18")
-	_check(int(data.size.height) == 14, "ch1_m1 height=14")
+	_check(int(data.size.width) == 22, "ch1_m1 width=22")
+	_check(int(data.size.height) == 16, "ch1_m1 height=16")
 	_check(data.has("layers"), "ch1_m1 包含 layers")
-	_check(data.layers.base_terrain.size() == 14, "ch1_m1 base_terrain 行数=14")
-	_check(data.layers.base_terrain[0].size() == 18, "ch1_m1 base_terrain 列数=18")
+	_check(data.layers.base_terrain.size() == 16, "ch1_m1 base_terrain 行数=16")
+	_check(data.layers.base_terrain[0].size() == 22, "ch1_m1 base_terrain 列数=22")
 	# objects 应包含 spawn_player 和 evac
 	var objs = data.get("objects", [])
 	var has_player_spawn = objs.any(func(o): return o.get("type") == "spawn_player")
@@ -1630,7 +1630,7 @@ func _test_chapter_one_environment_sample() -> void:
 	if not result.get("ok", false):
 		return
 	var map: Dictionary = result["data"]
-	_check(map.size == {"width": 18, "height": 14}, "MapSample: ch1_m1 固定为 18x14")
+	_check(map.size == {"width": 22, "height": 16}, "MapSample: ch1_m1 固定为 22x16 三遭遇区")
 	var level := CampaignRepository.get_level("ch1_m1")
 	_check(int(level.get("player_units", 0)) == 1 and int(level.get("enemy_count", 0)) == 3, "ch1_m1 force size is 1v3 (scout rescue adds 2nd player)")
 	_check(int(level.get("max_turns", 0)) == 18 and int(level.get("three_star_turns", 0)) == 11, "ch1_m1 standard turn contract")
