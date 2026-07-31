@@ -92,9 +92,7 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_overview"):
 		toggle_overview()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("toggle_network"):
-		# CODE-P2-02 will wire the network overlay; camera just prevents default.
-		get_viewport().set_input_as_handled()
+	# CH1-030: toggle_network 不再由相机吞掉，交由 BattleController._unhandled_input 处理
 
 ## 设置地图边界和安全视口
 ## CODE-P0-01: configure_bounds is the canonical entry point.

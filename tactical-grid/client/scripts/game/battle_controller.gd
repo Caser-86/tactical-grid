@@ -7,10 +7,25 @@ const CELL_SIZE = 64
 const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 
+## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
+const CONTEXT_HINT_ACTION := {
+	"teach_movement": "move",
+	"teach_attack": "attack",
+	"teach_interaction": "interact",
+	"teach_network_scan": "network",
+	"teach_end_turn": "end_turn",
+}
+
 ## 待展示的教程 flag 队列（来自 level_config.tutorial_flags，跳过已读）
 var _pending_tutorial_flags: Array[String] = []
 ## 当前活跃的教程提示实例
 var _active_tutorial_hint: Control = null
+## CH1-030: 上下文教学提示队列（战斗中伴随式显示，玩家完成动作后推进）
+var _context_hint_queue: Array[String] = []
+## CH1-030: 当前活跃的上下文提示实例
+var _active_context_hint: Control = null
+## CH1-030: 当前上下文提示对应的 flag
+var _active_context_flag: String = ""
 
 ## 渲染层
 @onready var map_layer: Node2D = $MapLayer
@@ -262,6 +277,7 @@ func _cleanup_units() -> void:
 			unit.free()
 	player_units.clear()
 	enemy_units.clear()
+	_dismiss_context_hint()
 	selected_unit = null
 	boss_unit = null
 	boss_data.clear()
@@ -321,6 +337,48 @@ func _on_tutorial_hint_closed() -> void:
 		_start_battle()
 	else:
 		_show_next_tutorial_or_start()
+
+## CH1-030: 战斗开始后启动上下文教学提示序列（伴随式、非阻断）
+func _begin_context_tutorials() -> void:
+	_context_hint_queue.clear()
+	for f in level_config.get("context_tutorial_flags", []):
+		_context_hint_queue.append(String(f))
+	_show_next_context_hint()
+
+## CH1-030: 显示下一个未读上下文提示；无剩余则清理
+func _show_next_context_hint() -> void:
+	while _context_hint_queue.size() > 0:
+		var flag = _context_hint_queue.pop_front()
+		if not TutorialHint.is_known(flag):
+			_show_context_hint(flag)
+			return
+	# 无剩余上下文提示
+	_dismiss_context_hint()
+
+## CH1-030: 实例化并显示单个上下文提示
+func _show_context_hint(flag: String) -> void:
+	_dismiss_context_hint()
+	_active_context_hint = TutorialHintScene.instantiate()
+	hud.add_child(_active_context_hint)
+	_active_context_flag = flag
+	_active_context_hint.show_context_hint(flag)
+
+## CH1-030: 清理当前上下文提示实例
+func _dismiss_context_hint() -> void:
+	if _active_context_hint != null and is_instance_valid(_active_context_hint):
+		_active_context_hint.queue_free()
+	_active_context_hint = null
+	_active_context_flag = ""
+
+## CH1-030: 玩家完成动作后推进上下文提示
+## action_type: "move" / "attack" / "interact" / "network" / "end_turn"
+func _advance_context_hint(action_type: String) -> void:
+	if _active_context_flag == "":
+		return
+	var expected: String = String(CONTEXT_HINT_ACTION.get(_active_context_flag, ""))
+	if expected == "" or expected == action_type:
+		TutorialHint.mark_known(_active_context_flag)
+		_show_next_context_hint()
 
 func _init_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -1281,6 +1339,8 @@ func _start_battle() -> void:
 	hud.update_objective(_get_objective_text())
 	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
+	# CH1-030: 战斗开始后启动上下文教学提示序列
+	_begin_context_tutorials()
 
 func _get_objective_text() -> String:
 	var objective_text := "目标：消灭所有敌人"
@@ -1478,6 +1538,7 @@ func _on_toggle_network() -> void:
 		hud.toggle_network_overlay()
 		_update_network_node_visibility()
 		_log("网络覆盖层: %s" % ("显示" if hud.is_network_overlay_visible() else "隐藏"))
+	_advance_context_hint("network")
 
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
 ## 单位生成由 reinforcement_spawned 信号统一驱动，这里不直接 spawn
@@ -1716,11 +1777,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("pause"):
-		_show_pause_menu()
+		# CH1-030: Esc 只在无目标模式时暂停；否则逐级取消当前动作
+		if _has_active_input_mode():
+			_cancel_action()
+		else:
+			_show_pause_menu()
 		return
 
 	if event.is_action_pressed("end_turn"):
 		_end_player_turn()
+		_advance_context_hint("end_turn")
 		return
 
 	if event.is_action_pressed("next_unit"):
@@ -1733,13 +1799,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# 鼠标移动时实时预览移动路径
 	if event is InputEventMouseMotion and selected_action == "move" and selected_unit:
-		_update_path_preview(get_global_mouse_position())
+		var mouse_motion := event as InputEventMouseMotion
+		var motion_world := get_viewport().canvas_transform.affine_inverse() * mouse_motion.position
+		_update_path_preview(motion_world)
 
 	if event is InputEventMouseButton and event.pressed:
-		var world_pos = get_global_mouse_position()
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_left_click(world_pos)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+		var mouse_btn := event as InputEventMouseButton
+		var click_world := get_viewport().canvas_transform.affine_inverse() * mouse_btn.position
+		print("  [DBG-BATTLE] mouse_btn click at screen=", mouse_btn.position, " world=", click_world, " grid=", GridSystem.world_to_grid(click_world))
+		if mouse_btn.button_index == MOUSE_BUTTON_LEFT:
+			_handle_left_click(click_world)
+		elif mouse_btn.button_index == MOUSE_BUTTON_RIGHT:
 			_cancel_action()
 
 func _handle_left_click(world_pos: Vector2) -> void:
@@ -1815,6 +1885,14 @@ func _deselect_unit() -> void:
 	hud.set_context_state(HUD.ContextState.NONE)
 	hud.set_targeting_hint("")
 	hud.update_objective(_get_objective_text())
+
+## CH1-030: 是否有活跃的目标选择或动作模式（Esc 逐级取消 vs 暂停的判定）
+func _has_active_input_mode() -> bool:
+	if targeting_controller and targeting_controller.is_active:
+		return true
+	if hud and hud._action_picker != null and is_instance_valid(hud._action_picker):
+		return true
+	return selected_action != ""
 
 func _cancel_action() -> void:
 	# 优先取消目标选择模式
@@ -2003,6 +2081,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 	hud.update_unit_info(selected_unit)
 
 	_check_victory_instant()
+	_advance_context_hint("move")
 
 func _try_attack(grid_pos: Vector2i) -> void:
 	if not selected_unit:
@@ -2028,7 +2107,7 @@ func _try_attack(grid_pos: Vector2i) -> void:
 		_log("目标不在攻击范围")
 		return
 
-	_do_player_attack(selected_unit, target)
+	var attack_ok = _do_player_attack(selected_unit, target)
 	# 刷新攻击范围显示
 	if selected_unit and selected_unit.current_ap > 0:
 		_show_attack_range(selected_unit)
@@ -2036,6 +2115,8 @@ func _try_attack(grid_pos: Vector2i) -> void:
 		selected_action = ""
 		_clear_layer(attack_highlight)
 	hud.update_unit_info(selected_unit)
+	if attack_ok:
+		_advance_context_hint("attack")
 
 ## 攻击可破坏目标实体（消耗 AP，造成武器伤害）
 func _attack_destructible(attacker: Unit, target_pos: Vector2i) -> void:
@@ -2088,6 +2169,7 @@ func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 	_log("%s 激活终端 (%d/%d)" % [unit.unit_name, terminals_activated, terminals_required])
 	hud.update_objective(_get_objective_text())
 	_check_victory_instant()
+	_advance_context_hint("interact")
 	return true
 
 ## Task 3: calculate star rating (0=defeat, 1=victory, 2=no casualty, 3=fast+optional)
@@ -2131,11 +2213,11 @@ func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
 
 ## CODE-CH1-010: 玩家攻击通过统一动作契约提交（query→commit）
 ## 敌人 AI 和警戒射击触发仍使用 _do_attack 的直接 execute_attack 路径
-func _do_player_attack(attacker: Unit, target: Unit) -> void:
+func _do_player_attack(attacker: Unit, target: Unit) -> bool:
 	var preview = action_system.query_action({"action": &"attack", "unit": attacker, "target": target})
 	if not bool(preview.get("valid", false)):
 		_log("攻击失败：%s" % preview.get("reason", "unknown"))
-		return
+		return false
 	var result = action_system.commit_action(preview)
 	if result.get("success", false):
 		AudioManager.sfx_attack(AudioManager.get_weapon_sfx_profile(attacker.weapon_special))
@@ -2164,8 +2246,10 @@ func _do_player_attack(attacker: Unit, target: Unit) -> void:
 		# 记录遥测：闪避算作命中（攻击命中判定通过，但被闪避）
 		_record_attack_telemetry(attacker, target, hit, damage, critical)
 		_update_unit_sprite_pos(target)
+		return true
 	else:
 		_log("攻击失败: %s" % result.get("reason", "unknown"))
+		return false
 
 func _do_attack(attacker: Unit, target: Unit) -> void:
 	var result = action_system.execute_attack(attacker, target)

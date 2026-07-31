@@ -20,16 +20,19 @@
       "outro_dialogue": "ch1_m1_outro",
       "tutorial_flags": [
         "teach_camera",
-        "teach_movement",
-        "teach_attack",
         "teach_cover",
-        "teach_interaction",
         "teach_upload_hold",
         "teach_evac",
-        "teach_network_scan",
         "teach_network_takeover",
         "teach_network_disable",
         "teach_network_overload"
+      ],
+      "context_tutorial_flags": [
+        "teach_movement",
+        "teach_attack",
+        "teach_interaction",
+        "teach_network_scan",
+        "teach_end_turn"
       ],
       "special_rules": {
         "no_overwatch": {

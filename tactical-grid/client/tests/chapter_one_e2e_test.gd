@@ -25,6 +25,8 @@ func _run() -> void:
 	await _test_calculate_stars_contract()
 	await _test_optional_reward_first_clear_one_time()
 	await _test_m1_infiltrate_stages()
+	# CH1-030: real input event E2E
+	await _test_real_input_flow()
 
 	# Clean saves again so the main loop starts fresh
 	for slot in range(SaveManager.MAX_LOCAL_SAVES):
@@ -470,3 +472,178 @@ func _test_optional_reward_first_clear_one_time() -> void:
 	var expected_second := after_first + base_credit + opt_credit
 	_check(after_second == expected_second,
 		"replay + optional: credits increase by base+optional only (got %d expected %d)" % [after_second, expected_second])
+
+
+## ===== CH1-030: 真实输入事件 E2E =====
+## 通过 Input.parse_input_event 注入 InputEventMouseButton/InputEventKey，
+## 断言真实事件改变选择、单位位置、敌人生命、节点状态、回合和暂停状态。
+## 不直接调用 _try_move / _try_attack 等内部执行函数冒充输入。
+
+var _last_mouse_screen_pos: Vector2 = Vector2.ZERO
+
+func _inject_key(physical_keycode: int) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = physical_keycode
+	ev.physical_keycode = physical_keycode
+	ev.pressed = true
+	ev.echo = false
+	ev.device = -1
+	get_viewport().push_input(ev)
+	await get_tree().process_frame
+
+func _move_mouse_to_grid(battle: BattleController, grid_pos: Vector2i) -> void:
+	var world_pos := GridSystem.grid_to_world(grid_pos)
+	world_pos += Vector2(BattleController.CELL_SIZE * 0.5, BattleController.CELL_SIZE * 0.5)
+	var canvas_transform := battle.get_viewport().canvas_transform
+	var screen_pos := canvas_transform * world_pos
+	_last_mouse_screen_pos = screen_pos
+	print("  [DBG-MOVE] grid=", grid_pos, " world=", world_pos, " screen=", screen_pos)
+	var motion := InputEventMouseMotion.new()
+	motion.position = screen_pos
+	motion.global_position = screen_pos
+	motion.device = -1
+	get_viewport().push_input(motion)
+	await get_tree().process_frame
+
+func _click_left_button() -> void:
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = _last_mouse_screen_pos
+	click.global_position = _last_mouse_screen_pos
+	click.device = -1
+	print("  [DBG-CLICK] _last_mouse_screen_pos=", _last_mouse_screen_pos, " click.position=", click.position)
+	get_viewport().push_input(click)
+	await get_tree().process_frame
+
+func _find_reachable_cell(battle: BattleController, unit: Unit) -> Vector2i:
+	for cell in battle.reachable_cells.keys():
+		if cell != unit.grid_pos:
+			return cell
+	return Vector2i(-1, -1)
+
+func _test_real_input_flow() -> void:
+	print("\n--- CH1-030 test: 真实输入事件 E2E ---")
+	GameManager.begin_new_game_for_test(0)
+	# 清除上下文教程已读状态以便验证推进
+	for f in ["teach_movement", "teach_attack", "teach_interaction", "teach_network_scan", "teach_end_turn"]:
+		GameManager.current_save.campaign_progress.story_flags["tutorial_" + f] = false
+	GameManager.current_level_id = "ch1_m1"
+	var battle := BattleScene.instantiate()
+	add_child(battle)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if battle.get_script() == null:
+		_check(false, "CH1-030: battle script loaded")
+		if is_instance_valid(battle):
+			battle.queue_free()
+		return
+
+	# 跳过 intro 对话和战前 modal 教程
+	if GameManager._active_dialogue and is_instance_valid(GameManager._active_dialogue):
+		GameManager._active_dialogue._end_dialogue()
+	await get_tree().process_frame
+	var tg := 0
+	while tg < 32:
+		tg += 1
+		await get_tree().process_frame
+		if battle._active_tutorial_hint and is_instance_valid(battle._active_tutorial_hint):
+			battle._active_tutorial_hint._on_continue()
+			continue
+		if battle._pending_tutorial_flags.is_empty():
+			break
+	await get_tree().process_frame
+
+	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 战斗在玩家行动阶段")
+	_check(battle.turn_manager.turn_number == 1, "CH1-030: 第 1 回合")
+	_check(battle._active_context_flag == "teach_movement", "CH1-030: 上下文教程显示移动提示")
+
+	var prev_time_scale := Engine.time_scale
+	Engine.time_scale = 1.0
+	# CH1-030: Headless mode defaults window to 64x64, causing push_input to scale
+	# mouse positions by 20x. Resize window to match viewport to avoid scaling.
+	get_window().size = Vector2i(1280, 720)
+	await get_tree().process_frame
+
+	# 1. 真实鼠标事件：点击玩家单位选中
+	var player_unit: Unit = battle.player_units[0]
+	_move_mouse_to_grid(battle, player_unit.grid_pos)
+	_click_left_button()
+	await get_tree().process_frame
+	_check(battle.selected_unit == player_unit, "CH1-030: 左键点击选中玩家单位")
+
+	# 2. HUD 移动按钮进入移动模式（UI 按钮交互，非内部执行函数）
+	battle.hud.move_button.pressed.emit()
+	await get_tree().process_frame
+	_check(battle.selected_action == "move", "CH1-030: 移动按钮进入移动模式")
+
+	# 3. 真实鼠标事件：点击可达格子移动单位（单位位置变化）
+	var move_target := _find_reachable_cell(battle, player_unit)
+	_check(move_target.x >= 0, "CH1-030: 存在可达移动目标")
+	if move_target.x >= 0:
+		_move_mouse_to_grid(battle, move_target)
+		_click_left_button()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(player_unit.grid_pos == move_target, "CH1-030: 左键点击移动单位到目标格")
+		_check(battle._active_context_flag != "teach_movement", "CH1-030: 移动后上下文教程推进")
+
+	# 4. 真实键盘事件：G 键切换网络覆盖层（节点状态）
+	_inject_key(KEY_G)
+	_check(battle.hud.is_network_overlay_visible(), "CH1-030: G 键显示网络覆盖层")
+	_inject_key(KEY_G)
+	_check(not battle.hud.is_network_overlay_visible(), "CH1-030: 再次 G 键隐藏网络覆盖层")
+
+	# 5. 真实鼠标事件：攻击敌人（敌人生命变化）
+	# 设置可靠攻击条件：敌人相邻、命中必中
+	var enemy: Unit = battle.enemy_units[0]
+	enemy.grid_pos = player_unit.grid_pos + Vector2i(1, 0)
+	enemy.is_alive = true
+	enemy.current_hp = enemy.max_hp
+	player_unit.base_hit = 100
+	enemy.dodge = 0.0
+	battle._select_unit(player_unit)
+	battle.hud.attack_button.pressed.emit()
+	await get_tree().process_frame
+	_check(battle.selected_action == "attack", "CH1-030: 攻击按钮进入攻击模式")
+	_check(battle.attack_targets.size() > 0, "CH1-030: 攻击范围内有敌人目标")
+	if battle.attack_targets.size() > 0:
+		var enemy_hp_before := enemy.current_hp
+		_move_mouse_to_grid(battle, enemy.grid_pos)
+		_click_left_button()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(enemy.current_hp < enemy_hp_before, "CH1-030: 攻击后敌人生命减少")
+
+	# 6. 真实键盘事件：Esc 在有目标模式时取消动作（不暂停）
+	# 攻击后 selected_action 仍为 "attack"（AP > 0）
+	if battle.selected_action != "attack":
+		battle._select_unit(player_unit)
+		battle.hud.attack_button.pressed.emit()
+		await get_tree().process_frame
+	_inject_key(KEY_ESCAPE)
+	_check(battle.selected_action == "", "CH1-030: Esc 取消攻击模式")
+	_check(not get_tree().paused, "CH1-030: Esc 在有目标模式时不暂停")
+
+	# 7. 真实键盘事件：Esc 在无目标模式时暂停
+	_inject_key(KEY_ESCAPE)
+	_check(get_tree().paused, "CH1-030: Esc 在无目标模式时暂停游戏")
+	# 清理暂停菜单
+	get_tree().paused = false
+	for child in battle.get_children():
+		if child.has_method("_on_resume"):
+			child.queue_free()
+	await get_tree().process_frame
+
+	# 8. 真实键盘事件：Space 结束回合（回合变化）
+	_inject_key(KEY_SPACE)
+	for frame in range(120):
+		await get_tree().process_frame
+		if battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION:
+			break
+	_check(battle.turn_manager.turn_number == 2, "CH1-030: Space 键结束回合进入第 2 回合")
+
+	Engine.time_scale = prev_time_scale
+	battle._cleanup_units()
+	battle.queue_free()
+	await get_tree().process_frame
