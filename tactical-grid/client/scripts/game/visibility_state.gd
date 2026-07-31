@@ -115,6 +115,14 @@ func get_all_last_known() -> Dictionary:
 	return _last_known.duplicate(true)
 
 
+## Reveal cells permanently (e.g. from camera takeover).
+## These cells are marked as observed; they will decay to recorded on the next
+## update_visibility call, consistent with normal sight semantics.
+func reveal_cells(cells: Array) -> void:
+	for cell in cells:
+		_cell_states[cell] = STATE_OBSERVED
+
+
 ## Reset all visibility state (e.g. for a new battle).
 func clear() -> void:
 	_cell_states.clear()

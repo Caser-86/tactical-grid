@@ -48,8 +48,8 @@ func _test_level_pacing() -> void:
 	print("\n--- 测试: 六关节奏递进 ---")
 	var expected_turn_limits := [18, 16, 17, 18, 19, 22]
 	var expected_three_star := [11, 10, 11, 12, 13, 16]
-	var expected_enemy_counts := [5, 5, 5, 5, 5, 6]
-	var expected_reinforcement_budgets := [3, 1, 1, 1, 1, 4]
+	var expected_enemy_counts := [3, 5, 5, 5, 5, 6]
+	var expected_reinforcement_budgets := [4, 1, 1, 1, 1, 4]
 	var previous_turn_limit := 0
 	for index in range(6):
 		var level_id := "ch1_m%d" % (index + 1)

@@ -34,8 +34,8 @@ func show_result(data: Dictionary) -> void:
 		title_label.text = "任务失败"
 		title_label.modulate = Color.RED
 
-	# 显示星级
-	_show_stars(data.get("stars", 0))
+	# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
+	_show_badges(data)
 
 	# 显示统计
 	turns_label.text = "回合数  %s" % str(data.get("turns", 0))
@@ -128,16 +128,32 @@ func _style_button(button: Button) -> void:
 	button.add_theme_color_override("font_color", Color("e8f6f7"))
 	button.add_theme_font_size_override("font_size", 17)
 
-func _show_stars(stars: int) -> void:
+## 显示任务徽章：任务完成 / 小队完整 / 情报收集
+## 替代原星级系统，保留 battle_result["stars"] 整数用于存档 rating 字段
+func _show_badges(data: Dictionary) -> void:
 	for child in stars_container.get_children():
 		child.queue_free()
+	var is_victory: bool = data.get("result", "defeat") == "victory"
+	var stars: int = int(data.get("stars", 0))
+	# Badge 1: Mission — awarded on any victory
+	var mission_earned: bool = is_victory
+	# Badge 2: Squad — awarded when all units survive (stars >= 2)
+	var squad_earned: bool = stars >= 2
+	# Badge 3: Intel — awarded on full clear (stars == 3: fast + optional)
+	var intel_earned: bool = stars >= 3
+	_add_badge("任务", mission_earned, Color("6dd6e5"))
+	_add_badge("小队", squad_earned, Color("7ee68a"))
+	_add_badge("情报", intel_earned, Color.GOLD)
 
-	for i in range(3):
-		var star = Label.new()
-		star.text = "★" if i < stars else "☆"
-		star.add_theme_font_size_override("font_size", 40)
-		star.modulate = Color.GOLD if i < stars else Color.GRAY
-		stars_container.add_child(star)
+func _add_badge(label_text: String, earned: bool, color: Color) -> void:
+	var badge = Label.new()
+	badge.text = label_text
+	badge.add_theme_font_size_override("font_size", 22)
+	if earned:
+		badge.modulate = color
+	else:
+		badge.modulate = Color(0.3, 0.3, 0.3, 0.5)
+	stars_container.add_child(badge)
 
 func _format_time(seconds: int) -> String:
 	var m = seconds / 60

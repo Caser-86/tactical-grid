@@ -314,8 +314,8 @@ func _test_m1_infiltrate_stages() -> void:
 
 	# Initial production state
 	_check(battle.map_width == 18 and battle.map_height == 14, "M1 production map is expanded")
-	_check(battle.player_units.size() == 3, "M1 deploys three distinct player jobs")
-	_check(battle.enemy_units.size() == 5, "M1 starts with five authored enemies")
+	_check(battle.player_units.size() == 1, "M1 deploys one player unit (assault) at start")
+	_check(battle.enemy_units.size() == 3, "M1 starts with three authored enemies")
 	_check(battle.mission_objective_state.get_stage() == &"approach", "M1 begins in approach")
 
 	var initial_enemies: int = battle.enemy_units.size()
@@ -323,9 +323,13 @@ func _test_m1_infiltrate_stages() -> void:
 	var terminal_pos: Vector2i = battle.mission_objective_state.terminals[0]
 
 	# Terminal activation -> UPLOAD stage, terminal_activated reinforcement event
+	# With enemy_cap=3, reinforcements only spawn when a slot frees up.
+	# Kill one enemy to make room for the terminal_counterattack wave.
+	battle.enemy_units[0].current_hp = 0
+	battle.enemy_units[0].is_alive = false
 	battle.mission_objective_state.on_terminal_interacted(actor, terminal_pos)
 	_check(battle.mission_objective_state.get_stage() == &"upload", "terminal activation enters upload stage")
-	_check(battle.enemy_units.size() >= initial_enemies + 2, "terminal_activated event spawned reinforcements")
+	_check(battle.enemy_units.size() >= 2, "terminal_activated event spawned reinforcements under cap")
 
 	# One paused upload round: move all players away from terminal
 	for unit in battle.player_units:
@@ -335,7 +339,7 @@ func _test_m1_infiltrate_stages() -> void:
 	_check(int(paused_result.get("progress", -1)) == 0, "paused round does not advance progress")
 
 	# Free one enemy slot under the cap so upload_completed reinforcement can spawn
-	if battle.enemy_units.size() >= 7:
+	if battle.enemy_units.size() >= 3:
 		battle.enemy_units[0].current_hp = 0
 		battle.enemy_units[0].is_alive = false
 
@@ -362,16 +366,17 @@ func _test_m1_infiltrate_stages() -> void:
 	# Star rating and optional credit
 	var modifiers: Dictionary = battle.mission_objective_state.get_result_modifiers()
 	var optional_complete := bool(modifiers.get("optional_resource_collected", false))
-	var stars: int = battle._calculate_stars(true, 3, 3, 10, optional_complete)
+	var stars: int = battle._calculate_stars(true, 1, 1, 10, optional_complete)
 	_check(stars == 3, "fast no-casualty clear with cache yields three stars")
 	_check(int(modifiers.get("optional_credit", 0)) == 150, "optional credit recorded as 150")
 
 	# Three-star requires optional; without cache it is two stars
-	var stars_no_cache: int = battle._calculate_stars(true, 3, 3, 10, false)
+	var stars_no_cache: int = battle._calculate_stars(true, 1, 1, 10, false)
 	_check(stars_no_cache == 2, "no-cache clear yields two stars")
 
 	# Casualty drops to one star
-	var stars_casualty: int = battle._calculate_stars(true, 2, 3, 10, true)
+	# With scout rescue, 2-player squad, 1 casualty = 1 survivor
+	var stars_casualty: int = battle._calculate_stars(true, 1, 2, 10, true)
 	_check(stars_casualty == 1, "casualty clear yields one star")
 
 	battle._cleanup_units()

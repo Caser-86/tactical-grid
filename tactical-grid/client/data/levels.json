@@ -1,269 +1,826 @@
 {
   "levels": {
     "ch1_m1": {
-      "name": "初次接触", "chapter": 1, "mission": 1,
-      "size": "large", "theme": "echo_yard", "mission_type": "infiltrate",
-      "difficulty": 1, "seed": 1001,
-      "player_units": 3, "enemy_count": 5,
-      "max_turns": 18, "three_star_turns": 11, "three_star_requires_optional": true, "max_reinforcements": 3, "enemy_cap": 7,
-      "intro_dialogue": "ch1_m1_intro", "outro_dialogue": "ch1_m1_outro",
-      "tutorial_flags": ["teach_camera", "teach_movement", "teach_attack", "teach_cover", "teach_interaction", "teach_upload_hold", "teach_evac", "teach_network_scan", "teach_network_takeover", "teach_network_disable", "teach_network_overload"],
+      "name": "初次接触",
+      "chapter": 1,
+      "mission": 1,
+      "size": "large",
+      "theme": "echo_yard",
+      "mission_type": "infiltrate",
+      "difficulty": 1,
+      "seed": 1001,
+      "player_units": 1,
+      "enemy_count": 3,
+      "max_turns": 18,
+      "three_star_turns": 11,
+      "three_star_requires_optional": true,
+      "max_reinforcements": 4,
+      "enemy_cap": 3,
+      "intro_dialogue": "ch1_m1_intro",
+      "outro_dialogue": "ch1_m1_outro",
+      "tutorial_flags": [
+        "teach_camera",
+        "teach_movement",
+        "teach_attack",
+        "teach_cover",
+        "teach_interaction",
+        "teach_upload_hold",
+        "teach_evac",
+        "teach_network_scan",
+        "teach_network_takeover",
+        "teach_network_disable",
+        "teach_network_overload"
+      ],
       "special_rules": {
-        "no_overwatch": { "enabled": true, "reason": "教学关：警戒暂未开放，先掌握移动与攻击基础" },
-        "no_items": { "enabled": true, "reason": "教学关：物品暂未开放，先掌握基础战斗" },
-        "enemy_passive_turn_1": { "enabled": true, "reason": "教学关：首回合敌人待命，便于观察" }
+        "no_overwatch": {
+          "enabled": true,
+          "reason": "教学关：警戒暂未开放，先掌握移动与攻击基础"
+        },
+        "no_items": {
+          "enabled": true,
+          "reason": "教学关：物品暂未开放，先掌握基础战斗"
+        },
+        "enemy_passive_turn_1": {
+          "enabled": true,
+          "reason": "教学关：首回合敌人待命，便于观察"
+        }
       },
-      "rewards": { "credit": 200, "exp": 150, "first_clear": { "credit": 300, "intel": 10 } }
+      "rewards": {
+        "credit": 200,
+        "exp": 150,
+        "first_clear": {
+          "credit": 300,
+          "intel": 10
+        }
+      }
     },
     "ch1_m2": {
-      "name": "掩体战术", "chapter": 1, "mission": 2,
-      "size": "medium", "theme": "cooling_works", "mission_type": "destroy",
-      "difficulty": 1, "seed": 1002,
-      "player_units": 3, "enemy_count": 5,
-      "max_turns": 16, "three_star_turns": 10, "max_reinforcements": 1, "enemy_cap": 6,
-      "intro_dialogue": "ch1_m2_intro", "outro_dialogue": "ch1_m2_outro",
-      "new_unlocks": ["sniper_class", "highland_mechanic", "destructible_cover"],
-      "tutorial_flags": ["teach_highground", "teach_destructible", "teach_resource"],
-      "rewards": { "credit": 250, "exp": 200, "first_clear": { "credit": 350, "intel": 15 } }
+      "name": "掩体战术",
+      "chapter": 1,
+      "mission": 2,
+      "size": "medium",
+      "theme": "cooling_works",
+      "mission_type": "destroy",
+      "difficulty": 1,
+      "seed": 1002,
+      "player_units": 3,
+      "enemy_count": 5,
+      "max_turns": 16,
+      "three_star_turns": 10,
+      "max_reinforcements": 1,
+      "enemy_cap": 6,
+      "intro_dialogue": "ch1_m2_intro",
+      "outro_dialogue": "ch1_m2_outro",
+      "new_unlocks": [
+        "sniper_class",
+        "highland_mechanic",
+        "destructible_cover"
+      ],
+      "tutorial_flags": [
+        "teach_highground",
+        "teach_destructible",
+        "teach_resource"
+      ],
+      "rewards": {
+        "credit": 250,
+        "exp": 200,
+        "first_clear": {
+          "credit": 350,
+          "intel": 15
+        }
+      }
     },
     "ch1_m3": {
-      "name": "高地优势", "chapter": 1, "mission": 3,
-        "size": "medium", "theme": "transit_hub", "mission_type": "extract",
-      "difficulty": 1, "seed": 1003,
-      "player_units": 3, "enemy_count": 5,
-      "max_turns": 17, "three_star_turns": 11, "max_reinforcements": 1, "enemy_cap": 6,
-      "intro_dialogue": "ch1_m3_intro", "outro_dialogue": "ch1_m3_outro",
-      "tutorial_flags": ["teach_overwatch"],
-      "rewards": { "credit": 250, "exp": 200, "first_clear": { "credit": 350, "intel": 15 } }
+      "name": "高地优势",
+      "chapter": 1,
+      "mission": 3,
+      "size": "medium",
+      "theme": "transit_hub",
+      "mission_type": "extract",
+      "difficulty": 1,
+      "seed": 1003,
+      "player_units": 3,
+      "enemy_count": 5,
+      "max_turns": 17,
+      "three_star_turns": 11,
+      "max_reinforcements": 1,
+      "enemy_cap": 6,
+      "intro_dialogue": "ch1_m3_intro",
+      "outro_dialogue": "ch1_m3_outro",
+      "tutorial_flags": [
+        "teach_overwatch"
+      ],
+      "rewards": {
+        "credit": 250,
+        "exp": 200,
+        "first_clear": {
+          "credit": 350,
+          "intel": 15
+        }
+      }
     },
     "ch1_m4": {
-      "name": "交互点", "chapter": 1, "mission": 4,
-        "size": "large", "theme": "transit_hub", "mission_type": "escort",
-      "difficulty": 1, "seed": 1004,
-      "player_units": 4, "enemy_count": 5,
-      "max_turns": 18, "three_star_turns": 12, "max_reinforcements": 1, "enemy_cap": 6,
-      "intro_dialogue": "ch1_m4_intro", "outro_dialogue": "ch1_m4_outro",
-      "tutorial_flags": ["teach_interaction", "teach_escort"],
-      "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
+      "name": "交互点",
+      "chapter": 1,
+      "mission": 4,
+      "size": "large",
+      "theme": "transit_hub",
+      "mission_type": "escort",
+      "difficulty": 1,
+      "seed": 1004,
+      "player_units": 4,
+      "enemy_count": 5,
+      "max_turns": 18,
+      "three_star_turns": 12,
+      "max_reinforcements": 1,
+      "enemy_cap": 6,
+      "intro_dialogue": "ch1_m4_intro",
+      "outro_dialogue": "ch1_m4_outro",
+      "tutorial_flags": [
+        "teach_interaction",
+        "teach_escort"
+      ],
+      "rewards": {
+        "credit": 300,
+        "exp": 250,
+        "first_clear": {
+          "credit": 400,
+          "intel": 20
+        }
+      }
     },
     "ch1_m5": {
-      "name": "技能初探", "chapter": 1, "mission": 5,
-        "size": "medium", "theme": "sentinel_core", "mission_type": "steal_data",
-      "difficulty": 2, "seed": 1005,
-      "player_units": 4, "enemy_count": 5,
-      "max_turns": 19, "three_star_turns": 13, "max_reinforcements": 1, "enemy_cap": 6,
-      "intro_dialogue": "ch1_m5_intro", "outro_dialogue": "ch1_m5_outro",
-      "tutorial_flags": ["teach_skills", "teach_items"],
-      "rewards": { "credit": 300, "exp": 250, "first_clear": { "credit": 400, "intel": 20 } }
+      "name": "技能初探",
+      "chapter": 1,
+      "mission": 5,
+      "size": "medium",
+      "theme": "sentinel_core",
+      "mission_type": "steal_data",
+      "difficulty": 2,
+      "seed": 1005,
+      "player_units": 4,
+      "enemy_count": 5,
+      "max_turns": 19,
+      "three_star_turns": 13,
+      "max_reinforcements": 1,
+      "enemy_cap": 6,
+      "intro_dialogue": "ch1_m5_intro",
+      "outro_dialogue": "ch1_m5_outro",
+      "tutorial_flags": [
+        "teach_skills",
+        "teach_items"
+      ],
+      "rewards": {
+        "credit": 300,
+        "exp": 250,
+        "first_clear": {
+          "credit": 400,
+          "intel": 20
+        }
+      }
     },
     "ch1_m6": {
-      "name": "数据哨兵", "chapter": 1, "mission": 6,
-        "size": "large", "theme": "sentinel_core", "mission_type": "assassinate",
-      "difficulty": 2, "seed": 1006,
-      "player_units": 4, "enemy_count": 6,
-      "max_turns": 22, "three_star_turns": 16, "max_reinforcements": 4, "enemy_cap": 8,
-      "is_boss": true, "boss_id": "data_sentinel",
-      "intro_dialogue": "ch1_m6_intro", "outro_dialogue": "ch1_m6_outro",
-      "rewards": { "credit": 1000, "exp": 500, "first_clear": { "credit": 1500, "intel": 50, "loot": "plasma_blade" } }
+      "name": "数据哨兵",
+      "chapter": 1,
+      "mission": 6,
+      "size": "large",
+      "theme": "sentinel_core",
+      "mission_type": "assassinate",
+      "difficulty": 2,
+      "seed": 1006,
+      "player_units": 4,
+      "enemy_count": 6,
+      "max_turns": 22,
+      "three_star_turns": 16,
+      "max_reinforcements": 4,
+      "enemy_cap": 8,
+      "is_boss": true,
+      "boss_id": "data_sentinel",
+      "intro_dialogue": "ch1_m6_intro",
+      "outro_dialogue": "ch1_m6_outro",
+      "rewards": {
+        "credit": 1000,
+        "exp": 500,
+        "first_clear": {
+          "credit": 1500,
+          "intel": 50,
+          "loot": "plasma_blade"
+        }
+      }
     },
     "ch2_m1": {
-      "name": "雨夜突袭", "chapter": 2, "mission": 1,
-      "size": "medium", "theme": "city_ruins", "mission_type": "steal_data",
-      "difficulty": 2, "seed": 2001,
-      "player_units": 4, "enemy_count": 6,
-      "weather": "rain", "time": "night",
-      "weather_effects": { "hit_modifier": -10, "vision_modifier": -1 },
-      "rewards": { "credit": 400, "exp": 300, "first_clear": { "credit": 600, "intel": 25 } }
+      "name": "雨夜突袭",
+      "chapter": 2,
+      "mission": 1,
+      "size": "medium",
+      "theme": "city_ruins",
+      "mission_type": "steal_data",
+      "difficulty": 2,
+      "seed": 2001,
+      "player_units": 4,
+      "enemy_count": 6,
+      "weather": "rain",
+      "time": "night",
+      "weather_effects": {
+        "hit_modifier": -10,
+        "vision_modifier": -1
+      },
+      "rewards": {
+        "credit": 400,
+        "exp": 300,
+        "first_clear": {
+          "credit": 600,
+          "intel": 25
+        }
+      }
     },
     "ch2_m2": {
-      "name": "烟雾迷宫", "chapter": 2, "mission": 2,
-      "size": "medium", "theme": "city_ruins", "mission_type": "extract",
-      "difficulty": 2, "seed": 2002,
-      "player_units": 4, "enemy_count": 7,
-      "rewards": { "credit": 400, "exp": 300, "first_clear": { "credit": 600, "intel": 25 } }
+      "name": "烟雾迷宫",
+      "chapter": 2,
+      "mission": 2,
+      "size": "medium",
+      "theme": "city_ruins",
+      "mission_type": "extract",
+      "difficulty": 2,
+      "seed": 2002,
+      "player_units": 4,
+      "enemy_count": 7,
+      "rewards": {
+        "credit": 400,
+        "exp": 300,
+        "first_clear": {
+          "credit": 600,
+          "intel": 25
+        }
+      }
     },
     "ch2_m3": {
-      "name": "破墙而入", "chapter": 2, "mission": 3,
-      "size": "medium", "theme": "city_ruins", "mission_type": "destroy",
-      "difficulty": 2, "seed": 2003,
-      "player_units": 4, "enemy_count": 7,
-      "rewards": { "credit": 450, "exp": 350, "first_clear": { "credit": 650, "intel": 30 } }
+      "name": "破墙而入",
+      "chapter": 2,
+      "mission": 3,
+      "size": "medium",
+      "theme": "city_ruins",
+      "mission_type": "destroy",
+      "difficulty": 2,
+      "seed": 2003,
+      "player_units": 4,
+      "enemy_count": 7,
+      "rewards": {
+        "credit": 450,
+        "exp": 350,
+        "first_clear": {
+          "credit": 650,
+          "intel": 30
+        }
+      }
     },
     "ch2_m4": {
-      "name": "视野压制", "chapter": 2, "mission": 4,
-      "size": "medium", "theme": "city_ruins", "mission_type": "extract",
-      "difficulty": 3, "seed": 2004,
-      "player_units": 4, "enemy_count": 8,
-      "rewards": { "credit": 500, "exp": 400, "first_clear": { "credit": 700, "intel": 30 } }
+      "name": "视野压制",
+      "chapter": 2,
+      "mission": 4,
+      "size": "medium",
+      "theme": "city_ruins",
+      "mission_type": "extract",
+      "difficulty": 3,
+      "seed": 2004,
+      "player_units": 4,
+      "enemy_count": 8,
+      "rewards": {
+        "credit": 500,
+        "exp": 400,
+        "first_clear": {
+          "credit": 700,
+          "intel": 30
+        }
+      }
     },
     "ch2_m5": {
-      "name": "双线作战", "chapter": 2, "mission": 5,
-      "size": "large", "theme": "city_ruins", "mission_type": "extract",
-      "difficulty": 3, "seed": 2005,
-      "player_units": 5, "enemy_count": 9,
-      "rewards": { "credit": 600, "exp": 500, "first_clear": { "credit": 800, "intel": 40 } }
+      "name": "双线作战",
+      "chapter": 2,
+      "mission": 5,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "extract",
+      "difficulty": 3,
+      "seed": 2005,
+      "player_units": 5,
+      "enemy_count": 9,
+      "rewards": {
+        "credit": 600,
+        "exp": 500,
+        "first_clear": {
+          "credit": 800,
+          "intel": 40
+        }
+      }
     },
     "ch2_m6": {
-      "name": "情报获取", "chapter": 2, "mission": 6,
-      "size": "medium", "theme": "city_ruins", "mission_type": "escort",
-      "difficulty": 3, "seed": 2006,
-      "player_units": 4, "enemy_count": 8,
-      "rewards": { "credit": 500, "exp": 400, "first_clear": { "credit": 700, "intel": 35 } }
+      "name": "情报获取",
+      "chapter": 2,
+      "mission": 6,
+      "size": "medium",
+      "theme": "city_ruins",
+      "mission_type": "escort",
+      "difficulty": 3,
+      "seed": 2006,
+      "player_units": 4,
+      "enemy_count": 8,
+      "rewards": {
+        "credit": 500,
+        "exp": 400,
+        "first_clear": {
+          "credit": 700,
+          "intel": 35
+        }
+      }
     },
     "ch2_m7": {
-      "name": "重装审判者", "chapter": 2, "mission": 7,
-      "size": "large", "theme": "city_ruins", "mission_type": "assassinate",
-      "difficulty": 3, "seed": 2007,
-      "player_units": 5, "enemy_count": 10,
-      "is_boss": true, "boss_id": "heavy_judge",
-      "rewards": { "credit": 1500, "exp": 700, "first_clear": { "credit": 2000, "intel": 80, "loot": "legendary_armor" } }
+      "name": "重装审判者",
+      "chapter": 2,
+      "mission": 7,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "assassinate",
+      "difficulty": 3,
+      "seed": 2007,
+      "player_units": 5,
+      "enemy_count": 10,
+      "is_boss": true,
+      "boss_id": "heavy_judge",
+      "rewards": {
+        "credit": 1500,
+        "exp": 700,
+        "first_clear": {
+          "credit": 2000,
+          "intel": 80,
+          "loot": "legendary_armor"
+        }
+      }
     },
     "ch3_m1": {
-      "name": "地下入口", "chapter": 3, "mission": 1,
-      "size": "medium", "theme": "underground", "mission_type": "infiltrate",
-      "difficulty": 3, "seed": 3001,
-      "player_units": 4, "enemy_count": 7,
+      "name": "地下入口",
+      "chapter": 3,
+      "mission": 1,
+      "size": "medium",
+      "theme": "underground",
+      "mission_type": "infiltrate",
+      "difficulty": 3,
+      "seed": 3001,
+      "player_units": 4,
+      "enemy_count": 7,
       "time": "night",
-      "special_rules": ["alarm_system", "stealth_bonus", "darkness"],
-      "rewards": { "credit": 500, "exp": 400, "first_clear": { "credit": 800, "intel": 30 } }
+      "special_rules": [
+        "alarm_system",
+        "stealth_bonus",
+        "darkness"
+      ],
+      "rewards": {
+        "credit": 500,
+        "exp": 400,
+        "first_clear": {
+          "credit": 800,
+          "intel": 30
+        }
+      }
     },
     "ch3_m2": {
-      "name": "毒雾管道", "chapter": 3, "mission": 2,
-      "size": "medium", "theme": "underground", "mission_type": "destroy",
-      "difficulty": 3, "seed": 3002,
-      "player_units": 4, "enemy_count": 7,
+      "name": "毒雾管道",
+      "chapter": 3,
+      "mission": 2,
+      "size": "medium",
+      "theme": "underground",
+      "mission_type": "destroy",
+      "difficulty": 3,
+      "seed": 3002,
+      "player_units": 4,
+      "enemy_count": 7,
       "weather": "poison_fog",
-      "rewards": { "credit": 550, "exp": 450, "first_clear": { "credit": 850, "intel": 35 } }
+      "rewards": {
+        "credit": 550,
+        "exp": 450,
+        "first_clear": {
+          "credit": 850,
+          "intel": 35
+        }
+      }
     },
     "ch3_m3": {
-      "name": "陷阱迷宫", "chapter": 3, "mission": 3,
-      "size": "medium", "theme": "underground", "mission_type": "extract",
-      "difficulty": 4, "seed": 3003,
-      "player_units": 4, "enemy_count": 8,
-      "rewards": { "credit": 600, "exp": 500, "first_clear": { "credit": 900, "intel": 40 } }
+      "name": "陷阱迷宫",
+      "chapter": 3,
+      "mission": 3,
+      "size": "medium",
+      "theme": "underground",
+      "mission_type": "extract",
+      "difficulty": 4,
+      "seed": 3003,
+      "player_units": 4,
+      "enemy_count": 8,
+      "rewards": {
+        "credit": 600,
+        "exp": 500,
+        "first_clear": {
+          "credit": 900,
+          "intel": 40
+        }
+      }
     },
     "ch3_m4": {
-      "name": "电力设施", "chapter": 3, "mission": 4,
-      "size": "medium", "theme": "underground", "mission_type": "destroy",
-      "difficulty": 4, "seed": 3004,
-      "player_units": 4, "enemy_count": 8,
+      "name": "电力设施",
+      "chapter": 3,
+      "mission": 4,
+      "size": "medium",
+      "theme": "underground",
+      "mission_type": "destroy",
+      "difficulty": 4,
+      "seed": 3004,
+      "player_units": 4,
+      "enemy_count": 8,
       "weather": "thunderstorm",
-      "rewards": { "credit": 600, "exp": 500, "first_clear": { "credit": 900, "intel": 40 } }
+      "rewards": {
+        "credit": 600,
+        "exp": 500,
+        "first_clear": {
+          "credit": 900,
+          "intel": 40
+        }
+      }
     },
     "ch3_m5": {
-      "name": "通讯枢纽", "chapter": 3, "mission": 5,
-      "size": "medium", "theme": "underground", "mission_type": "steal_data",
-      "difficulty": 4, "seed": 3005,
-      "player_units": 4, "enemy_count": 9,
-      "special_rules": ["timed_hack"],
-      "rewards": { "credit": 650, "exp": 550, "first_clear": { "credit": 950, "intel": 45 } }
+      "name": "通讯枢纽",
+      "chapter": 3,
+      "mission": 5,
+      "size": "medium",
+      "theme": "underground",
+      "mission_type": "steal_data",
+      "difficulty": 4,
+      "seed": 3005,
+      "player_units": 4,
+      "enemy_count": 9,
+      "special_rules": [
+        "timed_hack"
+      ],
+      "rewards": {
+        "credit": 650,
+        "exp": 550,
+        "first_clear": {
+          "credit": 950,
+          "intel": 45
+        }
+      }
     },
     "ch3_m6": {
-      "name": "影子佣兵", "chapter": 3, "mission": 6,
-      "size": "large", "theme": "underground", "mission_type": "assassinate",
-      "difficulty": 4, "seed": 3006,
-      "player_units": 5, "enemy_count": 10,
-      "is_boss": true, "boss_id": "shadow_mercenary",
-      "rewards": { "credit": 2000, "exp": 1000, "first_clear": { "credit": 2500, "intel": 100, "loot": "legendary_weapon_shadow_blade" } }
+      "name": "影子佣兵",
+      "chapter": 3,
+      "mission": 6,
+      "size": "large",
+      "theme": "underground",
+      "mission_type": "assassinate",
+      "difficulty": 4,
+      "seed": 3006,
+      "player_units": 5,
+      "enemy_count": 10,
+      "is_boss": true,
+      "boss_id": "shadow_mercenary",
+      "rewards": {
+        "credit": 2000,
+        "exp": 1000,
+        "first_clear": {
+          "credit": 2500,
+          "intel": 100,
+          "loot": "legendary_weapon_shadow_blade"
+        }
+      }
     },
     "ch4_m1": {
-      "name": "外围突破", "chapter": 4, "mission": 1,
-      "size": "large", "theme": "mountain_fort", "mission_type": "destroy",
-      "difficulty": 4, "seed": 4001,
-      "player_units": 5, "enemy_count": 9,
-      "rewards": { "credit": 700, "exp": 600, "first_clear": { "credit": 1000, "intel": 50 } }
+      "name": "外围突破",
+      "chapter": 4,
+      "mission": 1,
+      "size": "large",
+      "theme": "mountain_fort",
+      "mission_type": "destroy",
+      "difficulty": 4,
+      "seed": 4001,
+      "player_units": 5,
+      "enemy_count": 9,
+      "rewards": {
+        "credit": 700,
+        "exp": 600,
+        "first_clear": {
+          "credit": 1000,
+          "intel": 50
+        }
+      }
     },
     "ch4_m2": {
-      "name": "城墙攀登", "chapter": 4, "mission": 2,
-      "size": "medium", "theme": "mountain_fort", "mission_type": "extract",
-      "difficulty": 4, "seed": 4002,
-      "player_units": 4, "enemy_count": 8,
-      "rewards": { "credit": 700, "exp": 600, "first_clear": { "credit": 1000, "intel": 50 } }
+      "name": "城墙攀登",
+      "chapter": 4,
+      "mission": 2,
+      "size": "medium",
+      "theme": "mountain_fort",
+      "mission_type": "extract",
+      "difficulty": 4,
+      "seed": 4002,
+      "player_units": 4,
+      "enemy_count": 8,
+      "rewards": {
+        "credit": 700,
+        "exp": 600,
+        "first_clear": {
+          "credit": 1000,
+          "intel": 50
+        }
+      }
     },
     "ch4_m3": {
-      "name": "军械库", "chapter": 4, "mission": 3,
-      "size": "medium", "theme": "mountain_fort", "mission_type": "defend",
-      "difficulty": 5, "seed": 4003,
-      "player_units": 5, "enemy_count": 9,
-      "special_rules": ["defend_5_turns"],
-      "rewards": { "credit": 800, "exp": 700, "first_clear": { "credit": 1200, "intel": 60 } }
+      "name": "军械库",
+      "chapter": 4,
+      "mission": 3,
+      "size": "medium",
+      "theme": "mountain_fort",
+      "mission_type": "defend",
+      "difficulty": 5,
+      "seed": 4003,
+      "player_units": 5,
+      "enemy_count": 9,
+      "special_rules": [
+        "defend_5_turns"
+      ],
+      "rewards": {
+        "credit": 800,
+        "exp": 700,
+        "first_clear": {
+          "credit": 1200,
+          "intel": 60
+        }
+      }
     },
     "ch4_m4": {
-      "name": "指挥中心", "chapter": 4, "mission": 4,
-      "size": "large", "theme": "mountain_fort", "mission_type": "escort",
-      "difficulty": 5, "seed": 4004,
-      "player_units": 5, "enemy_count": 10,
-      "rewards": { "credit": 800, "exp": 700, "first_clear": { "credit": 1200, "intel": 60 } }
+      "name": "指挥中心",
+      "chapter": 4,
+      "mission": 4,
+      "size": "large",
+      "theme": "mountain_fort",
+      "mission_type": "escort",
+      "difficulty": 5,
+      "seed": 4004,
+      "player_units": 5,
+      "enemy_count": 10,
+      "rewards": {
+        "credit": 800,
+        "exp": 700,
+        "first_clear": {
+          "credit": 1200,
+          "intel": 60
+        }
+      }
     },
     "ch4_m5": {
-      "name": "围城之夜", "chapter": 4, "mission": 5,
-      "size": "large", "theme": "mountain_fort", "mission_type": "defend",
-      "difficulty": 5, "seed": 4005,
-      "player_units": 5, "enemy_count": 11,
-      "weather": "snow", "time": "night",
-      "special_rules": ["survive_8_turns"],
-      "rewards": { "credit": 900, "exp": 800, "first_clear": { "credit": 1300, "intel": 65 } }
+      "name": "围城之夜",
+      "chapter": 4,
+      "mission": 5,
+      "size": "large",
+      "theme": "mountain_fort",
+      "mission_type": "defend",
+      "difficulty": 5,
+      "seed": 4005,
+      "player_units": 5,
+      "enemy_count": 11,
+      "weather": "snow",
+      "time": "night",
+      "special_rules": [
+        "survive_8_turns"
+      ],
+      "rewards": {
+        "credit": 900,
+        "exp": 800,
+        "first_clear": {
+          "credit": 1300,
+          "intel": 65
+        }
+      }
     },
     "ch4_m6": {
-      "name": "矩阵将军", "chapter": 4, "mission": 6,
-      "size": "large", "theme": "mountain_fort", "mission_type": "assassinate",
-      "difficulty": 5, "seed": 4006,
-      "player_units": 6, "enemy_count": 12,
-      "is_boss": true, "boss_id": "matrix_general",
-      "rewards": { "credit": 3000, "exp": 1500, "first_clear": { "credit": 3500, "intel": 150, "loot": "legendary_full_set" } }
+      "name": "矩阵将军",
+      "chapter": 4,
+      "mission": 6,
+      "size": "large",
+      "theme": "mountain_fort",
+      "mission_type": "assassinate",
+      "difficulty": 5,
+      "seed": 4006,
+      "player_units": 6,
+      "enemy_count": 12,
+      "is_boss": true,
+      "boss_id": "matrix_general",
+      "rewards": {
+        "credit": 3000,
+        "exp": 1500,
+        "first_clear": {
+          "credit": 3500,
+          "intel": 150,
+          "loot": "legendary_full_set"
+        }
+      }
     },
     "ch5_m1": {
-      "name": "核心外围", "chapter": 5, "mission": 1,
-      "size": "large", "theme": "city_ruins", "mission_type": "destroy",
-      "difficulty": 5, "seed": 5001,
-      "player_units": 5, "enemy_count": 10,
+      "name": "核心外围",
+      "chapter": 5,
+      "mission": 1,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "destroy",
+      "difficulty": 5,
+      "seed": 5001,
+      "player_units": 5,
+      "enemy_count": 10,
       "weather": "thunderstorm",
-      "rewards": { "credit": 1000, "exp": 900, "first_clear": { "credit": 1500, "intel": 75 } }
+      "rewards": {
+        "credit": 1000,
+        "exp": 900,
+        "first_clear": {
+          "credit": 1500,
+          "intel": 75
+        }
+      }
     },
     "ch5_m2": {
-      "name": "数据洪流", "chapter": 5, "mission": 2,
-      "size": "large", "theme": "city_ruins", "mission_type": "extract",
-      "difficulty": 5, "seed": 5002,
-      "player_units": 5, "enemy_count": 10,
-      "special_rules": ["dynamic_terrain"],
-      "rewards": { "credit": 1000, "exp": 900, "first_clear": { "credit": 1500, "intel": 75 } }
+      "name": "数据洪流",
+      "chapter": 5,
+      "mission": 2,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "extract",
+      "difficulty": 5,
+      "seed": 5002,
+      "player_units": 5,
+      "enemy_count": 10,
+      "special_rules": [
+        "dynamic_terrain"
+      ],
+      "rewards": {
+        "credit": 1000,
+        "exp": 900,
+        "first_clear": {
+          "credit": 1500,
+          "intel": 75
+        }
+      }
     },
     "ch5_m3": {
-      "name": "架构师之眼", "chapter": 5, "mission": 3,
-      "size": "large", "theme": "city_ruins", "mission_type": "infiltrate",
-      "difficulty": 5, "seed": 5003,
-      "player_units": 5, "enemy_count": 11,
-      "special_rules": ["permanent_stealth_mode"],
-      "rewards": { "credit": 1200, "exp": 1000, "first_clear": { "credit": 1700, "intel": 85 } }
+      "name": "架构师之眼",
+      "chapter": 5,
+      "mission": 3,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "infiltrate",
+      "difficulty": 5,
+      "seed": 5003,
+      "player_units": 5,
+      "enemy_count": 11,
+      "special_rules": [
+        "permanent_stealth_mode"
+      ],
+      "rewards": {
+        "credit": 1200,
+        "exp": 1000,
+        "first_clear": {
+          "credit": 1700,
+          "intel": 85
+        }
+      }
     },
     "ch5_m4": {
-      "name": "最后选择", "chapter": 5, "mission": 4,
-      "size": "large", "theme": "city_ruins", "mission_type": "extract",
-      "difficulty": 5, "seed": 5004,
-      "player_units": 5, "enemy_count": 10,
-      "special_rules": ["ending_choice"],
-      "rewards": { "credit": 1200, "exp": 1000, "first_clear": { "credit": 1700, "intel": 85 } }
+      "name": "最后选择",
+      "chapter": 5,
+      "mission": 4,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "extract",
+      "difficulty": 5,
+      "seed": 5004,
+      "player_units": 5,
+      "enemy_count": 10,
+      "special_rules": [
+        "ending_choice"
+      ],
+      "rewards": {
+        "credit": 1200,
+        "exp": 1000,
+        "first_clear": {
+          "credit": 1700,
+          "intel": 85
+        }
+      }
     },
     "ch5_m5": {
-      "name": "架构师", "chapter": 5, "mission": 5,
-      "size": "large", "theme": "city_ruins", "mission_type": "assassinate",
-      "difficulty": 5, "seed": 5005,
-      "player_units": 6, "enemy_count": 12,
-      "is_boss": true, "boss_id": "architect",
-      "unlocks": ["ng_plus", "abyss_mode", "true_ending"],
-      "rewards": { "credit": 5000, "exp": 3000, "first_clear": { "credit": 5000, "intel": 200, "loot": "legendary_full_set" } }
+      "name": "架构师",
+      "chapter": 5,
+      "mission": 5,
+      "size": "large",
+      "theme": "city_ruins",
+      "mission_type": "assassinate",
+      "difficulty": 5,
+      "seed": 5005,
+      "player_units": 6,
+      "enemy_count": 12,
+      "is_boss": true,
+      "boss_id": "architect",
+      "unlocks": [
+        "ng_plus",
+        "abyss_mode",
+        "true_ending"
+      ],
+      "rewards": {
+        "credit": 5000,
+        "exp": 3000,
+        "first_clear": {
+          "credit": 5000,
+          "intel": 200,
+          "loot": "legendary_full_set"
+        }
+      }
     }
   },
   "sidequests": {
-    "s1": { "name": "生存挑战 I", "type": "survival", "difficulty": 3, "size": "small", "seed": 9001, "unlock": "ch1_m3" },
-    "s2": { "name": "护送任务", "type": "escort", "difficulty": 3, "size": "medium", "seed": 9002, "unlock": "ch2_m1" },
-    "s3": { "name": "限时撤离", "type": "timed", "difficulty": 4, "size": "medium", "seed": 9003, "unlock": "ch2_m5" },
-    "s4": { "name": "狙击挑战", "type": "sniper", "difficulty": 4, "size": "medium", "seed": 9004, "unlock": "ch3_m1" },
-    "s5": { "name": "潜行关", "type": "stealth", "difficulty": 4, "size": "medium", "seed": 9005, "unlock": "ch3_m3" },
-    "s6": { "name": "Boss挑战", "type": "boss", "difficulty": 5, "size": "large", "seed": 9006, "unlock": "ch4_m2" },
-    "s7": { "name": "无伤挑战", "type": "flawless", "difficulty": 5, "size": "medium", "seed": 9007, "unlock": "ch4_m5" },
-    "s8": { "name": "生存挑战 II", "type": "survival", "difficulty": 5, "size": "large", "seed": 9008, "unlock": "ch5_m1" },
-    "s9": { "name": "速通挑战", "type": "speedrun", "difficulty": 5, "size": "medium", "seed": 9009, "unlock": "ch5_m3" },
-    "s10": { "name": "终极挑战", "type": "ultimate", "difficulty": 6, "size": "large", "seed": 9010, "unlock": "ch5_m5" }
+    "s1": {
+      "name": "生存挑战 I",
+      "type": "survival",
+      "difficulty": 3,
+      "size": "small",
+      "seed": 9001,
+      "unlock": "ch1_m3"
+    },
+    "s2": {
+      "name": "护送任务",
+      "type": "escort",
+      "difficulty": 3,
+      "size": "medium",
+      "seed": 9002,
+      "unlock": "ch2_m1"
+    },
+    "s3": {
+      "name": "限时撤离",
+      "type": "timed",
+      "difficulty": 4,
+      "size": "medium",
+      "seed": 9003,
+      "unlock": "ch2_m5"
+    },
+    "s4": {
+      "name": "狙击挑战",
+      "type": "sniper",
+      "difficulty": 4,
+      "size": "medium",
+      "seed": 9004,
+      "unlock": "ch3_m1"
+    },
+    "s5": {
+      "name": "潜行关",
+      "type": "stealth",
+      "difficulty": 4,
+      "size": "medium",
+      "seed": 9005,
+      "unlock": "ch3_m3"
+    },
+    "s6": {
+      "name": "Boss挑战",
+      "type": "boss",
+      "difficulty": 5,
+      "size": "large",
+      "seed": 9006,
+      "unlock": "ch4_m2"
+    },
+    "s7": {
+      "name": "无伤挑战",
+      "type": "flawless",
+      "difficulty": 5,
+      "size": "medium",
+      "seed": 9007,
+      "unlock": "ch4_m5"
+    },
+    "s8": {
+      "name": "生存挑战 II",
+      "type": "survival",
+      "difficulty": 5,
+      "size": "large",
+      "seed": 9008,
+      "unlock": "ch5_m1"
+    },
+    "s9": {
+      "name": "速通挑战",
+      "type": "speedrun",
+      "difficulty": 5,
+      "size": "medium",
+      "seed": 9009,
+      "unlock": "ch5_m3"
+    },
+    "s10": {
+      "name": "终极挑战",
+      "type": "ultimate",
+      "difficulty": 6,
+      "size": "large",
+      "seed": 9010,
+      "unlock": "ch5_m5"
+    }
   }
 }

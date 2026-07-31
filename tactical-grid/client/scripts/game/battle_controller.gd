@@ -333,6 +333,7 @@ func _init_subsystems() -> void:
 	enemy_director = EnemyDirector.new()
 	add_child(enemy_director)
 	enemy_director.reinforcement_spawned.connect(_on_reinforcement_spawned)
+	enemy_director.player_reinforcement_spawned.connect(_on_player_reinforcement_spawned)
 
 	targeting_controller = TargetingController.new()
 	add_child(targeting_controller)
@@ -358,6 +359,7 @@ func _init_subsystems() -> void:
 	add_child(alert_state)
 	alert_state.setup()
 	tactical_network_state.alert_requested.connect(_on_network_alert_requested)
+	tactical_network_state.network_operation_performed.connect(_on_network_operation)
 	action_system.set_tactical_network_state(tactical_network_state)
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
@@ -1331,12 +1333,61 @@ func _on_reinforcement_spawned(units_data: Array, message: String) -> void:
 	if message != "":
 		_log(message)
 
+## 玩家增援信号回调：生成玩家单位，不占用敌人增援上限
+## 由 EnemyDirector.player_reinforcement_spawned 驱动
+func _on_player_reinforcement_spawned(units_data: Array, message: String) -> void:
+	_spawn_player_units(units_data)
+	if message != "":
+		_log(message)
+
+## 生成玩家增援单位并加入战斗
+## 出生点选择：优先使用脚本中指定的 position，否则跳过
+func _spawn_player_units(units_data: Array) -> void:
+	for unit_data in units_data:
+		var unit_type = unit_data.get("type", "assault")
+		var pos_arr = unit_data.get("position", [0, 0])
+		var spawn_pos = Vector2i(int(pos_arr[0]), int(pos_arr[1]))
+		# 若指定位置被占或越界，跳过本次增援
+		if not GridSystem.is_in_bounds(spawn_pos, map_width, map_height):
+			continue
+		if _get_unit_at(spawn_pos) != null:
+			continue
+		var unit = GameData.create_player_unit(unit_type, _get_job_display_name(unit_type))
+		unit.grid_pos = spawn_pos
+		unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
+		unit.entity_id = "%s_%d" % [unit.team, player_units.size()]
+		unit.current_ap = unit.max_ap
+		player_units.append(unit)
+		_create_unit_sprite(unit)
+		_log("玩家增援到达：%s (%d,%d)" % [unit.unit_name, spawn_pos.x, spawn_pos.y])
+
 ## CODE-P2-02: 网络操作触发的警报请求
 func _on_network_alert_requested(amount: int, reason: String) -> void:
 	if alert_state:
 		alert_state.apply_event(reason)
 		hud.update_alert_display(alert_state)
 		_log("警报事件: %s (amount=%d)" % [reason, amount])
+
+## 网络操作完成回调：将相机接管等事件桥接为 mission_event
+## 相机接管触发 player_reinforcement 脚本（scout rescue）
+func _on_network_operation(node_id: String, operation: String, result: Dictionary) -> void:
+	if not is_instance_valid(mission_objective_state):
+		return
+	var node_type: String = ""
+	if tactical_network_state:
+		var nodes = tactical_network_state.get_all_nodes()
+		var node = nodes.get(node_id, {})
+		node_type = String(node.get("type", ""))
+	# 相机接管：触发 scout rescue 事件增援
+	if operation == "takeover" and node_type == "camera":
+		var event_name = &"camera_takeover"
+		mission_objective_state.mission_event.emit(event_name, {"node_id": node_id})
+		_log("相机接管完成，评估事件增援")
+	# 相机接管后的区域揭示
+	if result.get("reveal_cells", []).size() > 0:
+		if visibility_state:
+			visibility_state.reveal_cells(result["reveal_cells"])
+			_log("相机揭示 %d 个格子" % result["reveal_cells"].size())
 
 ## CODE-P2-02: G 键切换网络覆盖层可视化，不影响任何游戏状态
 func _on_toggle_network() -> void:

@@ -1632,9 +1632,9 @@ func _test_chapter_one_environment_sample() -> void:
 	var map: Dictionary = result["data"]
 	_check(map.size == {"width": 18, "height": 14}, "MapSample: ch1_m1 固定为 18x14")
 	var level := CampaignRepository.get_level("ch1_m1")
-	_check(int(level.get("player_units", 0)) == 3 and int(level.get("enemy_count", 0)) == 5, "ch1_m1 force size is 3v5")
+	_check(int(level.get("player_units", 0)) == 1 and int(level.get("enemy_count", 0)) == 3, "ch1_m1 force size is 1v3 (scout rescue adds 2nd player)")
 	_check(int(level.get("max_turns", 0)) == 18 and int(level.get("three_star_turns", 0)) == 11, "ch1_m1 standard turn contract")
-	_check(int(level.get("max_reinforcements", 0)) == 3 and int(level.get("enemy_cap", 0)) == 7, "ch1_m1 pressure caps")
+	_check(int(level.get("max_reinforcements", 0)) == 4 and int(level.get("enemy_cap", 0)) == 3, "ch1_m1 pressure caps (max 3 active)")
 	_check(level.get("mission_type", "") == "infiltrate", "ch1_m1 uses staged infiltrate objective")
 	_check(bool(level.get("three_star_requires_optional", false)) == true, "ch1_m1 cache is required for three stars")
 	_check(map.get("theme", "") == "echo_yard", "MapSample: ch1_m1 使用回声货场主题")
@@ -1645,8 +1645,8 @@ func _test_chapter_one_environment_sample() -> void:
 
 	var player_spawns: Array = MapLoader.get_player_spawns(map)
 	var enemy_spawns: Array = MapLoader.get_enemy_spawns(map)
-	_check(player_spawns.size() == 3, "MapSample: three-player deployment")
-	_check(enemy_spawns.size() == 5, "MapSample: five initial enemies")
+	_check(player_spawns.size() == 1, "MapSample: one-player deployment (scout joins via event)")
+	_check(enemy_spawns.size() == 3, "MapSample: three initial enemies (phased reinforcements)")
 	var occupied: Dictionary = {}
 	var unique_spawns := true
 	for spawn in player_spawns + enemy_spawns:
@@ -1662,7 +1662,7 @@ func _test_chapter_one_environment_sample() -> void:
 	var resource_objects: Array = map.objects.filter(func(object): return object.get("type") == "resource")
 	_check(resource_objects.size() == 1, "MapSample: one optional cache")
 	_check(evac_objects.size() == 1, "MapSample: one locked evacuation anchor")
-	_check(map.scripts.filter(func(s): return s.trigger.get("type") == "event").size() == 2, "MapSample: two event waves")
+	_check(map.scripts.filter(func(s): return s.trigger.get("type") == "event").size() == 3, "MapSample: three event waves (scout rescue + 2 enemy)")
 	_check(not player_spawns.is_empty() and not terminal_objects.is_empty() and not evac_objects.is_empty(), "MapSample: 出生、终端和撤离目标完整")
 	if not player_spawns.is_empty() and not evac_objects.is_empty():
 		var start := Vector2i(int(player_spawns[0].x), int(player_spawns[0].y))

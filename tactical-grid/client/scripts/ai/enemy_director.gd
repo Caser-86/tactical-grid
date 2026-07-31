@@ -5,6 +5,8 @@ class_name EnemyDirector
 
 ## 增援生成请求信号：参数为单位数据数组 [{type, position}, ...] 和提示消息
 signal reinforcement_spawned(units_data: Array, message: String)
+## 玩家增援生成请求信号：参数同上，但不占用敌人增援上限
+signal player_reinforcement_spawned(units_data: Array, message: String)
 
 var turn_count: int = 0
 var reinforcement_triggers: Array[Dictionary] = []
@@ -31,7 +33,8 @@ func setup(scripts: Array) -> void:
 	# 从地图脚本中提取增援触发器
 	reinforcement_triggers.clear()
 	for script in scripts:
-		if script.get("action", "") == "spawn_reinforcement":
+		var action_type = String(script.get("action", ""))
+		if action_type == "spawn_reinforcement" or action_type == "spawn_player":
 			# 标记触发状态，避免重复触发
 			var entry = script.duplicate(true)
 			entry["triggered"] = false
@@ -70,6 +73,7 @@ func _trigger_matches(entry: Dictionary, turn: int, event_name: StringName) -> b
 			return event_name.is_empty() and _check_condition(String(trigger.get("condition", "")), turn)
 
 ## 统一评估增援触发器：回合触发和事件触发共用同一套上限/重复/信号逻辑
+## spawn_player 动作不占用敌人增援上限和场上敌人数量限制
 func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 	var spawned: Array = []
 	for trigger in reinforcement_triggers:
@@ -79,12 +83,20 @@ func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 		var is_repeat = trigger.get("repeat", false)
 		if not _trigger_matches(trigger, turn, event_name):
 			continue
-		# 达到增援上限则跳过
-		if reinforcements_spawned >= max_reinforcements:
-			break
-		# 场上敌人达到上限则跳过本次生成
 		var data = trigger.get("data", {})
 		var units_data = data.get("units", [])
+		var msg = data.get("message", "")
+		var action: String = String(trigger.get("action", "spawn_reinforcement"))
+		if action == "spawn_player":
+			# 玩家增援不占用敌人上限
+			if not is_repeat:
+				trigger["triggered"] = true
+			spawned.append({"units": units_data, "message": msg})
+			player_reinforcement_spawned.emit(units_data, msg)
+			continue
+		# 敌人增援：检查上限
+		if reinforcements_spawned >= max_reinforcements:
+			break
 		var would_exceed = (alive_enemy_count + units_data.size()) > enemy_cap_per_wave
 		if would_exceed:
 			# 非重复触发器保留以便下回合再试
@@ -96,7 +108,6 @@ func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 			trigger["triggered"] = true
 		# 累计已生成数量
 		reinforcements_spawned += units_data.size()
-		var msg = data.get("message", "")
 		spawned.append({"units": units_data, "message": msg})
 		# 发送信号通知 BattleController 实际生成单位
 		reinforcement_spawned.emit(units_data, msg)
