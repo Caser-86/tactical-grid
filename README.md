@@ -2,14 +2,13 @@
 
 Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游戏项目。新的“战术网络控制”系统垂直切片和 M1 初版已经进入 `main`；整部第一章和五章战役仍未完成，**不是已发布或内容完整的游戏**。
 
-后续开发、测试、文档和发布只以 `main` 为准。旧功能分支和 `docs/archive/` 中的材料仅用于找回与追溯，不再作为任务来源。
+后续开发、测试、文档和发布只以 `main` 为准。过期分支、服务端实验和旧路线图已经清理。
 
 ## 当前状态
 
 - Godot 客户端可从 `boot.tscn` 启动，包含主菜单、基地、战斗、设置、暂停、结算和对话流程。
 - 任务单一权威、战术网络、警戒、迷雾状态、敌方意图状态和 M1 分阶段流程已进入主线。
 - 2026-07-31 重新运行 Godot 发布门禁为 2,639/2,639 通过，0 失败。
-- 本轮服务端依赖未安装，`npm run build` 因找不到 `tsc` 失败；历史 Jest 数字不是本轮验证。
 - 敌方意图真实执行、完整迷雾表现、M1 真人门、干净克隆导出、三难度通关、长时/多硬件 QA、代码签名及 M2-M6 重做仍未完成。
 
 完整的已验证状态、限制和下一步请见 [项目状态](tactical-grid/PROJECT_STATUS.md) 与 [接管路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)。
@@ -19,16 +18,15 @@ Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游�
 ```text
 .
 ├── tactical-grid/          # 可运行项目模块
-│   ├── client/             # Godot 4.7.1 客户端
-│   ├── server/             # 可选 Node.js 地图与 API 开发工具
+│   ├── client/             # Godot 4.7.1 游戏、数据、资源与测试
 │   ├── README.md           # 本地运行、测试和目录说明
 │   └── PROJECT_STATUS.md   # 当前实测状态
-└── docs/                   # 活跃文档、路线图与历史归档
+└── docs/                   # 活跃文档、规格与唯一路线图
 ```
 
 ## 快速开始
 
-需要：Godot 4.7.1、Git；只有运行服务端和地图工具时才需要 Node.js 20+。
+需要：Godot 4.7.1、Git。
 
 在 Godot 中打开 `tactical-grid/client/project.godot` 并运行项目，或从命令行启动：
 
@@ -36,7 +34,7 @@ Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游�
 godot --path tactical-grid/client
 ```
 
-`tactical-grid/start.bat` 是开发启动器：它会打开 Godot 编辑器；传入 `--with-server` 时会额外启动本地 Node 服务。
+`tactical-grid/start.bat` 是开发启动器，会直接打开 Godot 编辑器。
 
 ## 文档入口
 

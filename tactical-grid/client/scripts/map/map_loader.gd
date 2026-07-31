@@ -1,5 +1,5 @@
 ﻿## 地图加载器
-## 从后端 API 或本地 JSON 加载地图数据
+## 从客户端锁定 JSON 加载正式关卡数据。
 class_name MapLoader
 
 ## 锁定地图存放目录（相对 res://）
@@ -74,7 +74,7 @@ static func _normalize_locked_map(raw: Dictionary, level_id: String) -> Dictiona
 	}
 	return result
 
-## 从 JSON 字典加载地图数据（保留旧接口，兼容测试和 API 返回数据）
+## 从 JSON 字典加载地图数据（保留旧接口供测试和工具使用）。
 static func load_from_dict(data: Dictionary) -> Dictionary:
 	var map_data = data.get("map_data", data)
 

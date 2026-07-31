@@ -1,95 +1,54 @@
 # Tactical Grid 项目模块
 
-本目录包含 Godot 客户端和用于开发、地图生成与可选 API 的 Node.js 服务端。游戏采取离线优先设计：日常运行不应依赖本地 Node 服务。
+本目录是纯 Godot 4.7.1 离线单机项目。正式关卡只读取 `client/data/locked_maps/`，运行、测试和导出均不依赖 Node、服务器、账号或网络。
 
-当前实现仍是开发版本。实测状态与发布阻断项见 [PROJECT_STATUS.md](PROJECT_STATUS.md)。
+当前真实状态见 [PROJECT_STATUS.md](PROJECT_STATUS.md)，唯一执行入口见 [PROJECT_TAKEOVER_ROADMAP.md](../docs/PROJECT_TAKEOVER_ROADMAP.md)。
 
 ## 环境
 
-- Godot 4.7.1
-- Node.js 20+（服务端、地图生成和服务端测试）
-- npm 与 Git
+- Godot 4.7.1 stable
+- Git
+- Windows 10/11 x64
 
-## 运行客户端
+## 运行
 
-在 Godot 中打开 `client/project.godot`，运行主场景 `res://scenes/boot.tscn`。
-
-也可以从本目录运行：
+在 Godot 中打开 `client/project.godot` 并运行 `res://scenes/boot.tscn`，或执行：
 
 ```powershell
 godot --path client
 ```
 
-`start.bat` 会打开 Godot 编辑器。传入 `--with-server` 时，它会在单独窗口启动本地开发服务器；这不是玩家发行版所需步骤。
+`start.bat` 只负责查找 Godot 4.7.1 并打开编辑器。
 
-## 服务端与地图工具
+## 测试
 
-```powershell
-cd server
-npm ci
-npm run build
-npm test -- --runInBand
-npm run test:mapgen:stress
-npx tsx tests/mapgen_seeds.ts
-```
-
-开发服务器可用下列命令启动：
+从 `client/` 运行：
 
 ```powershell
-cd server
-npm run dev
+powershell -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
 ```
 
-默认地址为 `http://localhost:3000`。客户端默认使用离线模式；不要把本地服务当作发布版依赖。
+该门禁执行 Godot 导入、音频技术检查、核心烟雾、第一章流程、HUD、存档、行动、地图、迷雾、敌方意图、网络和警戒测试。自动化通过不能替代真人操作、趣味性和发布环境验收。
 
-## Godot 验证
+## Windows 导出
 
-从仓库根目录运行：
-
-```powershell
-godot --headless --editor --path tactical-grid/client --quit
-godot --headless --path tactical-grid/client res://tests/battle_smoke_test.tscn
-```
-
-第二条命令执行当前核心测试。通过测试不等同于发布验收：资源泄漏、完整场景输入流程和导出包仍需单独验证。
-
-## Windows 导出（当前不可复现）
-
-从 `client/` 运行以下命令会先导入新资源，再按 `Windows Desktop x64` 预设导出：
+从 `client/` 运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
+powershell -ExecutionPolicy Bypass -File tests/verify_windows_package.ps1
 ```
 
-默认产物为 `export/TacticalGrid-Windows-x64.exe`。若 Godot 不在 `PATH`，可通过
-`GODOT_PATH` 环境变量或 `-GodotPath` 参数指定可执行文件。
-
-当前预设使用独立资源包，交付时必须把同目录生成的
-`TacticalGrid-Windows-x64.pck` 与 EXE 一并保留。
-
-注意：`export_presets.cfg` 当前没有纳入版本控制；构建脚本输出
-`export/TacticalGrid-Windows-x64.*`，验证器默认检查
-`client/build/TacticalGrid.*`。在 P0 统一预设、目录和文件名之前，
-现存包的验证通过不能证明干净克隆可复现发布。不要把这组命令当作正式发布流水线。
+正式发布前还必须完成干净克隆、干净 Windows 账户、分辨率矩阵、许可证、哈希和两小时长时运行。
 
 ## 目录
 
 ```text
 client/
-  scenes/                   # Godot 场景，入口为 boot.tscn
-  scripts/                  # 核心规则、战斗、UI、数据和网络代码
-  data/                     # 客户端配置数据
-  tests/                    # Godot 无头测试场景与运行脚本
-server/
-  src/                      # Express API 与地图生成器
-  data/                     # 配置与锁定地图生成产物
-  tests/                    # Jest、压力和固定种子测试
+  assets/                   # 已记录来源的运行时与源资源
+  data/                     # 游戏数据、锁定地图和资源清单
+  scenes/                   # Godot 场景
+  scripts/                  # 核心、战斗、AI、UI、地图和存档
+  tests/                    # 自动化契约、E2E 与发布门
+  tools/                    # 资源处理、音频生成和 Windows 构建
 ```
-
-## 文档
-
-- [仓库总览](../README.md)
-- [当前状态](PROJECT_STATUS.md)
-- [接管路线图](../docs/PROJECT_TAKEOVER_ROADMAP.md)
-- [文档索引](../docs/README.md)
-- [活跃设计范围](../docs/design/README.md)

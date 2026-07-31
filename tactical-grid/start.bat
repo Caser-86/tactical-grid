@@ -7,7 +7,6 @@ echo.
 
 set PROJECT_DIR=%~dp0
 set CLIENT_DIR=%PROJECT_DIR%client
-set SERVER_DIR=%PROJECT_DIR%server
 
 REM Allow overriding the Godot executable via environment variable
 if defined GODOT_PATH (
@@ -32,24 +31,8 @@ echo Using Godot: %GODOT_EXE%
 echo Project: %CLIENT_DIR%\project.godot
 echo.
 
-REM Optional: start backend server in a new window for backend/mapgen development
-if "%1"=="--with-server" (
-    echo [1/2] Starting backend server for development...
-    start "TacticalGrid-Server" cmd /k "cd /d %SERVER_DIR% && set JWT_SECRET=dev-secret && npx tsx src/index.ts"
-    timeout /t 4 /nobreak >nul
-    curl -s http://localhost:3000/health >nul 2>&1
-    if %errorlevel% == 0 (
-        echo    Server OK on http://localhost:3000
-    ) else (
-        echo    Server not ready yet; the editor will still open.
-    )
-    echo.
-    echo [2/2] Opening Godot editor...
-) else (
-    echo [1/1] Opening Godot editor...
-    echo Tip: run with --with-server to also start the Node backend.
-    echo.
-)
+echo [1/1] Opening Godot editor...
+echo.
 
 start "" %GODOT_EXE% -e "%CLIENT_DIR%\project.godot"
 
