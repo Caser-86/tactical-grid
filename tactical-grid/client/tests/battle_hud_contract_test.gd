@@ -71,7 +71,7 @@ func _test_hud_contract() -> void:
 		var expected_bounds_size = Vector2(_battle.map_width * _battle.CELL_SIZE, _battle.map_height * _battle.CELL_SIZE) + Vector2(80, 80)
 		_check(camera._map_bounds.size == expected_bounds_size, "相机边界包含地图和单位视觉安全边")
 		_check(camera._safe_viewport.size.x < get_viewport().get_visible_rect().size.x, "相机安全区为右侧单位面板预留空间")
-		_check(camera._safe_viewport.position.y >= 50.0, "相机安全区避开顶部 HUD")
+		_check(camera._safe_viewport.position.y >= HUDScript.TOP_BAR_HEIGHT, "相机安全区避开顶部 HUD")
 		# Task 5: readable camera opens at 1.0 zoom on the deployment
 		_check(is_equal_approx(camera.zoom.x, 1.0), "large map starts at readable 1.0 zoom")
 		var deployment_center: Vector2 = _battle.get_player_deployment_center()
@@ -106,6 +106,10 @@ func _test_hud_contract() -> void:
 	var objective_label: Label = hud.get_node_or_null("TopBar/ObjectiveLabel")
 	var viewport_width := get_viewport().get_visible_rect().size.x
 	_check(objective_label != null and objective_label.size.x >= viewport_width * 0.5, "顶部目标栏使用可显示 Boss 状态的响应式宽度")
+	var top_bar = hud.get_node_or_null("TopBar")
+	var right_panel = hud.get_node_or_null("RightPanel")
+	_check(top_bar != null and is_equal_approx(top_bar.offset_bottom, HUDScript.TOP_BAR_HEIGHT), "顶部栏为警报第二行保留空间")
+	_check(right_panel != null and is_equal_approx(right_panel.offset_top, HUDScript.TOP_BAR_HEIGHT), "右侧单位面板避开扩展后的顶部栏")
 
 	# 战斗对话必须与教程一样位于 CanvasLayer，否则会被战场相机缩放和裁切。
 	var dialogue = GameManager._active_dialogue
@@ -150,6 +154,16 @@ func _test_hud_contract() -> void:
 	_check(edge_variants is Array and not edge_variants.is_empty(), "材质交界格加载邻接边缘叠层")
 	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_0") != null, "战场实例化龙门吊地标")
 	_check(map_layer != null and map_layer.get_node_or_null("Environment_landmark_1") != null, "战场实例化照明塔地标")
+	var decorations_fit_map := true
+	if map_layer:
+		var map_rect := Rect2(Vector2.ZERO, Vector2(_battle.map_width * _battle.CELL_SIZE, _battle.map_height * _battle.CELL_SIZE))
+		for child in map_layer.get_children():
+			if child is Sprite2D and String(child.name).begins_with("Environment_") and child.texture:
+				var decoration_rect := Rect2(child.position, child.texture.get_size())
+				if not map_rect.encloses(decoration_rect):
+					decorations_fit_map = false
+	_check(decorations_fit_map, "环境地标完整限制在地图视觉边界内")
+	_check(_battle.visibility_renderer != null and _battle.visibility_renderer.z_index >= 2, "迷雾层覆盖环境装饰但低于单位层")
 
 	# 单位必须使用正式纹理并居中落在格内，不能再显示程序化字母棋子或格点偏移。
 	var unit_layer = _battle.get_node_or_null("UnitLayer")
@@ -427,7 +441,7 @@ func _test_network_toggle_and_alert_display() -> void:
 		return
 
 	# 验证警报标签和网络覆盖层节点存在
-	_check(hud.get_node_or_null("AlertLabel") != null, "HUD 创建 AlertLabel 节点")
+	_check(hud.get_node_or_null("TopBar/AlertLabel") != null, "HUD 创建 AlertLabel 节点")
 	_check(hud.get_node_or_null("NetworkOverlay") != null, "HUD 创建 NetworkOverlay 节点")
 	_check(not hud.is_network_overlay_visible(), "网络覆盖层初始隐藏")
 
@@ -460,16 +474,19 @@ func _test_network_toggle_and_alert_display() -> void:
 	_battle.alert_state.apply_event("noise_detected")
 	_check(_battle.alert_state.get_alert_level() == AlertState.LEVEL_SUSPICIOUS, "noise_detected 提升警报至 suspicious")
 	hud.update_alert_display(_battle.alert_state)
-	var alert_label: Label = hud.get_node_or_null("AlertLabel")
+	var alert_label: Label = hud.get_node_or_null("TopBar/AlertLabel")
 	_check(alert_label != null and alert_label.visible, "警报标签可见")
+	_check(alert_label != null and alert_label.get_parent() == hud.get_node("TopBar"), "警报标签挂载在顶部栏第二行")
+	_check(alert_label != null and alert_label.size.x >= 300.0, "警报标签有足够宽度显示完整下一步")
 	_check(alert_label != null and alert_label.text.contains("可疑"), "警报标签显示当前等级")
 	_check(alert_label != null and alert_label.text.contains("下一步"), "警报标签显示下一步后果")
+	_check(alert_label != null and not alert_label.text.contains("Enemies"), "警报标签不显示英文调试文案")
 
 	# 验证警报后果数据
 	var consequence: Dictionary = _battle.alert_state.get_consequence()
 	_check(int(consequence.get("reinforcement_bonus", 0)) == 1, "suspicious 警报提供 1 点增援加成")
 	var next_consequence: Dictionary = _battle.alert_state.get_next_consequence()
-	_check(String(next_consequence.get("description", "")).contains("hunt"), "下一步后果描述战斗级行为")
+	_check(String(next_consequence.get("description", "")).contains("追击"), "下一步后果描述战斗级行为")
 
 	# CH1-060: Alert display should show turns_until (distance to next escalation).
 	_check(alert_label != null and alert_label.text.contains("回合后"), "警报标签显示回合后倒计时")

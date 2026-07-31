@@ -4,7 +4,7 @@
 >
 > 状态：Active
 > 负责人：项目负责人
-> 更新日期：2026-07-31
+> 更新日期：2026-08-01
 > 适用范围：`main` 分支、第一章 M1-M6、Windows 第一章候选版
 > 产品规格：[第一章战术网络重设计](superpowers/specs/2026-07-30-chapter-one-tactical-network-redesign.md)
 > 唯一开发基线：`main`
@@ -28,7 +28,7 @@
 - 任务目标唯一权威、行动系统骨架、地图校验、迷雾状态、敌方意图状态、战术网络、警戒状态已接入代码库。
 - M1 已完成 CH1-070/080：22×16、三个紧凑遭遇区、7-9 名敌人、最多 3 名同时活跃、两个遭遇检查点、教学、失败重试、上传和撤离流程。
 - CH1-010 至 CH1-060 的代码与自动化契约已完成：统一行动、地图 v2/稳定 ID/RNG、真实输入 E2E、迷雾、敌方意图、战术网络和警戒表现。
-- CH1-090 已完成中继塔地标、选择/扫描/上传/撤离 VFX、中文 UI 字体、潜入/交战/高警戒三层战斗音乐和第一轮网络/意图/职业色饰程序化表现；当前仍未签核。
+- CH1-090 已完成中继塔地标、选择/扫描/上传/撤离 VFX、中文 UI 字体、潜入/交战/高警戒三层战斗音乐和第一轮网络/意图/职业色饰程序化表现；警报本地化、顶部状态分区、迷雾覆盖边界和地标越界保护已修复；首帧视觉快照工具已覆盖 720p/1080p、灰度和色觉检查；当前仍未签核。
 - 四套环境组件、角色和敌人图、HUD 图标、对话、VFX 与程序化 WAV 可作为正式生产底材。
 - 导出预设、Windows 构建脚本、包验证脚本和自动化发布门已进入版本控制。
 - 旧后端、旧路线图、旧 QA、旧文档归档和无生产引用的 API 客户端已从当前树移除；历史仍可从 Git 提交记录追溯。
@@ -679,6 +679,15 @@ powershell -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
 powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
 ```
 
+在 `tactical-grid/client` 执行第一章首帧视觉快照（窗口渲染，不使用 Godot 编辑器）：
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-output=build/chapter1_visual_1280x720_none.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=grayscale --qa-output=build/chapter1_visual_1280x720_grayscale.png
+```
+
+`qa-mode` 可使用 `none`、`deuteranopia` 或 `grayscale`；截图只能证明首帧布局和可读性，不能替代完整 M1 真人验收。
+
 验证发布包：
 
 ```powershell
@@ -691,8 +700,8 @@ powershell -ExecutionPolicy Bypass -File client/tests/verify_windows_package.ps1
 
 严格按以下顺序：
 
-1. 收口 CH1-090：完成角色/敌军正式辨识、三区域表现和人工表现验收；中文字体与三层音乐代码已完成，只需确认游戏内效果。
-2. 运行 720p/1080p、灰度、色觉和音频听感检查。
+1. 收口 CH1-090：完成角色/敌军正式辨识、三区域表现和人工表现验收；警报布局、地标迷雾边界和自动首帧快照已完成，中文字体与三层音乐代码已完成，只需确认完整流程中的游戏内效果。
+2. 运行完整 M1 的 720p/1080p、灰度、色觉和音频听感检查；首帧快照不计作人工签核。
 3. 通过 H1：至少 3 名首次玩家完成 M1 理解与趣味性测试。
 4. H1 通过后，才进入 CH1-110、CH1-120、CH1-130、CH1-140 和 M2-M6。
 

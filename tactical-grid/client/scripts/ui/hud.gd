@@ -19,6 +19,8 @@ class_name HUD
 var _battle_controller: Node = null
 var _log_lines: Array[String] = []
 const MAX_LOG_LINES = 8
+## 顶部栏保留一行战斗状态，第二行用于警报，避免状态文案覆盖回合信息。
+const TOP_BAR_HEIGHT := 78.0
 
 ## 当前目标选择提示文本（由 battle_controller 设置）
 var targeting_hint: String = ""
@@ -62,19 +64,21 @@ func _ready() -> void:
 	_context_prompt.visible = false
 	add_child(_context_prompt)
 	set_context_state(ContextState.NONE)
-	# CODE-P2-02: Alert display label (top-left, below turn info)
+	# CODE-P2-02: Alert display label (top bar second row)
 	_alert_label = Label.new()
 	_alert_label.name = "AlertLabel"
 	_alert_label.text = ""
-	_alert_label.add_theme_font_size_override("font_size", 14)
+	_alert_label.add_theme_font_size_override("font_size", 12)
 	_alert_label.add_theme_color_override("font_color", Color(0.95, 0.75, 0.45))
 	_alert_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_alert_label.anchor_right = 1.0
 	_alert_label.offset_left = 8.0
-	_alert_label.offset_top = 28.0
-	_alert_label.offset_right = 400.0
-	_alert_label.offset_bottom = 48.0
+	_alert_label.offset_top = 50.0
+	_alert_label.offset_right = -112.0
+	_alert_label.offset_bottom = 73.0
+	_alert_label.clip_text = true
 	_alert_label.visible = false
-	add_child(_alert_label)
+	$TopBar.add_child(_alert_label)
 
 	# CODE-P2-02: Network overlay (hidden by default, G toggles; visualization only)
 	_network_overlay = Control.new()
@@ -84,7 +88,7 @@ func _ready() -> void:
 	_network_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_network_overlay)
 
-	# CH1-050: Threat summary label (top-left, below alert label).
+	# CH1-050: Threat summary label (right panel, below selected-unit details).
 	# Summarizes observed enemy intents so the player can read the most
 	# dangerous known threats before ending the turn.
 	_threat_label = Label.new()
@@ -93,12 +97,13 @@ func _ready() -> void:
 	_threat_label.add_theme_font_size_override("font_size", 13)
 	_threat_label.add_theme_color_override("font_color", Color(0.96, 0.78, 0.55))
 	_threat_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_threat_label.offset_left = 8.0
-	_threat_label.offset_top = 50.0
-	_threat_label.offset_right = 460.0
-	_threat_label.offset_bottom = 96.0
+	_threat_label.offset_left = 10.0
+	_threat_label.offset_top = 312.0
+	_threat_label.offset_right = 240.0
+	_threat_label.offset_bottom = 432.0
+	_threat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_threat_label.visible = false
-	add_child(_threat_label)
+	$RightPanel.add_child(_threat_label)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -253,6 +258,7 @@ func apply_viewport_layout(viewport_size: Vector2i) -> void:
 	var right_panel = $RightPanel
 	right_panel.offset_left = -250.0
 	right_panel.offset_right = 0.0
+	right_panel.offset_top = TOP_BAR_HEIGHT
 
 	# BattleLog 限制在左侧 350px 宽度内，距底部 70px
 	var log = $BattleLog
@@ -263,6 +269,9 @@ func apply_viewport_layout(viewport_size: Vector2i) -> void:
 	var bar_width = float(viewport_size.x) * 0.8
 	action_bar.offset_left = -bar_width * 0.5
 	action_bar.offset_right = bar_width * 0.5
+
+func get_top_bar_height() -> float:
+	return TOP_BAR_HEIGHT
 
 func add_log(msg: String) -> void:
 	_log_lines.append(msg)

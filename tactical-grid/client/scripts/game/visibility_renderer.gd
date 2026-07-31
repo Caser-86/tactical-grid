@@ -8,7 +8,7 @@ extends Node2D
 class_name VisibilityRenderer
 
 ## 未探索格的实黑叠加色
-const COLOR_HIDDEN := Color(0.015, 0.022, 0.030, 0.97)
+const COLOR_HIDDEN := Color(0.015, 0.022, 0.030, 1.0)
 ## 已记录格的降饱和叠加色（保留地形可见但明显变暗）
 const COLOR_DIMMED := Color(0.04, 0.06, 0.10, 0.55)
 ## 摄像头区域微调色相，让玩家能识别"由摄像头维持的观察区"

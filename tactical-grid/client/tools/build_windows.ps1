@@ -34,8 +34,13 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
-& $GodotPath --headless --path $projectRoot --editor --import --quit
-if ($LASTEXITCODE -ne 0) { throw "Godot asset import failed with exit code $LASTEXITCODE." }
+# A clean checkout can need one pass to create generated font/audio import
+# metadata and a second pass to settle dependent theme resources before export.
+for ($importPass = 1; $importPass -le 2; $importPass++) {
+    Write-Host "Godot asset import pass $importPass/2..."
+    & $GodotPath --headless --path $projectRoot --editor --import --quit
+    if ($LASTEXITCODE -ne 0) { throw "Godot asset import failed on pass $importPass with exit code $LASTEXITCODE." }
+}
 
 & $GodotPath --headless --path $projectRoot --export-release 'Windows Desktop x64' $OutputPath
 if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE." }

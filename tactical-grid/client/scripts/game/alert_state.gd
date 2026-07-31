@@ -35,22 +35,22 @@ func setup() -> void:
 	}
 	_consequences = {
 		0: {
-			"description": "Enemies patrol normally",
+			"description": "敌人按原路线巡逻",
 			"reinforcement_bonus": 0,
 			"aggression_bonus": 0.0,
 		},
 		1: {
-			"description": "Enemies investigate last-known positions",
+			"description": "敌人调查最后目击位置",
 			"reinforcement_bonus": 1,
 			"aggression_bonus": 0.1,
 		},
 		2: {
-			"description": "Enemies actively hunt; reinforcements accelerated",
+			"description": "敌人主动追击，增援提前抵达",
 			"reinforcement_bonus": 2,
 			"aggression_bonus": 0.3,
 		},
 		3: {
-			"description": "All enemies converge; max reinforcements",
+			"description": "敌军全面集结，增援达到上限",
 			"reinforcement_bonus": 3,
 			"aggression_bonus": 0.5,
 		},
@@ -85,13 +85,13 @@ func get_consequence() -> Dictionary:
 func get_next_consequence() -> Dictionary:
 	if _current_level >= LEVEL_COMBAT:
 		return {
-			"description": "Alert at maximum: all enemies active",
+			"description": "警报已达上限：所有敌人进入战斗",
 			"turns_until": 0,
 		}
 	var next_level := _current_level + 1
 	var next_consequence: Dictionary = _consequences.get(next_level, {}).duplicate(true)
 	return {
-		"description": next_consequence.get("description", "Unknown"),
+		"description": next_consequence.get("description", "未知后果"),
 		"turns_until": 1,
 		"next_level": next_level,
 	}

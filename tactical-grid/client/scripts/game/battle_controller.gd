@@ -251,6 +251,9 @@ func _ready() -> void:
 func _setup_visibility_renderer() -> void:
 	visibility_renderer = VisibilityRenderer.new()
 	visibility_renderer.name = "VisibilityRenderer"
+	# Fog must cover unexplored environment props, while UnitSprite/FX keep their
+	# higher z-indices so readable gameplay actors remain visible.
+	visibility_renderer.z_index = 2
 	add_child(visibility_renderer)
 	# 插入到 MoveHighlightLayer 当前位置，使雾层位于 EvacZoneLayer 与 MoveHighlightLayer 之间。
 	if move_highlight:
@@ -1180,7 +1183,7 @@ func _render_evac_zone() -> void:
 ## 同步战场可视区与 HUD，确保右侧单位面板不会遮住可操作区域。
 func _configure_viewport_layout() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
-	var top_hud_height := 50.0
+	var top_hud_height := hud.get_top_bar_height()
 	var bottom_hud_height := 60.0
 	var right_panel_width := 250.0
 	hud.apply_viewport_layout(Vector2i(viewport_size))
@@ -1291,7 +1294,18 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 		sprite.name = "Environment_%s_%d" % [component_type, instance_index]
 		sprite.texture = texture
 		sprite.centered = false
-		sprite.position = GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
+		var requested_position := GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
+		# Large landmarks are anchored to a grid cell but must stay inside the
+		# map rectangle so hidden props cannot spill beyond the fog boundary.
+		var map_size := Vector2(map_width * CELL_SIZE, map_height * CELL_SIZE)
+		var max_position := Vector2(
+			maxf(0.0, map_size.x - texture.get_size().x),
+			maxf(0.0, map_size.y - texture.get_size().y)
+		)
+		sprite.position = Vector2(
+			clampf(requested_position.x, 0.0, max_position.x),
+			clampf(requested_position.y, 0.0, max_position.y)
+		)
 		sprite.z_index = int(decoration.get("z", 0))
 		map_layer.add_child(sprite)
 
@@ -1493,6 +1507,9 @@ func _start_battle() -> void:
 	turn_manager.start_battle()
 	hud.update_objective(_get_objective_text())
 	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
+	# Keep the first actionable frame self-explanatory; calm alert is still useful
+	# context when the player has not triggered any alarm yet.
+	hud.update_alert_display(alert_state)
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
 	# CH1-030: 战斗开始后启动上下文教学提示序列
 	_begin_context_tutorials()
