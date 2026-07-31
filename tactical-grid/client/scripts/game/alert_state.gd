@@ -4,6 +4,8 @@
 extends Node
 class_name AlertState
 
+signal level_changed(old_level: int, new_level: int)
+
 ## Alert level constants
 const LEVEL_CALM := 0
 const LEVEL_SUSPICIOUS := 1
@@ -65,6 +67,7 @@ func apply_event(event_name: String) -> Dictionary:
 	_current_level = maxi(_current_level, target_level)
 	if _current_level != old_level:
 		_turns_at_current_level = 0
+		level_changed.emit(old_level, _current_level)
 	return {"changed": _current_level != old_level, "new_level": _current_level}
 
 
@@ -101,8 +104,11 @@ func on_turn_end() -> void:
 	_turns_at_current_level += 1
 	var decay_threshold: int = 1 if _current_level == LEVEL_SUSPICIOUS else 2
 	if _turns_at_current_level >= decay_threshold:
+		var old_level := _current_level
 		_current_level = maxi(_current_level - 1, LEVEL_CALM)
 		_turns_at_current_level = 0
+		if _current_level != old_level:
+			level_changed.emit(old_level, _current_level)
 
 
 ## Get reinforcement bonus for current alert level.

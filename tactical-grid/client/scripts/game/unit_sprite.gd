@@ -56,6 +56,7 @@ func _draw() -> void:
 		draw_circle(Vector2.ZERO, radius - 3, color.darkened(0.30))
 	if not art_sprite or not art_sprite.texture:
 		_draw_tactical_silhouette(color)
+	_draw_role_accent(radius)
 
 	var border_color := Color.WHITE if selected else color.lightened(0.05)
 	var border_width := 3.0 if selected else 2.0
@@ -239,6 +240,45 @@ func _get_unit_color() -> Color:
 	if unit.team == "enemy":
 		return GameTheme.ENEMY_COLOR
 	return GameTheme.NEUTRAL_COLOR
+
+## CH1-090: Give every job a shape and accent color in addition to faction color.
+## This remains visible when unit art is small or shown in grayscale.
+func _draw_role_accent(radius: int) -> void:
+	if not unit:
+		return
+	var accent := _get_role_accent()
+	var marker_center := Vector2(radius * 0.62, -radius * 0.62)
+	draw_circle(marker_center, 6.0, Color(0.015, 0.025, 0.035, 0.92))
+	match String(unit.job):
+		"assault":
+			draw_colored_polygon(PackedVector2Array([
+				marker_center + Vector2(0, -4),
+				marker_center + Vector2(4, 3),
+				marker_center + Vector2(-4, 3),
+			]), accent)
+		"scout":
+			draw_arc(marker_center, 4.0, PI, TAU, 12, accent, 2.0)
+			draw_circle(marker_center + Vector2(0, 1), 1.5, accent)
+		"sniper":
+			draw_line(marker_center + Vector2(-4, 3), marker_center + Vector2(4, -3), accent, 2.0, true)
+			draw_circle(marker_center + Vector2(3, -2), 1.5, accent)
+		"heavy":
+			draw_rect(Rect2(marker_center - Vector2(4, 3), Vector2(8, 6)), accent, true)
+		_:
+			draw_circle(marker_center, 3.5, accent)
+	draw_arc(Vector2.ZERO, radius + 3, -0.85, 0.15, 10, accent, 2.5)
+
+func _get_role_accent() -> Color:
+	match String(unit.job):
+		"assault": return Color("ffb347")
+		"scout": return Color("55e7ff")
+		"sniper": return Color("c7a0ff")
+		"heavy": return Color("ffd35a")
+		"protocol_engineer": return Color("b46cff")
+		"hunter": return Color("ff5f9e")
+		"sentry_basic", "sentry_sniper": return Color("ff694f")
+		"drone_scout", "drone_assault": return Color("ff9b45")
+		_: return _get_unit_color().lightened(0.22)
 
 func _draw_tactical_silhouette(team_color: Color) -> void:
 	var body_color := Color(0.075, 0.10, 0.13) if unit.team == "player" else Color(0.17, 0.055, 0.045)

@@ -15,6 +15,7 @@ var sfx_volume: float = 0.8
 var ambient_volume: float = 0.5
 
 var current_bgm: String = ""
+var battle_music_layer: int = -1
 var audio_cache: Dictionary = {}
 
 func _ready() -> void:
@@ -94,6 +95,7 @@ func _restart_bgm() -> void:
 func stop_bgm() -> void:
 	bgm_player.stop()
 	current_bgm = ""
+	battle_music_layer = -1
 
 ## 播放音效
 func play_sfx(sfx_id: String) -> void:
@@ -250,7 +252,24 @@ func bgm_menu() -> void:
 	play_bgm("bgm_menu")
 
 func bgm_battle(size: String = "small") -> void:
-	play_bgm("bgm_battle_" + size)
+	if size == "small":
+		bgm_battle_layer(1)
+	else:
+		play_bgm("bgm_battle_" + size)
+
+## CH1-090: Switch battle music by the public alert level.
+## The three tracks are separate procedural loops so the transition remains deterministic.
+func bgm_battle_layer(alert_level: int) -> void:
+	var layer := clampi(alert_level, 0, 3)
+	var track := "bgm_battle_stealth"
+	if layer == 1:
+		track = "bgm_battle_engaged"
+	elif layer >= 2:
+		track = "bgm_battle_alert"
+	if battle_music_layer == layer and current_bgm == track:
+		return
+	battle_music_layer = layer
+	play_bgm(track)
 
 func bgm_boss() -> void:
 	play_bgm("bgm_boss")

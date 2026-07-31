@@ -482,6 +482,7 @@ func _init_subsystems() -> void:
 	alert_state = AlertState.new()
 	add_child(alert_state)
 	alert_state.setup()
+	alert_state.level_changed.connect(_on_alert_level_changed)
 	tactical_network_state.alert_requested.connect(_on_network_alert_requested)
 	tactical_network_state.network_operation_performed.connect(_on_network_operation)
 	action_system.set_tactical_network_state(tactical_network_state)
@@ -1468,7 +1469,7 @@ func _start_battle() -> void:
 	if boss_unit:
 		AudioManager.bgm_boss()
 	else:
-		AudioManager.bgm_battle()
+		AudioManager.bgm_battle_layer(alert_state.get_alert_level() if alert_state else AlertState.LEVEL_CALM)
 	# CH1-080: 初始化遭遇区为 zone_a（玩家出生点所在的第一个区域）
 	current_encounter_id = "zone_a"
 	# 每关使用独立基础上限，再应用难度加成（故事+5，困难-3）。
@@ -1672,6 +1673,11 @@ func _on_network_alert_requested(amount: int, reason: String) -> void:
 		alert_state.apply_event(reason)
 		hud.update_alert_display(alert_state)
 		_log("警报事件: %s (amount=%d)" % [reason, amount])
+
+func _on_alert_level_changed(_old_level: int, new_level: int) -> void:
+	if boss_unit:
+		return
+	AudioManager.bgm_battle_layer(new_level)
 
 ## 网络操作完成回调：将相机接管等事件桥接为 mission_event
 ## 相机接管触发 player_reinforcement 脚本（scout rescue）

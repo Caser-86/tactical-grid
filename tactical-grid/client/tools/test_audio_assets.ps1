@@ -13,7 +13,8 @@ if (-not $AudioRoot) {
 
 $ErrorActionPreference = 'Stop'
 $expected = @(
-    'bgm/bgm_menu.wav', 'bgm/bgm_battle_small.wav', 'bgm/bgm_boss.wav',
+    'bgm/bgm_menu.wav', 'bgm/bgm_battle_stealth.wav', 'bgm/bgm_battle_engaged.wav',
+    'bgm/bgm_battle_alert.wav', 'bgm/bgm_battle_small.wav', 'bgm/bgm_boss.wav',
     'bgm/bgm_base.wav', 'bgm/bgm_victory.wav', 'bgm/bgm_defeat.wav',
     'sfx/sfx_ui_click.wav', 'sfx/sfx_ui_hover.wav', 'sfx/sfx_select_unit.wav',
     'sfx/sfx_unit_land.wav', 'sfx/sfx_combat_pistol.wav', 'sfx/sfx_combat_shotgun.wav',

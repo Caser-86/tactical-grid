@@ -1,18 +1,19 @@
 # Resource Manifest
 
-> status: Pre-redesign runtime asset baseline
+> status: CH1-090 integrated runtime baseline; not a final release
 > owner: 项目负责人
 > updated: 2026-07-31
 > applies_to: 当前客户端运行时资源与来源追溯
 
 This manifest covers resources intentionally included in the current playable
-baseline. It does not certify that those resources meet the approved tactical-network
-redesign or final release quality. A resource without a documented source and license
-must not enter a release build.
+baseline. It does not certify that those resources meet final release quality or that
+the CH1-090 human acceptance gate has passed. A resource without a documented source
+and license must not enter a release build.
 
 | Path | Source | License | Created | Game use | Import / validation |
 | --- | --- | --- | --- | --- | --- |
 | `assets/audio/bgm/*.wav` | Original procedural PCM synthesis by `tools/generate_chapter1_audio.ps1` | CC0 1.0 | 2026-07-28 | Menu, battle, boss, base, victory and defeat music | Godot WAV import; loaded in smoke test |
+| `assets/audio/bgm/bgm_battle_stealth.wav`, `bgm_battle_engaged.wav`, `bgm_battle_alert.wav` | Original procedural PCM synthesis by `tools/generate_chapter1_audio.ps1` | CC0 1.0 | 2026-07-31 | CH1-090 stealth, engaged and high-alert battle music states selected from `AlertState` | 12-second mono PCM loops; loaded by `AudioManager.bgm_battle_layer()` and checked by audio technical QA |
 | `assets/audio/sfx/*.wav` | Original procedural PCM synthesis by `tools/generate_chapter1_audio.ps1` | CC0 1.0 | 2026-07-28 | UI, movement, combat, skill, item, turn and outcome feedback | Godot WAV import; loaded in smoke test |
 | `assets/audio/sfx/sfx_network_scan.wav`, `sfx_network_takeover.wav`, `sfx_network_disable.wav`, `sfx_network_overload.wav`, `sfx_alert_rise.wav`, `sfx_camera_reveal.wav`, `sfx_turret_reversal.wav`, `sfx_beacon_delay.wav` | Original procedural PCM synthesis by `tools/generate_network_audio.ps1` | CC0 1.0 | 2026-07-31 | Network scan, takeover, disable, overload and alert escalation facility feedback | Godot WAV import; polyphonic SFX pool in `audio_manager.gd`; validated by `tools/test_audio_assets.ps1` |
 | `assets/generated/chapter1/backgrounds/main_menu_data_district_v1.png` | Original AI image generated in Codex built-in Image Generation tool | Project-controlled original asset; no third-party source | 2026-07-28 | Main-menu background | 16:9 raster; visual inspection for no text/watermark; imported by Godot and referenced by `scenes/main_menu.tscn` |
@@ -30,6 +31,7 @@ must not enter a release build.
 | `assets/generated/chapter1/source/ch1_m1_units/*_source_v1.png` | Original AI images generated with the Codex built-in Image Generation tool; flat pure-green chroma background | Project-controlled original asset; no third-party source | 2026-07-30 | Internal unit-art direction and reproducible processing source | Reference/source only; excluded from Windows export by `export_presets.cfg` |
 | `assets/generated/chapter1/runtime/units/assault_96.png`, `sniper_96.png`, `heavy_96.png`, `sentry_basic_96.png`, `drone_scout_96.png`, `sentry_sniper_96.png`, `drone_assault_96.png` | Original AI images generated with the Codex built-in Image Generation tool, then green-dominant chroma-key removal, crop, resize and 96x96 compositing by `tools/process_chapter1_unit_art.ps1` | Project-controlled original asset; no third-party source | 2026-07-30 | Seven Chapter 1 unit runtime sprites (assault, sniper, heavy, sentry_basic, drone_scout, sentry_sniper, drone_assault) | Transparent 96x96 PNG; imported by Godot; loaded through `ArtCatalog`; 96x96 size, real alpha, >=0.12 silhouette difference, >=76px render size and no filled token base contracts pass in `unit_animation_contract_test` |
 | `default_bus_layout.tres` | Project-authored Godot configuration | Project source license | 2026-07-28 | Master, Music and SFX routing | Loaded at boot; bus contract smoke test |
+| `assets/fonts/SmileySans-Oblique.ttf`, `SmileySans-OFL-1.1.txt` | Smiley Sans release from the official `atelier-anchor/smiley-sans` repository | SIL Open Font License 1.1 | 2026-07-31 | Runtime UI font for Chinese labels and tutorial text | Static TTF embedded in `tactical_ui_theme.tres`; license shipped beside the font |
 
 ## Excluded Reference Files
 
@@ -44,12 +46,12 @@ before any release that needs character or tile artwork.
 
 The following assets are not yet present in this baseline and must receive individual
 manifest rows before release: four finalized player silhouettes, protocol engineer,
-hunter, network-node states, five facility-state icons, intent/alert feedback, M2-M6
-hero landmarks, a Chinese UI font. Network and alert audio is covered by `generate_network_audio.ps1` and the polyphonic SFX pool.
+hunter, network-node states, five facility-state icons, intent/alert feedback, and M2-M6
+hero landmarks. Network and alert audio is covered by `generate_network_audio.ps1` and the polyphonic SFX pool.
 
 CH1-090 progress: M1 hero landmark "失联中继塔" (`relay_tower_128.png`) is now integrated
 as echo_yard landmark variant 2. Selection, scan, upload and evac VFX are implemented as
 procedural `TacticalEffect` drawings (no external textures needed). Network node four-state
 visuals and enemy intent icons remain procedural (shape + colour) and are distinguishable in
-grayscale by shape alone. A Chinese UI font and human visual/audio acceptance are still required
-before CH1-090 can be signed off.
+grayscale by shape alone. Human visual/audio acceptance is still required before CH1-090
+can be signed off.

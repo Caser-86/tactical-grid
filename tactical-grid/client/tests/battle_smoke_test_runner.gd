@@ -90,9 +90,11 @@ func _test_audio_bus_contract() -> void:
 	_check(audio_manager.bgm_player.bus == &"Music", "Audio: BGMPlayer 路由到 Music")
 	_check(audio_manager.sfx_player.bus == &"SFX", "Audio: SFXPlayer 路由到 SFX")
 	_check(audio_manager.ambient_player.bus == &"SFX", "Audio: AmbientPlayer 路由到 SFX")
-	audio_manager.queue_free()
 	for audio_path in [
 		"res://assets/audio/bgm/bgm_menu.wav",
+		"res://assets/audio/bgm/bgm_battle_stealth.wav",
+		"res://assets/audio/bgm/bgm_battle_engaged.wav",
+		"res://assets/audio/bgm/bgm_battle_alert.wav",
 		"res://assets/audio/bgm/bgm_battle_small.wav",
 		"res://assets/audio/bgm/bgm_boss.wav",
 		"res://assets/audio/bgm/bgm_victory.wav",
@@ -121,7 +123,16 @@ func _test_audio_bus_contract() -> void:
 	_check(audio_manager.get_weapon_sfx_profile("double_tap") == "smg", "Audio: 冲锋枪使用独立音效类别")
 	_check(audio_manager.get_weapon_sfx_profile("suppressing_fire") == "machine_gun", "Audio: 机枪使用独立音效类别")
 	_check(audio_manager.get_weapon_sfx_profile("heal_40") == "medical", "Audio: 医疗枪使用独立音效类别")
+	_check(audio_manager.battle_music_layer == -1, "Audio: 战斗音乐初始层为空")
+	audio_manager.bgm_battle_layer(0)
+	_check(audio_manager.current_bgm == "bgm_battle_stealth", "Audio: 警戒 0 使用潜入音乐")
+	audio_manager.bgm_battle_layer(1)
+	_check(audio_manager.current_bgm == "bgm_battle_engaged", "Audio: 警戒 1 使用交战音乐")
+	audio_manager.bgm_battle_layer(3)
+	_check(audio_manager.current_bgm == "bgm_battle_alert", "Audio: 警戒 3 使用高警戒音乐")
+	audio_manager.queue_free()
 	_check(FileAccess.file_exists("res://data/RESOURCE_MANIFEST.md"), "Assets: 资源清单存在")
+	_check(FileAccess.file_exists("res://assets/fonts/SmileySans-Oblique.ttf"), "Assets: 中文字体存在")
 	var base_background = load("res://assets/generated/chapter1/backgrounds/base_echo_command_room_v1.png")
 	_check(base_background is Texture2D, "Assets: 基地背景可由 Godot 加载")
 	var mission_background = load("res://assets/generated/chapter1/backgrounds/mission_debrief_data_city_v1.png")

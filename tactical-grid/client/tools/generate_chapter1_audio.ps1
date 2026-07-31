@@ -65,6 +65,9 @@ function Write-Wav {
 
 $music = @(
     @('bgm/bgm_menu.wav', 146.83),
+    @('bgm/bgm_battle_stealth.wav', 155.56),
+    @('bgm/bgm_battle_engaged.wav', 185.00),
+    @('bgm/bgm_battle_alert.wav', 207.65),
     @('bgm/bgm_battle_small.wav', 174.61),
     @('bgm/bgm_boss.wav', 110.00),
     @('bgm/bgm_base.wav', 130.81),

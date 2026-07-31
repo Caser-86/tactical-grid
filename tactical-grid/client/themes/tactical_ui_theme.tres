@@ -1,4 +1,6 @@
-[gd_resource type="Theme" load_steps=9 format=3]
+[gd_resource type="Theme" load_steps=10 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/SmileySans-Oblique.ttf" id="1_font"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.035, 0.065, 0.09, 0.94)
@@ -113,6 +115,7 @@ corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [resource]
+default_font = ExtResource("1_font")
 default_font_size = 16
 Button/colors/font_color = Color(0.82, 0.94, 0.98, 1)
 Button/colors/font_hover_color = Color(1, 1, 1, 1)
