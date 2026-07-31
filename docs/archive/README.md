@@ -8,6 +8,7 @@
 |---|---|---|
 | [design-notes/](design-notes/) | 早期完整设计、扩展系统、角色/装备方案和内容设想 | 仅作灵感与历史参考，不构成首发承诺 |
 | [initial-audit/](initial-audit/) | 早期一次性审计脚本和输出 | 路径、版本和结论已过时，不作为当前验证命令 |
+| [PRE_REDESIGN_SUBMIT_BRANCH.md](PRE_REDESIGN_SUBMIT_BRANCH.md) | 旧 `submit-new-version` 分支的封存原因与归档 tag | 不得整体合并回 `main` |
 
 根目录中的 `2026-07-27` 至 `2026-07-30` 旧规格、实现计划和重设计前路线图是已执行或已取代的历史基线。其未勾选任务、旧命令、旧地图尺寸和完成宣称不得作为当前任务。
 
