@@ -4,8 +4,12 @@ This is a technical check only; it cannot replace a human listening review.
 #>
 [CmdletBinding()]
 param(
-    [string]$AudioRoot = (Join-Path $PSScriptRoot '..\assets\audio')
+    [string]$AudioRoot = ''
 )
+if (-not $AudioRoot) {
+    $root = if ($PSScriptRoot) { $PSScriptRoot } elseif ($PSCommandPath) { Split-Path -Parent $PSCommandPath } else { (Get-Location).Path }
+    $AudioRoot = Join-Path $root '..\assets\audio'
+}
 
 $ErrorActionPreference = 'Stop'
 $expected = @(
@@ -19,7 +23,8 @@ $expected = @(
     'sfx/sfx_explosion.wav', 'sfx/sfx_cover_destroy.wav', 'sfx/sfx_skill_cast.wav',
     'sfx/sfx_heal_effect.wav', 'sfx/sfx_overwatch_trigger.wav', 'sfx/sfx_turn_player_start.wav',
     'sfx/sfx_turn_enemy_start.wav', 'sfx/sfx_mission_victory.wav', 'sfx/sfx_mission_defeat.wav',
-    'sfx/sfx_level_up.wav', 'sfx/sfx_item_pickup.wav'
+    'sfx/sfx_level_up.wav', 'sfx/sfx_item_pickup.wav',
+    'sfx/sfx_network_scan.wav', 'sfx/sfx_network_takeover.wav', 'sfx/sfx_network_disable.wav', 'sfx/sfx_network_overload.wav', 'sfx/sfx_alert_rise.wav', 'sfx/sfx_camera_reveal.wav', 'sfx/sfx_turret_reversal.wav', 'sfx/sfx_beacon_delay.wav'
 )
 
 $hashes = @{}

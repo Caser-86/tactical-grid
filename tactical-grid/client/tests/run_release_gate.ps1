@@ -1,4 +1,4 @@
-﻿## Release Gate：第一章正式版测试入口
+## Release Gate：第一章正式版测试入口
 ## 退出码 0 代表 Godot 导入、烟雾测试和日志门全部通过
 ## 用法: pwsh -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
 ##       powershell -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
@@ -6,7 +6,8 @@ param(
     [string]$GodotExe = 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe'
 )
 
-$projectPath = Split-Path -Parent $PSScriptRoot
+$scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } elseif ($PSCommandPath) { Split-Path -Parent $PSCommandPath } else { (Get-Location).Path }
+$projectPath = Split-Path -Parent $scriptRoot
 
 Write-Host "=== Release Gate ==="
 Write-Host "Project: $projectPath"
@@ -85,7 +86,7 @@ Write-Host "  Import OK" -ForegroundColor Green
 # --- 1.5. 音频源文件技术质量 ---
 Write-Host "[1.5/3] Audio technical QA..."
 try {
-    & (Join-Path $PSScriptRoot '..\tools\test_audio_assets.ps1')
+    & (Join-Path $scriptRoot '..\tools\test_audio_assets.ps1')
     if (-not $?) { throw 'Audio QA returned a failed PowerShell status' }
 } catch {
     Write-Host "AUDIO QA FAILED: $_" -ForegroundColor Red

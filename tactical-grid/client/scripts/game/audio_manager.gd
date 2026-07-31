@@ -4,6 +4,10 @@ extends Node
 
 var bgm_player: AudioStreamPlayer
 var sfx_player: AudioStreamPlayer
+## AUDIO-01: Polyphonic SFX player pool (prevents combat sounds from interrupting facility feedback)
+var _sfx_pool: Array[AudioStreamPlayer] = []
+const SFX_POOL_SIZE := 4
+var _sfx_pool_index := 0
 var ambient_player: AudioStreamPlayer
 
 var bgm_volume: float = 0.7
@@ -23,6 +27,14 @@ func _ready() -> void:
 	sfx_player.name = "SFXPlayer"
 	sfx_player.bus = &"SFX"
 	add_child(sfx_player)
+
+	# AUDIO-01: Initialize polyphonic SFX player pool
+	for i in SFX_POOL_SIZE:
+		var pool_player := AudioStreamPlayer.new()
+		pool_player.name = "SFXPool_%d" % i
+		pool_player.bus = &"SFX"
+		add_child(pool_player)
+		_sfx_pool.append(pool_player)
 
 	ambient_player = AudioStreamPlayer.new()
 	ambient_player.name = "AmbientPlayer"
@@ -89,6 +101,40 @@ func play_sfx(sfx_id: String) -> void:
 	if stream:
 		sfx_player.stream = stream
 		sfx_player.play()
+
+## AUDIO-01: Play SFX through the polyphonic pool so concurrent sounds do not interrupt each other.
+func play_sfx_pooled(sfx_id: String) -> void:
+	var stream = _load_audio("sfx", sfx_id)
+	if stream:
+		var player: AudioStreamPlayer = _sfx_pool[_sfx_pool_index]
+		player.stream = stream
+		player.play()
+		_sfx_pool_index = (_sfx_pool_index + 1) % SFX_POOL_SIZE
+
+## AUDIO-01: Network and alert SFX
+func sfx_network_scan() -> void:
+	play_sfx_pooled("sfx_network_scan")
+
+func sfx_network_takeover() -> void:
+	play_sfx_pooled("sfx_network_takeover")
+
+func sfx_network_disable() -> void:
+	play_sfx_pooled("sfx_network_disable")
+
+func sfx_network_overload() -> void:
+	play_sfx_pooled("sfx_network_overload")
+
+func sfx_alert_rise() -> void:
+	play_sfx_pooled("sfx_alert_rise")
+
+func sfx_camera_reveal() -> void:
+	play_sfx_pooled("sfx_camera_reveal")
+
+func sfx_turret_reversal() -> void:
+	play_sfx_pooled("sfx_turret_reversal")
+
+func sfx_beacon_delay() -> void:
+	play_sfx_pooled("sfx_beacon_delay")
 
 ## 播放环境音
 func play_ambient(ambient_id: String) -> void:
@@ -217,3 +263,5 @@ func bgm_victory() -> void:
 
 func bgm_defeat() -> void:
 	play_bgm("bgm_defeat")
+
+
