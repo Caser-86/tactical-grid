@@ -111,6 +111,11 @@
     {"id": "northwest_evac", "type": "evac", "x": 2, "y": 1, "radius": 1},
     {"id": "west_salvage", "type": "resource", "x": 2, "y": 8, "reward": "credit_150"}
   ],
+  "nodes": [
+    {"id": "node_camera_east", "type": "camera", "state": "enemy", "x": 13, "y": 5},
+    {"id": "node_door_central", "type": "door", "state": "enemy", "x": 11, "y": 7},
+    {"id": "node_turret_north", "type": "turret", "state": "enemy", "x": 14, "y": 4}
+  ],
   "scripts": [
     {
       "trigger_id": "terminal_counterattack",

@@ -7,7 +7,7 @@
       "player_units": 3, "enemy_count": 5,
       "max_turns": 18, "three_star_turns": 11, "three_star_requires_optional": true, "max_reinforcements": 3, "enemy_cap": 7,
       "intro_dialogue": "ch1_m1_intro", "outro_dialogue": "ch1_m1_outro",
-      "tutorial_flags": ["teach_camera", "teach_movement", "teach_attack", "teach_cover", "teach_interaction", "teach_upload_hold", "teach_evac"],
+      "tutorial_flags": ["teach_camera", "teach_movement", "teach_attack", "teach_cover", "teach_interaction", "teach_upload_hold", "teach_evac", "teach_network_scan", "teach_network_takeover", "teach_network_disable", "teach_network_overload"],
       "special_rules": {
         "no_overwatch": { "enabled": true, "reason": "教学关：警戒暂未开放，先掌握移动与攻击基础" },
         "no_items": { "enabled": true, "reason": "教学关：物品暂未开放，先掌握基础战斗" },

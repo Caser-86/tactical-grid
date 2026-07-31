@@ -22,6 +22,10 @@ const HINT_COPY := {
 	"teach_items": "物品如医疗包可在战斗中使用，不消耗 AP，注意补给。",
 	"teach_camera": "战场大于屏幕。按住鼠标中键拖动画面，滚轮缩放，WASD 或方向键平移；Tab 查看全图，Home 返回当前单位。",
 	"teach_upload_hold": "终端上传需要连续控制 2 个敌方回合。至少一名队员留在终端一格范围内，否则上传暂停。",
+	"teach_network_scan": "按 G 键查看战术网络覆盖层。敌方控制的节点以红色显示，可操作的节点会高亮。",
+	"teach_network_takeover": "接管敌方设施消耗 1AP：相机揭示区域，门改变路线，炮塔翻转阵营。",
+	"teach_network_disable": "禁用设施消耗 1AP，使其暂时失效但不改变归属。适合安静通过。",
+	"teach_network_overload": "过载设施消耗 1AP，永久损坏但产生强力效果。会触发警报升级。",
 }
 
 @onready var _text_label: Label = $Panel/TextLabel
