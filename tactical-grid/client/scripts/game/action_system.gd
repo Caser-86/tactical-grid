@@ -565,7 +565,12 @@ func _get_move_cost(pos: Vector2i, job: String) -> int:
 	return GameData.get_move_cost(job, MapLoader.get_terrain_at(map_data, pos.x, pos.y))
 
 func _is_blocked(pos: Vector2i) -> bool:
-	return not MapLoader.is_passable(map_data, pos.x, pos.y)
+	if not MapLoader.is_passable(map_data, pos.x, pos.y):
+		return true
+	# CH1-060: Closed doors (enemy/neutral) block movement; player doors are open.
+	if tactical_network_state and tactical_network_state.is_cell_blocked_by_door(pos):
+		return true
+	return false
 
 func _is_vision_blocking(pos: Vector2i) -> bool:
 	var blocker = MapLoader.get_blocker_at(map_data, pos.x, pos.y)
@@ -982,6 +987,8 @@ func _query_overwatch(unit: Node, request: Dictionary) -> Dictionary:
 	})
 
 ## CODE-P2-02: 查询网络操作（takeover/disable/overload，各 1AP）
+## CH1-060: Preview now includes immediate_result, duration, alert_cost and
+## facility-specific effects from TacticalNetworkState.query_operation.
 func _query_network(unit: Node, request: Dictionary) -> Dictionary:
 	if not unit.can_act():
 		return {"valid": false, "reason": "cannot_act", "action": &"network"}
@@ -993,15 +1000,19 @@ func _query_network(unit: Node, request: Dictionary) -> Dictionary:
 		return {"valid": false, "reason": "missing_params", "action": &"network"}
 	if unit.current_ap < 1:
 		return {"valid": false, "reason": "insufficient_ap", "action": &"network"}
-	var node_state: String = tactical_network_state.get_node_state(node_id)
-	if node_state == "damaged":
-		return {"valid": false, "reason": "node_damaged", "action": &"network"}
-	if node_state == "":
-		return {"valid": false, "reason": "node_not_found", "action": &"network"}
+	# CH1-060: Use query_operation to get enriched preview data.
+	var op_preview: Dictionary = tactical_network_state.query_operation(node_id, operation, unit.current_ap)
+	if not bool(op_preview.get("valid", false)):
+		return {"valid": false, "reason": String(op_preview.get("reason", "invalid")), "action": &"network"}
 	return _register_preview({
 		"valid": true, "action": &"network", "unit": unit,
 		"node_id": node_id, "operation": operation,
 		"cost": {"ap": 1, "move": 0},
+		"immediate_result": String(op_preview.get("immediate_result", "")),
+		"duration": String(op_preview.get("duration", "")),
+		"alert_cost": int(op_preview.get("alert_cost", 0)),
+		"facility_type": String(op_preview.get("facility_type", "")),
+		"facilities_disabled": op_preview.get("facilities_disabled", []),
 	})
 
 func _register_preview(preview: Dictionary) -> Dictionary:

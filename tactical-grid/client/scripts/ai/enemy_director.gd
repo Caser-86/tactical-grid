@@ -21,6 +21,8 @@ var max_reinforcements: int = 20
 var alive_enemy_count: int = 0
 ## 单次增援后场上敌人上限（防止一次刷出过多）
 var enemy_cap_per_wave: int = 12
+## CH1-060: 增援延迟加成（来自被禁用的信标），推迟增援触发回合。
+var reinforcement_delay_bonus: int = 0
 
 ## 初始化 Director
 func setup(scripts: Array) -> void:
@@ -127,23 +129,26 @@ func on_event(event_name: StringName) -> Array:
 	return _evaluate_triggers(turn_count, event_name)
 
 ## 检查条件（支持 ">= N"、"<N"、"==N"）
+## CH1-060: 增援延迟加成从有效回合中扣除，推迟 >= 型触发器。
 func _check_condition(condition: String, turn: int) -> bool:
 	condition = condition.strip_edges()
+	# CH1-060: Beacon delay pushes back the effective turn for reinforcement triggers.
+	var effective_turn: int = maxi(turn - reinforcement_delay_bonus, 0)
 	if condition.begins_with(">="):
 		var value = int(condition.substr(2).strip_edges())
-		return turn >= value
+		return effective_turn >= value
 	if condition.begins_with("<="):
 		var value = int(condition.substr(2).strip_edges())
-		return turn <= value
+		return effective_turn <= value
 	if condition.begins_with("=="):
 		var value = int(condition.substr(2).strip_edges())
-		return turn == value
+		return effective_turn == value
 	if condition.begins_with("<"):
 		var value = int(condition.substr(1).strip_edges())
-		return turn < value
+		return effective_turn < value
 	if condition.begins_with(">"):
 		var value = int(condition.substr(1).strip_edges())
-		return turn > value
+		return effective_turn > value
 	return false
 
 ## 记录玩家损失

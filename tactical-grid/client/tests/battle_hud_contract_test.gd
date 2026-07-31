@@ -471,6 +471,20 @@ func _test_network_toggle_and_alert_display() -> void:
 	var next_consequence: Dictionary = _battle.alert_state.get_next_consequence()
 	_check(String(next_consequence.get("description", "")).contains("hunt"), "下一步后果描述战斗级行为")
 
+	# CH1-060: Alert display should show turns_until (distance to next escalation).
+	_check(alert_label != null and alert_label.text.contains("回合后"), "警报标签显示回合后倒计时")
+
+	# CH1-060: Network overlay should render connection lines and state shapes when visible.
+	_battle._on_toggle_network()
+	await get_tree().process_frame
+	_check(_battle._network_connection_lines != null, "网络连接线列表存在")
+	_check(_battle._network_shape_nodes != null, "网络状态形状字典存在")
+	# If the map has network nodes, there should be shape indicators rendered.
+	if _battle.tactical_network_state and _battle.tactical_network_state.get_all_nodes().size() > 0:
+		_check(_battle._network_shape_nodes.size() > 0, "网络状态形状已渲染")
+		_check(_battle._network_node_sprites.size() > 0, "网络节点精灵已渲染")
+	_battle._on_toggle_network()
+
 	await _dispose_battle()
 
 ## CODE-CH1-010: 玩家移动通过 commit_action 提交，预览被消费

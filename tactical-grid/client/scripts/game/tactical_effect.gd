@@ -12,6 +12,9 @@ func setup(kind: String) -> void:
 		"explosion", "destroy": duration = 0.55
 		"heal", "terminal": duration = 0.70
 		"miss": duration = 0.28
+		"network_takeover": duration = 0.50
+		"network_disable": duration = 0.35
+		"network_overload": duration = 0.65
 	duration = AccessibilitySettings.get_effect_duration(duration)
 	queue_redraw()
 
@@ -49,6 +52,23 @@ func _draw() -> void:
 			var height := 22.0 + progress * 18.0
 			draw_line(Vector2(0, 12), Vector2(0, -height), Color(0.20, 0.94, 1.0, fade), 3.0)
 			draw_arc(Vector2(0, -height), 9.0 + progress * 6.0, 0, TAU, 20, Color(0.64, 1.0, 1.0, fade), 2.0)
+		"network_takeover":
+			# CH1-060: Cyan expanding ring with inward spark to signal ownership transfer.
+			var radius := 6.0 + progress * 28.0
+			draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color(0.35, 1.0, 0.9, fade), 3.0)
+			draw_arc(Vector2.ZERO, radius * 0.6, 0, TAU, 20, Color(0.6, 1.0, 1.0, fade * 0.7), 2.0)
+			_draw_impact(Color(0.5, 1.0, 0.95, fade), radius * 0.4, 6, 2.0)
+		"network_disable":
+			# CH1-060: Grey spark burst to signal facility shutdown.
+			var radius := 5.0 + progress * 18.0
+			_draw_impact(Color(0.75, 0.75, 0.75, fade), radius, 6, 2.0)
+			draw_arc(Vector2.ZERO, radius * 0.5, 0, TAU, 16, Color(0.6, 0.6, 0.6, fade * 0.6), 1.5)
+		"network_overload":
+			# CH1-060: Orange-red electric explosion for overload hazard.
+			var radius := 8.0 + progress * 32.0
+			draw_circle(Vector2.ZERO, radius, Color(1.0, 0.35, 0.08, fade * 0.28))
+			draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color(1.0, 0.65, 0.18, fade), 3.0)
+			_draw_impact(Color(1.0, 0.85, 0.4, fade), radius, 8, 2.5)
 		_:
 			_draw_impact(Color(1.0, 0.38, 0.22, fade), 7.0 + progress * 18.0, 6, 2.5)
 

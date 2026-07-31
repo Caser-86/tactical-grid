@@ -85,6 +85,10 @@ var enemy_planner: EnemyPlanner
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
 var _network_node_sprites: Dictionary = {}
+## CH1-060: 网络连接线节点（覆盖层显示时可见）
+var _network_connection_lines: Array = []
+## CH1-060: 网络状态形状指示器（覆盖层显示时可见）
+var _network_shape_nodes: Dictionary = {}
 var alert_state: AlertState
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -1285,50 +1289,138 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 		map_layer.add_child(sprite)
 
 ## 渲染网络节点精灵（在地图上显示设施图标）
+## CH1-060: 同时绘制连接线和状态形状，用颜色+形状区分四种节点状态。
 func _render_network_nodes() -> void:
-	# 清除旧精灵
+	# 清除旧精灵、形状和连接线
 	for sprite in _network_node_sprites.values():
 		if is_instance_valid(sprite):
 			sprite.queue_free()
 	_network_node_sprites.clear()
+	for shape in _network_shape_nodes.values():
+		if is_instance_valid(shape):
+			shape.queue_free()
+	_network_shape_nodes.clear()
+	for line in _network_connection_lines:
+		if is_instance_valid(line):
+			line.queue_free()
+	_network_connection_lines.clear()
 	if not tactical_network_state:
 		return
+	var overlay_vis: bool = hud.is_network_overlay_visible() if hud else false
 	var nodes = tactical_network_state.get_all_nodes()
+	# CH1-060: Draw connection lines between linked nodes (only when overlay is visible).
+	var connections: Array = tactical_network_state.get_connections()
+	for conn in connections:
+		var from_id: String = String(conn.get("from", ""))
+		var to_id: String = String(conn.get("to", ""))
+		var from_pos: Vector2i = tactical_network_state.get_node_position(from_id)
+		var to_pos: Vector2i = tactical_network_state.get_node_position(to_id)
+		if from_pos.x < 0 or to_pos.x < 0:
+			continue
+		var line := Line2D.new()
+		line.name = "NetworkConn_%s_%s" % [from_id, to_id]
+		line.add_point(_get_cell_center(from_pos))
+		line.add_point(_get_cell_center(to_pos))
+		line.width = 2.0
+		# Color connections by the source node's state.
+		var from_state: String = tactical_network_state.get_node_state(from_id)
+		match from_state:
+			"enemy":
+				line.default_color = Color(1.0, 0.4, 0.4, 0.6)
+			"player":
+				line.default_color = Color(0.4, 1.0, 0.9, 0.7)
+			"damaged":
+				line.default_color = Color(0.5, 0.5, 0.5, 0.3)
+			_:
+				line.default_color = Color(0.7, 0.7, 0.7, 0.5)
+		line.z_index = 4
+		line.visible = overlay_vis
+		map_layer.add_child(line)
+		_network_connection_lines.append(line)
+	# CH1-060: Draw node sprites with state shape indicators.
 	for node_id in nodes:
 		var node = nodes[node_id]
 		var node_type = String(node.get("type", ""))
-		var texture = ArtCatalog.get_texture(&"network_node", StringName(node_type))
-		if not texture:
-			continue
-		var sprite = Sprite2D.new()
-		sprite.name = "NetworkNode_%s" % node_id
-		sprite.texture = texture
-		sprite.centered = true
-		var pos = tactical_network_state.get_node_position(node_id)
-		sprite.position = _get_cell_center(pos)
-		sprite.z_index = 5
-		sprite.visible = hud.is_network_overlay_visible() if hud else false
-		# 颜色编码：敌方=红，玩家=青，损坏=灰
 		var state = String(node.get("state", "neutral"))
+		var pos = tactical_network_state.get_node_position(node_id)
+		var world_pos := _get_cell_center(pos)
+		# CH1-060: Draw a state shape behind the icon to distinguish states by shape.
+		var shape := Polygon2D.new()
+		shape.name = "NetworkShape_%s" % node_id
+		shape.z_index = 4
+		shape.visible = overlay_vis
+		var shape_color := Color.WHITE
+		var half := float(CELL_SIZE) * 0.28
 		match state:
 			"enemy":
-				sprite.modulate = Color(1.0, 0.4, 0.4)
+				# Square for enemy-owned
+				shape.polygon = PackedVector2Array([
+					Vector2(-half, -half), Vector2(half, -half),
+					Vector2(half, half), Vector2(-half, half)
+				])
+				shape_color = Color(1.0, 0.35, 0.35, 0.55)
 			"player":
-				sprite.modulate = Color(0.4, 1.0, 0.9)
+				# Diamond for player-owned
+				shape.polygon = PackedVector2Array([
+					Vector2(0, -half), Vector2(half, 0),
+					Vector2(0, half), Vector2(-half, 0)
+				])
+				shape_color = Color(0.35, 1.0, 0.9, 0.55)
 			"damaged":
-				sprite.modulate = Color(0.5, 0.5, 0.5, 0.6)
+				# X shape for damaged (two crossed rectangles approximated by thin polygons)
+				shape.polygon = PackedVector2Array([
+					Vector2(-half, -half), Vector2(-half + 3, -half),
+					Vector2(half, half), Vector2(half - 3, half)
+				])
+				shape_color = Color(0.5, 0.5, 0.5, 0.4)
 			_:
-				sprite.modulate = Color(0.9, 0.9, 0.9)
-		map_layer.add_child(sprite)
-		_network_node_sprites[node_id] = sprite
+				# Circle (approximated) for neutral
+				var pts := PackedVector2Array()
+				var segs := 12
+				for i in range(segs):
+					var a := TAU * float(i) / float(segs)
+					pts.append(Vector2(cos(a) * half, sin(a) * half))
+				shape.polygon = pts
+				shape_color = Color(0.7, 0.7, 0.7, 0.4)
+		shape.color = shape_color
+		shape.position = world_pos
+		map_layer.add_child(shape)
+		_network_shape_nodes[node_id] = shape
+		# Node icon sprite
+		var texture = ArtCatalog.get_texture(&"network_node", StringName(node_type))
+		if texture:
+			var sprite = Sprite2D.new()
+			sprite.name = "NetworkNode_%s" % node_id
+			sprite.texture = texture
+			sprite.centered = true
+			sprite.position = world_pos
+			sprite.z_index = 5
+			sprite.visible = overlay_vis
+			match state:
+				"enemy":
+					sprite.modulate = Color(1.0, 0.4, 0.4)
+				"player":
+					sprite.modulate = Color(0.4, 1.0, 0.9)
+				"damaged":
+					sprite.modulate = Color(0.5, 0.5, 0.5, 0.6)
+				_:
+					sprite.modulate = Color(0.9, 0.9, 0.9)
+			map_layer.add_child(sprite)
+			_network_node_sprites[node_id] = sprite
 
 ## 更新网络节点精灵可见性（G 键切换时调用）
+## CH1-060: 同时切换连接线和状态形状的可见性。
 func _update_network_node_visibility() -> void:
 	var vis = hud.is_network_overlay_visible() if hud else false
 	for sprite in _network_node_sprites.values():
 		if is_instance_valid(sprite):
 			sprite.visible = vis
-		map_layer.add_child(sprite)
+	for shape in _network_shape_nodes.values():
+		if is_instance_valid(shape):
+			shape.visible = vis
+	for line in _network_connection_lines:
+		if is_instance_valid(line):
+			line.visible = vis
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	var rect = ColorRect.new()
@@ -1379,9 +1471,11 @@ func _start_battle() -> void:
 	turn_manager.setup(player_units, enemy_units, turn_limit)
 	action_system.set_units(player_units, enemy_units)
 	# CODE-P2-02: Setup tactical network from map data
+	# CH1-060: Pass connections so power conduits link to facilities and overlay renders links.
 	if tactical_network_state and not map_data.is_empty():
 		var nodes: Array = map_data.get("nodes", [])
-		tactical_network_state.setup(nodes)
+		var connections: Array = map_data.get("connections", [])
+		tactical_network_state.setup(nodes, connections)
 	# 根据关卡配置设置增援上限（防止无限刷怪）
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
@@ -1476,6 +1570,9 @@ func _process_reinforcements(turn_number: int) -> void:
 		if u and u.is_alive:
 			alive_e += 1
 	enemy_director.set_alive_counts(alive_p, alive_e)
+	# CH1-060: Sync beacon delay bonus from disabled beacons to delay reinforcements.
+	if tactical_network_state:
+		enemy_director.reinforcement_delay_bonus = tactical_network_state.get_reinforcement_delay_bonus()
 	# 检查增援触发：信号 reinforcement_spawned 驱动单位生成（见 _on_reinforcement_spawned）
 	enemy_director.on_turn_start(turn_number)
 	# 同步 action_system 的单位列表（增援可能已加入）
@@ -1570,6 +1667,7 @@ func _on_network_alert_requested(amount: int, reason: String) -> void:
 ## 网络操作完成回调：将相机接管等事件桥接为 mission_event
 ## 相机接管触发 player_reinforcement 脚本（scout rescue）
 ## CH1-040: 相机接管同时注册持久摄像头区域，维持观察区直到相机被禁用或过载。
+## CH1-060: 门/炮塔/电力/信标操作现在都有明确的战术反馈。
 func _on_network_operation(node_id: String, operation: String, result: Dictionary) -> void:
 	if not is_instance_valid(mission_objective_state):
 		return
@@ -1578,6 +1676,18 @@ func _on_network_operation(node_id: String, operation: String, result: Dictionar
 		var nodes = tactical_network_state.get_all_nodes()
 		var node = nodes.get(node_id, {})
 		node_type = String(node.get("type", ""))
+	# CH1-060: Spawn network operation VFX at the node position.
+	var node_pos: Vector2i = tactical_network_state.get_node_position(node_id) if tactical_network_state else Vector2i(-1, -1)
+	if node_pos.x >= 0:
+		match operation:
+			"takeover":
+				_spawn_effect("network_takeover", node_pos)
+			"disable":
+				_spawn_effect("network_disable", node_pos)
+			"overload":
+				_spawn_effect("network_overload", node_pos)
+				# Overload also creates a hazard explosion at the node.
+				_spawn_effect("explosion", node_pos)
 	# 相机接管：触发 scout rescue 事件增援
 	if operation == "takeover" and node_type == "camera":
 		var event_name = &"camera_takeover"
@@ -1603,6 +1713,40 @@ func _on_network_operation(node_id: String, operation: String, result: Dictionar
 		if visibility_renderer:
 			visibility_renderer.refresh()
 		_refresh_last_known_ghosts()
+	# CH1-060: Door operations change pathfinding; refresh node sprites to show new state.
+	if node_type == "door":
+		match operation:
+			"takeover":
+				_log("门 %s 已开启，路线可通行" % node_id)
+			"disable":
+				_log("门 %s 已禁用，永久关闭" % node_id)
+			"overload":
+				_log("门 %s 已过载，永久卡死并产生危害" % node_id)
+	# CH1-060: Turret ownership change; player turrets fire next enemy turn.
+	if node_type == "turret":
+		match operation:
+			"takeover":
+				_log("炮塔 %s 已接管，下个敌回合自动射击" % node_id)
+			"disable":
+				_log("炮塔 %s 已禁用，停止射击" % node_id)
+			"overload":
+				_log("炮塔 %s 已过载，爆炸损毁" % node_id)
+	# CH1-060: Power conduit cascade; connected facilities lose power.
+	if node_type == "power_conduit":
+		var disabled: Array = result.get("facilities_disabled", [])
+		if not disabled.is_empty():
+			_log("电力 %s %s：%d 个关联设施断电" % [node_id, operation, disabled.size()])
+	# CH1-060: Beacon delay; reinforcements pushed back.
+	if node_type == "reinforcement_beacon":
+		match operation:
+			"disable":
+				_log("信标 %s 已禁用，增援延迟 +2 回合" % node_id)
+			"overload":
+				_log("信标 %s 已过载，永久摧毁" % node_id)
+			"takeover":
+				_log("信标 %s 已接管，增援被阻止" % node_id)
+	# CH1-060: Refresh network node sprites to reflect the new state.
+	_render_network_nodes()
 
 ## CH1-040: 重新收集所有活跃摄像头区域格子，同步给渲染器。
 func _sync_camera_zone_cells() -> void:
@@ -1775,6 +1919,8 @@ func _run_enemy_turn() -> void:
 		return
 	# 敌人回合开始时处理 Boss 专属能力（召唤、护盾恢复等）
 	_process_boss_abilities()
+	# CH1-060: Player-owned turrets fire at enemies in range before enemies act.
+	_fire_player_turrets()
 	for enemy in enemy_units:
 		if not enemy.is_alive:
 			continue
@@ -1786,6 +1932,37 @@ func _run_enemy_turn() -> void:
 	if not turn_manager.battle_over:
 		_advance_upload_progress()
 		turn_manager.end_enemy_turn()
+
+## CH1-060: Player-owned turrets automatically fire at the nearest enemy in range
+## at the start of the enemy turn. Each turret fires once per turn if it has a
+## valid target and is powered (facility available).
+func _fire_player_turrets() -> void:
+	if not tactical_network_state:
+		return
+	var turrets: Array = tactical_network_state.get_player_turrets()
+	for turret in turrets:
+		var turret_pos: Vector2i = turret.get("pos", Vector2i(-1, -1))
+		var turret_range: int = int(turret.get("range", 5))
+		var turret_damage: int = int(turret.get("damage", 3))
+		# Find nearest alive enemy in range.
+		var best_target: Unit = null
+		var best_dist: int = 9999
+		for enemy in enemy_units:
+			if not enemy or not enemy.is_alive:
+				continue
+			var dist: int = GridSystem.manhattan_distance(turret_pos, enemy.grid_pos)
+			if dist > turret_range:
+				continue
+			if dist < best_dist:
+				best_dist = dist
+				best_target = enemy
+		if best_target:
+			best_target.take_damage(turret_damage)
+			_log("炮塔 %s 射击 %s，造成 %d 伤害" % [turret.get("node_id", ""), best_target.unit_name, turret_damage])
+			_spawn_effect("hit", best_target.grid_pos)
+			# unit_died signal handles death telemetry and sprite update automatically.
+			_render_units()
+	_check_victory_instant()
 
 func _execute_enemy_action(enemy: Unit) -> void:
 	# 每个敌人执行一次行动（攻击或移动），消耗1AP

@@ -383,6 +383,8 @@ func _on_pause_pressed() -> void:
 	if _battle_controller:
 		_battle_controller._show_pause_menu()
 ## CODE-P2-02: Update alert display from AlertState
+## CH1-060: Now shows distance to next escalation event (turns_until) and
+## color-codes the label by severity so players can read urgency at a glance.
 func update_alert_display(alert_state: Node) -> void:
 	if not _alert_label:
 		return
@@ -396,7 +398,22 @@ func update_alert_display(alert_state: Node) -> void:
 	var level_name: String = level_names[level] if level >= 0 and level < level_names.size() else "未知"
 	var desc: String = String(consequence.get("description", ""))
 	var next_desc: String = String(next.get("description", ""))
-	_alert_label.text = "警报: %s - %s | 下一步: %s" % [level_name, desc, next_desc]
+	var turns_until: int = int(next.get("turns_until", 0))
+	# CH1-060: Show turns_until so the player knows how close the next escalation is.
+	var next_text: String = next_desc
+	if turns_until > 0 and level < 3:
+		next_text = "%s（%d 回合后）" % [next_desc, turns_until]
+	_alert_label.text = "警报: %s - %s | 下一步: %s" % [level_name, desc, next_text]
+	# CH1-060: Color-code by severity: calm=cyan, suspicious=yellow, alert=orange, combat=red.
+	match level:
+		0:
+			_alert_label.add_theme_color_override("font_color", Color(0.72, 0.95, 1.0, 0.85))
+		1:
+			_alert_label.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45))
+		2:
+			_alert_label.add_theme_color_override("font_color", Color(0.96, 0.65, 0.30))
+		3:
+			_alert_label.add_theme_color_override("font_color", Color(1.0, 0.42, 0.32))
 	_alert_label.visible = true
 
 
