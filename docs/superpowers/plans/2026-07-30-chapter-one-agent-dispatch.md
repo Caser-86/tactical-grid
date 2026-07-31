@@ -23,6 +23,32 @@
 
 ---
 
+## 2026-07-31 Execution Status
+
+This document is the historical dispatch specification. Live priority and completion authority now belongs to `docs/PROJECT_TAKEOVER_ROADMAP.md`; future agents must work from `main`.
+
+| Task | Current status | Remaining gate |
+|---|---|---|
+| CODE-P0-01 | Code and automated contracts implemented | 720p/1080p runtime screenshots |
+| CODE-P0-02 | Context HUD, names and portraits implemented | Real first-player input evidence |
+| CODE-P0-03 | Complete | Keep regression tests green |
+| CODE-P0-04 | Save/export code implemented | Clean-clone export verification |
+| CODE-P1-01 | Partial | Route all production actions through query/validate/commit |
+| CODE-P1-02 | Partial | Require schema version, facilities, connections and data-stable IDs |
+| CODE-P2-01 | Partial | Wire planner/intents and render fog memory/last-known markers |
+| CODE-P2-02 | System slice implemented | Complete runtime facility/alert presentation |
+| CONTENT-01 | Partial | 22×16 three-encounter M1, checkpoint retry and manual flow |
+| ART-GEN/INTEGRATE-01 | Runtime unit batch integrated | Human grayscale recognition |
+| ART-GEN/INTEGRATE-02 | Facility icons integrated | Node-state, intent and alert visual set |
+| ART-GEN/INTEGRATE-03 | Landmark integrated | Exported 720p/1080p evidence |
+| AUDIO-01 | Technical integration complete | Human listening/mix gate |
+| DOC-QA-01 | Updated to unified main baseline | Keep evidence synchronized |
+| HUMAN-01/02 | Not started | Human participants and release hardware |
+
+All checkboxes below describe the original task contract and are not a second live backlog.
+
+---
+
 ## Dispatch Rules
 
 | Queue | What belongs here | Recommended model | Can run now? |
