@@ -53,7 +53,7 @@ godot --headless --path tactical-grid/client res://tests/battle_smoke_test.tscn
 
 第二条命令执行当前核心测试。通过测试不等同于发布验收：资源泄漏、完整场景输入流程和导出包仍需单独验证。
 
-## Windows 导出
+## Windows 导出（当前不可复现）
 
 从 `client/` 运行以下命令会先导入新资源，再按 `Windows Desktop x64` 预设导出：
 
@@ -65,11 +65,12 @@ powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
 `GODOT_PATH` 环境变量或 `-GodotPath` 参数指定可执行文件。
 
 当前预设使用独立资源包，交付时必须把同目录生成的
-`TacticalGrid-Windows-x64.pck` 与 EXE 一并保留。发布候选版还应运行：
+`TacticalGrid-Windows-x64.pck` 与 EXE 一并保留。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tests/verify_windows_package.ps1
-```
+注意：`export_presets.cfg` 当前没有纳入版本控制；构建脚本输出
+`export/TacticalGrid-Windows-x64.*`，验证器默认检查
+`client/build/TacticalGrid.*`。在 P0 统一预设、目录和文件名之前，
+现存包的验证通过不能证明干净克隆可复现发布。不要把这组命令当作正式发布流水线。
 
 ## 目录
 

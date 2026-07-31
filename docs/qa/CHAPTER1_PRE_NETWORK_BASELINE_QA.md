@@ -1,13 +1,17 @@
-# 第一章发布候选版验收记录
+# 第一章重设计前技术基线验收记录
 
 > 核验日期：2026-07-30
 > 分支：`codex/battle-camera-composition`
 > Godot：4.7.1 stable
-> 候选版本：1.0.0.0
+> 当时包内版本：1.0.0.0
+> 状态：Frozen baseline
+> 后继审计：`2026-07-30-project-wide-redesign-audit.md`
+
+> 本文件冻结重设计前的自动化、窗口化和构建证据。它不再证明当前第一章达到发布候选状态，也不应随当前构建覆盖旧哈希。现行任务和发布判断以总路线图与后继审计为准。
 
 ## 结论
 
-第一章已经达到“发布候选垂直切片”状态：六关生产场景可从主菜单连续进入，任务胜利、失败、重试、结算、存档恢复、Boss 击杀和第二章解锁均有真实场景自动化证据；Windows x64 候选包可独立冷启动。首关 `ch1_m1` 已扩展为 18×14 三阶段潜入任务，并通过生产 E2E 自动化验证。
+重设计前第一章曾达到“可运行技术垂直切片”状态：六关场景可从主菜单进入，任务胜利、失败、重试、结算、存档恢复、Boss 击杀和第二章解锁具有场景自动化证据；当时 Windows x64 包可独立冷启动。旧首关 `ch1_m1` 为 18×14 三阶段潜入任务，并通过当时的生产 E2E 自动化验证。
 
 这不等于整部五章游戏已经完成，也不等于已完成真人长时平衡试玩。当前平衡矩阵是可执行的设计目标与自动化契约，真人三难度通关记录仍是发布前人工 QA 项。扩展后的 18×14 首关仍需一次窗口化真人 QA。
 
@@ -17,7 +21,7 @@
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File client/tests/run_release_gate.ps1 `
-  -GodotPath "D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe"
+  -GodotExe "D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe"
 ```
 
 | 套件 | 通过 | 失败 | 覆盖重点 |

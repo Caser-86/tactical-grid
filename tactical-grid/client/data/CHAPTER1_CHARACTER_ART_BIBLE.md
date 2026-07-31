@@ -1,71 +1,57 @@
-# Chapter One Character Art Bible
+# 第一章角色美术圣经
 
-This document defines the runtime readability standard for Chapter One units. The production camera displays ordinary units inside a 64 x 64 cell and bosses inside a 96 x 96 to 128 x 128 footprint. Team rings, health and AP remain interface layers; identity must still survive when those layers and all text are removed.
+> status: Approved production direction
+> owner: 项目负责人
+> updated: 2026-07-30
+> applies_to: 第一章角色、敌军、Boss 与战场缩放可读性
+> supersedes: 重设计前五玩家职业和六敌军职责的美术基线
 
-## Shared Runtime Rules
+本文件定义新第一章的角色可读性。现有 64/96 像素精灵是可复用资产基线，不视为本标准已完成。
 
-- View: orthographic top-down with shallow painted volume and one consistent upper-left key light.
-- Player palette: navy, steel blue and cyan, with one job-specific accent.
-- Enemy palette: charcoal, oxidized red and hot orange, with threat-specific light patterns.
-- Silhouette: role recognition must rely on body width, weapon length, head/sensor shape, backpack and stance. Recoloring the same body is not accepted.
-- Scale: ordinary art fits inside 56 x 56 pixels within the 64 x 64 cell; Chapter One bosses use the 96 x 96 source and a wider base.
-- Animation: `idle`, `move`, `attack`, `hit`, `skill` and `death` are required states. Continuous interpolation or four or more visually distinct procedural beats is equivalent to a frame strip.
-- Reduced motion: idle bob is disabled and action durations are shortened through `AccessibilitySettings`; important camera feedback is disabled.
-- Team readability: the faction base remains visible under art and must not be used as the only player/enemy distinction.
+## 共享规则
 
-## Player Jobs
+- 视角：正交俯视，浅体积、统一左上主光。
+- 格子：64×64；普通单位核心轮廓占约 56×56；Boss 使用 96×96 以上足迹。
+- 阵营：玩家采用海军蓝、钢蓝、青色和职业色饰；敌军采用炭黑、氧化红和高亮橙。
+- 辨识：不得只靠阵营底环或颜色。体宽、武器、头部/传感器、背包、姿势和动作必须共同成立。
+- 缩放：在 1280×720 战场默认镜头、灰度和色觉缺陷模式下可读。
+- 动画：`idle`、`move`、`attack`、`hit`、`skill`、`death` 均需有区别明确的运动语言；减少动态模式关闭闲置晃动和非必要镜头冲击。
 
-| Job | Silhouette | Weapon / equipment | Accent | Motion language |
-| --- | --- | --- | --- | --- |
-| Assault | Medium shoulders, forward triangular stance | Medium rifle across chest | electric blue | short forward attack snap, decisive straight movement |
-| Sniper | Narrow torso and the longest barrel | Long rifle and compact optic | ice blue | low idle motion, long directional recoil |
-| Heavy | Widest shoulders and circular rear armor | Heavy weapon, thick forearms | amber-blue | slower weight shift, small recoil, strong hit resistance |
-| Medic | Medium-light body with visible medical pack/device | Medical projector and cross-shaped equipment light | white and mint | soft skill pulse, quick support movement |
-| Scout | Lightest asymmetrical body with raised sensor | Short weapon and sensor mast | cyan-green | faster bob, compact recoil, agile movement lean |
+## 玩家角色
 
-## Chapter One Enemy Roles
+| 角色 | 轮廓与装备 | 职业色饰 | 动作语言 |
+|---|---|---|---|
+| 突击 | 中型宽肩，胸前短枪，前冲三角站姿 | 青色前臂灯 | 短促前冲与直线压迫 |
+| 狙击 | 细长躯干，最长枪管，紧凑光学镜 | 冰白镜片 | 低幅待机，长定向后坐 |
+| 重装 | 最宽肩部，背部弹药，厚前臂 | 橙色肩甲 | 缓慢重心变化，沉重后坐 |
+| 侦察 | 最低姿态，非对称传感器背包，短武器 | 绿色腿甲与天线灯 | 敏捷侧移，接入脉冲 |
 
-| Runtime key | Tactical role | Required silhouette and signal |
-| --- | --- | --- |
-| `drone_assault` | fast assault | red star/wing planform, bright central core |
-| `sentry_basic` | line infantry | upright angular guard chassis and single weapon arm |
-| `sentry_sniper` | ranged threat | narrow guard chassis, long barrel and line-shaped targeting light |
-| `shield_bot` | support / protection | broad shield arc that is wider than the body |
-| `heavy_gunner` | heavy pressure | low wide chassis and oversized weapon block |
-| `jammer` | control | antenna crown and concentric signal lights |
+医疗兵不属于第一章四名正式可部署角色；可保留为基地 NPC 或后续章节候选，不能继续作为首章美术验收对象。
 
-## Data Sentinel
+## 敌军职责
 
-- Source key: `boss_data_sentinel`.
-- Source size: 96 x 96; runtime scale must remain visibly larger than ordinary enemies.
-- Base: wide mechanical pedestal rather than an ordinary faction disc.
-- Phase read: normal cyan core, warning amber transition and restrained red enrage pulse.
-- Camera: phase transition uses the `boss_phase` event feedback owned by `BattleCameraController`; reduced-motion mode disables it.
+| 敌人 | 可见职责 | 必须可读的信号 |
+|---|---|---|
+| 巡逻哨兵 | 基础火力与守点 | 直立角形躯体，单武器臂，红色前传感器 |
+| 侦察无人机 | 扫描、标记、提高警戒 | 翼形平面，中央扫描核，环形扫描光 |
+| 盾卫 | 为后排和节点提供保护 | 明显宽过身体的盾弧或投影壁 |
+| 协议工程师 | 夺回节点、启动增援 | 细长维护臂、数据线束、节点工具包 |
+| 猎手 | 侧翼追击 | 低矮前倾体态、长腿或推进组件、方向性追踪光 |
 
-## State Language
+旧 `sentry_sniper`、`heavy_gunner`、`jammer` 等精灵可在重设计中作为变体或后续章节素材，但不应取代第一章五种职责的清楚读法。
 
-| State | Required visual evidence |
-| --- | --- |
-| `idle` | subtle 1-2 px breathing/hover offset; disabled by reduced motion |
-| `move` | continuous cell-center interpolation with a slight directional lean |
-| `attack` | anticipation, forward snap and return/recoil |
-| `hit` | two-step red/white flash without hiding HP |
-| `skill` | cyan/mint scale pulse distinct from weapon recoil |
-| `death` | terminal fade, tilt and scale reduction; never returns to idle |
+## 数据哨兵 Boss
 
-## Current Vertical Slice
+- 保持显著大于普通敌人的 96×96 以上体积和宽机械底座。
+- 三阶段读法：青白网络核心、警告琥珀过渡、受控红色污染，不以高频闪烁制造压力。
+- 每阶段同时改变姿态、危险区、节点状态和音频，而不只是换血条颜色。
 
-- Assault, heavy and assault drone load separate production textures through `ArtCatalog`.
-- Their alpha silhouettes pass automated pairwise-difference checks at 64 x 64.
-- All six states are available through `UnitSprite`; movement, attack, hit, skill and death are wired into the real battle controller.
-- Units and tactical effects are positioned at cell centers rather than grid intersections.
-- Five-player black silhouette preview: `res://tests/unit_silhouette_preview.tscn`.
-- Automated dynamic contract: `res://tests/unit_animation_contract_test.tscn`.
+## 交付与验收
 
-## Remaining Batch Work
+1. 先完成突击、侦察、哨兵、无人机和摄像头节点组成的 M1 小样。
+2. 记录 5 人盲测，至少 4/5 能无标签识别四个玩家角色。
+3. 在密集遭遇中验证五种敌人不会依赖文字或底环才能识别。
+4. 检查纹理别名、画布触边、缩放模糊和线性过滤问题。
+5. 再批量制作重装、狙击、工程师、猎手、Boss 以及后续关卡变体。
 
-- Perform blind human recognition for all five player silhouettes and record at least 4/5 correct without labels.
-- Extend role-specific motion timing beyond the shared procedural baseline.
-- Verify six enemy roles together in a dense encounter and replace any texture aliases that fail recognition.
-- Add a boss phase preview and 100-unit/effect performance scene before Chapter One Production Gate.
-
+资源来源和运行时路径见 [资源清单](RESOURCE_MANIFEST.md)，生产顺序见 [总路线图](../../../docs/PROJECT_TAKEOVER_ROADMAP.md)。

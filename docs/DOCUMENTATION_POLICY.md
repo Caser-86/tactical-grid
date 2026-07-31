@@ -1,5 +1,9 @@
 # 文档与资源记录政策
 
+> status: Active
+> owner: 项目负责人
+> updated: 2026-07-30
+
 ## 目的
 
 文档必须帮助开发者判断“现在真实可运行什么、下一步做什么、如何验证”，而不是把设想、数据目录或旧审计结论误写成完成事实。
@@ -14,6 +18,19 @@
 | `docs/PROJECT_TAKEOVER_ROADMAP.md` | 任务、优先级、验收和阻断项 |
 | `docs/design/README.md` | 活跃首发设计范围 |
 | `docs/archive/` | 历史设计、一次性审计与已失效假设 |
+
+## 生命周期元数据
+
+活跃规格和路线图应声明：
+
+- `status`：Draft、Approved、Active、Frozen baseline、Superseded 或 Archived。
+- `owner`：维护责任人。
+- `updated`：最后一次事实核验日期。
+- `applies_to`：适用范围。
+- `supersedes`：取代的旧文档或基线。
+- `superseded_by`：后继文档。
+
+README 和状态页是派生摘要，不得拥有高于源代码、不可变 QA 或批准规格的权威级别。
 
 ## 完成状态规则
 

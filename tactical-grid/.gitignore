@@ -36,6 +36,7 @@ coverage/
 .godot/
 *.import
 export_presets.cfg
+!client/export_presets.cfg
 
 # Temporary
 tmp/
