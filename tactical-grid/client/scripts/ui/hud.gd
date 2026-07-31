@@ -256,6 +256,10 @@ func apply_viewport_layout(viewport_size: Vector2i) -> void:
 
 	# RightPanel 固定宽度 250，贴右边缘
 	var right_panel = $RightPanel
+	right_panel.anchor_left = 1.0
+	right_panel.anchor_right = 1.0
+	right_panel.anchor_top = 0.0
+	right_panel.anchor_bottom = 1.0
 	right_panel.offset_left = -250.0
 	right_panel.offset_right = 0.0
 	right_panel.offset_top = TOP_BAR_HEIGHT

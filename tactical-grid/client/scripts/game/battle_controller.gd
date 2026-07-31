@@ -1343,6 +1343,8 @@ func _render_network_nodes() -> void:
 		line.add_point(_get_cell_center(from_pos))
 		line.add_point(_get_cell_center(to_pos))
 		line.width = 2.0
+		line.set_meta("from_pos", from_pos)
+		line.set_meta("to_pos", to_pos)
 		# Color connections by the source node's state.
 		var from_state: String = tactical_network_state.get_node_state(from_id)
 		match from_state:
@@ -1355,7 +1357,7 @@ func _render_network_nodes() -> void:
 			_:
 				line.default_color = Color(0.7, 0.7, 0.7, 0.5)
 		line.z_index = 4
-		line.visible = overlay_vis
+		line.visible = overlay_vis and _network_cell_is_observed(from_pos) and _network_cell_is_observed(to_pos)
 		map_layer.add_child(line)
 		_network_connection_lines.append(line)
 	# CH1-060: Draw node sprites with state shape indicators.
@@ -1369,7 +1371,7 @@ func _render_network_nodes() -> void:
 		var shape := Polygon2D.new()
 		shape.name = "NetworkShape_%s" % node_id
 		shape.z_index = 4
-		shape.visible = overlay_vis
+		shape.visible = overlay_vis and _network_cell_is_observed(pos)
 		var shape_color := Color.WHITE
 		var half := float(CELL_SIZE) * 0.28
 		match state:
@@ -1416,7 +1418,7 @@ func _render_network_nodes() -> void:
 			sprite.centered = true
 			sprite.position = world_pos
 			sprite.z_index = 5
-			sprite.visible = overlay_vis
+			sprite.visible = overlay_vis and _network_cell_is_observed(pos)
 			match state:
 				"enemy":
 					sprite.modulate = Color(1.0, 0.4, 0.4)
@@ -1433,15 +1435,28 @@ func _render_network_nodes() -> void:
 ## CH1-060: 同时切换连接线和状态形状的可见性。
 func _update_network_node_visibility() -> void:
 	var vis = hud.is_network_overlay_visible() if hud else false
-	for sprite in _network_node_sprites.values():
+	for node_id in _network_node_sprites.keys():
+		var pos: Vector2i = tactical_network_state.get_node_position(String(node_id)) if tactical_network_state else Vector2i(-1, -1)
+		var node_visible := vis and _network_cell_is_observed(pos)
+		var sprite = _network_node_sprites[node_id]
 		if is_instance_valid(sprite):
-			sprite.visible = vis
-	for shape in _network_shape_nodes.values():
+			sprite.visible = node_visible
+	for node_id in _network_shape_nodes.keys():
+		var pos: Vector2i = tactical_network_state.get_node_position(String(node_id)) if tactical_network_state else Vector2i(-1, -1)
+		var node_visible := vis and _network_cell_is_observed(pos)
+		var shape = _network_shape_nodes[node_id]
 		if is_instance_valid(shape):
-			shape.visible = vis
+			shape.visible = node_visible
 	for line in _network_connection_lines:
 		if is_instance_valid(line):
-			line.visible = vis
+			var from_pos: Vector2i = line.get_meta("from_pos", Vector2i(-1, -1))
+			var to_pos: Vector2i = line.get_meta("to_pos", Vector2i(-1, -1))
+			line.visible = vis and _network_cell_is_observed(from_pos) and _network_cell_is_observed(to_pos)
+
+func _network_cell_is_observed(pos: Vector2i) -> bool:
+	if pos.x < 0 or pos.y < 0:
+		return false
+	return visibility_state == null or visibility_state.is_cell_observed(pos)
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	var rect = ColorRect.new()
@@ -3181,6 +3196,8 @@ func _update_visibility() -> void:
 	if visibility_renderer:
 		visibility_renderer.set_camera_cells(_camera_zone_cells)
 		visibility_renderer.refresh()
+	if hud and hud.is_network_overlay_visible():
+		_update_network_node_visibility()
 	# CH1-050: Visibility changes affect which intents are public. Refresh the
 	# intent renderer so newly observed/lost enemies update their display.
 	_refresh_enemy_intent_display()

@@ -28,14 +28,14 @@
 - 任务目标唯一权威、行动系统骨架、地图校验、迷雾状态、敌方意图状态、战术网络、警戒状态已接入代码库。
 - M1 已完成 CH1-070/080：22×16、三个紧凑遭遇区、7-9 名敌人、最多 3 名同时活跃、两个遭遇检查点、教学、失败重试、上传和撤离流程。
 - CH1-010 至 CH1-060 的代码与自动化契约已完成：统一行动、地图 v2/稳定 ID/RNG、真实输入 E2E、迷雾、敌方意图、战术网络和警戒表现。
-- CH1-090 已完成中继塔地标、选择/扫描/上传/撤离 VFX、中文 UI 字体、潜入/交战/高警戒三层战斗音乐和第一轮网络/意图/职业色饰程序化表现；警报本地化、顶部状态分区、迷雾覆盖边界和地标越界保护已修复；首帧视觉快照工具已覆盖 720p/1080p、灰度和色觉检查；当前仍未签核。
+- CH1-090 已完成中继塔地标、选择/扫描/上传/撤离 VFX、中文 UI 字体、潜入/交战/高警戒三层战斗音乐和第一轮网络/意图/职业色饰程序化表现；警报本地化、顶部状态分区、右侧单位面板停靠、网络节点迷雾约束和地标越界保护已修复；视觉快照工具现已覆盖首帧、选中、网络、意图、上传、撤离六个运行阶段，并支持 720p/1080p、灰度和色觉检查；当前仍未签核。
 - 四套环境组件、角色和敌人图、HUD 图标、对话、VFX 与程序化 WAV 可作为正式生产底材。
 - 导出预设、Windows 构建脚本、包验证脚本和自动化发布门已进入版本控制。
 - 旧后端、旧路线图、旧 QA、旧文档归档和无生产引用的 API 客户端已从当前树移除；历史仍可从 Git 提交记录追溯。
 
 ### 2.2 尚未完成
 
-- CH1-090 的代码与资源接入已完成第一轮；尚未完成角色/敌军正式方向辨识的人工确认、M1 三区域表现的双分辨率/灰度/色觉检查和音频听感验收。
+- CH1-090 的代码与资源接入已完成第一轮；网络节点不再穿透战争迷雾，右侧敌方意图摘要已纳入 HUD 位置回归测试，完整流程截图已覆盖网络/意图/上传/撤离阶段；尚未完成角色/敌军正式方向辨识的人工确认、M1 三区域表现的双分辨率/灰度/色觉人工检查和音频听感验收。
 - H1 首次玩家硬门尚未执行，M1 还没有 3 名首次玩家的理解、时长和趣味性记录。
 - M2-M6 仍以旧内容为基线，没有达到新设计的正式关卡标准。
 - 四名玩家角色和五类敌人尚未全部具备轮廓、能力、动画与战术职责区分。
@@ -309,7 +309,7 @@ func commit_action(preview: Dictionary) -> Dictionary
 - 行为：
   - 摄像头改变可见性，门改变路线，炮塔改变火力，电力改变设施可用性，信标改变增援。
   - 接管、禁用、过载均在预览中说明即时结果、持续时间和警戒代价。
-  - 网络层只在需要时显示连接；节点四状态同时用颜色、形状和动画区分。
+  - 网络层只在需要时显示连接；节点四状态同时用颜色、形状和动画区分，且节点/连接线只在两端格子已观察时显示。
   - HUD 显示当前警戒等级、距离下一级事件和下一项具体后果。
 - 测试：
   - 扩展 `tests/tactical_network_state_test.gd`。
@@ -368,7 +368,7 @@ func commit_action(preview: Dictionary) -> Dictionary
 
 #### CH1-090 M1 正式表现批次
 
-- 状态：进行中；中继塔、四类 VFX、中文字体、职业色饰和三层音乐已接入，正式角色方向表现与人工验收未完成
+- 状态：进行中；中继塔、四类 VFX、中文字体、职业色饰和三层音乐已接入，警报/意图 HUD 与网络迷雾约束已修复，正式角色方向表现与人工验收未完成
 - 依赖：CH1-070
 - 执行者：ImageGen + 图像处理工具 + Terra high 接入；人工视觉/听感验收
 - 视觉范围：
@@ -679,11 +679,16 @@ powershell -ExecutionPolicy Bypass -File tests/run_release_gate.ps1
 powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
 ```
 
-在 `tactical-grid/client` 执行第一章首帧视觉快照（窗口渲染，不使用 Godot 编辑器）：
+在 `tactical-grid/client` 执行第一章视觉快照（窗口渲染，不使用 Godot 编辑器）。`qa-stage` 可选 `initial`、`selection`、`network`、`intent`、`upload`、`evac`；网络/上传/撤离阶段为便于构图检查会强制揭示地图，不代表正式玩法关闭迷雾：
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-output=build/chapter1_visual_1280x720_none.png
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=grayscale --qa-output=build/chapter1_visual_1280x720_grayscale.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-stage=selection --qa-output=build/chapter1_visual_1280x720_selection.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-stage=network --qa-output=build/chapter1_visual_1280x720_network.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-stage=intent --qa-output=build/chapter1_visual_1280x720_intent.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-stage=upload --qa-output=build/chapter1_visual_1280x720_upload.png
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --path (Get-Location).Path --display-driver windows --rendering-method gl_compatibility --resolution 1280x720 res://tests/chapter1_visual_snapshot.tscn -- --qa-size=1280x720 --qa-mode=none --qa-stage=evac --qa-output=build/chapter1_visual_1280x720_evac.png
 ```
 
 `qa-mode` 可使用 `none`、`deuteranopia` 或 `grayscale`；截图只能证明首帧布局和可读性，不能替代完整 M1 真人验收。

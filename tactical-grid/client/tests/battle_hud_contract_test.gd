@@ -110,6 +110,17 @@ func _test_hud_contract() -> void:
 	var right_panel = hud.get_node_or_null("RightPanel")
 	_check(top_bar != null and is_equal_approx(top_bar.offset_bottom, HUDScript.TOP_BAR_HEIGHT), "顶部栏为警报第二行保留空间")
 	_check(right_panel != null and is_equal_approx(right_panel.offset_top, HUDScript.TOP_BAR_HEIGHT), "右侧单位面板避开扩展后的顶部栏")
+	_check(right_panel != null and right_panel.get_global_rect().position.x >= viewport_width - 250.0, "右侧单位面板实际停靠在视口右侧")
+	var threat_label: Label = hud.get_node_or_null("RightPanel/ThreatLabel")
+	hud.update_threat_summary({
+		"total": 1,
+		"move_count": 1,
+		"top_threats": [{"type": "move", "stale": false, "lethal": false}],
+	})
+	_check(threat_label != null and threat_label.visible, "敌方意图摘要在有情报时可见")
+	_check(threat_label != null and threat_label.text.contains("已知敌方意图"), "敌方意图摘要使用明确中文标题")
+	_check(threat_label != null and threat_label.get_global_rect().position.x >= viewport_width - 250.0, "敌方意图摘要实际位于右侧单位面板")
+	hud.update_threat_summary({"total": 0})
 
 	# 战斗对话必须与教程一样位于 CanvasLayer，否则会被战场相机缩放和裁切。
 	var dialogue = GameManager._active_dialogue
@@ -500,6 +511,14 @@ func _test_network_toggle_and_alert_display() -> void:
 	if _battle.tactical_network_state and _battle.tactical_network_state.get_all_nodes().size() > 0:
 		_check(_battle._network_shape_nodes.size() > 0, "网络状态形状已渲染")
 		_check(_battle._network_node_sprites.size() > 0, "网络节点精灵已渲染")
+		var fog_visibility_ok := true
+		for node_id in _battle._network_node_sprites.keys():
+			var node_pos: Vector2i = _battle.tactical_network_state.get_node_position(String(node_id))
+			var expected_visible: bool = _battle.visibility_state.is_cell_observed(node_pos)
+			var node_sprite: Sprite2D = _battle._network_node_sprites[node_id]
+			if node_sprite.visible != expected_visible:
+				fog_visibility_ok = false
+		_check(fog_visibility_ok, "迷雾外网络节点不泄露位置")
 	_battle._on_toggle_network()
 
 	await _dispose_battle()
