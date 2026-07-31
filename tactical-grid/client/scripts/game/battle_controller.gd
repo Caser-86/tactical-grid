@@ -37,6 +37,13 @@ var _active_context_flag: String = ""
 @onready var effect_layer: Node2D = $EffectLayer
 @onready var hud: HUD = $HUD
 @onready var camera: BattleCameraController = $Camera2D
+## CH1-040: 迷雾渲染层。程序化添加，位于 EvacZoneLayer 与 MoveHighlightLayer 之间，
+## 使其遮挡地形与撤离区，但不遮挡玩家高亮、单位与特效。
+var visibility_renderer: VisibilityRenderer = null
+## CH1-040: 活跃摄像头区域格子集合（供渲染器同步显示摄像头维持的观察区）
+var _camera_zone_cells: Array[Vector2i] = []
+## CH1-040: 已渲染的最后已知位置幽灵标记，entity_id -> UnitSprite
+var _last_known_ghosts: Dictionary = {}
 
 ## 战斗状态
 var map_data: Dictionary = {}
@@ -212,6 +219,7 @@ func _ready() -> void:
 	level_config = CampaignRepository.get_level(level_id)
 	_init_subsystems()
 	_generate_map()
+	_setup_visibility_renderer()
 	_spawn_units()
 	_setup_objective_state()
 	_setup_victory_conditions()
@@ -222,6 +230,17 @@ func _ready() -> void:
 	_render_units()
 	# 先播放 intro 对话，结束后再开始战斗
 	_play_intro_then_start()
+
+## CH1-040: 创建并挂载 VisibilityRenderer，置于 EvacZoneLayer 与 MoveHighlightLayer 之间。
+## 雾层遮挡地形与撤离区，但不遮挡玩家高亮、单位与特效。
+func _setup_visibility_renderer() -> void:
+	visibility_renderer = VisibilityRenderer.new()
+	visibility_renderer.name = "VisibilityRenderer"
+	add_child(visibility_renderer)
+	# 插入到 MoveHighlightLayer 当前位置，使雾层位于 EvacZoneLayer 与 MoveHighlightLayer 之间。
+	if move_highlight:
+		move_child(visibility_renderer, move_highlight.get_index())
+	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE))
 
 ## 初始化任务目标状态机，并把 battle_controller 的目标变量同步为 mos 的权威状态。
 ## mos 持有任务目标的真实状态；battle_controller 的同名变量作为只读镜像供渲染和旧代码使用。
@@ -277,6 +296,15 @@ func _cleanup_units() -> void:
 			unit.free()
 	player_units.clear()
 	enemy_units.clear()
+	# CH1-040: 清理最后已知位置幽灵标记及其临时 Unit 占位
+	for ghost in _last_known_ghosts.values():
+		if ghost and is_instance_valid(ghost):
+			var placeholder = ghost.unit
+			ghost.queue_free()
+			if placeholder and is_instance_valid(placeholder):
+				placeholder.free()
+	_last_known_ghosts.clear()
+	_camera_zone_cells.clear()
 	_dismiss_context_hint()
 	selected_unit = null
 	boss_unit = null
@@ -1511,6 +1539,7 @@ func _on_network_alert_requested(amount: int, reason: String) -> void:
 
 ## 网络操作完成回调：将相机接管等事件桥接为 mission_event
 ## 相机接管触发 player_reinforcement 脚本（scout rescue）
+## CH1-040: 相机接管同时注册持久摄像头区域，维持观察区直到相机被禁用或过载。
 func _on_network_operation(node_id: String, operation: String, result: Dictionary) -> void:
 	if not is_instance_valid(mission_objective_state):
 		return
@@ -1524,11 +1553,37 @@ func _on_network_operation(node_id: String, operation: String, result: Dictionar
 		var event_name = &"camera_takeover"
 		mission_objective_state.mission_event.emit(event_name, {"node_id": node_id})
 		_log("相机接管完成，评估事件增援")
-	# 相机接管后的区域揭示
-	if result.get("reveal_cells", []).size() > 0:
-		if visibility_state:
-			visibility_state.reveal_cells(result["reveal_cells"])
-			_log("相机揭示 %d 个格子" % result["reveal_cells"].size())
+	# CH1-040: 相机接管注册持久观察区；禁用/过载移除该区域。
+	var reveal_cells: Array = result.get("reveal_cells", [])
+	if reveal_cells.size() > 0 and visibility_state:
+		match operation:
+			"takeover":
+				var zone_id := "camera_%s" % node_id
+				visibility_state.add_camera_zone(zone_id, reveal_cells)
+				_sync_camera_zone_cells()
+				_log("相机接管揭示 %d 个格子（持久观察区）" % reveal_cells.size())
+			"disable", "overload":
+				var zone_id := "camera_%s" % node_id
+				visibility_state.remove_camera_zone(zone_id)
+				_sync_camera_zone_cells()
+				_log("相机失效，观察区收回为已记录：%s" % operation)
+			_:
+				visibility_state.reveal_cells(reveal_cells)
+				_log("揭示 %d 个格子" % reveal_cells.size())
+		if visibility_renderer:
+			visibility_renderer.refresh()
+		_refresh_last_known_ghosts()
+
+## CH1-040: 重新收集所有活跃摄像头区域格子，同步给渲染器。
+func _sync_camera_zone_cells() -> void:
+	_camera_zone_cells.clear()
+	if not visibility_state:
+		return
+	var zones: Dictionary = visibility_state._camera_zones
+	for zone_id in zones.keys():
+		for cell in zones[zone_id]:
+			if not _camera_zone_cells.has(cell):
+				_camera_zone_cells.append(cell)
 
 ## CODE-P2-02: G 键切换网络覆盖层可视化，不影响任何游戏状态
 func _on_toggle_network() -> void:
@@ -2002,8 +2057,11 @@ func _show_attack_range(unit: Unit) -> void:
 	_clear_layer(attack_highlight)
 	attack_targets.clear()
 	# 敌方单位
+	# CH1-040: 只能攻击处于正在观察格子的敌人；隐藏敌人不可被选中
 	for enemy in enemy_units:
 		if not enemy.is_alive:
+			continue
+		if visibility_state and not visibility_state.is_cell_observed(enemy.grid_pos):
 			continue
 		var dist = GridSystem.manhattan_distance(unit.grid_pos, enemy.grid_pos)
 		if dist >= unit.weapon_range[0] and dist <= unit.weapon_range[1]:
@@ -2151,8 +2209,12 @@ func _attack_destructible(attacker: Unit, target_pos: Vector2i) -> void:
 	_check_victory_instant()
 
 ## 尝试激活终端（玩家单位相邻时点击终端触发）
+## CH1-040: 终端必须处于正在观察的格子才能交互
 func _try_interact_terminal(unit: Unit, term_pos: Vector2i) -> bool:
 	if not term_pos in terminals:
+		return false
+	if visibility_state and not visibility_state.is_cell_observed(term_pos):
+		_log("终端未在观察范围内")
 		return false
 	if not _is_adjacent_reachable(unit, term_pos) and unit.grid_pos != term_pos:
 		_log("终端不在可达范围")
@@ -2191,6 +2253,10 @@ func _calculate_stars(
 ## Task 3: collect optional resource (player unit adjacent, costs 1 AP)
 func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
 	if not resource_pos in resource_positions:
+		return false
+	# CH1-040: 资源必须处于正在观察的格子才能交互
+	if visibility_state and not visibility_state.is_cell_observed(resource_pos):
+		_log("resource not in observed area")
 		return false
 	if not _is_adjacent_reachable(unit, resource_pos) and unit.grid_pos != resource_pos:
 		_log("resource out of reach")
@@ -2458,6 +2524,7 @@ func _begin_targeting(spec: Dictionary) -> void:
 	attack_targets.clear()
 	selected_action = "targeting"
 	# 构建上下文
+	# CH1-040: 注入 visibility_state，使目标选择跳过未观察的敌人
 	var context := {
 		"map_width": map_width,
 		"map_height": map_height,
@@ -2465,6 +2532,7 @@ func _begin_targeting(spec: Dictionary) -> void:
 		"enemies": enemy_units,
 		"los_check": Callable(self, "_has_los_for_targeting"),
 		"action_system": action_system,
+		"visibility_state": visibility_state,
 	}
 	targeting_controller.begin(selected_unit, _pending_action_id, spec, context)
 
@@ -2709,9 +2777,11 @@ func _get_move_cost(pos: Vector2i, job: String) -> int:
 
 ## CODE-P2-01: Update visibility from all alive player units.
 ## Computes visible cells, updates VisibilityState, and refreshes enemy sprite visibility.
+## CH1-040: 同步回合戳、刷新迷雾渲染层、渲染最后已知位置幽灵。
 func _update_visibility() -> void:
 	if not visibility_state:
 		return
+	visibility_state.set_turn(turn_manager.turn_number if turn_manager else 1)
 	var visible_cells: Array[Vector2i] = []
 	for unit in player_units:
 		if not unit or not unit.is_alive:
@@ -2737,8 +2807,13 @@ func _update_visibility() -> void:
 			})
 	visibility_state.update_visibility(visible_cells, visible_enemies)
 	_refresh_enemy_sprite_visibility()
+	_refresh_last_known_ghosts()
+	if visibility_renderer:
+		visibility_renderer.set_camera_cells(_camera_zone_cells)
+		visibility_renderer.refresh()
 
 ## CODE-P2-01: Hide enemy sprites not currently observed; show observed ones.
+## CH1-040: 实时敌人精灵只在正在观察时显示；离开视野后隐藏，由幽灵标记取代。
 func _refresh_enemy_sprite_visibility() -> void:
 	for child in unit_layer.get_children():
 		if not child is UnitSprite:
@@ -2750,6 +2825,54 @@ func _refresh_enemy_sprite_visibility() -> void:
 			continue
 		var observed = visibility_state.is_enemy_observed(sprite.unit.entity_id)
 		sprite.visible = observed
+
+## CH1-040: 渲染最后已知位置幽灵标记。
+## 离开视野的敌人在其最后已知格（已记录或正在观察）显示一个半透明轮廓 + "?" 不确定标记，
+## 不显示实时生命、意图或朝向。未探索区域的最后已知位置不渲染（玩家从未到过那里）。
+func _refresh_last_known_ghosts() -> void:
+	# 清理旧幽灵
+	for ghost in _last_known_ghosts.values():
+		if ghost and is_instance_valid(ghost):
+			ghost.queue_free()
+	_last_known_ghosts.clear()
+	if not visibility_state:
+		return
+	var renderable: Dictionary = visibility_state.get_renderable_last_known()
+	for eid in renderable.keys():
+		# 若敌人当前正在观察，则实时精灵已显示，不需要幽灵
+		if visibility_state.is_enemy_observed(eid):
+			continue
+		var snapshot: Dictionary = renderable[eid]
+		var pos = snapshot.get("pos", null)
+		if pos == null or not (pos is Vector2i):
+			continue
+		var ghost := UnitSprite.new()
+		ghost.name = "Ghost_%s" % eid
+		ghost.modulate = Color(1.0, 1.0, 1.0, 0.42)
+		ghost.z_index = 90
+		ghost.is_ghost = true
+		ghost.ghost_uncertain = bool(snapshot.get("uncertain", true))
+		unit_layer.add_child(ghost)
+		# 幽灵使用一个临时的 Unit 引用以便 _draw 工作；不连接信号以避免副作用
+		var placeholder := Unit.new()
+		placeholder.team = "enemy"
+		placeholder.unit_name = String(snapshot.get("name", eid))
+		placeholder.job = String(snapshot.get("job", "sentry"))
+		placeholder.entity_id = eid
+		placeholder.grid_pos = pos
+		placeholder.is_alive = true
+		placeholder.current_hp = int(snapshot.get("hp", 1))
+		placeholder.max_hp = max(1, placeholder.current_hp)
+		placeholder.max_ap = 0
+		placeholder.current_ap = 0
+		placeholder.max_shield = 0
+		placeholder.current_shield = 0
+		ghost.update_unit(placeholder)
+		ghost.position = _get_cell_center(pos)
+		ghost.set_meta("ghost_entity_id", eid)
+		ghost.set_meta("ghost_uncertain", bool(snapshot.get("uncertain", true)))
+		ghost.set_meta("ghost_turn_seen", int(snapshot.get("turn_seen", -1)))
+		_last_known_ghosts[eid] = ghost
 
 func _is_blocked(pos: Vector2i) -> bool:
 	if not MapLoader.is_passable(map_data, pos.x, pos.y):

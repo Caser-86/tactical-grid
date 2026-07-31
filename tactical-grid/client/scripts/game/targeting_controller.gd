@@ -169,10 +169,12 @@ func _rebuild_valid_cache() -> void:
 			push_warning("TargetingController: 未知 target_type=%s" % target_type)
 
 ## 填充单位目标
+## CH1-040: 敌方目标必须处于正在观察的格子；未观察的敌人不可被选中。
 func _populate_unit_targets(target_type: String) -> void:
 	var max_range = int(_spec.get("range", 1))
 	var requires_los = bool(_spec.get("requires_los", true))
 	var team_filter = String(_spec.get("team_filter", TEAM_ANY))
+	var vis_state = _context.get("visibility_state", null)
 	var candidates: Array = []
 	match team_filter:
 		TEAM_ALLY:
@@ -196,6 +198,10 @@ func _populate_unit_targets(target_type: String) -> void:
 			continue
 		if requires_los and not _has_los(_actor.grid_pos, unit.grid_pos):
 			continue
+		# CH1-040: 敌方单位必须处于正在观察的格子才能被选为目标
+		if unit.team == "enemy" and vis_state != null:
+			if not vis_state.is_cell_observed(unit.grid_pos):
+				continue
 		_valid_units_cache.append(unit)
 		if not _valid_cells_cache.has(unit.grid_pos):
 			_valid_cells_cache.append(unit.grid_pos)

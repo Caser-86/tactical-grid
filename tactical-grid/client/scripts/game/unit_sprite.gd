@@ -18,6 +18,11 @@ var hover := false
 var current_state: StringName = &"idle"
 var art_sprite: Sprite2D
 
+## CH1-040: 是否为最后已知位置幽灵标记。幽灵不显示实时生命/AP，只显示半透明轮廓与"?"不确定标记。
+var is_ghost := false
+## CH1-040: 幽灵的不确定标记是否显示（敌人离开视野后为 true）。
+var ghost_uncertain := true
+
 var _state_tween: Tween
 var _idle_elapsed := 0.0
 var _base_art_scale := Vector2.ONE
@@ -57,14 +62,28 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 40, border_color, border_width)
 	if _is_boss_unit():
 		draw_arc(Vector2.ZERO, radius + 4, 0, TAU, 48, Color(0.18, 0.96, 1.0, 0.88), 2.0)
-	_draw_hp_bar(radius)
-	_draw_shield_bar(radius)
-	_draw_ap_indicator(radius)
+	# CH1-040: 幽灵标记不显示实时生命/AP 条（信息已过期），只显示轮廓与"?"标记
+	if not is_ghost:
+		_draw_hp_bar(radius)
+		_draw_shield_bar(radius)
+		_draw_ap_indicator(radius)
 
 	if selected:
 		draw_arc(Vector2.ZERO, radius + (9 if _is_boss_unit() else 6), 0, TAU, 40, Color(0.22, 1.0, 0.78), 2.5)
 	elif hover:
 		draw_arc(Vector2.ZERO, radius + (7 if _is_boss_unit() else 4), 0, TAU, 40, Color(1, 1, 1, 0.55), 1.5)
+
+	# CH1-040: 幽灵的不确定标记（"?"）画在轮廓上方中央，提示玩家该位置信息已过期
+	if is_ghost and ghost_uncertain:
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(-6, -radius - 18),
+			"?",
+			HORIZONTAL_ALIGNMENT_CENTER,
+			12,
+			14,
+			Color(1.0, 0.78, 0.20, 0.95)
+		)
 
 func _draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()

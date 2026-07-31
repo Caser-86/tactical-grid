@@ -453,6 +453,26 @@ if ($checkpointResult.ExitCode -ne 0 -or $checkpointFailed -ne 0) {
     exit 1
 }
 
+# --- 2.992. Visibility renderer contract ---
+Write-Host "[2.992/3] Running visibility renderer contract..."
+try {
+    $visRendererResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/visibility_renderer_test.tscn')
+} catch {
+    Write-Host "VISIBILITY RENDERER TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$visRendererSummary = Get-LocalizedTestSummary -Output $visRendererResult.Stdout
+$visRendererPassed = [int]$visRendererSummary[0]
+$visRendererFailed = [int]$visRendererSummary[1]
+Write-Host "  Passed: $visRendererPassed"
+Write-Host "  Failed: $visRendererFailed"
+if ($visRendererResult.ExitCode -ne 0 -or $visRendererFailed -ne 0) {
+    Write-Host "VISIBILITY RENDERER TEST FAILED (exit=$($visRendererResult.ExitCode), failed=$visRendererFailed)" -ForegroundColor Red
+    ($visRendererResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($visRendererResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -473,7 +493,8 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($intentResult.Stdout -split "`r?`n") + ($intentResult.Stderr -split "`r?`n") + `
     ($tnsResult.Stdout -split "`r?`n") + ($tnsResult.Stderr -split "`r?`n") + `
     ($alertResult.Stdout -split "`r?`n") + ($alertResult.Stderr -split "`r?`n") + `
-    ($checkpointResult.Stdout -split "`r?`n") + ($checkpointResult.Stderr -split "`r?`n")
+    ($checkpointResult.Stdout -split "`r?`n") + ($checkpointResult.Stderr -split "`r?`n") + `
+    ($visRendererResult.Stdout -split "`r?`n") + ($visRendererResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -543,6 +564,7 @@ Write-Host "  Enemy intent state assertions: $intentPassed"
 Write-Host "  Tactical network state assertions: $tnsPassed"
 Write-Host "  Alert state assertions: $alertPassed"
 Write-Host "  Encounter checkpoint state assertions: $checkpointPassed"
+Write-Host "  Visibility renderer assertions: $visRendererPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

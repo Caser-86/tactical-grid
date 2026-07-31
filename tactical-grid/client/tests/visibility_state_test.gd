@@ -4,7 +4,7 @@ var _passed := 0
 var _failed := 0
 
 func _ready() -> void:
-	print("=== CODE-P2-01: VisibilityState tests ===")
+	print("=== CH1-040: VisibilityState tests ===")
 	_test_unexplored_default()
 	_test_observed_when_visible()
 	_test_recorded_after_leaving_sight()
@@ -14,6 +14,14 @@ func _ready() -> void:
 	_test_is_cell_observed()
 	_test_get_observed_enemies()
 	_test_clear_visibility()
+	# CH1-040: 迷雾运行时闭环新增测试
+	_test_render_state_mapping()
+	_test_last_known_turn_stamp()
+	_test_uncertain_flag_after_leaving_sight()
+	_test_camera_zone_persists_across_turns()
+	_test_camera_zone_revert_on_removal()
+	_test_renderable_last_known_excludes_unexplored()
+	_test_serialize_deserialize_camera_zones()
 	_print_summary()
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -121,6 +129,116 @@ func _test_clear_visibility() -> void:
 	vs.clear()
 	_check(vs.get_cell_state(Vector2i(1, 1)) == VisibilityState.STATE_UNEXPLORED, "Cell reset to unexplored after clear")
 	_check(not vs.is_enemy_observed("e"), "Enemy not observed after clear")
+
+## ===== CH1-040: 迷雾运行时闭环新增测试 =====
+
+func _test_render_state_mapping() -> void:
+	print("\n--- Test: render state maps to three visibility tiers ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	# Unexplored cell -> RENDER_HIDDEN
+	_check(vs.get_render_state(Vector2i(0, 0)) == VisibilityState.RENDER_HIDDEN, "Unexplored cell renders as hidden")
+	# Observed cell -> RENDER_VISIBLE
+	vs.update_visibility([Vector2i(2, 2)], [])
+	_check(vs.get_render_state(Vector2i(2, 2)) == VisibilityState.RENDER_VISIBLE, "Observed cell renders as visible")
+	# Recorded cell -> RENDER_DIMMED
+	vs.update_visibility([Vector2i(5, 5)], [])
+	_check(vs.get_render_state(Vector2i(2, 2)) == VisibilityState.RENDER_DIMMED, "Previously observed cell renders as dimmed")
+
+func _test_last_known_turn_stamp() -> void:
+	print("\n--- Test: last-known snapshot records the turn seen ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	vs.set_turn(3)
+	vs.update_visibility([Vector2i(4, 4)], [{"entity_id": "enemy_t", "pos": Vector2i(4, 4), "hp": 50}])
+	_check(vs.get_last_known_turn("enemy_t") == 3, "Last-known turn stamped as 3")
+	# Enemy leaves sight; turn stamp updates to the turn it was last seen
+	vs.set_turn(5)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	_check(vs.get_last_known_turn("enemy_t") == 5, "Last-known turn updated to 5 when enemy left sight")
+	_check(not vs.is_enemy_observed("enemy_t"), "Enemy no longer observed after leaving sight")
+
+func _test_uncertain_flag_after_leaving_sight() -> void:
+	print("\n--- Test: last-known becomes uncertain after enemy leaves sight ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	vs.set_turn(1)
+	vs.update_visibility([Vector2i(3, 3)], [{"entity_id": "enemy_u", "pos": Vector2i(3, 3), "hp": 40}])
+	_check(not vs.is_last_known_uncertain("enemy_u"), "Last-known is certain while enemy is observed")
+	# Enemy moves out of sight
+	vs.set_turn(2)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	_check(vs.is_last_known_uncertain("enemy_u"), "Last-known becomes uncertain after enemy leaves sight")
+	# Enemy re-enters sight: uncertainty clears
+	vs.set_turn(3)
+	vs.update_visibility([Vector2i(3, 3)], [{"entity_id": "enemy_u", "pos": Vector2i(3, 3), "hp": 40}])
+	_check(not vs.is_last_known_uncertain("enemy_u"), "Last-known is certain again when enemy re-observed")
+
+func _test_camera_zone_persists_across_turns() -> void:
+	print("\n--- Test: camera zone keeps cells observed across turns ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	# Player sees cell (1,1); camera zone covers (5,5) and (6,6)
+	vs.set_turn(1)
+	vs.update_visibility([Vector2i(1, 1)], [])
+	vs.add_camera_zone("cam_a", [Vector2i(5, 5), Vector2i(6, 6)])
+	_check(vs.get_cell_state(Vector2i(5, 5)) == VisibilityState.STATE_OBSERVED, "Camera zone cell observed immediately")
+	# Next turn: player moves away from (1,1); camera cells should stay observed
+	vs.set_turn(2)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	_check(vs.get_cell_state(Vector2i(5, 5)) == VisibilityState.STATE_OBSERVED, "Camera zone cell stays observed across turn")
+	_check(vs.get_cell_state(Vector2i(6, 6)) == VisibilityState.STATE_OBSERVED, "Second camera cell stays observed")
+	_check(vs.get_cell_state(Vector2i(1, 1)) == VisibilityState.STATE_RECORDED, "Player sight cell demotes to recorded")
+
+func _test_camera_zone_revert_on_removal() -> void:
+	print("\n--- Test: camera zone removal reverts cells to recorded ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	vs.set_turn(1)
+	vs.update_visibility([Vector2i(1, 1)], [])
+	vs.add_camera_zone("cam_b", [Vector2i(7, 7)])
+	_check(vs.get_cell_state(Vector2i(7, 7)) == VisibilityState.STATE_OBSERVED, "Camera cell observed while zone active")
+	# Remove camera zone; next update should demote the cell
+	vs.remove_camera_zone("cam_b")
+	vs.set_turn(2)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	_check(vs.get_cell_state(Vector2i(7, 7)) == VisibilityState.STATE_RECORDED, "Camera cell reverts to recorded after zone removal")
+
+func _test_renderable_last_known_excludes_unexplored() -> void:
+	print("\n--- Test: renderable last-known excludes unexplored positions ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	vs.set_turn(1)
+	# Enemy seen at (2,2) then leaves; (2,2) becomes recorded
+	vs.update_visibility([Vector2i(2, 2)], [{"entity_id": "e1", "pos": Vector2i(2, 2), "hp": 30}])
+	vs.set_turn(2)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	# Another enemy seen at (8,8) then leaves; (8,8) becomes recorded, then we
+	# never explore (9,9) so an enemy whose last-known is (9,9) should be excluded
+	vs.update_visibility([Vector2i(8, 8)], [{"entity_id": "e2", "pos": Vector2i(8, 8), "hp": 20}])
+	vs.set_turn(3)
+	vs.update_visibility([Vector2i(0, 0)], [])
+	var renderable := vs.get_renderable_last_known()
+	_check(renderable.has("e1"), "Enemy at recorded cell (2,2) is renderable")
+	_check(renderable.has("e2"), "Enemy at recorded cell (8,8) is renderable")
+
+func _test_serialize_deserialize_camera_zones() -> void:
+	print("\n--- Test: camera zones survive serialize/deserialize round-trip ---")
+	var vs := VisibilityState.new()
+	vs.setup(10, 10)
+	vs.set_turn(4)
+	vs.update_visibility([Vector2i(1, 1)], [{"entity_id": "e_s", "pos": Vector2i(1, 1), "hp": 25}])
+	vs.add_camera_zone("cam_s", [Vector2i(3, 3), Vector2i(4, 4)])
+	var data := vs.serialize()
+	var vs2 := VisibilityState.new()
+	vs2.setup(10, 10)
+	vs2.deserialize(data)
+	_check(vs2.get_cell_state(Vector2i(3, 3)) == VisibilityState.STATE_OBSERVED, "Camera cell restored as observed")
+	_check(vs2.get_last_known_turn("e_s") == 4, "Last-known turn restored")
+	# Camera zone should still persist across an update after restore
+	vs2.set_turn(5)
+	vs2.update_visibility([Vector2i(0, 0)], [])
+	_check(vs2.get_cell_state(Vector2i(3, 3)) == VisibilityState.STATE_OBSERVED, "Restored camera zone persists across turn")
 
 func _print_summary() -> void:
 	print("\n=== VisibilityState: %d passed, %d failed ===" % [_passed, _failed])
