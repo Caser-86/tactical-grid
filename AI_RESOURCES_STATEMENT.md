@@ -1,88 +1,61 @@
 # AI 生成资源声明
 
-本文件登记 Tactical Grid 项目中所有由人工智能模型生成的资源，以确保来源透明、可追溯。
+> status: Active compliance record
+> owner: 项目负责人
+> updated: 2026-07-31
+> applies_to: `tactical-grid/client/assets/` 内的 AI 生成源图和运行时资源
 
-## 1. 总体声明
+本文件记录 AI 资源的来源边界。它不把资源文件存在、目录契约通过或旧版本曾接入，写成重设计后美术已经完成。
 
-- 2026-06-17 的 16 张遗留 SDXL 图片仅作为内部风格参考，不进入发行包。
-- `client/assets/generated/chapter1/` 下的新资源由项目工作流独立生成。只有完成去背、切图、尺寸校验、Godot 导入、资源登记和实机检查的文件才可进入运行时目录。
-- 未处理的风格板和生成拼版保存在 `client/assets/generated/chapter1/source/`，由导出预设排除。
-- 当前 Codex 图像生成工具未向项目暴露精确后端模型 ID，因此登记为“Codex 内置 Image Generation”，不虚构具体模型版本。
+## 当前结论
 
-## 2. AI 生成图片清单
+- `tactical-grid/client/assets/characters/`、`effects/`、`tiles/`、`ui/` 中 2026-06-17 的 16 张 SDXL 图片仅作内部参考，存在水印、无 Alpha 或不能安全切图的问题，不进入发行包。
+- `tactical-grid/client/assets/generated/chapter1/source/` 中的风格板和生成拼版是源材料，必须由导出预设排除。
+- `tactical-grid/client/assets/generated/chapter1/runtime/` 中已处理资源是可复用的重设计前资产基线，不自动满足新角色辨识、网络设施、动画或关卡地标要求。
+- 当前 Codex 图像生成工具没有向项目暴露精确后端模型 ID，因此统一记录为“Codex 内置 Image Generation”，不虚构模型版本。
 
-### 2.1 角色肖像（10 张）
+## 已登记资源类别
 
-| 文件路径 | 内容描述 | 生成日期 | 模型 | 用途 |
-|---|---|---|---|---|
-| client/assets/characters/游戏Boss肖像_数据哨兵_巨型机械守卫_蓝红配色_发光眼睛_2026-06-17T18-15-39.png | Boss 数据哨兵肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏敌人肖像_攻击无人机_红色机械飞行单位_低多边形风格_正_2026-06-17T18-14-43.png | 攻击无人机肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏敌人肖像_隐形刺客_暗红色兜帽角色_手持能量刃_神秘感__2026-06-17T18-15-12.png | 隐形刺客肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏最终Boss肖像_架构师_巨型AI核心_全息投影人形_蓝_2026-06-17T18-16-07.png | 最终 Boss 架构师肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_侦察兵职业_AI叛逃者角色_穿着黑色潜行服_手_2026-06-17T18-13-45.png | 侦察兵肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_医疗兵职业_男性科学家角色_穿着白色实验服和蓝_2026-06-17T18-13-09.png | 医疗兵肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_敌方哨兵机器人_红色配色_机械外观_低多边形风_2026-06-17T18-05-21.png | 哨兵机器人肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_狙击手职业_女性角色_穿着蓝色潜行作战服_手持_2026-06-17T18-04-51.png | 狙击手肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_突击兵职业_男性士兵_穿着蓝色战术背心_手持霰_2026-06-17T18-04-22.png | 突击兵肖像 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/characters/游戏角色肖像_重装兵职业_壮汉角色_穿着重型装甲_手持机枪__2026-06-17T18-14-15.png | 重装兵肖像 | 2026-06-17 | SDXL | 风格参考 |
+| 路径 | 来源 | 当前用途与状态 |
+|---|---|---|
+| `tactical-grid/client/assets/characters/` 等四个遗留目录 | SDXL，2026-06-17 | 仅风格参考，导出排除，禁止恢复为运行时资源 |
+| `assets/generated/chapter1/backgrounds/*.png` | Codex 内置 Image Generation，2026-07-28 至 29 | 重设计前菜单、基地、启动与结算背景基线；新 UI 流程接入后复验 |
+| `assets/generated/chapter1/source/echo_yard_*.png` | Codex 内置 Image Generation，2026-07-30 | Echo Yard 视觉源材料，导出排除 |
+| `assets/generated/chapter1/runtime/environment/echo_yard/{prop,landmark}/*.png` | 生成拼版经色键、裁切和切图 | 可复用环境组件；M1 新地图必须重新进行构图和可读性验收 |
+| `assets/generated/chapter1/source/ch1_m1_units/*_source_v1.{png,jpg}` | Codex 内置 Image Generation，2026-07-30/31 | 单位源图（含 scout/protocol_engineer/hunter），导出排除 |
+| `assets/generated/chapter1/runtime/units/*.png` | 上述源图经 `process_chapter1_unit_art.ps1` 色键、裁切、96x96 合成 | 10 个单位精灵（含 scout/protocol_engineer/hunter）；已接入 ArtCatalog |
 
-### 2.2 特效（3 张）
+| `assets/generated/chapter1/source/network_icons/*_node_v1.jpg` | Codex 内置 Image Generation，2026-07-31 | 5 个网络节点图标源图（camera/door/turret/power_conduit/beacon），导出排除 |
+| `assets/generated/chapter1/runtime/network_icons/*_64.png` | 上述源图经 `process_network_icons.ps1` 色键、裁切、64x64 合成 | 5 个网络节点运行时图标；已接入 ArtCatalog 和网络覆盖层 |
+| `assets/generated/chapter1/source/landmarks/echo_yard_gantry_crane_v1.jpg` | Codex 内置 Image Generation，2026-07-31 | Echo Yard 门式起重机地标源图，导出排除 |
+| `assets/generated/chapter1/runtime/environment/echo_yard/landmark/gantry_crane_192x128.png` | 上述源图经 `process_landmark_source.ps1` 色键、裁切、192x128 合成 | 运行时地标精灵；已接入 ArtCatalog |
 
-| 文件路径 | 内容描述 | 生成日期 | 模型 | 用途 |
-|---|---|---|---|---|
-| client/assets/effects/游戏枪口闪光特效_明亮黄色光芒_低多边形风格_透明背景_游戏_2026-06-17T18-17-04.png | 枪口闪光 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/effects/游戏烟雾弹特效_灰色烟雾云_低多边形风格_透明背景_游戏素材_2026-06-17T18-17-30.png | 烟雾弹 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/effects/游戏爆炸特效_橙红色火球_低多边形风格_透明背景_游戏素材_2026-06-17T18-16-36.png | 爆炸特效 | 2026-06-17 | SDXL | 风格参考 |
+Cooling Works、Transit Hub 和 Sentinel Core 的运行时环境组件由项目脚本程序化生成，不属于 AI 图像资源；它们的详细来源见 [资源清单](tactical-grid/client/data/RESOURCE_MANIFEST.md)。
 
-### 2.3 地形贴图（1 张）
+## 运行时接入门
 
-| 文件路径 | 内容描述 | 生成日期 | 模型 | 用途 |
-|---|---|---|---|---|
-| client/assets/tiles/战棋游戏地形贴图集_俯视角_低多边形风格_包含平地_道路_森_2026-06-17T18-06-17.png | 地形贴图集 | 2026-06-17 | SDXL | 风格参考 |
+任何新增 AI 资源必须同时满足：
 
-### 2.4 UI 资源（2 张）
+1. 在本文件和资源清单中记录最终路径、生成工具、日期和用途。
+2. 记录去背、裁切、切图、调色或转码等修改。
+3. 验证尺寸、Alpha、导入设置、缩放、动画、碰撞和实际游戏触发。
+4. 在 1280×720、灰度和色觉缺陷模式下检查可读性。
+5. 完成一个 M1 遭遇区小样后，才允许批量生产同类资产。
+6. 商业发布前复核生成服务届时条款与目标发行范围。
 
-| 文件路径 | 内容描述 | 生成日期 | 模型 | 用途 |
-|---|---|---|---|---|
-| client/assets/ui/战术战棋游戏主菜单背景_废墟城市夜景_赛博朋克风格_蓝色和橙_2026-06-17T18-06-45.png | 主菜单背景 | 2026-06-17 | SDXL | 风格参考 |
-| client/assets/ui/游戏UI图标集_战术战棋游戏_包含移动_攻击_技能_物品_警_2026-06-17T18-05-49.png | UI 图标集 | 2026-06-17 | SDXL | 风格参考 |
+外部第三方资源还必须在 [第三方通知](THIRD_PARTY_NOTICES.md) 中登记来源和许可证。
 
-### 2.5 已处理并接入的项目生成资源
+## 重设计缺口
 
-| 文件路径 | 内容描述 | 生成日期 | 模型/工具 | 用途与处理 |
-|---|---|---|---|---|
-| `client/assets/generated/chapter1/backgrounds/*.png` | 主菜单、启动、基地和结算背景 | 2026-07-28 至 2026-07-29 | Codex 内置 Image Generation | 项目原创背景；检查无文字和水印后由场景或 `ArtCatalog` 加载 |
-| `client/assets/generated/chapter1/source/echo_yard_styleboard_v1.png` | 回声货场视觉与构图风格板 | 2026-07-30 | Codex 内置 Image Generation | 仅作内部参考；导出排除 |
-| `client/assets/generated/chapter1/source/echo_yard_props_sheet_*.png` | 六种货场掩体/道具生成拼版及去背中间文件 | 2026-07-30 | Codex 内置 Image Generation + 色键处理工具 | 源文件；导出排除 |
-| `client/assets/generated/chapter1/runtime/environment/echo_yard/prop/*.png` | 蓝/橙货箱、钢制路障、管束、电缆盘和控制箱 | 2026-07-30 | 上述拼版经 `process_echo_yard_prop_sheet.ps1` 切图 | 透明运行时资源；Godot 导入、目录契约和发布版实机画面已验证 |
-| `client/assets/generated/chapter1/source/echo_yard_landmarks_sheet_*.png` | 龙门吊与照明塔生成拼版及去背中间文件 | 2026-07-30 | Codex 内置 Image Generation + 色键处理工具 | 源文件；导出排除 |
-| `client/assets/generated/chapter1/runtime/environment/echo_yard/landmark/*.png` | 龙门吊与照明塔 | 2026-07-30 | 上述拼版经 `process_echo_yard_landmark_sheet.ps1` 切图 | 透明运行时资源；Godot 导入、目录契约和发布版实机画面已验证 |
-| `client/assets/generated/chapter1/runtime/environment/cooling_works/*.png` | 冷却工坊的地面、边缘、掩体、危险贴花和地标 | 2026-07-30 | `generate_cooling_works_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
-| `client/assets/generated/chapter1/runtime/environment/transit_hub/*.png` | 磁悬轨道枢纽的月台、导轨、站台掩体、贴花和地标 | 2026-07-30 | `generate_transit_hub_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
-| `client/assets/generated/chapter1/runtime/environment/sentinel_core/*.png` | 哨兵核心的环形地面、相位掩体、回路贴花和核心地标 | 2026-07-30 | `generate_sentinel_core_environment.ps1` 程序化绘制 | 不使用第三方素材；27 个运行时 PNG 已完成 Godot 导入，并由地图与资源加载契约验证 |
-| `client/assets/generated/chapter1/source/ch1_m1_units/*_source_v1.png` | 七名第一章首发单位（突击兵、狙击手、重装兵、基础哨兵、侦察无人机、狙击哨兵、突击无人机）的三视四分之三俯视源插画 | 2026-07-30 | Codex 内置 Image Generation | 源文件；纯绿幕背景；导出排除 |
-| `client/assets/generated/chapter1/runtime/units/assault_96.png` 等 7 张 | 上述七名单位的透明 96×96 运行时精灵 | 2026-07-30 | 上述源图经 `process_chapter1_unit_art.ps1` 绿色主导色键去背、裁剪、缩放合成 | 透明运行时资源；已完成 Godot 导入、`ArtCatalog` 加载、尺寸/透明度/剪影差异契约和烟雾测试验证 |
+- 四名玩家角色的终版轮廓、职业色饰和动画。
+- 协议工程师与猎手敌人。
+- 节点四状态、五类设施、敌方意图、警戒和网络反馈。
+- 每关一个主地标，以及符合简体中文 UI 的正式字体。
 
-## 3. 遗留参考图已知问题
+详细资产生产顺序见 [成品化总路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)。
 
-1. 上述 2.1 至 2.4 的 16 张遗留图片均为 1024×1024、24 位 RGB，无 Alpha 通道，不能直接用于游戏精灵。
-2. 这些遗留图片可观察到“图片由AI生成”水印。
-3. 遗留地形图和 UI 图是展示拼版，不是规则网格化、可切片的生产素材。
-4. 遗留特效图没有真实透明通道，部分包含烘焙棋盘格或黑底。
-5. 遗留图片没有运行时引用，并由 Windows 导出预设明确排除。
+## 变更记录
 
-## 4. 后续处理要求
-
-- 任何新增 AI 生成资源必须在本文件和 `client/data/RESOURCE_MANIFEST.md` 中登记。
-- 生成源图不得直接进入运行时；必须完成尺寸、透明通道、切图、Godot 导入和游戏内效果测试。
-- 外部第三方资源必须在 `THIRD_PARTY_NOTICES.md` 中登记来源和许可证；项目原创 AI 资源不得伪装成第三方开源资源。
-- 商业发布前需再次核对所用生成服务的届时条款与目标发行范围。
-
-## 5. 修改记录
-
-- 2026-07-27：初次创建 AI 资源声明，登记 16 张现有 AI 生成图片
-- 2026-07-30：区分遗留参考图与新处理的项目生成资源，登记 Echo Yard 背景、道具、地标和源图排除策略
-- 2026-07-30：登记 Cooling Works 的程序化运行时环境套件；其不属于 AI 图像生成资源，但在此声明中保留与 AI 资源并列的完整可追溯记录
-- 2026-07-30：登记 Mag-Rail Transit Hub 的程序化运行时环境套件和其 `ch1_m3` 关卡接入
-- 2026-07-30：登记 Sentinel Core 的程序化运行时环境套件和其 `ch1_m5` 关卡接入
-- 2026-07-30：登记第一章首发七名单位（突击兵、狙击手、重装兵、基础哨兵、侦察无人机、狙击哨兵、突击无人机）的 96×96 运行时精灵；源图由 Codex Image Generation 生成，经 `process_chapter1_unit_art.ps1` 绿色主导色键去背并确定性合成
+- 2026-07-27：登记遗留 AI 参考图。
+- 2026-07-30：登记第一章背景、Echo Yard 源图、环境组件和单位处理流程。
+- 2026-07-30：改为重设计资产基线记录，移除“旧资源即最终完成”的暗示。

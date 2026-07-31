@@ -38,7 +38,10 @@ $Jobs = @(
     @{ key='sentry_basic';  source='sentry_basic_source_v1.png';  output='sentry_basic_96.png' }
     @{ key='drone_scout';   source='drone_scout_source_v1.png';   output='drone_scout_96.png' }
     @{ key='sentry_sniper'; source='sentry_sniper_source_v1.png'; output='sentry_sniper_96.png' }
-    @{ key='drone_assault'; source='drone_assault_source_v1.png'; output='drone_assault_96.png' }
+    @{ key='drone_assault'; source='drone_assault_source_v1.png'; output='drone_assault_96.png' },
+    @{ key='scout';              source='scout_source_v1.png';              output='scout_96.png' },
+    @{ key='protocol_engineer';  source='protocol_engineer_source_v1.png';  output='protocol_engineer_96.png' },
+    @{ key='hunter';             source='hunter_source_v1.png';             output='hunter_96.png' }
 )
 
 function Convert-To32bppArgb {
@@ -172,4 +175,4 @@ foreach ($job in $Jobs) {
     Write-Host ("Processed {0,-14} art={1,3}x{2,-3} on 96x96 -> {3}" -f $job.key, $resizeW, $resizeH, $job.output)
 }
 
-Write-Host "All seven Chapter 1 unit sprites processed into $OutputRoot"
+Write-Host "All Chapter 1 unit sprites processed into $OutputRoot"

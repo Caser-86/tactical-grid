@@ -57,6 +57,8 @@ var enemy_intent_state: EnemyIntentState
 var enemy_planner: EnemyPlanner
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
+## 网络节点精灵（覆盖层显示时可见）
+var _network_node_sprites: Dictionary = {}
 var alert_state: AlertState
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -1019,6 +1021,7 @@ func _render_map() -> void:
 			_draw_tactical_tile(pos, terrain, block, "", environment_kit, floor_variant, edge_variants, blocker_variant)
 
 	_render_environment_decorations(environment_kit, environment.get("decorations", []))
+	_render_network_nodes()
 
 	# 标记撤离点、目标和终端
 	for obj in map_data.objects:
@@ -1159,6 +1162,52 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 		sprite.centered = false
 		sprite.position = GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
 		sprite.z_index = int(decoration.get("z", 0))
+		map_layer.add_child(sprite)
+
+## 渲染网络节点精灵（在地图上显示设施图标）
+func _render_network_nodes() -> void:
+	# 清除旧精灵
+	for sprite in _network_node_sprites.values():
+		if is_instance_valid(sprite):
+			sprite.queue_free()
+	_network_node_sprites.clear()
+	if not tactical_network_state:
+		return
+	var nodes = tactical_network_state.get_all_nodes()
+	for node_id in nodes:
+		var node = nodes[node_id]
+		var node_type = String(node.get("type", ""))
+		var texture = ArtCatalog.get_texture(&"network_node", StringName(node_type))
+		if not texture:
+			continue
+		var sprite = Sprite2D.new()
+		sprite.name = "NetworkNode_%s" % node_id
+		sprite.texture = texture
+		sprite.centered = true
+		var pos = tactical_network_state.get_node_position(node_id)
+		sprite.position = _get_cell_center(pos)
+		sprite.z_index = 5
+		sprite.visible = hud.is_network_overlay_visible() if hud else false
+		# 颜色编码：敌方=红，玩家=青，损坏=灰
+		var state = String(node.get("state", "neutral"))
+		match state:
+			"enemy":
+				sprite.modulate = Color(1.0, 0.4, 0.4)
+			"player":
+				sprite.modulate = Color(0.4, 1.0, 0.9)
+			"damaged":
+				sprite.modulate = Color(0.5, 0.5, 0.5, 0.6)
+			_:
+				sprite.modulate = Color(0.9, 0.9, 0.9)
+		map_layer.add_child(sprite)
+		_network_node_sprites[node_id] = sprite
+
+## 更新网络节点精灵可见性（G 键切换时调用）
+func _update_network_node_visibility() -> void:
+	var vis = hud.is_network_overlay_visible() if hud else false
+	for sprite in _network_node_sprites.values():
+		if is_instance_valid(sprite):
+			sprite.visible = vis
 		map_layer.add_child(sprite)
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
@@ -1395,6 +1444,7 @@ func _on_toggle_network() -> void:
 		tactical_network_state.toggle_overlay()
 	if hud:
 		hud.toggle_network_overlay()
+		_update_network_node_visibility()
 		_log("网络覆盖层: %s" % ("显示" if hud.is_network_overlay_visible() else "隐藏"))
 
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
