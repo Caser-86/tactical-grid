@@ -36,6 +36,8 @@ var _context_prompt: Label = null
 var _alert_label: Label = null
 var _network_overlay: Control = null
 var _network_overlay_visible: bool = false
+## CH1-050: 敌方意图威胁摘要标签，显示在警报标签下方。
+var _threat_label: Label = null
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -81,6 +83,22 @@ func _ready() -> void:
 	_network_overlay.visible = false
 	_network_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_network_overlay)
+
+	# CH1-050: Threat summary label (top-left, below alert label).
+	# Summarizes observed enemy intents so the player can read the most
+	# dangerous known threats before ending the turn.
+	_threat_label = Label.new()
+	_threat_label.name = "ThreatLabel"
+	_threat_label.text = ""
+	_threat_label.add_theme_font_size_override("font_size", 13)
+	_threat_label.add_theme_color_override("font_color", Color(0.96, 0.78, 0.55))
+	_threat_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_threat_label.offset_left = 8.0
+	_threat_label.offset_top = 50.0
+	_threat_label.offset_right = 460.0
+	_threat_label.offset_bottom = 96.0
+	_threat_label.visible = false
+	add_child(_threat_label)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -399,4 +417,61 @@ func set_network_overlay_visible(vis: bool) -> void:
 ## CODE-P2-02: Check if network overlay is visible
 func is_network_overlay_visible() -> bool:
 	return _network_overlay_visible
+
+
+## CH1-050: Update the threat summary label with the current public intents.
+## summary: { lethal_count, attack_count, move_count, overwatch_count, others, total, top_threats }
+## Renders a one-line overview plus up to three top threats with type icons
+## and a stale marker when the information is outdated.
+func update_threat_summary(summary: Dictionary) -> void:
+	if not _threat_label:
+		return
+	var total: int = int(summary.get("total", 0))
+	if total <= 0:
+		_threat_label.text = ""
+		_threat_label.visible = false
+		return
+	var lethal: int = int(summary.get("lethal_count", 0))
+	var attacks: int = int(summary.get("attack_count", 0))
+	var moves: int = int(summary.get("move_count", 0))
+	var overwatch: int = int(summary.get("overwatch_count", 0))
+	var others: int = int(summary.get("others", 0))
+	var parts: Array[String] = []
+	if lethal > 0:
+		parts.append("致命 %d" % lethal)
+	if attacks > 0:
+		parts.append("攻击 %d" % attacks)
+	if moves > 0:
+		parts.append("移动 %d" % moves)
+	if overwatch > 0:
+		parts.append("警戒 %d" % overwatch)
+	if others > 0:
+		parts.append("其他 %d" % others)
+	var header := "已知敌方意图：%s" % " | ".join(parts)
+	var top_threats: Array = summary.get("top_threats", [])
+	var lines := [header]
+	for threat in top_threats:
+		var itype: String = String(threat.get("type", "wait"))
+		var is_stale: bool = bool(threat.get("stale", false))
+		var is_lethal: bool = bool(threat.get("lethal", false))
+		var tag := itype
+		if is_lethal:
+			tag = "致命攻击"
+		elif itype == "attack":
+			tag = "攻击"
+		elif itype in ["move", "move_to_cover"]:
+			tag = "移动"
+		elif itype == "overwatch":
+			tag = "警戒"
+		var suffix := ""
+		if is_stale:
+			suffix = "（已过期）"
+		lines.append("  - %s%s" % [tag, suffix])
+	_threat_label.text = "\n".join(lines)
+	# Highlight in red when at least one lethal threat is visible.
+	if lethal > 0:
+		_threat_label.add_theme_color_override("font_color", Color(1.0, 0.42, 0.32))
+	else:
+		_threat_label.add_theme_color_override("font_color", Color(0.96, 0.78, 0.55))
+	_threat_label.visible = true
 

@@ -473,6 +473,26 @@ if ($visRendererResult.ExitCode -ne 0 -or $visRendererFailed -ne 0) {
     exit 1
 }
 
+# --- 2.993. Enemy intent renderer contract ---
+Write-Host "[2.993/3] Running enemy intent renderer contract..."
+try {
+    $intentRendererResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/enemy_intent_renderer_test.tscn')
+} catch {
+    Write-Host "ENEMY INTENT RENDERER TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$intentRendererSummary = Get-LocalizedTestSummary -Output $intentRendererResult.Stdout
+$intentRendererPassed = [int]$intentRendererSummary[0]
+$intentRendererFailed = [int]$intentRendererSummary[1]
+Write-Host "  Passed: $intentRendererPassed"
+Write-Host "  Failed: $intentRendererFailed"
+if ($intentRendererResult.ExitCode -ne 0 -or $intentRendererFailed -ne 0) {
+    Write-Host "ENEMY INTENT RENDERER TEST FAILED (exit=$($intentRendererResult.ExitCode), failed=$intentRendererFailed)" -ForegroundColor Red
+    ($intentRendererResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($intentRendererResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -494,7 +514,8 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($tnsResult.Stdout -split "`r?`n") + ($tnsResult.Stderr -split "`r?`n") + `
     ($alertResult.Stdout -split "`r?`n") + ($alertResult.Stderr -split "`r?`n") + `
     ($checkpointResult.Stdout -split "`r?`n") + ($checkpointResult.Stderr -split "`r?`n") + `
-    ($visRendererResult.Stdout -split "`r?`n") + ($visRendererResult.Stderr -split "`r?`n")
+    ($visRendererResult.Stdout -split "`r?`n") + ($visRendererResult.Stderr -split "`r?`n") + `
+    ($intentRendererResult.Stdout -split "`r?`n") + ($intentRendererResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -565,6 +586,7 @@ Write-Host "  Tactical network state assertions: $tnsPassed"
 Write-Host "  Alert state assertions: $alertPassed"
 Write-Host "  Encounter checkpoint state assertions: $checkpointPassed"
 Write-Host "  Visibility renderer assertions: $visRendererPassed"
+Write-Host "  Enemy intent renderer assertions: $intentRendererPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

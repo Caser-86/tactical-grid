@@ -44,6 +44,10 @@ var visibility_renderer: VisibilityRenderer = null
 var _camera_zone_cells: Array[Vector2i] = []
 ## CH1-040: 已渲染的最后已知位置幽灵标记，entity_id -> UnitSprite
 var _last_known_ghosts: Dictionary = {}
+## CH1-050: 敌方意图渲染层。程序化添加，位于单位层之上，绘制观察到的敌人意图。
+var enemy_intent_renderer: EnemyIntentRenderer = null
+## CH1-050: 是否已在敌回合前生成下回合计划（避免重复规划）。
+var _enemy_intents_planned: bool = false
 
 ## 战斗状态
 var map_data: Dictionary = {}
@@ -220,6 +224,7 @@ func _ready() -> void:
 	_init_subsystems()
 	_generate_map()
 	_setup_visibility_renderer()
+	_setup_enemy_intent_renderer()
 	_spawn_units()
 	_setup_objective_state()
 	_setup_victory_conditions()
@@ -242,6 +247,19 @@ func _setup_visibility_renderer() -> void:
 		move_child(visibility_renderer, move_highlight.get_index())
 	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE))
 
+
+## CH1-050: 创建并挂载 EnemyIntentRenderer，位于单位层之上，绘制观察到的敌人意图
+## （攻击箭头、移动目标、警戒、致命/过期标记）。仅显示公开意图，不读取原始 AI 状态。
+func _setup_enemy_intent_renderer() -> void:
+	enemy_intent_renderer = EnemyIntentRenderer.new()
+	enemy_intent_renderer.name = "EnemyIntentRenderer"
+	add_child(enemy_intent_renderer)
+	# 放到 effect_layer 之上，确保箭头不被特效层遮挡；但 z_index 仍由 EnemyIntentRenderer
+	# 自身控制（95），位于单位（100+）之下，避免遮挡单位本体。
+	if effect_layer:
+		move_child(enemy_intent_renderer, effect_layer.get_index() + 1)
+	enemy_intent_renderer.setup(enemy_intent_state, visibility_state, float(CELL_SIZE), map_width, map_height)
+
 ## 初始化任务目标状态机，并把 battle_controller 的目标变量同步为 mos 的权威状态。
 ## mos 持有任务目标的真实状态；battle_controller 的同名变量作为只读镜像供渲染和旧代码使用。
 func _setup_objective_state() -> void:
@@ -254,6 +272,11 @@ func _setup_objective_state() -> void:
 	# Configure reinforcement triggers early so mission events can spawn waves
 	# before _start_battle() completes (e.g. during E2E integration tests).
 	enemy_director.setup(map_data.get("scripts", []))
+	# CH1-050: Wire enemy intent state and planner now that visibility_state and
+	# map_data are both ready. Planning happens at end of player turn; the
+	# renderer reads public intents each refresh.
+	enemy_intent_state.setup(visibility_state)
+	enemy_planner.setup(map_data)
 	_sync_objective_state_from_mos()
 
 ## 从 mos 同步目标状态到 battle_controller 的镜像变量。
@@ -1412,6 +1435,13 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 				alert_state.on_turn_end()
 			hud.update_alert_display(alert_state)
 			_update_visibility()
+			# CH1-050: Freeze intents for enemies that left sight during the
+			# enemy turn. Stale intents remain visible (marked outdated) so the
+			# player can still read the last known plan, but no longer leak
+			# real-time information.
+			if enemy_intent_state:
+				enemy_intent_state.freeze_stale_intents()
+			_refresh_enemy_intent_display()
 			if mission_objective_state:
 				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "player"})
 			hud.update_objective(_get_objective_text())
@@ -1762,7 +1792,10 @@ func _execute_enemy_action(enemy: Unit) -> void:
 	if enemy.current_ap <= 0:
 		return
 
-	var action = UtilityAI.decide_action(enemy, player_units, map_data, enemy_units)
+	# CH1-050: Prefer the planned action from the public intent preview so the
+	# player's observation matches execution. If the plan is missing or no
+	# longer valid (e.g. target died), fall back to a fresh UtilityAI decision.
+	var action := _consume_planned_action(enemy)
 
 	match action.get("type", "wait"):
 		"attack":
@@ -1795,6 +1828,46 @@ func _execute_enemy_action(enemy: Unit) -> void:
 			"overwatch":
 				enemy.add_status("overwatch", 1)
 				enemy.spend_ap(1)
+
+
+## CH1-050: Resolve the planned action for an enemy and consume it from the
+## intent state so it is not shown again after execution. If the plan is
+## missing or its target is no longer valid, fall back to UtilityAI so the
+## enemy still acts deterministically.
+func _consume_planned_action(enemy: Unit) -> Dictionary:
+	var planned: Dictionary = {}
+	if enemy_intent_state and _enemy_intents_planned:
+		var stored: Dictionary = enemy_intent_state.get_intent(enemy.entity_id)
+		if not stored.is_empty():
+			var itype: String = String(stored.get("type", "wait"))
+			# Re-resolve attack target from the stored target_pos so the plan
+			# stays valid even if the player moved the target unit.
+			if itype == "attack":
+				var target_pos = stored.get("target_pos", null)
+				if target_pos is Vector2i:
+					var target_unit = _get_unit_at(target_pos)
+					if target_unit and target_unit.is_alive and target_unit.team == "player":
+						planned = {
+							"type": "attack",
+							"target": target_unit,
+						}
+			elif itype in ["move", "move_to_cover"]:
+				var target_pos = stored.get("target_pos", null)
+				if target_pos is Vector2i and target_pos.x >= 0:
+					planned = {
+						"type": itype,
+						"target_pos": target_pos,
+					}
+			elif itype == "overwatch":
+				planned = {"type": "overwatch"}
+			else:
+				planned = {"type": itype}
+			# Consume the intent so the renderer does not keep showing it after
+			# the enemy has already acted.
+			enemy_intent_state.remove_intent(enemy.entity_id)
+	if planned.is_empty():
+		planned = UtilityAI.decide_action(enemy, player_units, map_data, enemy_units)
+	return planned
 
 func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
 	var path = Pathfinding.find_path(
@@ -2351,7 +2424,55 @@ func _do_attack(attacker: Unit, target: Unit) -> void:
 
 func _end_player_turn() -> void:
 	_deselect_unit()
+	# CH1-050: Plan next enemy turn before handing control to the enemy phase.
+	# The player can read the public intents during the enemy turn and act on
+	# them next turn; the renderer and HUD are refreshed after planning.
+	_plan_enemy_intents()
+	_refresh_enemy_intent_display()
 	turn_manager.end_player_turn()
+
+
+## CH1-050: Generate next-turn intents for every alive enemy.
+## Each intent captures the action the enemy would take if the player ended
+## the turn right now. The plan is committed during the enemy action phase
+## via _execute_enemy_action, so the public preview matches execution unless
+## the player changes the board state (move/kill/disable) before ending turn.
+func _plan_enemy_intents() -> void:
+	if not enemy_planner or not enemy_intent_state:
+		return
+	enemy_intent_state.clear()
+	for enemy in enemy_units:
+		if not enemy or not enemy.is_alive:
+			continue
+		# Skip passive enemies (e.g. mission rules or tutorial first turn).
+		if enemy.current_ap <= 0:
+			continue
+		var plan: Dictionary = enemy_planner.plan_action(
+			enemy, player_units, enemy_units, visibility_state
+		)
+		var intent: Dictionary = plan.get("intent", {})
+		if intent.is_empty():
+			intent = {"type": "wait"}
+		enemy_intent_state.set_intent(enemy.entity_id, intent)
+	_enemy_intents_planned = true
+
+
+## CH1-050: Refresh the intent renderer and HUD threat summary after a plan
+## change or visibility update. Safe to call when no plan exists yet.
+func _refresh_enemy_intent_display() -> void:
+	if not enemy_intent_renderer or not enemy_intent_state:
+		return
+	# Sync enemy positions so the renderer can draw arrows from the right cell
+	# even for stale intents where only the last-known snapshot is available.
+	var positions: Dictionary = {}
+	for enemy in enemy_units:
+		if not enemy or not enemy.is_alive:
+			continue
+		positions[enemy.entity_id] = enemy.grid_pos
+	enemy_intent_renderer.set_enemy_positions(positions)
+	enemy_intent_renderer.refresh()
+	if hud:
+		hud.update_threat_summary(enemy_intent_state.get_threat_summary())
 
 ## Tab switches to the next player unit that still has AP.
 func _on_next_unit() -> void:
@@ -2811,6 +2932,9 @@ func _update_visibility() -> void:
 	if visibility_renderer:
 		visibility_renderer.set_camera_cells(_camera_zone_cells)
 		visibility_renderer.refresh()
+	# CH1-050: Visibility changes affect which intents are public. Refresh the
+	# intent renderer so newly observed/lost enemies update their display.
+	_refresh_enemy_intent_display()
 
 ## CODE-P2-01: Hide enemy sprites not currently observed; show observed ones.
 ## CH1-040: 实时敌人精灵只在正在观察时显示；离开视野后隐藏，由幽灵标记取代。
