@@ -1776,6 +1776,9 @@ func _on_toggle_network() -> void:
 		hud.toggle_network_overlay()
 		_update_network_node_visibility()
 		_log("网络覆盖层: %s" % ("显示" if hud.is_network_overlay_visible() else "隐藏"))
+	# CH1-090: Scan VFX plays at the selected unit or map center.
+	var scan_pos: Vector2i = selected_unit.grid_pos if selected_unit else Vector2i(map_width / 2, map_height / 2)
+	_spawn_effect("scan", scan_pos)
 	_advance_context_hint("network")
 
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
@@ -1806,6 +1809,9 @@ func _advance_upload_progress() -> void:
 	var upload_result := mission_objective_state.apply_event(&"enemy_turn_completed", {})
 	if upload_result.get("changed", false):
 		hud.update_objective(mission_objective_state.get_status_text())
+		# CH1-090: Upload VFX on the active terminal to visualise progress.
+		if terminals.size() > 0:
+			_spawn_effect("upload", terminals[0])
 ## 在地图边缘（敌人侧）寻找可用的增援出生点
 func _find_reinforcement_spawn() -> Vector2i:
 	# 优先在地图右侧（敌人侧）边缘找空位
@@ -2184,6 +2190,8 @@ func _select_unit(unit: Unit) -> void:
 	if unit.team == "player":
 		hud.set_context_state(HUD.ContextState.UNIT_SELECTED)
 		_advance_context_hint("select")
+		# CH1-090: Selection VFX confirms the pick.
+		_spawn_effect("selection", unit.grid_pos)
 	else:
 		_advance_context_hint("observe")
 	_show_move_range(unit)
@@ -2408,6 +2416,9 @@ func _try_move(grid_pos: Vector2i) -> void:
 	hud.update_unit_info(selected_unit)
 
 	_check_encounter_zone(selected_unit.grid_pos)
+	# CH1-090: Evac VFX when a unit steps onto an extraction cell.
+	if selected_unit.grid_pos in evac_cells and mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
+		_spawn_effect("evac", selected_unit.grid_pos)
 	_check_victory_instant()
 	_advance_context_hint("move")
 

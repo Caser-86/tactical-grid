@@ -42,6 +42,7 @@ const ENVIRONMENT_COMPONENTS := {
 		&"landmark": [
 			ENVIRONMENT_ROOT + "echo_yard/landmark/gantry_crane_192x128.png",
 			ENVIRONMENT_ROOT + "echo_yard/landmark/floodlight_tower_128.png",
+			ENVIRONMENT_ROOT + "echo_yard/landmark/relay_tower_128.png",
 		],
 	},
 	&"cooling_works": {

@@ -1679,12 +1679,15 @@ func _test_chapter_one_environment_sample() -> void:
 		_check(false, "MapSample: ArtCatalog 提供环境组件查询接口")
 		catalog.free()
 		return
-	var expected_counts := {"floor": 8, "edge": 8, "prop": 6, "decal": 3, "landmark": 2}
+	var expected_counts := {"floor": 8, "edge": 8, "prop": 6, "decal": 3, "landmark": 3}
 	for component_type in expected_counts:
 		var paths: Array = catalog.get_environment_component_paths("echo_yard", component_type)
 		_check(paths.size() >= expected_counts[component_type], "MapSample: echo_yard %s 组件数量 >= %d" % [component_type, expected_counts[component_type]])
 		for path in paths:
 			_check(load(path) is Texture2D, "MapSample: 环境组件可加载 %s" % path)
+	# CH1-090: relay tower (variant 2) must be registered for M1 hero landmark
+	var landmark_paths: Array = catalog.get_environment_component_paths("echo_yard", "landmark")
+	_check(landmark_paths.size() >= 3, "CH1-090: echo_yard 包含三处地标（含失联中继塔）")
 	catalog.free()
 
 ## ch1_m2 是冷却工区批量生产的第一张地图；契约防止地图尺寸和环境资源退回仓库占位数据。
@@ -2203,6 +2206,12 @@ func _test_accessibility_settings() -> void:
 	effect.setup("terminal")
 	_check(effect.duration < 0.70, "Accessibility: spawned tactical effects use reduced duration")
 	effect.free()
+	# CH1-090: verify the four new VFX types initialise and clean up without errors
+	for vfx_type in ["selection", "scan", "upload", "evac"]:
+		var vfx := TacticalEffectScript.new()
+		vfx.setup(vfx_type)
+		_check(vfx.duration > 0.0, "CH1-090: %s VFX has positive duration" % vfx_type)
+		vfx.free()
 	var settings_menu := preload("res://scenes/settings_menu.tscn").instantiate()
 	add_child(settings_menu)
 	await get_tree().process_frame

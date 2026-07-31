@@ -22,6 +22,7 @@ must not enter a release build.
 | `assets/generated/chapter1/runtime/{blockers,effects,hud_icons,icons,objectives,portraits,status_icons,tiles}/` | Original procedural raster generation by project tooling | CC0 1.0 | 2026-07-29 | Blockers, terrain, icons, effects, objectives and first-pass portraits | Godot import and catalog contracts where referenced; individual runtime reachability remains a production audit item |
 | `assets/generated/chapter1/runtime/environment/echo_yard/prop/*.png` | Original AI images generated with the Codex built-in Image Generation tool, then chroma-key removal and deterministic 3 x 2 slicing by `tools/process_echo_yard_prop_sheet.ps1` | Project-controlled original asset; no third-party source | 2026-07-30 | Six Echo Freight Yard cover/prop variants | Transparent PNG; imported by Godot; loaded through `ArtCatalog`; verified in the exported Windows battle scene |
 | `assets/generated/chapter1/runtime/environment/echo_yard/landmark/*.png` | Original AI images generated with the Codex built-in Image Generation tool, then chroma-key removal and manual-safe slicing by `tools/process_echo_yard_landmark_sheet.ps1` | Project-controlled original asset; no third-party source | 2026-07-30 | Gantry crane and floodlight tower landmarks | Transparent PNG; imported by Godot; loaded through `ArtCatalog`; verified in the exported Windows battle scene |
+| `assets/generated/chapter1/runtime/environment/echo_yard/landmark/relay_tower_128.png` | Original AI image generated with the Codex built-in Image Generation tool, then green-dominant chroma-key removal, opaque-bounds crop and 128x128 resize by inline PowerShell processing | Project-controlled original asset; no third-party source | 2026-07-31 | M1 "失联中继塔" (Lost Relay Tower) hero landmark, echo_yard variant 2 | Transparent 128x128 PNG; imported by Godot; loaded through `ArtCatalog` as echo_yard landmark variant 2; placed at (11,0) in `ch1_m1.json` |
 | `assets/generated/chapter1/source/echo_yard_*.png` | Original AI style board and generation sheets from the Codex built-in Image Generation tool | Project-controlled original asset; no third-party source | 2026-07-30 | Internal environment direction and reproducible processing source | Reference/source only; excluded from Windows export by `export_presets.cfg` |
 | `assets/generated/chapter1/runtime/environment/cooling_works/*.png` | Original procedural raster generation by `tools/generate_cooling_works_environment.ps1`; no third-party textures, samples, fonts, or source art | CC0 1.0 | 2026-07-30 | Reusable Cooling Works environment baseline for redesigned M2 | 27 PNG files; imported by Godot; catalog, map and resource loading contracts pass in the old battle smoke test; redesigned map composition still requires validation |
 | `assets/generated/chapter1/runtime/environment/transit_hub/*.png` | Original procedural raster generation by `tools/generate_transit_hub_environment.ps1`; no third-party textures, samples, fonts, or source art | CC0 1.0 | 2026-07-30 | Reusable Mag-Rail environment baseline for redesigned M3/M4 | 27 PNG files; imported by Godot; catalog, map and resource loading contracts pass in the old battle smoke test; redesigned map composition still requires validation |
@@ -43,5 +44,12 @@ before any release that needs character or tile artwork.
 
 The following assets are not yet present in this baseline and must receive individual
 manifest rows before release: four finalized player silhouettes, protocol engineer,
-hunter, network-node states, five facility-state icons, intent/alert feedback, M1-M6
+hunter, network-node states, five facility-state icons, intent/alert feedback, M2-M6
 hero landmarks, a Chinese UI font. Network and alert audio is covered by `generate_network_audio.ps1` and the polyphonic SFX pool.
+
+CH1-090 progress: M1 hero landmark "失联中继塔" (`relay_tower_128.png`) is now integrated
+as echo_yard landmark variant 2. Selection, scan, upload and evac VFX are implemented as
+procedural `TacticalEffect` drawings (no external textures needed). Network node four-state
+visuals and enemy intent icons remain procedural (shape + colour) and are distinguishable in
+grayscale by shape alone. A Chinese UI font and human visual/audio acceptance are still required
+before CH1-090 can be signed off.

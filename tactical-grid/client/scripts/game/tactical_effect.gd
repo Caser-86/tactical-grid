@@ -15,6 +15,10 @@ func setup(kind: String) -> void:
 		"network_takeover": duration = 0.50
 		"network_disable": duration = 0.35
 		"network_overload": duration = 0.65
+		"selection": duration = 0.30
+		"scan": duration = 0.45
+		"upload": duration = 0.60
+		"evac": duration = 0.70
 	duration = AccessibilitySettings.get_effect_duration(duration)
 	queue_redraw()
 
@@ -69,6 +73,34 @@ func _draw() -> void:
 			draw_circle(Vector2.ZERO, radius, Color(1.0, 0.35, 0.08, fade * 0.28))
 			draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color(1.0, 0.65, 0.18, fade), 3.0)
 			_draw_impact(Color(1.0, 0.85, 0.4, fade), radius, 8, 2.5)
+		"selection":
+			# CH1-090: Cyan double-ring pulse to confirm unit selection.
+			var r1 := 10.0 + progress * 14.0
+			var r2 := 6.0 + progress * 20.0
+			draw_arc(Vector2.ZERO, r1, 0, TAU, 24, Color(0.35, 1.0, 0.9, fade), 2.5)
+			draw_arc(Vector2.ZERO, r2, 0, TAU, 20, Color(0.6, 1.0, 1.0, fade * 0.6), 1.5)
+		"scan":
+			# CH1-090: Sweeping radar arc to signal network layer toggle.
+			var sweep := progress * TAU
+			var r := 14.0 + progress * 18.0
+			draw_arc(Vector2.ZERO, r, sweep - 1.2, sweep, 16, Color(0.4, 1.0, 0.95, fade), 3.0)
+			draw_arc(Vector2.ZERO, r, sweep - 0.6, sweep, 16, Color(0.6, 1.0, 1.0, fade * 0.5), 2.0)
+			draw_arc(Vector2.ZERO, r * 0.7, 0, TAU, 24, Color(0.3, 0.9, 0.85, fade * 0.25), 1.0)
+		"upload":
+			# CH1-090: Ascending data stream to signal upload progress.
+			for i in range(3):
+				var offset := fmod(progress * 3.0 + float(i) * 0.33, 1.0)
+				var y := 14.0 - offset * 28.0
+				var a := (1.0 - offset) * fade
+				draw_circle(Vector2((i - 1) * 5.0, y), 3.0, Color(0.2, 0.94, 1.0, a))
+			draw_arc(Vector2(0, -14.0 - progress * 6.0), 8.0 + progress * 4.0, 0, TAU, 16, Color(0.64, 1.0, 1.0, fade), 2.0)
+		"evac":
+			# CH1-090: Green pillar to signal successful extraction.
+			var h := 16.0 + progress * 36.0
+			var w := 4.0 + (1.0 - progress) * 4.0
+			draw_rect(Rect2(-w, -h, w * 2.0, h), Color(0.0, 1.0, 0.55, fade * 0.35))
+			draw_arc(Vector2(0, -h), 10.0 + progress * 8.0, 0, TAU, 20, Color(0.3, 1.0, 0.75, fade), 2.5)
+			draw_arc(Vector2(0, -h), 6.0 + progress * 4.0, 0, TAU, 16, Color(0.5, 1.0, 0.9, fade * 0.6), 1.5)
 		_:
 			_draw_impact(Color(1.0, 0.38, 0.22, fade), 7.0 + progress * 18.0, 6, 2.5)
 

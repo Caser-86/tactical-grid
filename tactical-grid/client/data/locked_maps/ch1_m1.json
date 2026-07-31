@@ -88,6 +88,13 @@
         "z": 1
       },
       {
+        "component_type": "landmark",
+        "variant": 2,
+        "x": 11,
+        "y": 0,
+        "z": 1
+      },
+      {
         "component_type": "decal",
         "variant": 0,
         "x": 6,
