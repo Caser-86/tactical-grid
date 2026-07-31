@@ -1,10 +1,14 @@
 {
   "map_id": "ch1_m3_transit_hub_v1",
+  "schema_version": 2,
+  "mission_id": "ch1_m3",
   "seed": 1003,
   "size": {"width": 16, "height": 12},
   "theme": "transit_hub",
   "mission_type": "extract",
   "difficulty": 1,
+  "encounters": [],
+  "checkpoints": [],
   "environment": {
     "kit": "transit_hub",
     "route_anchors": [[3,5],[8,6],[12,5]],

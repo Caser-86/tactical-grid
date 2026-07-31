@@ -171,6 +171,8 @@ func create_default_campaign_progress() -> Dictionary:
 		"completed_missions": [],
 		"mission_ratings": {},
 		"story_flags": {},
+		# CODE-CH1-020: 当前遭遇检查点（最近写入的快照），失败重试时由 BattleController 读取
+		"encounter_checkpoint": {},
 	}
 
 ## 创建默认存档数据
@@ -309,4 +311,24 @@ func _migrate_campaign_progress(data: Dictionary) -> void:
 		progress["current_chapter"] = 1
 	if not progress.has("current_mission"):
 		progress["current_mission"] = CampaignRepository.get_first_level()
+	# CODE-CH1-020: 遭遇检查点字段（旧存档没有，补全为空字典）
+	if not progress.has("encounter_checkpoint"):
+		progress["encounter_checkpoint"] = {}
 	data["campaign_progress"] = progress
+
+## CODE-CH1-020: 写入遭遇检查点到 campaign_progress。
+## snapshot 由 EncounterCheckpointState.snapshot() 生成。
+func set_encounter_checkpoint(save_data: Dictionary, snapshot: Dictionary) -> void:
+	if not save_data.has("campaign_progress"):
+		save_data["campaign_progress"] = create_default_campaign_progress()
+	save_data["campaign_progress"]["encounter_checkpoint"] = snapshot.duplicate(true)
+
+## CODE-CH1-020: 读取当前遭遇检查点；无检查点返回空字典。
+func get_encounter_checkpoint(save_data: Dictionary) -> Dictionary:
+	var progress = save_data.get("campaign_progress", {})
+	return progress.get("encounter_checkpoint", {}).duplicate(true)
+
+## CODE-CH1-020: 清除遭遇检查点（成功完成遭遇或任务后调用）。
+func clear_encounter_checkpoint(save_data: Dictionary) -> void:
+	if save_data.has("campaign_progress"):
+		save_data["campaign_progress"]["encounter_checkpoint"] = {}

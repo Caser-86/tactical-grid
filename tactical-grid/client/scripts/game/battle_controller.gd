@@ -87,6 +87,8 @@ var boss_current_phase: int = 0
 var boss_max_hp_for_phase: int = 0
 ## Boss 专属能力运行时状态：ability_id -> { "counter": int, "last_turn": int }
 var boss_ability_state: Dictionary = {}
+## CODE-CH1-020: Boss 召唤计数器，用于派生稳定 entity_id（不依赖 enemy_units 数组顺序）
+var _boss_summon_counter: int = 0
 ## Boss 预警旗标：每个阶段是否已展示过预警
 var boss_phase_warned: Array[bool] = []
 ## 护送 VIP 单位引用（escort 任务）
@@ -267,6 +269,7 @@ func _cleanup_units() -> void:
 	boss_current_phase = 0
 	boss_max_hp_for_phase = 0
 	boss_ability_state.clear()
+	_boss_summon_counter = 0
 	boss_phase_warned.clear()
 	escort_vip = null
 
@@ -593,7 +596,9 @@ func _spawn_units() -> void:
 				unit = GameData.create_player_unit("assault", _get_job_display_name("assault"))
 			unit.grid_pos = Vector2i(obj.x, obj.y)
 			unit.height = MapLoader.get_height_at(map_data, obj.x, obj.y)
-			unit.entity_id = "%s_%d" % [unit.team, player_units.size()]
+			# CODE-CH1-020: 优先使用地图提供的稳定 ID；缺失时回退到 team_index
+			var stable_id: String = String(obj.get("id", ""))
+			unit.entity_id = stable_id if stable_id != "" else "%s_%d" % [unit.team, player_units.size()]
 			player_units.append(unit)
 
 		elif obj.type == "spawn_enemy":
@@ -601,7 +606,9 @@ func _spawn_units() -> void:
 			var unit = GameData.create_enemy_unit(enemy_type)
 			unit.grid_pos = Vector2i(obj.x, obj.y)
 			unit.height = MapLoader.get_height_at(map_data, obj.x, obj.y)
-			unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
+			# CODE-CH1-020: 优先使用地图提供的稳定 ID
+			var stable_id: String = String(obj.get("id", ""))
+			unit.entity_id = stable_id if stable_id != "" else "%s_%d" % [unit.team, enemy_units.size()]
 			_apply_difficulty_to_enemy(unit)
 			enemy_units.append(unit)
 
@@ -677,6 +684,7 @@ func _apply_boss_stats(unit: Unit, bdata: Dictionary) -> void:
 	boss_current_phase = 0
 	boss_max_hp_for_phase = hp
 	boss_ability_state.clear()
+	_boss_summon_counter = 0
 	boss_phase_warned.clear()
 	boss_phase_warned.resize(boss_phases.size())
 	for i in range(boss_phase_warned.size()):
@@ -922,6 +930,7 @@ func _execute_boss_ability(ability_id: String, current_turn: int) -> void:
 			pass
 
 ## Boss 召唤增援单位
+## CODE-CH1-020: 使用 boss_summon 计数器派生稳定 ID，保证多次召唤身份可预测。
 func _boss_summon_unit(enemy_type: String, display_name: String) -> void:
 	if enemy_director:
 		if enemy_director.reinforcements_spawned >= enemy_director.max_reinforcements:
@@ -943,7 +952,9 @@ func _boss_summon_unit(enemy_type: String, display_name: String) -> void:
 		return
 	unit.grid_pos = spawn_pos
 	unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
-	unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
+	# CODE-CH1-020: 用 boss_summon_<count> 派生稳定 ID，避免依赖 enemy_units.size() 顺序
+	_boss_summon_counter += 1
+	unit.entity_id = "boss_summon_%d" % _boss_summon_counter
 	_apply_difficulty_to_enemy(unit)
 	enemy_units.append(unit)
 	if enemy_director:
@@ -1354,8 +1365,10 @@ func _process_reinforcements(turn_number: int) -> void:
 
 ## 实际生成增援敌人单位并加入战斗
 ## 出生点选择：优先使用脚本中指定的 position，否则在地图边缘找空位
-func _spawn_reinforcement_units(units_data: Array) -> void:
-	for unit_data in units_data:
+## CODE-CH1-020: 增援单位使用 trigger_id + index 派生稳定 ID，保证同一触发多次重试产生相同身份。
+func _spawn_reinforcement_units(units_data: Array, trigger_id: String = "") -> void:
+	for i in range(units_data.size()):
+		var unit_data = units_data[i]
 		var enemy_type = unit_data.get("type", "sentry_basic")
 		var pos_arr = unit_data.get("position", [0, 0])
 		var spawn_pos = Vector2i(int(pos_arr[0]), int(pos_arr[1]))
@@ -1368,7 +1381,16 @@ func _spawn_reinforcement_units(units_data: Array) -> void:
 		var unit = GameData.create_enemy_unit(enemy_type)
 		unit.grid_pos = spawn_pos
 		unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
-		unit.entity_id = "%s_%d" % [unit.team, enemy_units.size()]
+		# CODE-CH1-020: 优先使用脚本提供的 id；否则用 trigger_id+index 派生；最后回退到 team_index
+		var stable_id: String = String(unit_data.get("id", ""))
+		if stable_id == "":
+			# 从 unit_data 提取 EnemyDirector 注入的 trigger_id
+			var trig: String = String(unit_data.get("trigger_id", trigger_id))
+			if trig != "":
+				stable_id = "reinforce_%s_%d" % [trig, i]
+			else:
+				stable_id = "%s_%d" % [unit.team, enemy_units.size()]
+		unit.entity_id = stable_id
 		_apply_difficulty_to_enemy(unit)
 		enemy_units.append(unit)
 		# 渲染新单位精灵
@@ -1391,8 +1413,10 @@ func _on_player_reinforcement_spawned(units_data: Array, message: String) -> voi
 
 ## 生成玩家增援单位并加入战斗
 ## 出生点选择：优先使用脚本中指定的 position，否则跳过
+## CODE-CH1-020: 玩家增援同样使用 trigger_id+index 派生稳定 ID。
 func _spawn_player_units(units_data: Array) -> void:
-	for unit_data in units_data:
+	for i in range(units_data.size()):
+		var unit_data = units_data[i]
 		var unit_type = unit_data.get("type", "assault")
 		var pos_arr = unit_data.get("position", [0, 0])
 		var spawn_pos = Vector2i(int(pos_arr[0]), int(pos_arr[1]))
@@ -1404,7 +1428,15 @@ func _spawn_player_units(units_data: Array) -> void:
 		var unit = GameData.create_player_unit(unit_type, _get_job_display_name(unit_type))
 		unit.grid_pos = spawn_pos
 		unit.height = MapLoader.get_height_at(map_data, spawn_pos.x, spawn_pos.y)
-		unit.entity_id = "%s_%d" % [unit.team, player_units.size()]
+		# CODE-CH1-020: 优先使用脚本提供的 id；否则用 trigger_id+index 派生
+		var stable_id: String = String(unit_data.get("id", ""))
+		if stable_id == "":
+			var trig: String = String(unit_data.get("trigger_id", ""))
+			if trig != "":
+				stable_id = "reinforce_%s_%d" % [trig, i]
+			else:
+				stable_id = "%s_%d" % [unit.team, player_units.size()]
+		unit.entity_id = stable_id
 		unit.current_ap = unit.max_ap
 		player_units.append(unit)
 		_create_unit_sprite(unit)

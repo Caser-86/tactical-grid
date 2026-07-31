@@ -1,5 +1,7 @@
 {
   "map_id": "ch1_m1_echo_yard_v2",
+  "schema_version": 2,
+  "mission_id": "ch1_m1",
   "seed": 1001,
   "size": {
     "width": 18,
@@ -8,6 +10,40 @@
   "theme": "echo_yard",
   "mission_type": "infiltrate",
   "difficulty": 1,
+  "encounters": [
+    {
+      "id": "zone_a",
+      "zone_id": "A",
+      "name": "东侧入口",
+      "trigger_cells": [[8, 13]]
+    },
+    {
+      "id": "zone_b",
+      "zone_id": "B",
+      "name": "中段侦察",
+      "trigger_cells": [[11, 7]]
+    },
+    {
+      "id": "zone_c",
+      "zone_id": "C",
+      "name": "上传与撤离",
+      "trigger_cells": [[15, 6]]
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "cp_a_to_b",
+      "encounter_id": "zone_a",
+      "next_encounter_id": "zone_b",
+      "trigger": "camera_takeover"
+    },
+    {
+      "id": "cp_b_to_c",
+      "encounter_id": "zone_b",
+      "next_encounter_id": "zone_c",
+      "trigger": "terminal_activated"
+    }
+  ],
   "environment": {
     "kit": "echo_yard",
     "route_anchors": [

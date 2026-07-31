@@ -1,10 +1,14 @@
 {
   "map_id": "ch1_m2_cooling_works_v1",
+  "schema_version": 2,
+  "mission_id": "ch1_m2",
   "seed": 1002,
   "size": {"width": 16, "height": 12},
   "theme": "cooling_works",
   "mission_type": "destroy",
   "difficulty": 1,
+  "encounters": [],
+  "checkpoints": [],
   "environment": {
     "kit": "cooling_works",
     "route_anchors": [[3, 5], [8, 9], [12, 5]],

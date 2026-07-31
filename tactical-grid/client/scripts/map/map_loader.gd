@@ -1,4 +1,4 @@
-﻿## 地图加载器
+## 地图加载器
 ## 从客户端锁定 JSON 加载正式关卡数据。
 class_name MapLoader
 
@@ -34,7 +34,10 @@ static func load_locked_map(level_id: String) -> Dictionary:
 	return {"ok": true, "data": normalized}
 
 ## 将服务端锁定地图格式归一化为客户端运行时使用的 map_data 结构。
-## 服务端地图包含 vision/validation/victory(s) 等额外字段，这里只保留运行时需要的部分。
+## CODE-CH1-020: 同时支持 schema_version=1 和 =2 的输入。
+## - v1 输入：从 objects/nodes 派生 entities/network_nodes，并补全 encounters/checkpoints 为空数组。
+## - v2 输入：直接使用 entities/network_nodes，同时保留 objects/nodes 别名供旧代码读取。
+## 归一化后所有 v2 字段都存在，schema_version 保持输入值（v1 仍为 1，由 validator 决定是否宽松校验）。
 static func _normalize_locked_map(raw: Dictionary, level_id: String) -> Dictionary:
 	var layers = raw.get("layers", {})
 	# 确保三层都存在，缺失时用空数组占位（上层调用方应自行处理尺寸）
@@ -53,25 +56,81 @@ static func _normalize_locked_map(raw: Dictionary, level_id: String) -> Dictiona
 		w = int(size_dict.get("width", 10))
 		h = int(size_dict.get("height", 8))
 
+	var schema_ver := int(raw.get("schema_version", 1))
+	# v2 字段：优先使用新名称；若新名称为空且旧名称存在，则从旧名称派生
+	var entities: Array = raw.get("entities", [])
+	var objects: Array = raw.get("objects", [])
+	if entities.is_empty() and not objects.is_empty():
+		entities = objects.duplicate(true)
+	elif objects.is_empty() and not entities.is_empty():
+		# v2 优先：旧代码读取 objects 时也能拿到数据
+		objects = entities.duplicate(true)
+
+	var network_nodes: Array = raw.get("network_nodes", [])
+	var nodes: Array = raw.get("nodes", [])
+	if network_nodes.is_empty() and not nodes.is_empty():
+		network_nodes = nodes.duplicate(true)
+	elif nodes.is_empty() and not network_nodes.is_empty():
+		nodes = network_nodes.duplicate(true)
+
+	# v2 专属字段：encounters / checkpoints / mission_id
+	# v1 输入无这些字段时，补全为空数组/默认 mission_id
+	var encounters: Array = raw.get("encounters", [])
+	var checkpoints: Array = raw.get("checkpoints", [])
+	var mission_id: String = String(raw.get("mission_id", level_id))
+
 	var result := {
 		"map_id": raw.get("map_id", level_id),
 		"level_id": level_id,
+		"mission_id": mission_id,
 		"seed": int(raw.get("seed", 0)),
 		"size": {"width": w, "height": h},
 		"theme": raw.get("theme", "warehouse"),
 		"mission_type": raw.get("mission_type", "extract"),
 		"difficulty": int(raw.get("difficulty", 1)),
 		"layers": layers,
-		"objects": raw.get("objects", []),
+		# v1 别名（保留供旧代码读取）
+		"objects": objects,
+		"nodes": nodes,
+		# v2 规范名称
+		"entities": entities,
+		"network_nodes": network_nodes,
+		"facilities": raw.get("facilities", []),
+		"connections": raw.get("connections", []),
+		"encounters": encounters,
+		"checkpoints": checkpoints,
 		"scripts": raw.get("scripts", []),
 		"victory": raw.get("victory", {}),
 		"environment": raw.get("environment", {}),
 		"mission_flow": raw.get("mission_flow", {}),
-		"schema_version": int(raw.get("schema_version", 1)),
-		"nodes": raw.get("nodes", []),
-		"facilities": raw.get("facilities", []),
-		"connections": raw.get("connections", []),
+		"schema_version": schema_ver,
 	}
+	return result
+
+## CODE-CH1-020: 将 v1 锁定地图迁移为 v2 模式。
+## 用于在加载阶段把 v1 文件提升为 v2，使运行时只需要处理一种数据形状。
+## 返回的字典 schema_version=2，entities/network_nodes/encounters/checkpoints 已填充。
+## 如果输入已经是 v2，原样返回（深拷贝）。
+static func migrate_to_v2(map_data: Dictionary) -> Dictionary:
+	var schema_ver := int(map_data.get("schema_version", 1))
+	if schema_ver >= 2:
+		return map_data.duplicate(true)
+	var result := map_data.duplicate(true)
+	# 从 v1 别名派生 v2 字段
+	if result.get("entities", []).is_empty():
+		result["entities"] = (result.get("objects", []) as Array).duplicate(true)
+	if result.get("network_nodes", []).is_empty():
+		result["network_nodes"] = (result.get("nodes", []) as Array).duplicate(true)
+	if not result.has("mission_id") or String(result.get("mission_id", "")) == "":
+		var mid: String = String(result.get("level_id", ""))
+		if mid == "":
+			mid = String(result.get("map_id", ""))
+		result["mission_id"] = mid
+	if not result.has("encounters"):
+		result["encounters"] = []
+	if not result.has("checkpoints"):
+		result["checkpoints"] = []
+	result["schema_version"] = 2
 	return result
 
 ## 从 JSON 字典加载地图数据（保留旧接口供测试和工具使用）。

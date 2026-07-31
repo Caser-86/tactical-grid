@@ -74,6 +74,7 @@ func _trigger_matches(entry: Dictionary, turn: int, event_name: StringName) -> b
 
 ## 统一评估增援触发器：回合触发和事件触发共用同一套上限/重复/信号逻辑
 ## spawn_player 动作不占用敌人增援上限和场上敌人数量限制
+## CODE-CH1-020: 把 trigger_id 注入每个 unit_data，使 BattleController 能派生稳定 entity_id。
 func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 	var spawned: Array = []
 	for trigger in reinforcement_triggers:
@@ -84,8 +85,16 @@ func _evaluate_triggers(turn: int, event_name: StringName) -> Array:
 		if not _trigger_matches(trigger, turn, event_name):
 			continue
 		var data = trigger.get("data", {})
-		var units_data = data.get("units", [])
+		var raw_units = data.get("units", [])
 		var msg = data.get("message", "")
+		var trig_id: String = String(trigger.get("trigger_id", ""))
+		# 给每个 unit_data 注入 trigger_id（若未显式提供 id），便于 BattleController 派生稳定身份
+		var units_data: Array = []
+		for ud in raw_units:
+			var copy = ud.duplicate(true) if ud is Dictionary else ud
+			if copy is Dictionary and not copy.has("trigger_id"):
+				copy["trigger_id"] = trig_id
+			units_data.append(copy)
 		var action: String = String(trigger.get("action", "spawn_reinforcement"))
 		if action == "spawn_player":
 			# 玩家增援不占用敌人上限

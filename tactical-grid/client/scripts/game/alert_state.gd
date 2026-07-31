@@ -113,3 +113,17 @@ func get_reinforcement_bonus() -> int:
 ## Get aggression bonus for current alert level.
 func get_aggression_bonus() -> float:
 	return float(get_consequence().get("aggression_bonus", 0.0))
+
+
+## CODE-CH1-020: 序列化警戒状态为可 JSON 化字典（供 EncounterCheckpointState 使用）。
+func serialize() -> Dictionary:
+	return {
+		"current_level": _current_level,
+		"turns_at_current_level": _turns_at_current_level,
+	}
+
+
+## CODE-CH1-020: 从序列化字典恢复警戒状态。
+func deserialize(data: Dictionary) -> void:
+	_current_level = int(data.get("current_level", LEVEL_CALM))
+	_turns_at_current_level = int(data.get("turns_at_current_level", 0))

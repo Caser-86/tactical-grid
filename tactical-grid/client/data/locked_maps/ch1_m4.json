@@ -1,5 +1,5 @@
 {
-  "map_id":"ch1_m4_transit_escort_v1","seed":1004,"size":{"width":16,"height":14},"theme":"transit_hub","mission_type":"escort","difficulty":1,
+  "map_id":"ch1_m4_transit_escort_v1","schema_version":2,"mission_id":"ch1_m4","seed":1004,"size":{"width":16,"height":14},"theme":"transit_hub","mission_type":"escort","difficulty":1,"encounters":[],"checkpoints":[],
   "environment":{"kit":"transit_hub","route_anchors":[[3,10],[8,7],[13,5]],"floor_variant_overrides":[
     {"x":7,"y":3,"variant":2},{"x":8,"y":3,"variant":2},{"x":7,"y":4,"variant":3},{"x":8,"y":4,"variant":3},{"x":7,"y":5,"variant":2},{"x":8,"y":5,"variant":2},{"x":7,"y":6,"variant":3},{"x":8,"y":6,"variant":3},{"x":7,"y":7,"variant":2},{"x":8,"y":7,"variant":2},{"x":7,"y":8,"variant":3},{"x":8,"y":8,"variant":3},{"x":7,"y":9,"variant":2},{"x":8,"y":9,"variant":2},{"x":11,"y":4,"variant":4},{"x":12,"y":4,"variant":4},{"x":13,"y":4,"variant":4}],"decorations":[
     {"component_type":"landmark","variant":0,"x":0,"y":1,"z":1},{"component_type":"landmark","variant":1,"x":10,"y":1,"z":1},{"component_type":"decal","variant":0,"x":7,"y":7,"z":0},{"component_type":"decal","variant":1,"x":4,"y":10,"z":0},{"component_type":"decal","variant":2,"x":13,"y":5,"z":0}]},

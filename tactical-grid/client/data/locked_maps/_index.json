@@ -2,8 +2,9 @@
   "maps": [
     {
       "level_id": "ch1_m1",
+      "schema_version": 2,
       "name": "初次接触",
-      "map_file": "data/generated_maps/ch1_m1.json",
+      "map_file": "data/locked_maps/ch1_m1.json",
       "seed": 1001,
       "size": "large",
       "theme": "echo_yard",
@@ -11,8 +12,9 @@
     },
     {
       "level_id": "ch1_m2",
+      "schema_version": 2,
       "name": "掩体战术",
-      "map_file": "data/generated_maps/ch1_m2.json",
+      "map_file": "data/locked_maps/ch1_m2.json",
       "seed": 1002,
       "size": "medium",
       "theme": "cooling_works",
@@ -20,8 +22,9 @@
     },
     {
       "level_id": "ch1_m3",
+      "schema_version": 2,
       "name": "高地优势",
-      "map_file": "data/generated_maps/ch1_m3.json",
+      "map_file": "data/locked_maps/ch1_m3.json",
       "seed": 1003,
       "size": "medium",
       "theme": "transit_hub",
@@ -29,8 +32,9 @@
     },
     {
       "level_id": "ch1_m4",
+      "schema_version": 2,
       "name": "交互点",
-      "map_file": "data/generated_maps/ch1_m4.json",
+      "map_file": "data/locked_maps/ch1_m4.json",
       "seed": 1004,
       "size": "large",
       "theme": "transit_hub",
@@ -39,7 +43,7 @@
     {
       "level_id": "ch1_m5",
       "name": "技能初探",
-      "map_file": "data/generated_maps/ch1_m5.json",
+      "map_file": "data/locked_maps/ch1_m5.json",
       "seed": 1005,
       "size": "medium",
       "theme": "sentinel_core",
@@ -47,8 +51,9 @@
     },
     {
       "level_id": "ch1_m6",
+      "schema_version": 2,
       "name": "数据哨兵",
-      "map_file": "data/generated_maps/ch1_m6.json",
+      "map_file": "data/locked_maps/ch1_m6.json",
       "seed": 1006,
       "size": "large",
       "theme": "sentinel_core",
@@ -57,7 +62,7 @@
     {
       "level_id": "ch2_m1",
       "name": "雨夜突袭",
-      "map_file": "data/generated_maps/ch2_m1.json",
+      "map_file": "data/locked_maps/ch2_m1.json",
       "seed": 2001,
       "size": "medium",
       "theme": "city_ruins",
@@ -66,7 +71,7 @@
     {
       "level_id": "ch2_m2",
       "name": "烟雾迷宫",
-      "map_file": "data/generated_maps/ch2_m2.json",
+      "map_file": "data/locked_maps/ch2_m2.json",
       "seed": 2002,
       "size": "medium",
       "theme": "city_ruins",
@@ -75,7 +80,7 @@
     {
       "level_id": "ch2_m3",
       "name": "破墙而入",
-      "map_file": "data/generated_maps/ch2_m3.json",
+      "map_file": "data/locked_maps/ch2_m3.json",
       "seed": 2003,
       "size": "medium",
       "theme": "city_ruins",
@@ -84,7 +89,7 @@
     {
       "level_id": "ch2_m4",
       "name": "视野压制",
-      "map_file": "data/generated_maps/ch2_m4.json",
+      "map_file": "data/locked_maps/ch2_m4.json",
       "seed": 2004,
       "size": "medium",
       "theme": "city_ruins",
@@ -93,7 +98,7 @@
     {
       "level_id": "ch2_m5",
       "name": "双线作战",
-      "map_file": "data/generated_maps/ch2_m5.json",
+      "map_file": "data/locked_maps/ch2_m5.json",
       "seed": 2005,
       "size": "large",
       "theme": "city_ruins",
@@ -102,7 +107,7 @@
     {
       "level_id": "ch2_m6",
       "name": "情报获取",
-      "map_file": "data/generated_maps/ch2_m6.json",
+      "map_file": "data/locked_maps/ch2_m6.json",
       "seed": 2006,
       "size": "medium",
       "theme": "city_ruins",
@@ -111,7 +116,7 @@
     {
       "level_id": "ch2_m7",
       "name": "重装审判者",
-      "map_file": "data/generated_maps/ch2_m7.json",
+      "map_file": "data/locked_maps/ch2_m7.json",
       "seed": 2007,
       "size": "large",
       "theme": "city_ruins",
@@ -120,7 +125,7 @@
     {
       "level_id": "ch3_m1",
       "name": "地下入口",
-      "map_file": "data/generated_maps/ch3_m1.json",
+      "map_file": "data/locked_maps/ch3_m1.json",
       "seed": 3001,
       "size": "medium",
       "theme": "underground",
@@ -129,7 +134,7 @@
     {
       "level_id": "ch3_m2",
       "name": "毒雾管道",
-      "map_file": "data/generated_maps/ch3_m2.json",
+      "map_file": "data/locked_maps/ch3_m2.json",
       "seed": 3002,
       "size": "medium",
       "theme": "underground",
@@ -138,7 +143,7 @@
     {
       "level_id": "ch3_m3",
       "name": "陷阱迷宫",
-      "map_file": "data/generated_maps/ch3_m3.json",
+      "map_file": "data/locked_maps/ch3_m3.json",
       "seed": 3003,
       "size": "medium",
       "theme": "underground",
@@ -147,7 +152,7 @@
     {
       "level_id": "ch3_m4",
       "name": "电力设施",
-      "map_file": "data/generated_maps/ch3_m4.json",
+      "map_file": "data/locked_maps/ch3_m4.json",
       "seed": 3004,
       "size": "medium",
       "theme": "underground",
@@ -156,7 +161,7 @@
     {
       "level_id": "ch3_m5",
       "name": "通讯枢纽",
-      "map_file": "data/generated_maps/ch3_m5.json",
+      "map_file": "data/locked_maps/ch3_m5.json",
       "seed": 3005,
       "size": "medium",
       "theme": "underground",
@@ -165,7 +170,7 @@
     {
       "level_id": "ch3_m6",
       "name": "影子佣兵",
-      "map_file": "data/generated_maps/ch3_m6.json",
+      "map_file": "data/locked_maps/ch3_m6.json",
       "seed": 3006,
       "size": "large",
       "theme": "underground",
@@ -174,7 +179,7 @@
     {
       "level_id": "ch4_m1",
       "name": "外围突破",
-      "map_file": "data/generated_maps/ch4_m1.json",
+      "map_file": "data/locked_maps/ch4_m1.json",
       "seed": 4001,
       "size": "large",
       "theme": "mountain_fort",
@@ -183,7 +188,7 @@
     {
       "level_id": "ch4_m2",
       "name": "城墙攀登",
-      "map_file": "data/generated_maps/ch4_m2.json",
+      "map_file": "data/locked_maps/ch4_m2.json",
       "seed": 4002,
       "size": "medium",
       "theme": "mountain_fort",
@@ -192,7 +197,7 @@
     {
       "level_id": "ch4_m3",
       "name": "军械库",
-      "map_file": "data/generated_maps/ch4_m3.json",
+      "map_file": "data/locked_maps/ch4_m3.json",
       "seed": 4003,
       "size": "medium",
       "theme": "mountain_fort",
@@ -201,7 +206,7 @@
     {
       "level_id": "ch4_m4",
       "name": "指挥中心",
-      "map_file": "data/generated_maps/ch4_m4.json",
+      "map_file": "data/locked_maps/ch4_m4.json",
       "seed": 4004,
       "size": "large",
       "theme": "mountain_fort",
@@ -210,7 +215,7 @@
     {
       "level_id": "ch4_m5",
       "name": "围城之夜",
-      "map_file": "data/generated_maps/ch4_m5.json",
+      "map_file": "data/locked_maps/ch4_m5.json",
       "seed": 4005,
       "size": "large",
       "theme": "mountain_fort",
@@ -219,7 +224,7 @@
     {
       "level_id": "ch4_m6",
       "name": "矩阵将军",
-      "map_file": "data/generated_maps/ch4_m6.json",
+      "map_file": "data/locked_maps/ch4_m6.json",
       "seed": 4006,
       "size": "large",
       "theme": "mountain_fort",
@@ -228,7 +233,7 @@
     {
       "level_id": "ch5_m1",
       "name": "核心外围",
-      "map_file": "data/generated_maps/ch5_m1.json",
+      "map_file": "data/locked_maps/ch5_m1.json",
       "seed": 5001,
       "size": "large",
       "theme": "city_ruins",
@@ -237,7 +242,7 @@
     {
       "level_id": "ch5_m2",
       "name": "数据洪流",
-      "map_file": "data/generated_maps/ch5_m2.json",
+      "map_file": "data/locked_maps/ch5_m2.json",
       "seed": 5002,
       "size": "large",
       "theme": "city_ruins",
@@ -246,7 +251,7 @@
     {
       "level_id": "ch5_m3",
       "name": "架构师之眼",
-      "map_file": "data/generated_maps/ch5_m3.json",
+      "map_file": "data/locked_maps/ch5_m3.json",
       "seed": 5003,
       "size": "large",
       "theme": "city_ruins",
@@ -255,7 +260,7 @@
     {
       "level_id": "ch5_m4",
       "name": "最后选择",
-      "map_file": "data/generated_maps/ch5_m4.json",
+      "map_file": "data/locked_maps/ch5_m4.json",
       "seed": 5004,
       "size": "large",
       "theme": "city_ruins",
@@ -264,7 +269,7 @@
     {
       "level_id": "ch5_m5",
       "name": "架构师",
-      "map_file": "data/generated_maps/ch5_m5.json",
+      "map_file": "data/locked_maps/ch5_m5.json",
       "seed": 5005,
       "size": "large",
       "theme": "city_ruins",

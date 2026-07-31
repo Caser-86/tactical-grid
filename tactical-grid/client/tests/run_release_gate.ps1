@@ -433,6 +433,26 @@ if ($alertResult.ExitCode -ne 0 -or $alertFailed -ne 0) {
     exit 1
 }
 
+# --- 2.991. Encounter checkpoint state contract ---
+Write-Host "[2.991/3] Running encounter checkpoint state contract..."
+try {
+    $checkpointResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/encounter_checkpoint_state_test.tscn')
+} catch {
+    Write-Host "ENCOUNTER CHECKPOINT STATE TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$checkpointSummary = Get-LocalizedTestSummary -Output $checkpointResult.Stdout
+$checkpointPassed = [int]$checkpointSummary[0]
+$checkpointFailed = [int]$checkpointSummary[1]
+Write-Host "  Passed: $checkpointPassed"
+Write-Host "  Failed: $checkpointFailed"
+if ($checkpointResult.ExitCode -ne 0 -or $checkpointFailed -ne 0) {
+    Write-Host "ENCOUNTER CHECKPOINT STATE TEST FAILED (exit=$($checkpointResult.ExitCode), failed=$checkpointFailed)" -ForegroundColor Red
+    ($checkpointResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($checkpointResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 3. 日志门：检查预期 ERROR/WARNING ---
 Write-Host "[3/3] Checking log gate..."
 
@@ -452,7 +472,8 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($visibilityResult.Stdout -split "`r?`n") + ($visibilityResult.Stderr -split "`r?`n") + `
     ($intentResult.Stdout -split "`r?`n") + ($intentResult.Stderr -split "`r?`n") + `
     ($tnsResult.Stdout -split "`r?`n") + ($tnsResult.Stderr -split "`r?`n") + `
-    ($alertResult.Stdout -split "`r?`n") + ($alertResult.Stderr -split "`r?`n")
+    ($alertResult.Stdout -split "`r?`n") + ($alertResult.Stderr -split "`r?`n") + `
+    ($checkpointResult.Stdout -split "`r?`n") + ($checkpointResult.Stderr -split "`r?`n")
 
 # 预期的 WARNING（存档损坏恢复测试产生，共 3 条：2 来自 smoke test，1 来自 save_recovery_test）
 $expectedWarningPattern = 'Save file corrupted or missing, trying backup'
@@ -521,6 +542,7 @@ Write-Host "  Visibility state assertions: $visibilityPassed"
 Write-Host "  Enemy intent state assertions: $intentPassed"
 Write-Host "  Tactical network state assertions: $tnsPassed"
 Write-Host "  Alert state assertions: $alertPassed"
+Write-Host "  Encounter checkpoint state assertions: $checkpointPassed"
 Write-Host "  Failures: $failed"
 Write-Host "  Expected warnings: $($expectedWarnings.Count)"
 Write-Host "  Unexpected warnings: $($unexpectedWarnings.Count)"

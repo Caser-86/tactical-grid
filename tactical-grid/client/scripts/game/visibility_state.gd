@@ -130,3 +130,44 @@ func clear() -> void:
 	_observed_enemies.clear()
 	_newly_revealed.clear()
 	_previously_observed.clear()
+
+
+## CODE-CH1-020: 序列化迷雾记忆状态为可 JSON 化字典（供 EncounterCheckpointState 使用）。
+## Vector2i 作为 Dictionary 键时会被 Godot 序列化为 "x,y" 字符串；这里显式转换以便
+## 跨会话恢复且不依赖 Godot 内部键序列化。
+func serialize() -> Dictionary:
+	var cells: Array = []
+	for cell in _cell_states.keys():
+		cells.append({"cell": {"x": cell.x, "y": cell.y}, "state": String(_cell_states[cell])})
+	var last_known: Array = []
+	for eid in _last_known.keys():
+		last_known.append({"entity_id": eid, "data": _last_known[eid]})
+	return {
+		"width": _width,
+		"height": _height,
+		"cell_states": cells,
+		"last_known": last_known,
+		"observed_enemies": _observed_enemies.keys(),
+	}
+
+
+## CODE-CH1-020: 从序列化字典恢复迷雾记忆状态。
+## 注意：_previously_observed 和 _newly_revealed 不恢复，因为它们只与单回合边界相关。
+func deserialize(data: Dictionary) -> void:
+	_width = int(data.get("width", 0))
+	_height = int(data.get("height", 0))
+	_cell_states.clear()
+	_last_known.clear()
+	_observed_enemies.clear()
+	_newly_revealed.clear()
+	_previously_observed.clear()
+	for entry in data.get("cell_states", []):
+		var cell_dict = entry.get("cell", {})
+		var cell := Vector2i(int(cell_dict.get("x", 0)), int(cell_dict.get("y", 0)))
+		_cell_states[cell] = StringName(entry.get("state", "unexplored"))
+	for entry in data.get("last_known", []):
+		var eid = entry.get("entity_id", "")
+		if eid != "":
+			_last_known[eid] = entry.get("data", {})
+	for eid in data.get("observed_enemies", []):
+		_observed_enemies[eid] = true
