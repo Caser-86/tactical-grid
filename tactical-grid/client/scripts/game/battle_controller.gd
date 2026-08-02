@@ -1473,6 +1473,34 @@ func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(rect)
 
+## 范围格使用“填充 + 边框”双重编码，避免玩家只能靠颜色猜动作类型。
+func _highlight_range_cell(layer: Node2D, pos: Vector2i, fill_color: Color, border_color: Color, border_width: int = 2) -> void:
+	var origin := GridSystem.grid_to_world(pos)
+
+	var inner := ColorRect.new()
+	inner.color = fill_color
+	inner.position = origin + Vector2(border_width, border_width)
+	inner.size = Vector2(CELL_SIZE - border_width * 2, CELL_SIZE - border_width * 2)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(inner)
+
+	var edges := [
+		{&"position": origin, &"size": Vector2(CELL_SIZE, border_width)},
+		{&"position": origin + Vector2(0, CELL_SIZE - border_width), &"size": Vector2(CELL_SIZE, border_width)},
+		{&"position": origin, &"size": Vector2(border_width, CELL_SIZE)},
+		{&"position": origin + Vector2(CELL_SIZE - border_width, 0), &"size": Vector2(border_width, CELL_SIZE)},
+	]
+	for edge_data in edges:
+		var edge := ColorRect.new()
+		edge.color = border_color
+		edge.position = edge_data[&"position"]
+		edge.size = edge_data[&"size"]
+		edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(edge)
+
+func _highlight_edge_color(color: Color, alpha: float = 0.9) -> Color:
+	return Color(color.r, color.g, color.b, alpha)
+
 func _clear_layer(layer: Node2D) -> void:
 	for child in layer.get_children():
 		child.queue_free()
@@ -2361,7 +2389,8 @@ func _show_move_range(unit: Unit) -> void:
 	for cell in reachable_cells:
 		if cell == unit.grid_pos:
 			continue
-		_highlight_cell(move_highlight, cell, _highlight_color("move", COLOR_MOVE))
+		var move_color := _highlight_color("move", COLOR_MOVE)
+		_highlight_range_cell(move_highlight, cell, move_color, _highlight_edge_color(move_color))
 
 	# 标记选中单位本回合能进入的撤离区域格。
 	if mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
@@ -2463,7 +2492,8 @@ func _show_attack_range(unit: Unit) -> void:
 			if dist < min_range or dist > max_range:
 				continue
 			if VisionSystem.has_line_of_sight(unit.grid_pos, cell, map_width, map_height, _is_vision_blocking):
-				_highlight_cell(attack_highlight, cell, _highlight_color("attack", COLOR_ATTACK_RANGE))
+				var attack_range_color := _highlight_color("attack", COLOR_ATTACK_RANGE)
+				_highlight_range_cell(attack_highlight, cell, attack_range_color, _highlight_edge_color(attack_range_color))
 	# 敌方单位
 	# CH1-040: 只能攻击处于正在观察格子的敌人；隐藏敌人不可被选中
 	for enemy in enemy_units:
@@ -2479,7 +2509,9 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(enemy)
-				_highlight_cell(attack_highlight, enemy.grid_pos, _highlight_color("attack", COLOR_ATTACK))
+				var target_color := _highlight_color("attack", COLOR_ATTACK)
+				var target_border := _highlight_color("target", Color(1.0, 0.78, 0.16, 0.95))
+				_highlight_range_cell(attack_highlight, enemy.grid_pos, target_color, _highlight_edge_color(target_border))
 	# 可破坏目标（destroy 任务）
 	for tpos in destructible_targets:
 		var state = destructible_target_states.get(tpos, {})
@@ -2493,7 +2525,8 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(tpos)  # 混合类型：Unit 和 Vector2i
-				_highlight_cell(attack_highlight, tpos, _highlight_color("target", COLOR_TARGET))
+				var destructible_color := _highlight_color("target", COLOR_TARGET)
+				_highlight_range_cell(attack_highlight, tpos, destructible_color, _highlight_edge_color(destructible_color))
 
 ## 直接点击敌人后进入可读的二次确认预览，不执行攻击。
 func _begin_direct_attack_preview(target: Unit) -> void:
