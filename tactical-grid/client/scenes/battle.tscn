@@ -115,6 +115,18 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 1
 
+[node name="ShortcutHint" type="Label" parent="HUD/BottomBar"]
+layout_mode = 1
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 330.0
+offset_bottom = 55.0
+theme_override_colors/font_color = Color(0.55, 0.75, 0.8, 0.9)
+theme_override_font_sizes/font_size = 11
+text = "左键选择 / 点击高亮格操作\n右键取消 · Tab切换 · G网络 · Home总览 · Space结束"
+autowrap_mode = 2
+vertical_alignment = 1
+
 [node name="MoveButton" type="Button" parent="HUD/BottomBar/ActionBar"]
 layout_mode = 2
 text = "移动"

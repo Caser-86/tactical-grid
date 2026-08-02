@@ -103,6 +103,11 @@ func _test_hud_contract() -> void:
 			_check(visible_world.grow(1.0).has_point(corner), "camera can reach map corner %s" % corner)
 	var action_bar = hud.get_node_or_null("BottomBar/ActionBar")
 	_check(action_bar != null and action_bar.offset_right > 0.0, "HUD 在启动时应用视口布局")
+	var shortcut_hint: Label = hud.get_node_or_null("BottomBar/ShortcutHint")
+	_check(shortcut_hint != null and shortcut_hint.visible, "底部显示常用操作提示")
+	_check(shortcut_hint != null and shortcut_hint.text.contains("右键取消") and shortcut_hint.text.contains("G网络"), "操作提示包含取消和网络快捷键")
+	_check(shortcut_hint != null and shortcut_hint.text.contains("Home总览") and shortcut_hint.text.contains("Space结束"), "操作提示包含总览和结束回合快捷键")
+	_check(shortcut_hint != null and shortcut_hint.get_global_rect().position.y >= get_viewport().get_visible_rect().size.y - 60.0, "操作提示位于底部栏内")
 	var objective_label: Label = hud.get_node_or_null("TopBar/ObjectiveLabel")
 	var viewport_width := get_viewport().get_visible_rect().size.x
 	_check(objective_label != null and objective_label.size.x >= viewport_width * 0.5, "顶部目标栏使用可显示 Boss 状态的响应式宽度")
