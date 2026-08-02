@@ -532,6 +532,24 @@ func _click_left_button() -> void:
 	get_viewport().push_input(click)
 	await get_tree().process_frame
 
+func _click_right_button() -> void:
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_RIGHT
+	click.pressed = true
+	click.position = _last_mouse_screen_pos
+	click.global_position = _last_mouse_screen_pos
+	click.device = -1
+	get_viewport().push_input(click)
+	await get_tree().process_frame
+	click = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_RIGHT
+	click.pressed = false
+	click.position = _last_mouse_screen_pos
+	click.global_position = _last_mouse_screen_pos
+	click.device = -1
+	get_viewport().push_input(click)
+	await get_tree().process_frame
+
 func _click_control(control: Control) -> void:
 	var screen_pos := control.get_global_rect().get_center()
 	var motion := InputEventMouseMotion.new()
@@ -638,6 +656,12 @@ func _test_real_input_flow() -> void:
 	# 1. 真实鼠标事件：点击玩家单位选中
 	var player_unit: Unit = battle.player_units[0]
 	_move_mouse_to_grid(battle, player_unit.grid_pos)
+	_click_right_button()
+	_check(battle.selected_unit == player_unit, "CH1-030: 右键点击友军保持选中")
+	_check(battle.selected_action == "move", "CH1-030: 右键点击友军直接进入移动模式")
+	_check(battle.move_highlight.get_child_count() > 0, "CH1-030: 右键移动快捷键显示可达范围")
+	_click_right_button()
+	_check(battle.selected_action == "", "CH1-030: 移动模式下右键取消")
 	_click_left_button()
 	await get_tree().process_frame
 	_check(battle.selected_unit == player_unit, "CH1-030: 左键点击选中玩家单位")

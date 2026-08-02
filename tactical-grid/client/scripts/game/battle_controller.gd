@@ -2177,7 +2177,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mouse_btn.button_index == MOUSE_BUTTON_LEFT:
 			_handle_left_click(click_world)
 		elif mouse_btn.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel_action()
+			_handle_right_click(click_world)
+
+## 右键是移动快捷键：点击友军立即显示可达范围；移动模式下再次右键取消。
+func _handle_right_click(world_pos: Vector2) -> void:
+	var grid_pos := GridSystem.world_to_grid(world_pos)
+	var clicked_unit := _get_unit_at(grid_pos) if GridSystem.is_in_bounds(grid_pos, map_width, map_height) else null
+	if selected_action == "move":
+		_cancel_action()
+		return
+	if selected_action == "targeting" or (hud._action_picker != null and is_instance_valid(hud._action_picker)):
+		_cancel_action()
+		return
+	if clicked_unit and clicked_unit.is_alive and clicked_unit.team == "player":
+		if clicked_unit != selected_unit:
+			_select_unit(clicked_unit)
+		if selected_unit and selected_unit.current_ap > 0:
+			on_move_button()
+		return
+	if selected_unit and selected_unit.is_alive and selected_unit.team == "player" and selected_action == "":
+		on_move_button()
+		return
+	_cancel_action()
 
 func _handle_left_click(world_pos: Vector2) -> void:
 	var grid_pos = GridSystem.world_to_grid(world_pos)

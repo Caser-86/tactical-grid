@@ -105,7 +105,7 @@ func _test_hud_contract() -> void:
 	_check(action_bar != null and action_bar.offset_right > 0.0, "HUD 在启动时应用视口布局")
 	var shortcut_hint: Label = hud.get_node_or_null("BottomBar/ShortcutHint")
 	_check(shortcut_hint != null and shortcut_hint.visible, "底部显示常用操作提示")
-	_check(shortcut_hint != null and shortcut_hint.text.contains("右键取消") and shortcut_hint.text.contains("G网络"), "操作提示包含取消和网络快捷键")
+	_check(shortcut_hint != null and shortcut_hint.text.contains("右键移动/取消") and shortcut_hint.text.contains("G网络"), "操作提示包含移动/取消和网络快捷键")
 	_check(shortcut_hint != null and shortcut_hint.text.contains("Home聚焦") and shortcut_hint.text.contains("Space结束"), "操作提示包含聚焦和结束回合快捷键")
 	_check(shortcut_hint != null and shortcut_hint.get_global_rect().position.y >= get_viewport().get_visible_rect().size.y - 60.0, "操作提示位于底部栏内")
 	var objective_label: Label = hud.get_node_or_null("TopBar/ObjectiveLabel")
