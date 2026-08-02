@@ -361,7 +361,7 @@ func commit_action(preview: Dictionary) -> Dictionary
   - `scenes/mission_result.tscn`
 - 行为：
   - 只教学选择、移动、攻击、观察、接管和结束回合。
-  - 对话不遮挡目标格，战斗中短句可快速跳过且不会吞掉下一次点击。
+- 对话不遮挡目标格，战斗中短句可快速跳过且不会吞掉下一次点击；选项按钮放行真实鼠标按下/释放事件并进入对应回应分支。
   - 失败页明确说明最近失败原因，并提供“从遭遇重试/重新开始/返回基地”。
   - 结算固定为任务、情报、小队三个徽章，并说明每项取得或失去原因。
 - 测试：扩展 `tests/chapter_one_e2e_test.gd` 和 `tests/chapter_one_objectives_test.gd`。

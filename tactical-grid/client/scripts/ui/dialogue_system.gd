@@ -51,6 +51,9 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# 选项按钮必须先收到 GUI 点击，否则根节点会吞掉 pressed 信号。
+			if _is_choice_click(event.position):
+				return
 			# CH1-080: 标记输入已处理，防止点击穿透到战场控制器吞掉下一次地图点击
 			get_viewport().set_input_as_handled()
 			if is_typing:
@@ -69,6 +72,12 @@ func _input(event: InputEvent) -> void:
 				_show_full_text()
 			elif choices_container.get_child_count() == 0:
 				_next_line()
+
+func _is_choice_click(screen_position: Vector2) -> bool:
+	for child in choices_container.get_children():
+		if child is Control and child.get_global_rect().has_point(screen_position):
+			return true
+	return false
 
 ## 开始对话
 func start_dialogue(dialogue_id: String) -> void:

@@ -214,6 +214,26 @@ if ($dialogueResult.ExitCode -ne 0 -or $dialogueFailed -ne 0) {
     exit 1
 }
 
+# --- 2.645. 对话选项真实输入合约 ---
+Write-Host "[2.645/3] Running dialogue choice input contract..."
+try {
+    $dialogueChoiceResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/dialogue_choice_input_test.tscn')
+} catch {
+    Write-Host "DIALOGUE CHOICE INPUT TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$dialogueChoiceSummary = Get-LocalizedTestSummary -Output $dialogueChoiceResult.Stdout
+$dialogueChoicePassed = [int]$dialogueChoiceSummary[0]
+$dialogueChoiceFailed = [int]$dialogueChoiceSummary[1]
+Write-Host "  Passed: $dialogueChoicePassed"
+Write-Host "  Failed: $dialogueChoiceFailed"
+if ($dialogueChoiceResult.ExitCode -ne 0 -or $dialogueChoiceFailed -ne 0) {
+    Write-Host "DIALOGUE CHOICE INPUT TEST FAILED (exit=$($dialogueChoiceResult.ExitCode), failed=$dialogueChoiceFailed)" -ForegroundColor Red
+    ($dialogueChoiceResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($dialogueChoiceResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 2.65. Battle HUD and tutorial layout contract ---
 Write-Host "[2.65/3] Running battle HUD contract..."
 try {
@@ -542,6 +562,7 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($baseResult.Stdout -split "`r?`n") + ($baseResult.Stderr -split "`r?`n") + `
     ($characterPanelResult.Stdout -split "`r?`n") + ($characterPanelResult.Stderr -split "`r?`n") + `
     ($dialogueResult.Stdout -split "`r?`n") + ($dialogueResult.Stderr -split "`r?`n") + `
+    ($dialogueChoiceResult.Stdout -split "`r?`n") + ($dialogueChoiceResult.Stderr -split "`r?`n") + `
     ($hudResult.Stdout -split "`r?`n") + ($hudResult.Stderr -split "`r?`n") + `
     ($bossResult.Stdout -split "`r?`n") + ($bossResult.Stderr -split "`r?`n") + `
     ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
@@ -615,6 +636,7 @@ Write-Host "  Unit presentation assertions: $unitPassed"
 Write-Host "  Base presentation assertions: $basePassed"
 Write-Host "  Character panel assertions: $characterPanelPassed"
 Write-Host "  Dialogue layout assertions: $dialoguePassed"
+Write-Host "  Dialogue choice input assertions: $dialogueChoicePassed"
 Write-Host "  Battle HUD assertions: $hudPassed"
 Write-Host "  Data Sentinel assertions: $bossPassed"
 Write-Host "  Balance assertions: $balancePassed"
