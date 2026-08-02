@@ -503,6 +503,9 @@ func _inject_key(physical_keycode: int) -> void:
 	ev.device = -1
 	get_viewport().push_input(ev)
 	await get_tree().process_frame
+	ev.pressed = false
+	get_viewport().push_input(ev)
+	await get_tree().process_frame
 
 func _move_mouse_to_grid(battle: BattleController, grid_pos: Vector2i) -> void:
 	var world_pos := GridSystem.grid_to_world(grid_pos)
@@ -528,6 +531,58 @@ func _click_left_button() -> void:
 	print("  [DBG-CLICK] _last_mouse_screen_pos=", _last_mouse_screen_pos, " click.position=", click.position)
 	get_viewport().push_input(click)
 	await get_tree().process_frame
+
+func _click_control(control: Control) -> void:
+	var screen_pos := control.get_global_rect().get_center()
+	var motion := InputEventMouseMotion.new()
+	motion.position = screen_pos
+	motion.global_position = screen_pos
+	motion.device = -1
+	get_viewport().push_input(motion)
+	await get_tree().process_frame
+	for is_pressed in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = is_pressed
+		click.position = screen_pos
+		click.global_position = screen_pos
+		click.device = -1
+		get_viewport().push_input(click)
+		await get_tree().process_frame
+
+func _drag_camera(battle: BattleController) -> Dictionary:
+	var start_screen := Vector2(500.0, 400.0)
+	var end_screen := Vector2(380.0, 400.0)
+	var before := battle.camera.position
+	var motion := InputEventMouseMotion.new()
+	motion.position = start_screen
+	motion.global_position = start_screen
+	motion.device = -1
+	get_viewport().push_input(motion)
+	await get_tree().process_frame
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_MIDDLE
+	press.pressed = true
+	press.position = start_screen
+	press.global_position = start_screen
+	press.device = -1
+	get_viewport().push_input(press)
+	await get_tree().process_frame
+	motion = InputEventMouseMotion.new()
+	motion.position = end_screen
+	motion.global_position = end_screen
+	motion.device = -1
+	get_viewport().push_input(motion)
+	await get_tree().process_frame
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_MIDDLE
+	release.pressed = false
+	release.position = end_screen
+	release.global_position = end_screen
+	release.device = -1
+	get_viewport().push_input(release)
+	await get_tree().process_frame
+	return {"before": before, "after": battle.camera.position}
 
 func _find_reachable_cell(battle: BattleController, unit: Unit) -> Vector2i:
 	for cell in battle.reachable_cells.keys():
@@ -569,6 +624,8 @@ func _test_real_input_flow() -> void:
 
 	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 战斗在玩家行动阶段")
 	_check(battle.turn_manager.turn_number == 1, "CH1-030: 第 1 回合")
+	_check(battle.selected_unit != null and battle.selected_unit.team == "player", "CH1-030: 玩家回合自动选中可行动队员")
+	_check(battle.hud.attack_button.visible, "CH1-030: 玩家回合动作条显示攻击按钮")
 	_check(battle._active_context_flag == "teach_selection", "CH1-030: 上下文教程显示选择提示")
 
 	var prev_time_scale := Engine.time_scale
@@ -642,9 +699,10 @@ func _test_real_input_flow() -> void:
 	player_unit.base_hit = 100
 	enemy.dodge = 0.0
 	battle._select_unit(player_unit)
-	battle.hud.attack_button.pressed.emit()
+	await _click_control(battle.hud.attack_button)
 	await get_tree().process_frame
 	_check(battle.selected_action == "attack", "CH1-030: 攻击按钮进入攻击模式")
+	_check(battle.attack_highlight.get_child_count() > 0, "CH1-030: 点击攻击后显示攻击范围高亮")
 	_check(battle.attack_targets.size() > 0, "CH1-030: 攻击范围内有敌人目标")
 	if battle.attack_targets.size() > 0:
 		var enemy_hp_before := enemy.current_hp
@@ -675,12 +733,27 @@ func _test_real_input_flow() -> void:
 	await get_tree().process_frame
 
 	# 8. 真实键盘事件：Space 结束回合（回合变化）
+	_check(battle.hud.end_turn_button.visible, "CH1-030: 结束回合按钮可见")
+	_check(not battle.hud.end_turn_button.disabled, "CH1-030: 结束回合按钮可用")
+	await _click_control(battle.hud.end_turn_button)
+	await get_tree().process_frame
+	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 鼠标点击结束回合后回到玩家阶段")
+	_check(battle.turn_manager.turn_number == 2, "CH1-030: 鼠标点击结束回合进入第 2 回合")
+	_check(battle.selected_unit != null and battle.selected_unit.team == "player", "CH1-030: 敌人行动后自动恢复玩家单位选择")
+	_check(battle.hud.attack_button.visible, "CH1-030: 敌人行动后动作条恢复显示")
+
+	# 9. 真实中键拖拽：相机位置应随拖拽改变，而不是被输入层吞掉。
+	var drag_result := await _drag_camera(battle)
+	_check(drag_result.before != drag_result.after,
+		"CH1-030: 中键拖拽可以移动战场镜头")
+
+	# 10. 真实键盘事件：Space 结束回合（回合变化）
 	_inject_key(KEY_SPACE)
-	for frame in range(120):
+	for frame in range(300):
 		await get_tree().process_frame
-		if battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION:
+		if battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION and battle.turn_manager.turn_number >= 3:
 			break
-	_check(battle.turn_manager.turn_number == 2, "CH1-030: Space 键结束回合进入第 2 回合")
+	_check(battle.turn_manager.turn_number == 3, "CH1-030: Space 键结束回合进入第 3 回合")
 
 	Engine.time_scale = prev_time_scale
 	battle._cleanup_units()

@@ -25,6 +25,7 @@ default_bus_layout="res://default_bus_layout.tres"
 
 [display]
 
+window/dpi/allow_hidpi=false
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"

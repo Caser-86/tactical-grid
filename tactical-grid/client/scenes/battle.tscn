@@ -123,7 +123,7 @@ offset_right = 330.0
 offset_bottom = 55.0
 theme_override_colors/font_color = Color(0.55, 0.75, 0.8, 0.9)
 theme_override_font_sizes/font_size = 11
-text = "左键选择 / 点击高亮格操作\n右键取消 · Tab切换 · G网络 · Home总览 · Space结束"
+text = "左键选择 / 点击高亮格操作\n中键拖动地图 · WASD/方向键移动镜头\n右键取消 · Tab切换 · G网络 · Home聚焦 · Space结束"
 autowrap_mode = 2
 vertical_alignment = 1
 

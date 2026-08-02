@@ -242,7 +242,7 @@ func set_context_state(state: ContextState) -> void:
 		ContextState.ATTACK_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击红色目标攻击，右键取消"
+				_context_prompt.text = "点击红色高亮格攻击，右键取消"
 		ContextState.FACILITY_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true

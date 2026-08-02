@@ -221,6 +221,7 @@ func _finalize_telemetry(battle_result: Dictionary) -> Dictionary:
 ## 颜色
 const COLOR_MOVE = Color(0.13, 0.59, 0.95, 0.35)
 const COLOR_ATTACK = Color(0.96, 0.26, 0.21, 0.35)
+const COLOR_ATTACK_RANGE = Color(0.96, 0.26, 0.21, 0.13)
 const COLOR_PATH = Color(0.0, 1.0, 0.0, 0.25)
 const COLOR_EVAC = Color(0.0, 1.0, 0.0, 0.4)
 const COLOR_TARGET = Color(1.0, 0.62, 0.0, 0.4)
@@ -1578,6 +1579,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			if enemy_intent_state:
 				enemy_intent_state.freeze_stale_intents()
 			_refresh_enemy_intent_display()
+			_auto_select_player_unit()
 			if mission_objective_state:
 				mission_objective_state.apply_event(&"turn_started", {"turn": turn_manager.turn_number, "team": "player"})
 			hud.update_objective(_get_objective_text())
@@ -2234,6 +2236,15 @@ func _select_unit(unit: Unit) -> void:
 		_advance_context_hint("observe")
 	_show_move_range(unit)
 
+## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
+func _auto_select_player_unit() -> void:
+	if selected_unit and selected_unit.is_alive and selected_unit.team == "player":
+		return
+	for unit in player_units:
+		if unit and unit.is_alive and unit.team == "player":
+			_select_unit(unit)
+			return
+
 func _deselect_unit() -> void:
 	# 取消任何进行中的目标选择
 	_cancel_targeting_if_active()
@@ -2371,6 +2382,18 @@ func _draw_path_line(path: Array) -> void:
 func _show_attack_range(unit: Unit) -> void:
 	_clear_layer(attack_highlight)
 	attack_targets.clear()
+	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
+	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
+	# 先显示完整可射击区域，再用更亮的格子标出真实敌人/目标，
+	# 让玩家即使暂时没有敌人也能理解武器射程。
+	for y in range(maxi(0, unit.grid_pos.y - max_range), mini(map_height, unit.grid_pos.y + max_range + 1)):
+		for x in range(maxi(0, unit.grid_pos.x - max_range), mini(map_width, unit.grid_pos.x + max_range + 1)):
+			var cell := Vector2i(x, y)
+			var dist := GridSystem.manhattan_distance(unit.grid_pos, cell)
+			if dist < min_range or dist > max_range:
+				continue
+			if VisionSystem.has_line_of_sight(unit.grid_pos, cell, map_width, map_height, _is_vision_blocking):
+				_highlight_cell(attack_highlight, cell, _highlight_color("attack", COLOR_ATTACK_RANGE))
 	# 敌方单位
 	# CH1-040: 只能攻击处于正在观察格子的敌人；隐藏敌人不可被选中
 	for enemy in enemy_units:
@@ -2379,7 +2402,7 @@ func _show_attack_range(unit: Unit) -> void:
 		if visibility_state and not visibility_state.is_cell_observed(enemy.grid_pos):
 			continue
 		var dist = GridSystem.manhattan_distance(unit.grid_pos, enemy.grid_pos)
-		if dist >= unit.weapon_range[0] and dist <= unit.weapon_range[1]:
+		if dist >= min_range and dist <= max_range:
 			var has_los = VisionSystem.has_line_of_sight(
 				unit.grid_pos, enemy.grid_pos,
 				map_width, map_height, _is_vision_blocking
@@ -2393,7 +2416,7 @@ func _show_attack_range(unit: Unit) -> void:
 		if state.get("destroyed", false):
 			continue
 		var dist = GridSystem.manhattan_distance(unit.grid_pos, tpos)
-		if dist >= unit.weapon_range[0] and dist <= unit.weapon_range[1]:
+		if dist >= min_range and dist <= max_range:
 			var has_los = VisionSystem.has_line_of_sight(
 				unit.grid_pos, tpos,
 				map_width, map_height, _is_vision_blocking
@@ -2771,6 +2794,10 @@ func on_attack_button() -> void:
 	if selected_unit and selected_unit.team == "player" and selected_unit.current_ap > 0:
 		selected_action = "attack"
 		hud.set_context_state(HUD.ContextState.ATTACK_PREVIEW)
+		_clear_layer(move_highlight)
+		_clear_layer(path_preview_layer)
+		path_preview.clear()
+		reachable_cells.clear()
 		_show_attack_range(selected_unit)
 
 func on_skill_button() -> void:
