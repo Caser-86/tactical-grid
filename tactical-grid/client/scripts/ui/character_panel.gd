@@ -3,7 +3,7 @@
 extends Control
 class_name CharacterPanel
 
-@onready var portrait = $Panel/MainContainer/LeftContainer/Portrait
+@onready var portrait: TextureRect = $Panel/MainContainer/LeftContainer/Portrait
 @onready var name_label = $Panel/MainContainer/LeftContainer/NameLabel
 @onready var job_label = $Panel/MainContainer/LeftContainer/JobLabel
 @onready var level_label = $Panel/MainContainer/LeftContainer/LevelLabel
@@ -82,6 +82,8 @@ func open_panel(char_index: int = 0) -> void:
 func _show_empty() -> void:
 	current_character = {}
 	current_char_index = -1
+	portrait.texture = null
+	portrait.visible = false
 	title_label.text = "暂无角色"
 	name_label.text = "-"
 	job_label.text = "-"
@@ -115,6 +117,7 @@ func _update_display() -> void:
 	var lvl = current_character.get("level", 1)
 	level_label.text = "Lv.%d  (%d/%d XP)" % [lvl, xp, xp_next]
 	title_label.text = "%s - %s" % [name_label.text, job_label.text]
+	_update_portrait()
 
 	# HP
 	var max_hp = current_character.get("hp_max", 100)
@@ -135,6 +138,14 @@ func _update_display() -> void:
 	_update_equipment()
 	_update_skill_tree()
 	_apply_tab_visibility()
+
+func _update_portrait() -> void:
+	var job: StringName = StringName(current_character.get("job", "assault"))
+	var texture: Texture2D = ArtCatalog.get_texture(&"unit", job)
+	if texture == null:
+		texture = ArtCatalog.get_texture(&"unit", &"assault")
+	portrait.texture = texture
+	portrait.visible = texture != null
 
 func _update_stats() -> void:
 	for child in stat_container.get_children():

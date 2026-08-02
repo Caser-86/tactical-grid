@@ -174,6 +174,26 @@ if ($baseResult.ExitCode -ne 0 -or $baseFailed -ne 0) {
     exit 1
 }
 
+# --- 2.62. 角色详情面板纹理合约 ---
+Write-Host "[2.62/3] Running character panel contract..."
+try {
+    $characterPanelResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/character_panel_contract_test.tscn')
+} catch {
+    Write-Host "CHARACTER PANEL TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$characterPanelSummary = Get-LocalizedTestSummary -Output $characterPanelResult.Stdout
+$characterPanelPassed = [int]$characterPanelSummary[0]
+$characterPanelFailed = [int]$characterPanelSummary[1]
+Write-Host "  Passed: $characterPanelPassed"
+Write-Host "  Failed: $characterPanelFailed"
+if ($characterPanelResult.ExitCode -ne 0 -or $characterPanelFailed -ne 0) {
+    Write-Host "CHARACTER PANEL TEST FAILED (exit=$($characterPanelResult.ExitCode), failed=$characterPanelFailed)" -ForegroundColor Red
+    ($characterPanelResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($characterPanelResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 2.65. Battle HUD and tutorial layout contract ---
 Write-Host "[2.65/3] Running battle HUD contract..."
 try {
@@ -500,6 +520,7 @@ Write-Host "[3/3] Checking log gate..."
 $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($unitResult.Stdout -split "`r?`n") + ($unitResult.Stderr -split "`r?`n") + `
     ($baseResult.Stdout -split "`r?`n") + ($baseResult.Stderr -split "`r?`n") + `
+    ($characterPanelResult.Stdout -split "`r?`n") + ($characterPanelResult.Stderr -split "`r?`n") + `
     ($hudResult.Stdout -split "`r?`n") + ($hudResult.Stderr -split "`r?`n") + `
     ($bossResult.Stdout -split "`r?`n") + ($bossResult.Stderr -split "`r?`n") + `
     ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
@@ -571,6 +592,7 @@ Write-Host "=== Release Gate PASSED ===" -ForegroundColor Green
 Write-Host "  Stable assertion count: $passed"
 Write-Host "  Unit presentation assertions: $unitPassed"
 Write-Host "  Base presentation assertions: $basePassed"
+Write-Host "  Character panel assertions: $characterPanelPassed"
 Write-Host "  Battle HUD assertions: $hudPassed"
 Write-Host "  Data Sentinel assertions: $bossPassed"
 Write-Host "  Balance assertions: $balancePassed"
