@@ -2271,7 +2271,7 @@ func _select_unit(unit: Unit) -> void:
 		_spawn_effect("selection", unit.grid_pos)
 	else:
 		_advance_context_hint("observe")
-	_show_move_range(unit)
+	_refresh_selected_unit_affordances(unit)
 
 ## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
 func _auto_select_player_unit() -> void:
@@ -2338,8 +2338,8 @@ func _cancel_action() -> void:
 		_clear_layer(path_preview_layer)
 		path_preview.clear()
 		if selected_unit:
-			_show_move_range(selected_unit)
 			hud.update_unit_info(selected_unit)
+			_refresh_selected_unit_affordances(selected_unit)
 		hud.set_targeting_hint("")
 		hud.update_objective(_get_objective_text())
 	else:
@@ -2375,6 +2375,32 @@ func _show_move_range(unit: Unit) -> void:
 			# 终端相邻格可达时高亮终端
 			if _is_adjacent_reachable(unit, term_pos):
 				_highlight_cell(move_highlight, term_pos, _highlight_color("target", COLOR_TARGET))
+
+## 选中单位后的默认可发现性层：同时展示移动与攻击信息。
+## 玩家不需要先找到隐藏的“攻击模式”按钮，红色区域就是当前武器的有效范围。
+func _refresh_selected_unit_affordances(unit: Unit) -> void:
+	if not unit or not is_instance_valid(unit):
+		return
+	_show_move_range(unit)
+	_clear_layer(attack_highlight)
+	attack_targets.clear()
+	if unit.team != "player":
+		return
+	if unit.current_ap <= 0:
+		hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+		return
+	_show_attack_range(unit)
+	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
+	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
+	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
+	if attack_targets.is_empty():
+		hud.set_context_prompt(
+			"蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % range_text
+		)
+	else:
+		hud.set_context_prompt(
+			"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
+		)
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
 ## 仅在 move 模式下、目标格可达时绘制路径线条和途径格子高亮
@@ -2550,8 +2576,12 @@ func _try_move(grid_pos: Vector2i) -> void:
 	_log("%s 移动到 (%d,%d)" % [selected_unit.unit_name, grid_pos.x, grid_pos.y])
 	_clear_layer(path_preview_layer)
 	path_preview.clear()
-	_show_move_range(selected_unit)
+	selected_action = ""
+	attack_preview_target = null
+	attack_preview_data.clear()
+	attack_confirmation_required = false
 	hud.update_unit_info(selected_unit)
+	_refresh_selected_unit_affordances(selected_unit)
 
 	_check_encounter_zone(selected_unit.grid_pos)
 	# CH1-090: Evac VFX when a unit steps onto an extraction cell.
@@ -3109,8 +3139,8 @@ func _on_targeting_cancelled() -> void:
 	_pending_action_kind = ""
 	if selected_unit:
 		selected_action = ""
-		_show_move_range(selected_unit)
 		hud.update_unit_info(selected_unit)
+		_refresh_selected_unit_affordances(selected_unit)
 	else:
 		selected_action = ""
 
@@ -3172,10 +3202,7 @@ func _execute_pending_action(target_data: Dictionary) -> void:
 				_log("%s 物品 %s 失败：%s" % [selected_unit.unit_name, action_name, result.get("reason", "")])
 	# 刷新单位信息和移动范围
 	hud.update_unit_info(selected_unit)
-	if selected_unit.current_ap > 0:
-		_show_move_range(selected_unit)
-	else:
-		_clear_layer(move_highlight)
+	_refresh_selected_unit_affordances(selected_unit)
 	_check_victory_instant()
 
 func on_overwatch_button() -> void:
@@ -3197,6 +3224,7 @@ func on_overwatch_button() -> void:
 			_log("%s 进入警戒" % selected_unit.unit_name)
 			_record_overwatch_telemetry()
 			hud.update_unit_info(selected_unit)
+			_refresh_selected_unit_affordances(selected_unit)
 
 func on_end_turn_button() -> void:
 	_end_player_turn()

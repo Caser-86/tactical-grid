@@ -666,6 +666,10 @@ func _test_real_input_flow() -> void:
 	_click_left_button()
 	await get_tree().process_frame
 	_check(battle.selected_unit == player_unit, "CH1-030: 左键点击选中玩家单位")
+	_check(battle.attack_highlight.get_child_count() > 0, "CH1-030: 选中玩家单位显示攻击范围")
+	_check(battle.hud._context_prompt.text.contains("蓝色") and
+		battle.hud._context_prompt.text.contains("红色"),
+		"CH1-030: 选中玩家单位提示移动与攻击颜色含义")
 
 	# 2. HUD 移动按钮进入移动模式（UI 按钮交互，非内部执行函数）
 	battle.hud.move_button.pressed.emit()
@@ -698,6 +702,8 @@ func _test_real_input_flow() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check(player_unit.grid_pos == move_target, "CH1-030: 左键点击移动单位到目标格")
+		_check(battle.selected_action == "", "CH1-030: 移动完成回到直接选择模式")
+		_check(battle.attack_highlight.get_child_count() > 0, "CH1-030: 移动完成恢复攻击范围提示")
 		if fog_probe.x >= 0:
 			_check(
 				battle.visibility_state.get_cell_state(fog_probe) == VisibilityState.STATE_OBSERVED,

@@ -153,6 +153,9 @@ func _test_hud_contract() -> void:
 		tutorial.free()
 		_battle._active_tutorial_hint = null
 		_battle._pending_tutorial_flags.clear()
+	_check(TutorialHintScript.get_hint_copy("teach_selection").contains("蓝色格") and
+		TutorialHintScript.get_hint_copy("teach_selection").contains("红色区域"),
+		"选择教程说明蓝色移动与红色攻击范围")
 	_check(TutorialHintScript.get_hint_copy("teach_movement").contains("右键点击队员") and
 		TutorialHintScript.get_hint_copy("teach_movement").contains("蓝色高亮格"),
 		"移动教程说明右键快捷移动与高亮目标格")

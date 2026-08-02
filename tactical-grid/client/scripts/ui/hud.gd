@@ -235,7 +235,8 @@ func set_context_state(state: ContextState) -> void:
 				_context_prompt.text = "选择一个单位开始行动"
 		ContextState.UNIT_SELECTED:
 			if _context_prompt:
-				_context_prompt.visible = false
+				_context_prompt.visible = true
+				_context_prompt.text = "蓝色高亮格 = 可移动；红色区域/敌人 = 可攻击"
 		ContextState.MOVE_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
