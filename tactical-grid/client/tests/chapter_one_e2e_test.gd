@@ -594,11 +594,37 @@ func _test_real_input_flow() -> void:
 	var move_target := _find_reachable_cell(battle, player_unit)
 	_check(move_target.x >= 0, "CH1-030: 存在可达移动目标")
 	if move_target.x >= 0:
+		# 选择一个移动后才会进入视野的格子，防止只验证单位坐标而漏掉迷雾刷新。
+		var fog_probe := Vector2i(-1, -1)
+		var post_move_cells: Array[Vector2i] = VisionSystem.get_visible_cells(
+			move_target, player_unit.vision_range,
+			battle.map_width, battle.map_height,
+			battle._is_vision_blocking
+		)
+		for candidate in post_move_cells:
+			if battle.visibility_state.get_cell_state(candidate) == VisibilityState.STATE_UNEXPLORED:
+				fog_probe = candidate
+				break
+		_check(fog_probe.x >= 0, "CH1-030: 移动目标能扩展到新的迷雾区域")
+		if fog_probe.x >= 0:
+			_check(
+				battle.visibility_renderer.get_render_state_for_cell(fog_probe) == VisibilityState.RENDER_HIDDEN,
+				"CH1-030: 移动前新区域仍被黑雾遮挡"
+			)
 		_move_mouse_to_grid(battle, move_target)
 		_click_left_button()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check(player_unit.grid_pos == move_target, "CH1-030: 左键点击移动单位到目标格")
+		if fog_probe.x >= 0:
+			_check(
+				battle.visibility_state.get_cell_state(fog_probe) == VisibilityState.STATE_OBSERVED,
+				"CH1-030: 移动后新区域立即写入可见状态"
+			)
+			_check(
+				battle.visibility_renderer.get_render_state_for_cell(fog_probe) == VisibilityState.RENDER_VISIBLE,
+				"CH1-030: 移动后迷雾渲染立即显示周边"
+			)
 		_check(battle._active_context_flag != "teach_movement", "CH1-030: 移动后上下文教程推进")
 
 	# 4. 真实键盘事件：G 键切换网络覆盖层（节点状态）

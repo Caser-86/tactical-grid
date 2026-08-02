@@ -2447,6 +2447,10 @@ func _try_move(grid_pos: Vector2i) -> void:
 		_log("%s 警戒射击 %s!" % [t.watcher.unit_name, t.target.unit_name])
 		_update_unit_sprite_pos(t.target)
 
+	# 移动会改变玩家视野，不能等到下一回合才更新战争迷雾。
+	# 放在陷阱和警戒结算后，保证最终存活状态与最终位置都已写入。
+	_update_visibility()
+
 	_log("%s 移动到 (%d,%d)" % [selected_unit.unit_name, grid_pos.x, grid_pos.y])
 	_clear_layer(path_preview_layer)
 	path_preview.clear()
