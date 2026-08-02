@@ -643,7 +643,8 @@ func _test_real_input_flow() -> void:
 	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 战斗在玩家行动阶段")
 	_check(battle.turn_manager.turn_number == 1, "CH1-030: 第 1 回合")
 	_check(battle.selected_unit != null and battle.selected_unit.team == "player", "CH1-030: 玩家回合自动选中可行动队员")
-	_check(battle.hud.attack_button.visible, "CH1-030: 玩家回合动作条显示攻击按钮")
+	_check(not battle.hud.attack_button.visible and battle.hud.skill_button.visible,
+		"CH1-030: 简化动作条隐藏移动/攻击并保留技能操作")
 	_check(battle._active_context_flag == "teach_selection", "CH1-030: 上下文教程显示选择提示")
 
 	var prev_time_scale := Engine.time_scale
@@ -714,7 +715,7 @@ func _test_real_input_flow() -> void:
 	_inject_key(KEY_G)
 	_check(not battle.hud.is_network_overlay_visible(), "CH1-030: 再次 G 键隐藏网络覆盖层")
 
-	# 5. 真实鼠标事件：攻击敌人（敌人生命变化）
+	# 5. 真实鼠标事件：直接点击敌人先预览，再次点击确认攻击
 	# 设置可靠攻击条件：敌人相邻、命中必中
 	var enemy: Unit = battle.enemy_units[0]
 	enemy.grid_pos = player_unit.grid_pos + Vector2i(1, 0)
@@ -723,18 +724,22 @@ func _test_real_input_flow() -> void:
 	player_unit.base_hit = 100
 	enemy.dodge = 0.0
 	battle._select_unit(player_unit)
-	await _click_control(battle.hud.attack_button)
+	var enemy_hp_before_preview := enemy.current_hp
+	_move_mouse_to_grid(battle, enemy.grid_pos)
+	_click_left_button()
 	await get_tree().process_frame
-	_check(battle.selected_action == "attack", "CH1-030: 攻击按钮进入攻击模式")
-	_check(battle.attack_highlight.get_child_count() > 0, "CH1-030: 点击攻击后显示攻击范围高亮")
-	_check(battle.attack_targets.size() > 0, "CH1-030: 攻击范围内有敌人目标")
+	_check(battle.selected_action == "attack", "CH1-030: 直接点击敌人进入攻击预览")
+	_check(battle.hud._context_prompt.text.contains(enemy.unit_name), "CH1-030: 攻击预览锁定点击的敌人")
+	_check(battle.attack_highlight.get_child_count() > 0, "CH1-030: 直接点击敌人显示攻击范围高亮")
+	_check(enemy.current_hp == enemy_hp_before_preview, "CH1-030: 攻击预览不会立即扣除生命")
+	_check(battle.hud._context_prompt.text.contains("命中") and
+		battle.hud._context_prompt.text.contains("预计伤害"),
+		"CH1-030: 攻击预览显示命中率和预计伤害")
 	if battle.attack_targets.size() > 0:
-		var enemy_hp_before := enemy.current_hp
-		_move_mouse_to_grid(battle, enemy.grid_pos)
 		_click_left_button()
 		await get_tree().process_frame
 		await get_tree().process_frame
-		_check(enemy.current_hp < enemy_hp_before, "CH1-030: 攻击后敌人生命减少")
+		_check(enemy.current_hp < enemy_hp_before_preview, "CH1-030: 二次点击确认后敌人生命减少")
 
 	# 6. 真实键盘事件：Esc 在有目标模式时取消动作（不暂停）
 	# 攻击后 selected_action 仍为 "attack"（AP > 0）
@@ -764,7 +769,8 @@ func _test_real_input_flow() -> void:
 	_check(battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "CH1-030: 鼠标点击结束回合后回到玩家阶段")
 	_check(battle.turn_manager.turn_number == 2, "CH1-030: 鼠标点击结束回合进入第 2 回合")
 	_check(battle.selected_unit != null and battle.selected_unit.team == "player", "CH1-030: 敌人行动后自动恢复玩家单位选择")
-	_check(battle.hud.attack_button.visible, "CH1-030: 敌人行动后动作条恢复显示")
+	_check(not battle.hud.attack_button.visible and battle.hud.skill_button.visible,
+		"CH1-030: 敌人行动后简化动作条恢复显示")
 
 	# 9. 真实中键拖拽：相机位置应随拖拽改变，而不是被输入层吞掉。
 	var drag_result := await _drag_camera(battle)

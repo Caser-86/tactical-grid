@@ -69,6 +69,11 @@ var selected_unit: Unit = null
 var selected_action: String = ""  # "", "move", "attack", "skill", "item", "targeting"
 var reachable_cells: Dictionary = {}
 var attack_targets: Array = []
+## 直接点击敌人时的二次确认目标，避免误触立即结算攻击。
+var attack_preview_target: Unit = null
+var attack_preview_data: Dictionary = {}
+var attack_confirmation_required := false
+var last_player_attack_result: Dictionary = {}
 var path_preview: Array[Vector2i] = []
 # 当前正在选择目标的技能/物品 ID（由 HUD 行动选择面板设置）
 var _pending_action_id: String = ""
@@ -2234,12 +2239,23 @@ func _handle_left_click(world_pos: Vector2) -> void:
 					return
 			_try_move(grid_pos)
 		"attack":
+			var target := _get_unit_at(grid_pos)
+			if attack_confirmation_required:
+				if target and target.team != "player" and target == attack_preview_target:
+					_try_attack(grid_pos)
+				elif target and target.team != "player" and target in attack_targets:
+					_show_attack_preview(target)
+				else:
+					hud.set_context_prompt("请点击红色目标确认攻击，右键取消")
+				return
 			_try_attack(grid_pos)
 		"":
 			# 选择单位
 			var unit = _get_unit_at(grid_pos)
-			if unit and unit.is_alive:
+			if unit and unit.is_alive and unit.team == "player":
 				_select_unit(unit)
+			elif unit and unit.is_alive and unit.team != "player" and selected_unit and selected_unit.team == "player":
+				_begin_direct_attack_preview(unit)
 			else:
 				_deselect_unit()
 
@@ -2274,6 +2290,10 @@ func _deselect_unit() -> void:
 		_update_unit_sprite_selection(selected_unit, false)
 	selected_unit = null
 	selected_action = ""
+	attack_preview_target = null
+	attack_preview_data.clear()
+	attack_confirmation_required = false
+	last_player_attack_result.clear()
 	_pending_action_id = ""
 	_pending_action_kind = ""
 	reachable_cells.clear()
@@ -2309,6 +2329,9 @@ func _cancel_action() -> void:
 		return
 	if selected_action != "":
 		selected_action = ""
+		attack_preview_target = null
+		attack_preview_data.clear()
+		attack_confirmation_required = false
 		_pending_action_id = ""
 		_pending_action_kind = ""
 		_clear_layer(attack_highlight)
@@ -2446,6 +2469,35 @@ func _show_attack_range(unit: Unit) -> void:
 				attack_targets.append(tpos)  # 混合类型：Unit 和 Vector2i
 				_highlight_cell(attack_highlight, tpos, _highlight_color("target", COLOR_TARGET))
 
+## 直接点击敌人后进入可读的二次确认预览，不执行攻击。
+func _begin_direct_attack_preview(target: Unit) -> void:
+	if not selected_unit or selected_unit.team != "player":
+		return
+	on_attack_button()
+	attack_confirmation_required = true
+	if target in attack_targets:
+		_show_attack_preview(target)
+	else:
+		hud.set_context_prompt("无法攻击 %s：超出射程或没有视线" % target.unit_name)
+
+## 查询当前目标的真实攻击结果参数，并把关键数字放到上下文提示中。
+func _show_attack_preview(target: Unit) -> void:
+	if not selected_unit or not target or not target.is_alive:
+		return
+	var preview := action_system.query_action({"action": &"attack", "unit": selected_unit, "target": target})
+	if not bool(preview.get("valid", false)):
+		hud.set_context_prompt("无法攻击 %s" % target.unit_name)
+		return
+	attack_preview_target = target
+	attack_preview_data = preview.duplicate(true)
+	var hit_percent := int(roundf(float(preview.get("hit_chance", 0.0)) * 100.0))
+	var expected_damage := int(preview.get("damage", 0))
+	hud.set_context_prompt(
+		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消" % [
+			target.unit_name, hit_percent, expected_damage, target.current_hp, target.max_hp
+		]
+	)
+
 ## 检查单位的可达格中是否有与目标格相邻的
 func _is_adjacent_reachable(unit: Unit, target_pos: Vector2i) -> bool:
 	for dx in [-1, 0, 1]:
@@ -2532,7 +2584,10 @@ func _try_attack(grid_pos: Vector2i) -> void:
 		_log("目标不在攻击范围")
 		return
 
+	var target_hp_before: int = int(target.current_hp)
 	var attack_ok = _do_player_attack(selected_unit, target)
+	attack_preview_target = null
+	attack_preview_data.clear()
 	# 刷新攻击范围显示
 	if selected_unit and selected_unit.current_ap > 0:
 		_show_attack_range(selected_unit)
@@ -2542,6 +2597,16 @@ func _try_attack(grid_pos: Vector2i) -> void:
 	hud.update_unit_info(selected_unit)
 	if attack_ok:
 		_advance_context_hint("attack")
+		if attack_confirmation_required and selected_action == "attack":
+			var result := last_player_attack_result
+			var hit := bool(result.get("hit", false))
+			var damage_dealt := maxi(0, target_hp_before - target.current_hp)
+			if hit:
+				hud.set_context_prompt("命中 %s：%d 伤害 · 目标 HP %d/%d · 点击其他红色目标预览" % [
+					target.unit_name, damage_dealt, target.current_hp, target.max_hp
+				])
+			else:
+				hud.set_context_prompt("攻击 %s：未命中 · 点击其他红色目标预览" % target.unit_name)
 
 ## 攻击可破坏目标实体（消耗 AP，造成武器伤害）
 func _attack_destructible(attacker: Unit, target_pos: Vector2i) -> void:
@@ -2665,12 +2730,14 @@ func _try_interact_resource(unit: Unit, resource_pos: Vector2i) -> bool:
 ## CODE-CH1-010: 玩家攻击通过统一动作契约提交（query→commit）
 ## 敌人 AI 和警戒射击触发仍使用 _do_attack 的直接 execute_attack 路径
 func _do_player_attack(attacker: Unit, target: Unit) -> bool:
+	last_player_attack_result.clear()
 	var preview = action_system.query_action({"action": &"attack", "unit": attacker, "target": target})
 	if not bool(preview.get("valid", false)):
 		_log("攻击失败：%s" % preview.get("reason", "unknown"))
 		return false
 	var result = action_system.commit_action(preview)
 	if result.get("success", false):
+		last_player_attack_result = result.get("result", {}).duplicate(true)
 		AudioManager.sfx_attack(AudioManager.get_weapon_sfx_profile(attacker.weapon_special))
 		_play_unit_state(attacker, &"attack", Vector2(target.grid_pos - attacker.grid_pos))
 		_spawn_effect("muzzle", attacker.grid_pos)
@@ -2814,6 +2881,9 @@ func on_move_button() -> void:
 func on_attack_button() -> void:
 	if selected_unit and selected_unit.team == "player" and selected_unit.current_ap > 0:
 		selected_action = "attack"
+		attack_preview_target = null
+		attack_preview_data.clear()
+		attack_confirmation_required = false
 		hud.set_context_state(HUD.ContextState.ATTACK_PREVIEW)
 		_clear_layer(move_highlight)
 		_clear_layer(path_preview_layer)

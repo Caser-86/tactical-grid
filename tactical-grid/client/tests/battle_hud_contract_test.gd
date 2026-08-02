@@ -153,8 +153,12 @@ func _test_hud_contract() -> void:
 		tutorial.free()
 		_battle._active_tutorial_hint = null
 		_battle._pending_tutorial_flags.clear()
-	_check(TutorialHintScript.get_hint_copy("teach_movement").contains("下方【移动】"), "移动教程说明动作栏与高亮目标格")
-	_check(TutorialHintScript.get_hint_copy("teach_attack").contains("下方【攻击】"), "攻击教程说明动作栏与红色目标")
+	_check(TutorialHintScript.get_hint_copy("teach_movement").contains("右键点击队员") and
+		TutorialHintScript.get_hint_copy("teach_movement").contains("蓝色高亮格"),
+		"移动教程说明右键快捷移动与高亮目标格")
+	_check(TutorialHintScript.get_hint_copy("teach_attack").contains("直接点击红色敌人") and
+		TutorialHintScript.get_hint_copy("teach_attack").contains("预计伤害"),
+		"攻击教程说明直接点击敌人并查看预计伤害")
 
 	# 正式地图必须渲染环境组件，而不是退回纯色程序格。
 	var map_layer = _battle.get_node_or_null("MapLayer")
@@ -268,9 +272,9 @@ func _test_hud_contract() -> void:
 	_battle.selected_unit = player_unit
 	hud.update_unit_info(player_unit)
 
-	# 验证五个行动按钮可见
-	_check(move_btn.visible, "选中玩家单位后 MoveButton 可见")
-	_check(attack_btn.visible, "选中玩家单位后 AttackButton 可见")
+	# 简化操作：移动/攻击由地图直接点击，动作栏只保留技能类操作。
+	_check(not move_btn.visible, "选中玩家单位后 MoveButton 仍隐藏")
+	_check(not attack_btn.visible, "选中玩家单位后 AttackButton 仍隐藏")
 	_check(skill_btn.visible, "选中玩家单位后 SkillButton 可见")
 	_check(item_btn.visible, "选中玩家单位后 ItemButton 可见")
 	_check(overwatch_btn.visible, "选中玩家单位后 OverwatchButton 可见")

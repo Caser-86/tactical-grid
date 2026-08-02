@@ -216,8 +216,9 @@ func set_buttons_disabled(disabled: bool) -> void:
 
 func set_action_buttons_visible(visible: bool) -> void:
 	# 始终显示结束回合，其他按钮根据选择状态
-	move_button.visible = visible
-	attack_button.visible = visible
+	# 默认交互直接点击地图；保留移动/攻击回调，但不占用主动作栏。
+	move_button.visible = false
+	attack_button.visible = false
 	skill_button.visible = visible
 	item_button.visible = visible
 	overwatch_button.visible = visible
@@ -238,15 +239,24 @@ func set_context_state(state: ContextState) -> void:
 		ContextState.MOVE_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击蓝色高亮格移动，右键取消"
+				_context_prompt.text = "左键点击蓝色高亮格移动，右键取消"
 		ContextState.ATTACK_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击红色高亮格攻击，右键取消"
+				_context_prompt.text = "点击敌人查看攻击结果，再次点击确认，右键取消"
 		ContextState.FACILITY_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
 				_context_prompt.text = "点击设施节点交互，右键取消"
+
+## 设置一次性的上下文提示，例如攻击预览或结算结果。
+func set_context_prompt(text: String) -> void:
+	if _context_prompt:
+		_context_prompt.text = text
+		_context_prompt.visible = true
+
+func get_context_prompt_text() -> String:
+	return _context_prompt.text if _context_prompt else ""
 
 ## 在窗口尺寸变化时更新 HUD 安全区域，避免裁切或大面积空白
 func apply_viewport_layout(viewport_size: Vector2i) -> void:
