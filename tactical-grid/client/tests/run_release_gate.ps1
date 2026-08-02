@@ -194,6 +194,26 @@ if ($characterPanelResult.ExitCode -ne 0 -or $characterPanelFailed -ne 0) {
     exit 1
 }
 
+# --- 2.64. 对话布局合约 ---
+Write-Host "[2.64/3] Running dialogue layout contract..."
+try {
+    $dialogueResult = Invoke-GodotHeadless -Exe $GodotExe -Path $projectPath -ArgumentList @('--headless', '--path', $projectPath, 'res://tests/dialogue_layout_contract_test.tscn')
+} catch {
+    Write-Host "DIALOGUE LAYOUT TEST FAILED: $_" -ForegroundColor Red
+    exit 1
+}
+$dialogueSummary = Get-LocalizedTestSummary -Output $dialogueResult.Stdout
+$dialoguePassed = [int]$dialogueSummary[0]
+$dialogueFailed = [int]$dialogueSummary[1]
+Write-Host "  Passed: $dialoguePassed"
+Write-Host "  Failed: $dialogueFailed"
+if ($dialogueResult.ExitCode -ne 0 -or $dialogueFailed -ne 0) {
+    Write-Host "DIALOGUE LAYOUT TEST FAILED (exit=$($dialogueResult.ExitCode), failed=$dialogueFailed)" -ForegroundColor Red
+    ($dialogueResult.Stdout -split "`r?`n") | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    ($dialogueResult.Stderr -split "`r?`n") | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # --- 2.65. Battle HUD and tutorial layout contract ---
 Write-Host "[2.65/3] Running battle HUD contract..."
 try {
@@ -521,6 +541,7 @@ $combinedOut = $testOut + ($testErrStr -split "`r?`n") + `
     ($unitResult.Stdout -split "`r?`n") + ($unitResult.Stderr -split "`r?`n") + `
     ($baseResult.Stdout -split "`r?`n") + ($baseResult.Stderr -split "`r?`n") + `
     ($characterPanelResult.Stdout -split "`r?`n") + ($characterPanelResult.Stderr -split "`r?`n") + `
+    ($dialogueResult.Stdout -split "`r?`n") + ($dialogueResult.Stderr -split "`r?`n") + `
     ($hudResult.Stdout -split "`r?`n") + ($hudResult.Stderr -split "`r?`n") + `
     ($bossResult.Stdout -split "`r?`n") + ($bossResult.Stderr -split "`r?`n") + `
     ($balanceResult.Stdout -split "`r?`n") + ($balanceResult.Stderr -split "`r?`n") + `
@@ -593,6 +614,7 @@ Write-Host "  Stable assertion count: $passed"
 Write-Host "  Unit presentation assertions: $unitPassed"
 Write-Host "  Base presentation assertions: $basePassed"
 Write-Host "  Character panel assertions: $characterPanelPassed"
+Write-Host "  Dialogue layout assertions: $dialoguePassed"
 Write-Host "  Battle HUD assertions: $hudPassed"
 Write-Host "  Data Sentinel assertions: $bossPassed"
 Write-Host "  Balance assertions: $balancePassed"

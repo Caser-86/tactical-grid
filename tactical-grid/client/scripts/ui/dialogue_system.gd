@@ -34,6 +34,8 @@ var current_choices: Array = []
 ## CODE-P0-02: speaker -> 立绘位置（left/right），由 characters 数组填充
 var _speaker_positions: Dictionary = {}
 
+const PORTRAIT_COLUMN_WIDTH := 280.0
+
 func _ready() -> void:
 	hide()
 	continue_hint.visible = false
@@ -112,18 +114,37 @@ func _show_line(line: Dictionary) -> void:
 func _show_speaker_portrait(speaker: String) -> void:
 	portrait_left.visible = false
 	portrait_right.visible = false
+	_apply_content_layout("center")
 	if speaker == "":
 		return
+	var position: String = _speaker_positions.get(speaker, "left")
+	_apply_content_layout(position)
 	var texture: Texture2D = null
 	var art_catalog = get_node_or_null(^"/root/ArtCatalog")
 	if art_catalog and art_catalog.has_method("get_texture"):
 		texture = art_catalog.get_texture(&"portrait", StringName(speaker))
 	if texture == null:
 		return
-	var position: String = _speaker_positions.get(speaker, "left")
 	var target: TextureRect = portrait_right if position == "right" else portrait_left
 	target.texture = texture
 	target.visible = true
+
+func _apply_content_layout(position: String) -> void:
+	var left_offset := 20.0
+	var right_offset := -20.0
+	match position:
+		"left":
+			left_offset = PORTRAIT_COLUMN_WIDTH
+		"right":
+			right_offset = -PORTRAIT_COLUMN_WIDTH
+	text_label.offset_left = left_offset
+	text_label.offset_right = right_offset
+	choices_container.offset_left = left_offset + 50.0
+	choices_container.offset_right = right_offset
+	name_label.offset_left = left_offset
+	name_label.offset_right = right_offset
+	continue_hint.offset_left = left_offset
+	continue_hint.offset_right = right_offset
 
 ## 打字机效果
 func _type_text(text: String) -> void:
@@ -135,14 +156,14 @@ func _type_text(text: String) -> void:
 		await get_tree().create_timer(type_speed).timeout
 
 	is_typing = false
-	continue_hint.visible = true
+	continue_hint.visible = choices_container.get_child_count() == 0
 
 ## 跳过打字
 func _show_full_text() -> void:
 	is_typing = false
 	if current_index < current_lines.size():
 		text_label.text = current_lines[current_index].get("text", "")
-	continue_hint.visible = true
+	continue_hint.visible = choices_container.get_child_count() == 0
 
 ## 下一行
 func _next_line() -> void:
