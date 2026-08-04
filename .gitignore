@@ -20,6 +20,7 @@ yarn-error.log*
 # --- Build / Dist ---
 dist/
 build/
+artifacts/
 *.tsbuildinfo
 
 # --- 环境变量 ---

@@ -2,8 +2,11 @@ config_version=5
 
 [application]
 
-config/name="Tactical Grid"
-config/description="平面回合制战术战棋游戏"
+config/name="Tactical Grid V2: Infiltration"
+config/description="Tactical Grid V2 独立潜入探索冒险版本"
+config/version="2.0.0-v2"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="TacticalGrid_V2_Infiltration"
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
