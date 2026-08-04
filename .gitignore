@@ -56,6 +56,7 @@ temp/
 *.bak
 .cache/
 .superpowers/
+.worktrees/
 
 # --- Python ---
 __pycache__/
