@@ -18,16 +18,16 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 - 独立 Git 分支：已建立。
 - Godot 项目名称：`Tactical Grid V2: Infiltration`。
 - Godot 用户目录：`TacticalGrid_V2_Infiltration`。
-- V2 玩法规格：待建立。
+- V2 玩法规格：已写入，等待用户签核。
 - V2 M1 灰盒：未开始。
 - V2 发布资格：未评估。
 
 ## 执行顺序
 
-1. 编写并确认 V2 正式玩法规格。
-2. 建立 V2 的角色、敌人、操作和伤害验收标准。
-3. 用现有资源制作 M1 灰盒并进行真实输入测试。
-4. M1 通过首次玩家门后，再制作 V2 正式美术和后续关卡。
+1. 审阅并确认 [V2 总规格](V2_MASTER_SPEC.md)。
+2. 生成带任务编号、依赖、文件、测试命令和代理类型的逐任务实施计划。
+3. 先实现 V2 技术骨架、操作与 HUD，再用现有资源制作 M1 灰盒。
+4. 完成真实输入与首次玩家测试；M1 通过硬门后再批量制作正式美术和后续关卡。
 
 ## 禁止事项
 
@@ -41,7 +41,7 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 | 内容 | V1 | V2 |
 |---|---|---|
 | Git 分支 | `main` | `codex/ch1-infiltration-v2` |
-| 保护标签 | `v1-chapter1-baseline` | 待建立 V2 里程碑标签 |
+| 保护标签 | `v1-chapter1-baseline` | 规格签核后创建 `v2-spec-approved` |
 | Godot 用户目录 | 原 Tactical Grid 目录 | `TacticalGrid_V2_Infiltration` |
 | 资源新增位置 | V1 原目录 | `client/assets/v2/` |
 | 测试新增位置 | V1 原测试目录 | `client/tests/v2/` |

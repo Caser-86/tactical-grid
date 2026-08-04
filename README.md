@@ -7,8 +7,8 @@ V2 的唯一开发入口见 [V2 版本说明](docs/v2/README.md)。V1 文档和�
 ## V2 当前状态
 
 - V2 已完成独立 worktree、Git 分支、Godot 项目身份和用户数据目录隔离。
-- V2 当前仍继承 V1 的可运行基线，玩法重设计尚未开始。
-- V2 的下一步是先建立独立正式规格和 M1 灰盒，再开始玩法代码改动。
+- V2 当前仍继承 V1 的可运行基线，正式总规格已经写入并等待用户签核，玩法代码尚未开始修改。
+- V2 的下一步是签核总规格并生成逐任务实施计划，然后按 P1 技术骨架、P2 操作与 HUD、P3 M1 灰盒的顺序执行。
 
 完整的 V2 状态、边界和下一步请见 [V2 项目状态](tactical-grid/PROJECT_STATUS_V2.md) 与 [V2 文档入口](docs/v2/README.md)。
 
@@ -40,6 +40,7 @@ godot --path tactical-grid/client
 - [项目模块说明](tactical-grid/README.md)：安装、启动、测试和目录结构。
 - [V2 当前状态](tactical-grid/PROJECT_STATUS_V2.md)：V2 当前状态与发布阻断项。
 - [V2 版本说明](docs/v2/README.md)：V2 唯一执行入口、边界与后续规格。
+- [V2 总规格](docs/v2/V2_MASTER_SPEC.md)：产品、玩法、内容、技术、资源、测试与发布的唯一权威要求。
 
 ## 贡献约定
 
