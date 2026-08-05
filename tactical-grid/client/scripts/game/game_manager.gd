@@ -4,6 +4,7 @@ extends Node
 
 const ProgressionManagerScript = preload("res://scripts/game/progression_manager.gd")
 const DialogueScene = preload("res://scenes/dialogue.tscn")
+const V2CampaignProgressScript = preload("res://scripts/v2/mission/v2_campaign_progress.gd")
 
 signal save_loaded(slot: int)
 signal save_created(slot: int)
@@ -63,6 +64,57 @@ func begin_new_game_for_test(slot: int) -> Dictionary:
 	current_state = GameState.BASE
 	SaveManager.save_game(current_save, current_slot)
 	return current_save
+
+## V2 新游戏入口。V2 使用独立身份和存档目录，不复用 V1 队伍结构。
+func new_v2_game(slot: int = 0) -> bool:
+	current_slot = slot
+	current_save = SaveManager.create_v2_save()
+	current_state = GameState.BASE
+	var saved: bool = SaveManager.save_game_v2(current_save, current_slot)
+	if saved:
+		save_created.emit(current_slot)
+	return saved
+
+## V2 测试入口：初始化存档但不切换到尚未完成的 V2 场景。
+func begin_v2_new_game_for_test(slot: int = 0) -> Dictionary:
+	if not new_v2_game(slot):
+		return {}
+	return current_save.duplicate(true)
+
+func continue_v2_game() -> bool:
+	for slot in range(SaveManager.V2_MAX_LOCAL_SAVES):
+		var data: Dictionary = SaveManager.load_game_v2(slot)
+		if not data.is_empty():
+			current_slot = slot
+			current_save = data
+			current_state = GameState.BASE
+			save_loaded.emit(current_slot)
+			return true
+	return false
+
+func load_v2_slot(slot: int) -> bool:
+	var data: Dictionary = SaveManager.load_game_v2(slot)
+	if data.is_empty():
+		return false
+	current_slot = slot
+	current_save = data
+	current_state = GameState.BASE
+	save_loaded.emit(current_slot)
+	return true
+
+func save_current_v2() -> bool:
+	if current_save.is_empty():
+		return false
+	return SaveManager.save_game_v2(current_save, current_slot)
+
+func complete_v2_mission(result: Dictionary) -> bool:
+	if current_save.is_empty():
+		return false
+	var mission_id := StringName(String(result.get("mission_id", result.get("level_id", ""))))
+	if mission_id == StringName(""):
+		return false
+	current_save = V2CampaignProgressScript.complete_mission(current_save, mission_id, result)
+	return save_current_v2()
 
 ## 继续游戏（读取最新有效存档）
 func continue_game() -> bool:

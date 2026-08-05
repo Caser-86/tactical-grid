@@ -2,12 +2,18 @@
 ## 本地存档：支持多槽位、原子写入、备份和损坏恢复
 extends Node
 
+const V2CampaignProgress = preload("res://scripts/v2/mission/v2_campaign_progress.gd")
 const SAVE_DIR = "user://saves/"
 const MAX_LOCAL_SAVES = 3
 const SAVE_VERSION = "1.0.0"
+const V2_SAVE_DIR = "user://saves_v2/"
+const V2_MAX_LOCAL_SAVES = 3
+const V2_SAVE_VERSION = "2.0.0"
+const V2_GAME_LINE = "v2_infiltration"
 
 func _ready() -> void:
 	_ensure_save_dir()
+	_ensure_v2_save_dir()
 
 func _ensure_save_dir() -> void:
 	if not DirAccess.dir_exists_absolute(SAVE_DIR):
@@ -161,6 +167,128 @@ func delete_save(slot: int) -> void:
 		DirAccess.remove_absolute(final_path)
 	if FileAccess.file_exists(backup_path):
 		DirAccess.remove_absolute(backup_path)
+
+## ===== V2 独立存档 API =====
+## V2 与 V1 使用不同目录和身份字段，避免两个产品线互相读取存档。
+func _ensure_v2_save_dir() -> void:
+	if not DirAccess.dir_exists_absolute(V2_SAVE_DIR):
+		DirAccess.make_dir_recursive_absolute(V2_SAVE_DIR)
+
+func _v2_save_path(slot: int) -> String:
+	return V2_SAVE_DIR + "save_%d.json" % slot
+
+func _v2_backup_path(slot: int) -> String:
+	return V2_SAVE_DIR + "save_%d.bak" % slot
+
+func _v2_temp_path(slot: int) -> String:
+	return V2_SAVE_DIR + "save_%d.tmp" % slot
+
+func create_v2_save() -> Dictionary:
+	var data: Dictionary = V2CampaignProgress.create_default()
+	data["playtime_seconds"] = 0
+	data["save_time"] = 0
+	return data
+
+func save_game_v2(save_data: Dictionary, slot: int = 0) -> bool:
+	if slot < 0 or slot >= V2_MAX_LOCAL_SAVES:
+		push_error("Invalid V2 save slot: " + str(slot))
+		return false
+	var validation: Dictionary = V2CampaignProgress.validate(save_data)
+	if not bool(validation.get("valid", false)):
+		return false
+	_ensure_v2_save_dir()
+	var prepared: Dictionary = save_data.duplicate(true)
+	prepared["game_line"] = V2_GAME_LINE
+	prepared["save_version"] = V2_SAVE_VERSION
+	prepared["save_time"] = Time.get_unix_time_from_system()
+	var temp_path := _v2_temp_path(slot)
+	var final_path := _v2_save_path(slot)
+	var backup_path := _v2_backup_path(slot)
+	var file := FileAccess.open(temp_path, FileAccess.WRITE)
+	if file == null:
+		push_error("Failed to write V2 temp save: " + temp_path)
+		return false
+	file.store_string(JSON.stringify(prepared, "  "))
+	file.close()
+	if _read_file(temp_path).is_empty():
+		push_error("V2 save verification failed: " + temp_path)
+		DirAccess.remove_absolute(temp_path)
+		return false
+	if FileAccess.file_exists(final_path):
+		DirAccess.remove_absolute(backup_path)
+		var backup_err := DirAccess.rename_absolute(final_path, backup_path)
+		if backup_err != OK:
+			push_error("Failed to backup V2 save: " + str(backup_err))
+		var finalize_err := DirAccess.rename_absolute(temp_path, final_path)
+		if finalize_err != OK:
+			push_error("Failed to finalize V2 save: " + str(finalize_err))
+			if FileAccess.file_exists(backup_path):
+				DirAccess.rename_absolute(backup_path, final_path)
+			return false
+		return true
+	var finalize_err := DirAccess.rename_absolute(temp_path, final_path)
+	if finalize_err != OK:
+		push_error("Failed to finalize V2 save: " + str(finalize_err))
+		return false
+	return true
+
+func load_game_v2(slot: int = 0) -> Dictionary:
+	if slot < 0 or slot >= V2_MAX_LOCAL_SAVES:
+		return {}
+	_ensure_v2_save_dir()
+	var final_path := _v2_save_path(slot)
+	var backup_path := _v2_backup_path(slot)
+	var data: Dictionary = _read_and_validate_v2(final_path)
+	if not data.is_empty():
+		return data
+	if FileAccess.file_exists(backup_path):
+		push_warning("V2 save file corrupted or missing, trying backup: " + backup_path)
+		data = _read_and_validate_v2(backup_path)
+		if not data.is_empty():
+			if FileAccess.file_exists(final_path):
+				DirAccess.remove_absolute(final_path)
+			save_game_v2(data, slot)
+			return data
+	return {}
+
+func _read_and_validate_v2(path: String) -> Dictionary:
+	var text := _read_file(path)
+	if text.is_empty():
+		return {}
+	var parser := JSON.new()
+	if parser.parse(text) != OK or not parser.data is Dictionary:
+		return {}
+	var data: Dictionary = parser.data
+	var validation: Dictionary = V2CampaignProgress.validate(data)
+	if not bool(validation.get("valid", false)):
+		return {}
+	return data
+
+func get_v2_local_saves() -> Array[Dictionary]:
+	var saves: Array[Dictionary] = []
+	for slot in range(V2_MAX_LOCAL_SAVES):
+		var data: Dictionary = load_game_v2(slot)
+		if not data.is_empty():
+			saves.append({
+				"slot": slot,
+				"mission": data.get("current_mission", ""),
+				"rescued_characters": data.get("rescued_characters", []).duplicate(),
+				"save_time": data.get("save_time", 0),
+			})
+	return saves
+
+func has_any_v2_save() -> bool:
+	for slot in range(V2_MAX_LOCAL_SAVES):
+		if not load_game_v2(slot).is_empty():
+			return true
+	return false
+
+func delete_v2_save(slot: int) -> void:
+	if slot < 0 or slot >= V2_MAX_LOCAL_SAVES:
+		return
+	for path in [_v2_save_path(slot), _v2_backup_path(slot), _v2_temp_path(slot)]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 
 ## 创建默认战役进度
 func create_default_campaign_progress() -> Dictionary:
