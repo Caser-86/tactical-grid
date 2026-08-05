@@ -3,6 +3,7 @@ extends SceneTree
 const Runner = preload("res://tests/v2/test_runner.gd")
 const UnitScript = preload("res://scripts/game/unit.gd")
 const V2ActionService = preload("res://scripts/v2/combat/v2_action_service.gd")
+const Pathfinding = preload("res://scripts/core/pathfinding.gd")
 
 var t := Runner.new()
 
@@ -12,6 +13,12 @@ func _initialize() -> void:
 	if controller_script == null:
 		t.finish(self)
 		return
+	var reachable := Pathfinding.get_reachable_cells(
+		Vector2i(1, 1), 1, 8, 8,
+		func(_cell: Vector2i) -> int: return 1,
+		func(_cell: Vector2i) -> bool: return false
+	)
+	t.check(reachable.has(Vector2i(2, 1)) and not reachable.has(Vector2i(3, 1)), "移动范围不包含超出移动点数的边界格")
 
 	var battle: Node = controller_script.new()
 	var safe_unit: Unit = _make_unit("player_safe", Vector2i(1, 1), 5)
