@@ -3,10 +3,15 @@ class_name V2MapLoader
 
 const V2MapValidator = preload("res://scripts/v2/content/v2_map_validator.gd")
 const ROOT := "res://data/v2/locked_maps/"
+const MAP_FILES := {
+	"ch1_m1": "ch1_m1.json",
+	"ch1_m1_echo_yard_v3": "ch1_m1.json",
+}
 
 static func load_map(map_id: StringName) -> Dictionary:
 	var id := String(map_id)
-	var path := ROOT + id + ".json"
+	var file_name: String = MAP_FILES.get(id, id + ".json")
+	var path := ROOT + file_name
 	if id.is_empty() or not FileAccess.file_exists(path):
 		return {"success": false, "reason": &"map_missing", "path": path}
 	var file := FileAccess.open(path, FileAccess.READ)

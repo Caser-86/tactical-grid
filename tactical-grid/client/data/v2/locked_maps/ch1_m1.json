@@ -1,0 +1,143 @@
+{
+  "map_id": "ch1_m1_echo_yard_v3",
+  "schema_version": 3,
+  "mission_id": "ch1_m1",
+  "seed": 1001,
+  "size": {"width": 22, "height": 16},
+  "theme": "echo_yard",
+  "mission_type": "rescue_extract",
+  "primary_objective_id": "rescue_scout",
+  "layers": {
+    "base_terrain": [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    "blocker": [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    "vision": [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    "height": [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    "cover": [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,0,0,0,0,0,2,2,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ]
+  },
+  "entities": [
+    {"id":"spawn_assault", "type":"spawn_player", "x":3, "y":14, "team":"player", "character_id":"assault"},
+    {"id":"rescue_scout", "type":"objective_primary", "x":13, "y":7, "team":"neutral", "character_id":"scout", "state":"captive"},
+    {"id":"evac_northeast", "type":"evac", "x":19, "y":2, "radius":1, "state":"locked_until_rescue"},
+    {"id":"camera_console_south", "type":"facility_marker", "x":7, "y":11, "facility_type":"camera"},
+    {"id":"camera_east", "type":"facility_marker", "x":15, "y":5, "facility_type":"camera"},
+    {"id":"optional_record", "type":"facility_marker", "x":4, "y":4, "facility_type":"record"},
+    {"id":"landmark_crane", "type":"landmark", "x":10, "y":1, "landmark_type":"gantry_crane"},
+    {"id":"enemy_sentry_south", "type":"spawn_enemy", "x":8, "y":12, "team":"enemy", "enemy_id":"sentry", "active_on_start":true},
+    {"id":"enemy_drone_south", "type":"spawn_enemy", "x":10, "y":10, "team":"enemy", "enemy_id":"drone", "active_on_start":true},
+    {"id":"enemy_sentry_rescue", "type":"spawn_enemy", "x":14, "y":8, "team":"enemy", "enemy_id":"sentry", "active_on_start":false},
+    {"id":"enemy_drone_rescue", "type":"spawn_enemy", "x":16, "y":7, "team":"enemy", "enemy_id":"drone", "active_on_start":false},
+    {"id":"enemy_sentry_record", "type":"spawn_enemy", "x":6, "y":5, "team":"enemy", "enemy_id":"sentry", "active_on_start":false},
+    {"id":"enemy_sentry_evac", "type":"spawn_enemy", "x":18, "y":3, "team":"enemy", "enemy_id":"sentry", "active_on_start":false}
+  ],
+  "encounters": [
+    {"id":"encounter_south", "name":"南区巡逻", "trigger":"start", "trigger_cells":[[3,14],[4,14]], "active_enemy_ids":["enemy_sentry_south","enemy_drone_south"], "active_count":2, "active_cap":3},
+    {"id":"encounter_rescue", "name":"营救区搜索", "trigger":"enter_rescue_radius", "center":[13,7], "radius":5, "trigger_cells":[[12,7],[13,7],[14,7]], "active_enemy_ids":["enemy_sentry_rescue","enemy_drone_rescue"], "deactivate_on_trigger":["enemy_sentry_south"], "active_count":2, "active_cap":3},
+    {"id":"encounter_record", "name":"事故记录哨戒", "trigger":"enter_record_radius", "center":[4,4], "radius":4, "trigger_cells":[[4,4]], "active_enemy_ids":["enemy_sentry_record"], "deactivate_on_trigger":["enemy_sentry_south","enemy_drone_south"], "active_count":1, "active_cap":3},
+    {"id":"encounter_evac", "name":"撤离拦截", "trigger":"pre_evac", "trigger_cells":[[16,5]], "active_enemy_ids":["enemy_sentry_evac"], "deactivate_on_trigger":["enemy_sentry_rescue","enemy_drone_rescue"], "active_count":1, "active_cap":3}
+  ],
+  "checkpoints": [
+    {"id":"cp_start", "x":3, "y":14, "encounter_id":"encounter_south", "next_encounter_id":"encounter_rescue"},
+    {"id":"cp_rescue", "x":13, "y":7, "encounter_id":"encounter_rescue", "next_encounter_id":"encounter_evac"},
+    {"id":"cp_pre_evac", "x":16, "y":5, "encounter_id":"encounter_evac"}
+  ],
+  "facilities": [
+    {"id":"facility_camera_console_south", "type":"camera", "x":7, "y":11, "entity_id":"camera_console_south", "action_id":"view_camera_east"},
+    {"id":"facility_camera_east", "type":"camera", "x":15, "y":5, "entity_id":"camera_east", "action_id":"view_camera_east"},
+    {"id":"facility_optional_record", "type":"record", "x":4, "y":4, "entity_id":"optional_record", "action_id":"upload_incident_record"}
+  ],
+  "main_routes": [
+    {"id":"route_south_rescue", "name":"南侧主线", "required_ids":["spawn_assault","camera_console_south","rescue_scout","evac_northeast"], "cells":[[3,14],[7,11],[10,9],[13,7],[16,5],[19,2]]},
+    {"id":"route_west_record", "name":"西侧记录线", "required_ids":["spawn_assault","optional_record","rescue_scout","evac_northeast"], "cells":[[3,14],[2,10],[4,4],[9,5],[13,7],[17,4],[19,2]]}
+  ],
+  "activation_schedule": [
+    {"stage":"start", "active_ids":["enemy_sentry_south","enemy_drone_south"], "active_count":2},
+    {"stage":"rescue", "active_ids":["enemy_sentry_south","enemy_sentry_rescue","enemy_drone_rescue"], "active_count":3},
+    {"stage":"record", "active_ids":["enemy_sentry_record"], "active_count":1},
+    {"stage":"pre_evac", "active_ids":["enemy_sentry_evac"], "active_count":1}
+  ]
+}

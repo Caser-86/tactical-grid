@@ -90,6 +90,9 @@ static func validate(map_data: Dictionary) -> Dictionary:
 
 	return {"valid": errors.is_empty(), "errors": errors, "warnings": warnings}
 
+static func has_route(map_data: Dictionary, start: Vector2i, target: Vector2i) -> bool:
+	return _is_reachable(map_data, start, target)
+
 static func _validate_layers(raw_layers: Variant, width: int, height: int, errors: Array[String]) -> bool:
 	if not raw_layers is Dictionary:
 		errors.append("layers must be an object")
