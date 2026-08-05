@@ -53,6 +53,15 @@ static func _validate_loaded_references(documents: Dictionary, errors: Array[Str
 		var mission: Dictionary = missions[raw_id]
 		for dialogue_id in mission.get("dialogue_ids", []):
 			_validate_reference_if_loaded("missions.%s.dialogue_ids" % id, dialogue_id, dialogues, errors)
+	for raw_id in modules.keys():
+		var id := String(raw_id)
+		var module: Dictionary = modules[raw_id]
+		_validate_reference_if_loaded("modules.%s.character_id" % id, module.get("character_id", ""), characters, errors)
+		var unlock: Variant = module.get("unlock", {})
+		if unlock is Dictionary:
+			var mission_id := String(unlock.get("mission", ""))
+			if not mission_id.is_empty() and mission_id != "base":
+				_validate_reference_if_loaded("modules.%s.unlock.mission" % id, mission_id, missions, errors)
 
 static func _validate_reference_if_loaded(
 		field_name: String,
@@ -61,7 +70,7 @@ static func _validate_reference_if_loaded(
 		errors: Array[String]
 ) -> void:
 	var reference_id := String(reference)
-	if reference_id.is_empty() or document.is_empty():
+	if reference_id.is_empty():
 		return
 	if not document.has(reference_id):
 		errors.append("%s references missing ID %s" % [field_name, reference_id])
