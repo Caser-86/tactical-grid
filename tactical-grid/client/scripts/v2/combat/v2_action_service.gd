@@ -2,6 +2,7 @@ extends RefCounted
 class_name V2ActionService
 
 const V2CombatRulesScript = preload("res://scripts/v2/combat/v2_combat_rules.gd")
+const V2AbilityRulesScript = preload("res://scripts/v2/combat/v2_ability_rules.gd")
 
 var _map_data: Dictionary = {}
 var _players: Array = []
@@ -27,7 +28,9 @@ func query_action(request: Dictionary) -> Dictionary:
 			return _query_move(request)
 		&"attack":
 			return _query_attack(request)
-		&"ability", &"interaction":
+		&"ability":
+			return _query_ability(request)
+		&"interaction":
 			return {"valid": false, "reason": &"unsupported_action"}
 		_:
 			return {"valid": false, "reason": &"unknown_action"}
@@ -62,6 +65,8 @@ func commit_action(preview: Dictionary) -> Dictionary:
 			result = _commit_move(stored)
 		&"attack":
 			result = _commit_attack(stored)
+		&"ability":
+			result = _commit_ability(stored)
 		_:
 			return {"success": false, "reason": &"unknown_action", "preview_id": preview_id}
 	if not bool(result.get("success", false)):
@@ -141,6 +146,35 @@ func _query_attack(request: Dictionary) -> Dictionary:
 	combat_preview["target_shield"] = target.current_shield
 	return _store_preview(combat_preview)
 
+func _query_ability(request: Dictionary) -> Dictionary:
+	var actor: Unit = _get_unit(request.get("unit", null))
+	if actor == null:
+		return {"valid": false, "reason": &"invalid_unit"}
+	var ability_id := StringName(String(request.get("ability_id", request.get("id", ""))))
+	var target_data: Dictionary = {}
+	var raw_target_data: Variant = request.get("target_data", {})
+	if raw_target_data is Dictionary:
+		target_data = raw_target_data.duplicate(true)
+	var context: Dictionary = {}
+	var raw_context: Variant = request.get("context", {})
+	if raw_context is Dictionary:
+		context = raw_context.duplicate(true)
+	context["state_revision"] = _state_revision
+	var ability_preview: Dictionary = V2AbilityRulesScript.query(actor, ability_id, target_data, context)
+	if not bool(ability_preview.get("valid", false)):
+		return ability_preview
+	ability_preview["action"] = &"ability"
+	ability_preview["unit"] = actor
+	ability_preview["actor_pos"] = actor.grid_pos
+	ability_preview["context"] = context
+	var target: Unit = ability_preview.get("target_unit", target_data.get("target_unit", null))
+	if target != null:
+		ability_preview["target_unit"] = target
+		ability_preview["target_pos"] = target.grid_pos
+		ability_preview["target_hp"] = target.current_hp
+		ability_preview["target_shield"] = target.current_shield
+	return _store_preview(ability_preview)
+
 func _store_preview(preview: Dictionary) -> Dictionary:
 	var preview_id := _next_preview_id
 	_next_preview_id += 1
@@ -167,6 +201,13 @@ func _is_fresh(preview: Dictionary) -> bool:
 			and target.current_shield == int(preview.get("target_shield", -1))
 			and unit.can_act()
 		)
+	if action == &"ability":
+		if unit.grid_pos != preview.get("actor_pos", Vector2i(-1, -1)) or not unit.can_act():
+			return false
+		var target: Unit = preview.get("target_unit", null)
+		if target != null:
+			return is_instance_valid(target) and target.is_alive and target.grid_pos == preview.get("target_pos", Vector2i(-1, -1)) and target.current_hp == int(preview.get("target_hp", -1)) and target.current_shield == int(preview.get("target_shield", -1))
+		return true
 	return false
 
 func _commit_move(preview: Dictionary) -> Dictionary:
@@ -202,6 +243,12 @@ func _commit_attack(preview: Dictionary) -> Dictionary:
 		"hp_damage": hp_damage,
 		"event": {"type": &"damage_applied", "amount": final_damage},
 	}
+
+func _commit_ability(preview: Dictionary) -> Dictionary:
+	var actor: Unit = preview.get("unit", null)
+	var context: Dictionary = preview.get("context", {}).duplicate(true)
+	context["state_revision"] = _state_revision
+	return V2AbilityRulesScript.commit(actor, preview, context)
 
 func _get_unit(value: Variant) -> Unit:
 	if value is Unit:
