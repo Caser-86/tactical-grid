@@ -1,0 +1,10 @@
+{
+  "script_tests": [
+    "res://tests/v2/user_data_path_probe.gd",
+    "res://tests/v2/gate_manifest_test.gd"
+  ],
+  "scene_tests": [],
+  "powershell_tests": [
+    "tests/run_release_gate.ps1"
+  ]
+}
