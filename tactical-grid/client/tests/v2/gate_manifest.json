@@ -3,7 +3,8 @@
     "res://tests/v2/user_data_path_probe.gd",
     "res://tests/v2/gate_manifest_test.gd",
     "res://tests/v2/v2_data_repository_test.gd",
-    "res://tests/v2/v2_schema_reference_test.gd"
+    "res://tests/v2/v2_schema_reference_test.gd",
+    "res://tests/v2/v2_map_schema_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [
