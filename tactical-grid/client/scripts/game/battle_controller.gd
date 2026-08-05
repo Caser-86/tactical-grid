@@ -525,7 +525,7 @@ func _init_subsystems() -> void:
 	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
 	v2_input_router.cancel_requested.connect(_on_v2_cancel_requested)
 	v2_input_router.pointer_cancel_requested.connect(_on_v2_cancel_requested)
-	v2_input_router.end_turn_requested.connect(_end_player_turn)
+	v2_input_router.end_turn_requested.connect(request_end_turn)
 	v2_input_router.next_unit_requested.connect(_on_next_unit)
 
 func _setup_v2_services() -> void:
@@ -2383,11 +2383,12 @@ func _auto_select_player_unit() -> void:
 func _deselect_unit() -> void:
 	# 取消任何进行中的目标选择
 	_cancel_targeting_if_active()
-	hud.hide_action_picker()
+	if hud:
+		hud.hide_action_picker()
 	if selected_unit:
 		_update_unit_sprite_selection(selected_unit, false)
 	selected_unit = null
-	if _is_v2_battle() and v2_input_router:
+	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.FREE_SELECT)
 	selected_action = ""
 	attack_preview_target = null
@@ -2413,12 +2414,13 @@ func _deselect_unit() -> void:
 	_clear_layer(attack_highlight)
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
-	hud.clear_attack_preview()
-	hud.update_unit_info(null)
-	hud.set_action_buttons_visible(false)
-	hud.set_context_state(HUD.ContextState.NONE)
-	hud.set_targeting_hint("")
-	hud.update_objective(_get_objective_text())
+	if hud:
+		hud.clear_attack_preview()
+		hud.update_unit_info(null)
+		hud.set_action_buttons_visible(false)
+		hud.set_context_state(HUD.ContextState.NONE)
+		hud.set_targeting_hint("")
+		hud.update_objective(_get_objective_text())
 
 ## CH1-030: 是否有活跃的目标选择或动作模式（Esc 逐级取消 vs 暂停的判定）
 func _has_active_input_mode() -> bool:
@@ -3293,6 +3295,56 @@ func _end_player_turn() -> void:
 	_refresh_enemy_intent_display()
 	turn_manager.end_player_turn()
 
+## V2: 所有结束回合入口共用的公开接口，返回明确失败原因而不是静默无响应。
+func request_end_turn() -> Dictionary:
+	if turn_manager == null:
+		return {"success": false, "reason": &"turn_manager_unavailable"}
+	if turn_manager.battle_over:
+		return {"success": false, "reason": &"battle_over"}
+	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION:
+		return {"success": false, "reason": &"not_player_phase", "phase": turn_manager.current_phase}
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.PAUSED:
+		return {"success": false, "reason": &"paused"}
+	if hud and hud._action_picker != null and is_instance_valid(hud._action_picker):
+		return {"success": false, "reason": &"interaction_menu_open"}
+	if targeting_controller and targeting_controller.is_active:
+		return {"success": false, "reason": &"target_selection_open"}
+	cancel_current_preview()
+	_end_player_turn()
+	return {"success": true, "phase": turn_manager.current_phase}
+
+## V2: 取消预览/菜单，但保留选中的队员和范围信息。
+func cancel_current_preview() -> Dictionary:
+	if targeting_controller and targeting_controller.is_active:
+		targeting_controller.cancel()
+	if hud:
+		hud.hide_action_picker()
+	_clear_layer(attack_highlight)
+	_clear_layer(path_preview_layer)
+	path_preview.clear()
+	selected_action = ""
+	attack_preview_target = null
+	attack_preview_data.clear()
+	attack_confirmation_required = false
+	_pending_action_id = ""
+	_pending_action_kind = ""
+	_cancel_v2_preview(v2_pending_move_preview)
+	v2_pending_move_preview.clear()
+	_clear_v2_hover_preview()
+	_clear_v2_locked_attack()
+	v2_pending_interaction_facility_id = ""
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	if v2_input_router:
+		var state := v2_input_router.get_state()
+		if state in [V2BattleInputRouter.State.ATTACK_LOCKED, V2BattleInputRouter.State.ABILITY_TARGETING, V2BattleInputRouter.State.INTERACTION_MENU]:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	return {"success": true, "state": v2_input_router.get_state_name() if v2_input_router else "unit_selected"}
+
 
 ## CH1-050: Generate next-turn intents for every alive enemy.
 ## Each intent captures the action the enemy would take if the player ended
@@ -3680,7 +3732,10 @@ func on_overwatch_button() -> void:
 			_refresh_selected_unit_affordances(selected_unit)
 
 func on_end_turn_button() -> void:
-	_end_player_turn()
+	if _is_v2_battle():
+		request_end_turn()
+	else:
+		_end_player_turn()
 
 ## ===== 单位事件回调 =====
 

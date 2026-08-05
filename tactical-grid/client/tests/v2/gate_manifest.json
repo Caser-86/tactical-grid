@@ -17,7 +17,8 @@
     "res://tests/v2/v2_affordance_contract_test.gd",
     "res://tests/v2/v2_direct_move_input_test.gd",
     "res://tests/v2/v2_attack_input_test.gd",
-    "res://tests/v2/v2_interaction_service_test.gd"
+    "res://tests/v2/v2_interaction_service_test.gd",
+    "res://tests/v2/v2_cancel_end_turn_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [
