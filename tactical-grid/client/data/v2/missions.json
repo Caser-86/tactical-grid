@@ -12,7 +12,7 @@
     "active_cap": 3,
     "duration_minutes": [12, 18],
     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],
-    "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_rescue", "ch1_m1_outro"]
+    "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_rescue", "ch1_m1_record", "ch1_m1_outro"]
   },
   "ch1_m2": {
     "id": "ch1_m2",

@@ -529,14 +529,19 @@ git commit -m "feat(v2): unlock scout through M1 progression"
 
 **Files:**
 - Modify: `tactical-grid/client/data/v2/dialogues.json`
+- Modify: `tactical-grid/client/data/v2/missions.json`
 - Create: `tactical-grid/client/tests/v2/v2_m1_dialogue_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_m1_dialogue_scene_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_m1_dialogue_scene_test.tscn`
 - Modify: `tactical-grid/client/scripts/ui/dialogue_system.gd`
+- Modify: `tactical-grid/client/scripts/ui/base_controller.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Dialogue IDs: `ch1_m1_brief/ch1_m1_intro/ch1_m1_rescue/ch1_m1_record/ch1_m1_outro`。
 
-- [ ] **Step 1: 写节点数、字数和选项可点击测试**
+- [x] **Step 1: 写节点数、字数和选项可点击测试**
 
 ```gdscript
 for id in ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_rescue", "ch1_m1_record", "ch1_m1_outro"]:
@@ -547,20 +552,24 @@ t.check(V2Data.get_dialogue(&"ch1_m1_outro").lines.size() <= 8, "战后不超过
 t.check(V2Data.get_dialogue(&"ch1_m1_record").full_text.length() <= 120, "记录不超过 120 字")
 ```
 
-- [ ] **Step 2: 确认 F03 空对话数组导致失败**
+- [x] **Step 2: 确认 F03 空对话数组导致失败**
 
-- [ ] **Step 3: 写入正式短文本并绑定事件**
+- [x] **Step 3: 写入正式短文本并绑定事件**
 
 剧情内容只解释失联、侦察兵被困、数据哨兵正在观察设施和两人撤离，不一次介绍后五关系统。对话头像位于右侧安全区，选项始终在头像左下且可点击；不显示“点击继续”覆盖选项。
 
-- [ ] **Step 4: 运行对话布局、两选项输入和 720p/1080p 快照**
+- [x] **Step 4: 运行对话布局和两选项输入合同；720p/1080p 全视觉快照统一由 M112 矩阵生成**
 
-- [ ] **Step 5: 提交**
+验证结果：空数据 RED 合同失败 15 项；填入内容后 M111 对话内容合同 29/29、正式对话场景合同 7/7；M110 基地场景 24/24；V2 玩家真实输入 41/41；营救场景 13/13；重试场景 14/14；完整 V2 release gate 通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。战前简报提供两个可点击方针；V2 选项写入独立 `story_flags`；V2 存档优先读取 `V2Data`，缺失时不回退到 V1；营救和事故记录事件分别显示短对话。
+
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/data/v2/dialogues.json tactical-grid/client/scripts/ui/dialogue_system.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): write concise M1 narrative"
 ```
+
+提交结果：`feat(v2): write concise M1 narrative`。
 
 ### Task M112: M1 自动 E2E 和视觉矩阵
 

@@ -204,8 +204,19 @@ func _on_choice_selected(index: int) -> void:
 	# 触发 flag
 	if choice.has("flag"):
 		choice_made.emit(choice.flag)
-		GameManager.current_save.campaign_progress.story_flags[choice.flag] = true
-		GameManager.save_current()
+		var flag := String(choice.flag)
+		if String(GameManager.current_save.get("game_line", "")) == "v2_infiltration":
+			var v2_flags: Dictionary = GameManager.current_save.get("story_flags", {}).duplicate(true)
+			v2_flags[flag] = true
+			GameManager.current_save["story_flags"] = v2_flags
+			GameManager.save_current_v2()
+		else:
+			var progress: Dictionary = GameManager.current_save.get("campaign_progress", {}).duplicate(true)
+			var flags: Dictionary = progress.get("story_flags", {}).duplicate(true)
+			flags[flag] = true
+			progress["story_flags"] = flags
+			GameManager.current_save["campaign_progress"] = progress
+			GameManager.save_current()
 
 	# 显示回应
 	if choice.has("response"):
@@ -223,6 +234,13 @@ func _end_dialogue() -> void:
 
 ## 加载对话数据
 func _load_dialogue(dialogue_id: String) -> Dictionary:
+	# V2 has an independent dialogue document. Do not silently fall back to V1
+	# when a V2 entry is missing, otherwise the two products can cross-contaminate.
+	if String(GameManager.current_save.get("game_line", "")) == "v2_infiltration":
+		var v2_data = get_node_or_null(^"/root/V2Data")
+		if v2_data and v2_data.has_method("get_dialogue"):
+			return v2_data.get_dialogue(StringName(dialogue_id))
+		return {}
 	# 优先使用 GameData 已加载的数据
 	if GameData and not GameData.get_dialogue(dialogue_id).is_empty():
 		return GameData.get_dialogue(dialogue_id)

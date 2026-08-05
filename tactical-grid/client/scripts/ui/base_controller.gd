@@ -177,6 +177,17 @@ func _on_v2_mission_selected(mission_id: String) -> void:
 		return
 	GameManager.current_save["selected_squad"] = selected
 	GameManager.save_current_v2()
+	if mission_id == "ch1_m1":
+		var v2_repository: Node = get_node_or_null("/root/V2Data")
+		if v2_repository and not v2_repository.get_dialogue(&"ch1_m1_brief").is_empty():
+			GameManager.play_dialogue(
+				"ch1_m1_brief",
+				Callable(self, "_start_v2_mission_after_brief").bind(mission_id)
+			)
+			return
+	GameManager.go_to_battle(mission_id)
+
+func _start_v2_mission_after_brief(mission_id: String) -> void:
 	GameManager.go_to_battle(mission_id)
 
 func _load_campaign() -> void:

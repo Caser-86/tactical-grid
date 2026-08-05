@@ -1,8 +1,68 @@
 {
-  "ch1_m1_brief": {"id": "ch1_m1_brief", "lines": []},
-  "ch1_m1_intro": {"id": "ch1_m1_intro", "lines": []},
-  "ch1_m1_rescue": {"id": "ch1_m1_rescue", "lines": []},
-  "ch1_m1_outro": {"id": "ch1_m1_outro", "lines": []},
+  "ch1_m1_brief": {
+    "id": "ch1_m1_brief",
+    "trigger": "mission_selected",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "回声货场失去联系，侦察兵还在里面。", "emotion": "serious"},
+      {"speaker": "alpha", "text": "单人进入，找到他就撤，不恋战。", "emotion": "neutral"},
+      {"speaker": "commander", "text": "行动方针？", "emotion": "neutral", "choices": true}
+    ],
+    "choices": [
+      {"text": "稳步推进", "flag": "ch1_m1_cautious", "response": {"speaker": "alpha", "text": "收到。先看清路线，再接近目标。", "emotion": "neutral"}},
+      {"text": "快速接触", "flag": "ch1_m1_fast", "response": {"speaker": "alpha", "text": "明白。找到侦察兵就立刻撤离。", "emotion": "serious"}}
+    ]
+  },
+  "ch1_m1_intro": {
+    "id": "ch1_m1_intro",
+    "trigger": "mission_start",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "南侧入口安全。蓝色格子可移动，红色目标可攻击。", "emotion": "neutral"},
+      {"speaker": "alpha", "text": "我会沿掩体推进。侦察兵的信标在中区。", "emotion": "serious"}
+    ]
+  },
+  "ch1_m1_rescue": {
+    "id": "ch1_m1_rescue",
+    "trigger": "scout_rescued",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "alpha", "text": "找到你了。还能行动吗？", "emotion": "serious"},
+      {"speaker": "commander", "text": "侦察兵归队。现在两人一起去东北撤离点。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m1_record": {
+    "id": "ch1_m1_record",
+    "trigger": "optional_record_uploaded",
+    "full_text": "事故记录显示，数据哨兵在撤离前已改写巡逻路线。侦察模块 B 已登记。",
+    "characters": [
+      {"id": "commander", "position": "right"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "记录上传完成。我们知道它在观察谁了。", "emotion": "serious"}
+    ]
+  },
+  "ch1_m1_outro": {
+    "id": "ch1_m1_outro",
+    "trigger": "mission_victory",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "alpha", "text": "侦察兵安全，回声货场暂时安静了。", "emotion": "relieved"},
+      {"speaker": "commander", "text": "带回的信号会指向下一处设施。先回基地整备。", "emotion": "serious"}
+    ]
+  },
   "ch1_m2_brief": {"id": "ch1_m2_brief", "lines": []},
   "ch1_m2_intro": {"id": "ch1_m2_intro", "lines": []},
   "ch1_m2_rescue": {"id": "ch1_m2_rescue", "lines": []},

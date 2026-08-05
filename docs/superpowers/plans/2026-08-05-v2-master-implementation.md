@@ -423,7 +423,7 @@ function Invoke-V2PowerShell([string] $Path) {
 | M108 | `Invoke-V2Script 'tests/v2/v2_m1_tutorial_test.gd'` |
 | M109 | `Invoke-V2Script 'tests/v2/v2_m1_retry_test.gd'` |
 | M110 | `Invoke-V2Script 'tests/v2/v2_m1_progression_test.gd'` |
-| M111 | `Invoke-V2Script 'tests/v2/v2_m1_dialogue_test.gd'` |
+| M111 | `Invoke-V2Script 'tests/v2/v2_m1_dialogue_test.gd'; Invoke-V2Scene 'tests/v2/v2_m1_dialogue_scene_test.tscn'` |
 | M112 | `Invoke-V2Scene 'tests/v2/v2_m1_e2e_test.tscn'; Invoke-V2Scene 'tests/v2/v2_m1_visual_snapshot.tscn'` |
 | M113 | `Invoke-V2Script 'tests/v2/v2_playtest_recorder_test.gd'` |
 | H1 | `$h1 = Get-Content '..\..\artifacts\v2\verification\h1\H1_SUMMARY.md' -Raw; if ($h1 -notmatch 'decision:\s*PASS') { throw 'H1 real-player gate is not PASS' }` |
@@ -554,7 +554,7 @@ function Invoke-V2PowerShell([string] $Path) {
 - [x] M108 六步行为教学。教学流合同 31/31；V1 教学/HUD 合同 136/136；V2 玩家回合 41/41；救援场景 13/13；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
 - [x] M109 失败、检查点和三种重试出口。纯合同 15/15；正式重试场景 14/14；V2 检查点 13/13；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
 - [x] M110 基地解锁、编队、模块和结算。进度合同 16/16；基地/角色面板/结算正式场景合同 24/24；完整 V2 release gate 通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
-- [ ] M111 M1 短对话和事故记录。
+- [x] M111 M1 短对话和事故记录。内容合同 29/29；正式对话场景 7/7；V2 玩家输入 41/41；完整 V2 release gate 通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
 - [ ] M112 M1 自动 E2E 和视觉矩阵。
 - [ ] M113 首次玩家记录工具。
 - [ ] H1 三名首次玩家门。

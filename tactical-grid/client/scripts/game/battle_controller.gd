@@ -796,6 +796,8 @@ func _on_v2_rescue_committed(result: Dictionary) -> void:
 	_advance_context_hint("interact")
 	_render_v2_rescue_marker()
 	_render_v2_hud()
+	if _is_v2_battle() and level_id == "ch1_m1":
+		GameManager.play_dialogue("ch1_m1_rescue")
 
 func _on_v2_checkpoint_requested(checkpoint_id: StringName, _result: Dictionary) -> void:
 	_save_v2_checkpoint(checkpoint_id)
@@ -3400,6 +3402,8 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 	_log("设施 %s：%s" % [facility_id, consequence])
 	if String(result.get("reward_module", "")) != "":
 		_log("可选目标完成：已登记模块 %s" % String(result.get("reward_module", "")))
+		if _is_v2_battle() and level_id == "ch1_m1" and String(result.get("action_id", "")) == "upload_incident_record":
+			GameManager.play_dialogue("ch1_m1_record")
 	if hud:
 		hud.set_context_prompt("设施操作完成：%s" % consequence)
 	if tactical_network_state:
