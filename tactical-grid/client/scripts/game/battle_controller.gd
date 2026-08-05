@@ -532,6 +532,7 @@ func _init_subsystems() -> void:
 	v2_mission_flow = {"game_line": "v2_infiltration", "state_revision": 0}
 	v2_interaction_service = V2InteractionServiceScript.new()
 	v2_input_router = V2BattleInputRouterScript.new()
+	add_child(v2_input_router)
 	v2_input_router.cell_left_clicked.connect(_on_v2_cell_left_clicked)
 	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
 	v2_input_router.cancel_requested.connect(_on_v2_cancel_requested)
@@ -541,10 +542,18 @@ func _init_subsystems() -> void:
 	v2_input_router.camera_pan_requested.connect(_on_v2_camera_pan)
 	v2_input_router.camera_zoom_requested.connect(_on_v2_camera_zoom)
 	v2_input_router.focus_requested.connect(_on_v2_camera_focus)
+	v2_input_router.network_overlay_requested.connect(_on_toggle_network)
 
 func _setup_v2_services() -> void:
 	if v2_action_service == null:
 		return
+	# V2 uses one move budget and one action budget for every live combat unit.
+	# Enable this before TurnManager starts the first player phase so the first
+	# real click can query and commit an action without a legacy AP fallback.
+	for raw_unit in player_units + enemy_units:
+		var unit: Unit = raw_unit
+		if unit and not unit.v2_turn_mode_enabled:
+			unit.enable_v2_turn_mode()
 	v2_action_service.setup(map_data, player_units, enemy_units)
 	v2_mission_flow["mission_id"] = level_id
 	v2_mission_flow["state_revision"] = 1
@@ -1756,6 +1765,8 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			_log("第 %d 回合 - 玩家行动" % turn_manager.turn_number)
 
 		TurnManager.TurnPhase.ENEMY_ACTION:
+			if _is_v2_battle() and v2_input_router:
+				v2_input_router.set_state(V2BattleInputRouter.State.ENEMY_TURN)
 			hud.update_turn_display(turn_manager.turn_number, phase)
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
@@ -1822,6 +1833,8 @@ func _spawn_reinforcement_units(units_data: Array, trigger_id: String = "") -> v
 				stable_id = "%s_%d" % [unit.team, enemy_units.size()]
 		unit.entity_id = stable_id
 		_apply_difficulty_to_enemy(unit)
+		if _is_v2_battle():
+			unit.enable_v2_turn_mode()
 		enemy_units.append(unit)
 		# 渲染新单位精灵
 		_create_unit_sprite(unit)
@@ -1868,6 +1881,8 @@ func _spawn_player_units(units_data: Array) -> void:
 				stable_id = "%s_%d" % [unit.team, player_units.size()]
 		unit.entity_id = stable_id
 		unit.current_ap = unit.max_ap
+		if _is_v2_battle():
+			unit.enable_v2_turn_mode()
 		player_units.append(unit)
 		_create_unit_sprite(unit)
 		_log("玩家增援到达：%s (%d,%d)" % [unit.unit_name, spawn_pos.x, spawn_pos.y])
@@ -2594,6 +2609,7 @@ func _finalize_v2_move(result: Dictionary) -> void:
 	refresh_visibility_transaction(&"unit_moved")
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	_render_v2_hud()
 
 func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	if not _is_v2_battle():
@@ -2758,10 +2774,11 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 		hud.set_context_prompt("攻击结算：%s 受到 %d 点伤害，HP %d/%d" % [
 		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
 		])
-	_render_v2_hud()
+	last_player_attack_result = result.duplicate(true)
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_update_visibility()
+	_render_v2_hud()
 
 func _clear_v2_hover_preview() -> void:
 	_cancel_v2_preview(v2_hover_attack_preview)

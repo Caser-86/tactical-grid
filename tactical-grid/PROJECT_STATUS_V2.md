@@ -1,7 +1,7 @@
 # Tactical Grid V2 当前状态
 
 > version: V2 Infiltration
-> status: P0 approved; implementation ready
+> status: P2 passed; M1 vertical slice ready to start
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
 
@@ -18,11 +18,13 @@
 - P1 技术骨架 F01-F12 已完成：独立门禁、权威数据、地图 schema v3、V2 存档身份、行动预算、确定性战斗、事务行动、角色能力、检查点、敌人意图和运行入口集成。
 - V2 P1 release gate 已通过：V2 脚本测试 10 组全部通过；继承 V1 release gate 1816 个稳定断言、章节一 E2E 190 个断言，失败数为 0。
 - V2Data 已作为独立 autoload 启动；GameManager 会在启动时硬校验 V2 数据，失败不会静默回退到 V1 数据。
-- BattleController 已创建 V2 行动、任务流程和交互依赖槽位，但正式输入仍保留 V1 ActionSystem，等待 P2 按合同切换。
+- P2 I01-I12 已完成：直接地图选择、蓝色移动/红色攻击范围、悬停与二次确认、设施菜单、右键取消、Space 结束回合、中键拖动、滚轮缩放、Home 聚焦、紧凑 HUD、精确伤害、事务级战争迷雾、设置与无障碍选项。
+- V2 实战单位已统一启用移动/行动双预算；G 键网络覆盖层、敌方回合状态和攻击结算后的 HUD 状态已接入真实场景。
+- V2 真实输入集成测试 `v2_player_turn_e2e_test.tscn` 已通过 37 个断言，覆盖 battle.tscn、角色选择、蓝格移动、敌人悬停、双击攻击、HP 预览/结算、镜头、取消、G、Space、敌方回合和下一回合恢复。
+- V2 P2 全门已通过：V2 脚本合同全部通过，其中设置合同包含 18 个断言；真实输入场景 37 个断言；V1 稳定断言 1816、章节一 E2E 190，失败数 0，发布门禁异常警告/错误 0。
 
 ## 尚未开始
 
-- V2 正式输入与战斗 HUD 重构。
 - V2 M1 灰盒。
 - V2 新角色和敌人美术。
 - V2 首次玩家测试。
@@ -34,4 +36,4 @@ V1 的 `PROJECT_STATUS.md`、`docs/PROJECT_TAKEOVER_ROADMAP.md` 和 2026-07-30 �
 
 ## 下一步
 
-P1 已完成。下一步从 `docs/superpowers/plans/2026-08-05-v2-p2-interaction-hud.md` 的 I01 开始，先实现单击选择、移动/攻击范围、目标预览、取消和结束回合，再接入 V2 HUD。P2 通过前不开始 M1 正式美术批量制作；H1 通过前不扩展后续章节正式内容。
+P1 和 P2 已完成。下一步从 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M101 开始，先锁定 M1 任务数据、正式目标流和地图灰盒，再进入角色/敌人美术批量制作。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。

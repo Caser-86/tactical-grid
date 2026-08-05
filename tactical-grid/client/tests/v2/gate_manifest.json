@@ -25,7 +25,9 @@
     "res://tests/v2/v2_visibility_transaction_test.gd",
     "res://tests/v2/v2_settings_contract_test.gd"
   ],
-  "scene_tests": [],
+  "scene_tests": [
+    "res://tests/v2/v2_player_turn_e2e_test.tscn"
+  ],
   "powershell_tests": [
     "tests/run_release_gate.ps1"
   ]
