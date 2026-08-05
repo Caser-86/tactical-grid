@@ -527,6 +527,9 @@ func _init_subsystems() -> void:
 	v2_input_router.pointer_cancel_requested.connect(_on_v2_cancel_requested)
 	v2_input_router.end_turn_requested.connect(request_end_turn)
 	v2_input_router.next_unit_requested.connect(_on_next_unit)
+	v2_input_router.camera_pan_requested.connect(_on_v2_camera_pan)
+	v2_input_router.camera_zoom_requested.connect(_on_v2_camera_zoom)
+	v2_input_router.focus_requested.connect(_on_v2_camera_focus)
 
 func _setup_v2_services() -> void:
 	if v2_action_service == null:
@@ -540,6 +543,8 @@ func _setup_v2_services() -> void:
 	v2_locked_attack_target_id = ""
 	v2_pending_interaction_facility_id = ""
 	v2_interaction_service.setup(map_data, tactical_network_state, visibility_state, alert_state)
+	if camera:
+		camera.set_input_router_mode(_is_v2_battle())
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -2710,6 +2715,18 @@ func _on_v2_cancel_requested() -> void:
 		_deselect_unit()
 	elif selected_unit:
 		_refresh_selected_unit_affordances(selected_unit)
+
+func _on_v2_camera_pan(delta: Vector2) -> void:
+	if camera:
+		camera.pan_by_screen_delta(delta)
+
+func _on_v2_camera_zoom(amount: int) -> void:
+	if camera:
+		camera.zoom_at(float(amount), get_viewport().get_mouse_position())
+
+func _on_v2_camera_focus() -> void:
+	if camera and selected_unit:
+		camera.focus_cell(selected_unit.grid_pos)
 
 ## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
 func _open_v2_interaction_menu(entity_id: String) -> void:
