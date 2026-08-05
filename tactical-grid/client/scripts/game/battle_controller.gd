@@ -18,6 +18,7 @@ const V2EncounterActivationScript = preload("res://scripts/v2/mission/v2_encount
 const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.gd")
 const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
+const V2PlaytestRecorderScript = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -127,6 +128,8 @@ var v2_last_checkpoint_id: String = ""
 var v2_rescue_marker: Node2D = null
 var _v2_units_rendered := false
 var v2_visibility_summary: Dictionary = {}
+## M113: opt-in only. Normal game launches never create a playtest file.
+var v2_playtest_recorder: RefCounted = null
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -369,6 +372,7 @@ func _exit_tree() -> void:
 	# 取消任何进行中的目标选择，避免信号回调悬空
 	if targeting_controller and targeting_controller.is_active:
 		targeting_controller.cancel()
+	_finish_v2_playtest(false, {"ended_by": "scene_exit"})
 	_cleanup_units()
 
 ## 释放所有单位节点（player_units 和 enemy_units 中的 Unit 实例）
@@ -506,6 +510,7 @@ func _show_v2_tutorial_step() -> void:
 		v2_tutorial_flow.current_text(),
 		Callable(self, "_skip_v2_tutorial"),
 	)
+	_record_v2_playtest_event(&"hint_shown", {"hint_id": String(v2_tutorial_flow.current_step())})
 
 func _skip_v2_tutorial() -> void:
 	if v2_tutorial_flow:
@@ -543,6 +548,43 @@ func _advance_v2_tutorial(event_name: StringName, payload: Dictionary = {}) -> D
 			_dismiss_context_hint()
 		_render_v2_hud()
 	return result
+
+## M113: enable recording only when a tester explicitly supplies an anonymous
+## QA flag. This keeps normal player sessions local and telemetry-free.
+func _configure_v2_playtest_recorder(args: Array = []) -> Dictionary:
+	v2_playtest_recorder = null
+	if not _is_v2_battle() or level_id != "ch1_m1":
+		return {"success": false, "enabled": false, "error": "playtest_not_available"}
+	var actual_args := args
+	if actual_args.is_empty():
+		actual_args = OS.get_cmdline_args()
+	var recorder: RefCounted = V2PlaytestRecorderScript.new()
+	var difficulty := String(GameManager.get_settings().get("difficulty", "standard"))
+	var result: Dictionary = recorder.start_from_cmdline(actual_args, difficulty)
+	if bool(result.get("enabled", false)):
+		v2_playtest_recorder = recorder
+	return result
+
+func _record_v2_playtest_event(event_type: StringName, payload: Dictionary = {}) -> void:
+	if v2_playtest_recorder == null:
+		return
+	v2_playtest_recorder.record(event_type, payload)
+
+func _finish_v2_playtest(victory: bool, result: Dictionary = {}) -> void:
+	if v2_playtest_recorder == null:
+		return
+	var event_type: StringName = &"mission_completed" if victory else &"mission_failed"
+	_record_v2_playtest_event(event_type, {
+		"result": "victory" if victory else "defeat",
+		"turns": int(result.get("turns", turn_manager.turn_number if turn_manager else 0)),
+		"reason": String(result.get("defeat_reason", result.get("reason", ""))),
+	})
+	v2_playtest_recorder.finish({
+		"completed": victory,
+		"result": "victory" if victory else "defeat",
+		"turns": int(result.get("turns", turn_manager.turn_number if turn_manager else 0)),
+	})
+	v2_playtest_recorder = null
 
 func _init_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -789,6 +831,7 @@ func _register_v2_rescued_unit(unit: Unit) -> void:
 	_render_v2_hud()
 
 func _on_v2_rescue_committed(result: Dictionary) -> void:
+	_record_v2_playtest_event(&"scout_rescued", {"character_id": String(result.get("character_id", "scout"))})
 	_update_v2_encounters([&"scout_rescued"])
 	if hud:
 		hud.set_context_prompt("营救成功：侦察兵已加入小队，可立即选择行动")
@@ -2097,6 +2140,7 @@ func _start_battle() -> void:
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
 	hud.set_battle_controller(self)
+	_configure_v2_playtest_recorder()
 	turn_manager.start_battle()
 	var restored_v2_checkpoint := false
 	if _is_v2_battle():
@@ -2563,6 +2607,8 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		battle_result["unlocked_modules"] = v2_unlocked_modules
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
+	if _is_v2_battle():
+		_finish_v2_playtest(victory, battle_result)
 
 	if victory:
 		if _is_v2_battle():
@@ -2911,6 +2957,7 @@ func _select_unit(unit: Unit) -> void:
 		_advance_context_hint("observe")
 	_refresh_selected_unit_affordances(unit)
 	if unit.team == "player":
+		_record_v2_playtest_event(&"unit_selected", {"unit_id": unit.entity_id})
 		_advance_v2_tutorial(&"unit_selected", {"unit_id": unit.entity_id})
 	_render_v2_hud()
 
@@ -3062,6 +3109,11 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		if hud:
 			hud.update_unit_info(selected_unit)
 	refresh_visibility_transaction(&"unit_moved")
+	if selected_unit:
+		_record_v2_playtest_event(&"move_committed", {
+			"unit_id": selected_unit.entity_id,
+			"to": [selected_unit.grid_pos.x, selected_unit.grid_pos.y],
+		})
 	if v2_mission_flow and selected_unit:
 		_apply_v2_mission_event(&"unit_moved", {
 			"unit": selected_unit,
@@ -3255,6 +3307,10 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
 		])
 	last_player_attack_result = result.duplicate(true)
+	_record_v2_playtest_event(&"attack_committed", {
+		"target_id": target.entity_id if target else "",
+		"damage": int(result.get("hp_damage", result.get("damage", 0))),
+	})
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_advance_v2_tutorial(&"attack_committed", {

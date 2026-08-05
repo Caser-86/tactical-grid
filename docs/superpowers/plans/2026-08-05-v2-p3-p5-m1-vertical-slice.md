@@ -619,6 +619,8 @@ git commit -m "test(v2): cover complete M1 graybox flow"
 **Files:**
 - Create: `tactical-grid/client/scripts/v2/mission/v2_playtest_recorder.gd`
 - Create: `tactical-grid/client/tests/v2/v2_playtest_recorder_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_playtest_integration_contract_test.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
 - Create: `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md`
 - Create: `docs/v2/playtests/M1_FIRST_PLAYER_FORM.md`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
@@ -651,6 +653,14 @@ t.check(not data.has("player_name") and not data.has("machine_name"), "不收集
 负责人自测只验证记录工具，不计入 H1 三名首次玩家样本。记录器合同测试验证了 `user://playtests/m1/P01.json` 的实际写入和重新解析；M113 不把负责人自测伪装成 H1 玩家证据。
 
 验证证据：记录器 `Passed: 16 / Failed: 0`；空文件缺失阶段确认 `res://scripts/v2/mission/v2_playtest_recorder.gd` 不存在时 preload 失败；`gate_manifest.gd` 通过 `1/1`。真人测试流程写入 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 和 `M1_FIRST_PLAYER_FORM.md`。
+
+M113 后续安全增强：BattleController 仅在启动参数包含 `--v2-playtest-id=P01`、`P02` 或 `P03` 时创建记录器，并在首次玩家回合前记录选择、移动、攻击、提示、营救、胜负和结束事件；普通启动不创建记录器、不写试玩文件、不改变存档。命令示例：
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64.exe' --path tactical-grid/client --v2-playtest-id=P01
+```
+
+命令行启用/禁用合同 `Passed: 7 / Failed: 0`；完整 V2 release gate 仍通过。
 
 - [x] **Step 5: 提交**
 

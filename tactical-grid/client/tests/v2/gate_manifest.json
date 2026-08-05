@@ -35,7 +35,8 @@
     "res://tests/v2/v2_damage_presentation_test.gd",
     "res://tests/v2/v2_visibility_transaction_test.gd",
     "res://tests/v2/v2_settings_contract_test.gd",
-    "res://tests/v2/v2_playtest_recorder_test.gd"
+    "res://tests/v2/v2_playtest_recorder_test.gd",
+    "res://tests/v2/v2_playtest_integration_contract_test.gd"
   ],
   "scene_tests": [
     "res://tests/v2/v2_player_turn_e2e_test.tscn",

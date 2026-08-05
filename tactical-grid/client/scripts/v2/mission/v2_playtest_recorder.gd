@@ -63,6 +63,23 @@ func start(participant_id: String, difficulty: String = "standard") -> Dictionar
 		return _failure("session_started_event_failed")
 	return {"success": true, "participant_id": normalized_id, "mission_id": MISSION_ID}
 
+func start_from_cmdline(args: Array, difficulty: String = "standard") -> Dictionary:
+	var participant_id := participant_id_from_cmdline(args)
+	if participant_id.is_empty():
+		return {"success": false, "enabled": false, "error": "playtest_disabled"}
+	var result := start(participant_id, difficulty)
+	result["enabled"] = bool(result.get("success", false))
+	return result
+
+static func participant_id_from_cmdline(args: Array) -> String:
+	for raw_arg in args:
+		var arg := String(raw_arg)
+		if not arg.begins_with("--v2-playtest-id="):
+			continue
+		var candidate := arg.trim_prefix("--v2-playtest-id=").strip_edges().to_upper()
+		return candidate if _is_anonymous_id(candidate) else ""
+	return ""
+
 func record(event_type: StringName, payload: Dictionary = {}) -> Dictionary:
 	if not _active:
 		return _failure("session_not_active")
@@ -128,7 +145,7 @@ func save(path: String = "") -> Dictionary:
 func get_last_save() -> Dictionary:
 	return _last_save.duplicate(true)
 
-func _is_anonymous_id(value: String) -> bool:
+static func _is_anonymous_id(value: String) -> bool:
 	if value.length() < 3 or value.length() > 8 or not value.begins_with("P"):
 		return false
 	for index in range(1, value.length()):
