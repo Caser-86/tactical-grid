@@ -78,6 +78,8 @@ func _run() -> void:
 	if hover_move_target.x >= 0:
 		await _move_mouse_to_cell(battle, hover_move_target)
 		t.check(_group_count(battle.v2_affordance_presenter, "v2_path_overlay") > 0, "悬停蓝色移动格在地面显示路径")
+		t.check(_group_count(battle.v2_affordance_presenter, "v2_path_line") == 1, "悬停蓝色移动格显示连续路线")
+		t.check(battle.hud.context_label.text.contains("左键移动"), "悬停蓝色移动格明确提示左键移动")
 
 	# M107 bridge: a completed camera observation changes the real battle front
 	# state and immediately reaches the V2 HUD snapshot.
@@ -111,6 +113,7 @@ func _run() -> void:
 	if target != null and attack_cell.x >= 0:
 		t.check(not battle.reachable_cells.has(attack_cell), "敌人占用格不显示为蓝色可移动格")
 		await get_tree().process_frame
+		target.current_hp = 1
 		var hp_before := target.current_hp
 		await _move_mouse_to_cell(battle, attack_cell)
 		t.check(battle.hud.get_attack_preview_text().contains("悬停预览"), "悬停敌人显示攻击预览")
@@ -123,6 +126,8 @@ func _run() -> void:
 		t.check(battle.effect_layer.get_node_or_null("V2AttackFeedback") != null, "攻击在地面显示弹道与命中反馈")
 		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "攻击完成后回到单位选择状态")
 		t.check(battle.hud.phase_label.text.contains("已选中"), "攻击完成后 HUD 状态同步回已选中")
+		await get_tree().create_timer(0.75).timeout
+		t.check(battle._get_unit_sprite(target) == null, "敌人倒地动画结束后移除精灵，空格可供移动")
 		target.grid_pos = player.grid_pos
 		battle.call("_update_unit_sprite_pos", target, false)
 		battle.call("_on_v2_cell_left_clicked", player.grid_pos)

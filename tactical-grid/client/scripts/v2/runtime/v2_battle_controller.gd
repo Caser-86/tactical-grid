@@ -183,7 +183,9 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 				_update_unit_sprite_pos(target, true)
 		&"move":
 			var target_cell: Variant = result.get("target_cell", Vector2i(-1, -1))
-			if target_cell is Vector2i and enemy.spend_v2_move():
+			# The intent executor validates occupancy first, but the live roster is
+			# authoritative at commit time. Never let an AI move share a player cell.
+			if target_cell is Vector2i and not _is_occupied_by_other_unit(target_cell, enemy) and enemy.spend_v2_move():
 				enemy.move_to(target_cell)
 				_update_unit_sprite_pos(enemy, true)
 		&"scan":

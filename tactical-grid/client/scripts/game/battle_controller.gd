@@ -3232,6 +3232,9 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		var display_path: Array[Vector2i] = [selected_unit.grid_pos]
 		display_path.append_array(path)
 		v2_affordance_presenter.show_path(display_path, false)
+		if hud:
+			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消选择。" % [cell.x + 1, cell.y + 1])
+		_render_v2_hud()
 
 ## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
 func request_attack_preview(target: Unit) -> Dictionary:
@@ -3320,6 +3323,7 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 		v2_damage_presenter.play_attack(events, reduce_motion)
 	if _is_v2_battle() and selected_unit and target:
 		_play_v2_attack_world_feedback(selected_unit, target)
+		_schedule_v2_dead_sprite_cleanup(target)
 	_clear_v2_locked_attack()
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
@@ -3385,6 +3389,20 @@ func _add_v2_attack_effect_sprite(parent: Node2D, effect_name: String, art_key: 
 	sprite.modulate = tint
 	sprite.z_index = 1
 	parent.add_child(sprite)
+
+## A defeated unit frees its grid cell immediately in rules, so its visual must
+## leave after the short death animation instead of appearing to overlap a mover.
+func _schedule_v2_dead_sprite_cleanup(unit: Unit) -> void:
+	if not _is_v2_battle() or unit == null or unit.is_alive:
+		return
+	var sprite := _get_unit_sprite(unit)
+	if sprite == null:
+		return
+	var duration := 0.22 if GameManager.get_settings().get("reduce_motion", false) else 0.62
+	get_tree().create_timer(duration).timeout.connect(func() -> void:
+		if is_instance_valid(sprite) and not unit.is_alive:
+			sprite.queue_free()
+	)
 
 func _clear_v2_hover_preview() -> void:
 	_cancel_v2_preview(v2_hover_attack_preview)
@@ -4506,6 +4524,7 @@ func _on_unit_died(unit: Unit) -> void:
 	if _is_v2_battle() and v2_mission_flow:
 		_apply_v2_mission_event(&"unit_downed", {"unit": unit, "unit_id": unit.entity_id})
 	if _is_v2_battle() and v2_damage_signal_suppressed:
+		_schedule_v2_dead_sprite_cleanup(unit)
 		_record_death_telemetry(unit)
 		if unit == boss_unit:
 			_log("Boss 已被击杀！")
@@ -4517,6 +4536,8 @@ func _on_unit_died(unit: Unit) -> void:
 	if sprite:
 		sprite.update_unit(unit)
 		sprite.play_death()
+	if _is_v2_battle():
+		_schedule_v2_dead_sprite_cleanup(unit)
 	_record_death_telemetry(unit)
 	# Boss 死亡时更新目标显示
 	if unit == boss_unit:
