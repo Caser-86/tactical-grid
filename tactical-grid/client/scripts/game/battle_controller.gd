@@ -10,6 +10,7 @@ const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service
 const V2InteractionServiceScript = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
 const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
 const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
+const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
@@ -103,7 +104,9 @@ var v2_mission_flow: Dictionary = {}
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
+var v2_damage_presenter: RefCounted = null
 var v2_input_router: V2BattleInputRouter = null
+var v2_damage_signal_suppressed := false
 var v2_pending_move_preview: Dictionary = {}
 ## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
 var v2_hover_attack_preview: Dictionary = {}
@@ -265,6 +268,7 @@ func _ready() -> void:
 	_setup_v2_services()
 	_setup_v2_affordance_presenter()
 	_setup_v2_hud_presenter()
+	_setup_v2_damage_presenter()
 	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
@@ -562,6 +566,9 @@ func _setup_v2_hud_presenter() -> void:
 		return
 	v2_hud_presenter = V2HudPresenterScript.new()
 	v2_hud_presenter.setup(hud)
+
+func _setup_v2_damage_presenter() -> void:
+	v2_damage_presenter = V2DamagePresenterScript.new()
 
 ## V2: 将战斗状态压缩成一个可读快照，HUD 不需要理解回合系统或服务层对象。
 func _render_v2_hud(context_override: String = "") -> void:
@@ -2683,7 +2690,9 @@ func confirm_locked_attack(target: Unit) -> Dictionary:
 		return {"success": false, "reason": &"invalid_target"}
 	if v2_locked_attack_preview.is_empty() or String(target.entity_id) != v2_locked_attack_target_id:
 		return request_attack_preview(target)
+	v2_damage_signal_suppressed = true
 	var result := v2_action_service.commit_action(v2_locked_attack_preview) if v2_action_service else {"success": false, "reason": &"v2_action_service_unavailable"}
+	v2_damage_signal_suppressed = false
 	if not bool(result.get("success", false)):
 		if hud:
 			hud.show_action_reason(result.get("reason", &"invalid_attack"))
@@ -2723,6 +2732,16 @@ func _query_v2_attack_preview(target: Unit) -> Dictionary:
 	}) if v2_action_service else {"valid": false, "reason": &"v2_action_service_unavailable"}
 
 func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
+	var committed_preview := v2_locked_attack_preview.duplicate(true)
+	if v2_damage_presenter:
+		var events: Array[Dictionary] = v2_damage_presenter.build_events(committed_preview, result)
+		var attacker_sprite := _get_unit_sprite(selected_unit)
+		var target_sprite := _get_unit_sprite(target)
+		for event in events:
+			event["attacker_sprite"] = attacker_sprite
+			event["target_sprite"] = target_sprite
+		var reduce_motion := bool(GameManager.get_settings().get("reduce_motion", false))
+		v2_damage_presenter.play_attack(events, reduce_motion)
 	_clear_v2_locked_attack()
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
@@ -3834,6 +3853,12 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 		hud.update_unit_info(unit)
 
 func _on_unit_died(unit: Unit) -> void:
+	if _is_v2_battle() and v2_damage_signal_suppressed:
+		_record_death_telemetry(unit)
+		if unit == boss_unit:
+			_log("Boss 已被击杀！")
+			hud.update_objective(_get_objective_text())
+		return
 	_log("%s 阵亡" % unit.unit_name)
 	AudioManager.sfx_unit_down()
 	var sprite := _get_unit_sprite(unit)
@@ -3847,6 +3872,8 @@ func _on_unit_died(unit: Unit) -> void:
 		hud.update_objective(_get_objective_text())
 
 func _on_unit_damaged(unit: Unit, _amount: int) -> void:
+	if _is_v2_battle() and v2_damage_signal_suppressed:
+		return
 	_update_unit_sprite_pos(unit)
 	if unit.is_alive:
 		_play_unit_state(unit, &"hit")

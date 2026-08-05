@@ -26,6 +26,9 @@ var ghost_uncertain := true
 var _state_tween: Tween
 var _idle_elapsed := 0.0
 var _base_art_scale := Vector2.ONE
+var _combat_feedback_texts: Array[String] = []
+var _hp_preview_ratio := -1.0
+var _hp_preview_tween: Tween
 
 func _ready() -> void:
 	_ensure_art_sprite()
@@ -227,6 +230,52 @@ func _reset_art_transform() -> void:
 	art_sprite.modulate = Color.WHITE
 	modulate = Color.WHITE
 
+## 显示一次可读的战斗结果文本，并在短动画后自动清理。
+## 文本记录保留到下一次 clear_combat_feedback，便于表现合同读取已显示内容。
+func show_combat_feedback(text: String, color: Color = Color.WHITE) -> void:
+	if text == "":
+		return
+	_combat_feedback_texts.append(text)
+	var label := Label.new()
+	label.name = "CombatFeedback"
+	label.text = text
+	label.position = Vector2(-28, -42 - _combat_feedback_texts.size() * 14)
+	label.z_index = 20
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.02, 0.03, 0.04, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	add_child(label)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position", label.position + Vector2(0, -18), 0.32)
+	tween.tween_property(label, "modulate", Color(1, 1, 1, 0), 0.32).set_delay(0.16)
+	tween.chain().tween_callback(label.queue_free)
+
+func get_combat_feedback_texts() -> Array[String]:
+	return _combat_feedback_texts.duplicate()
+
+func clear_combat_feedback() -> void:
+	_combat_feedback_texts.clear()
+
+## 在 0.16 秒内从旧生命值过渡到提交后的生命值。
+func show_hp_prestrip(hp_before: int, hp_after: int) -> void:
+	if not unit:
+		return
+	if _hp_preview_tween and _hp_preview_tween.is_valid():
+		_hp_preview_tween.kill()
+	_hp_preview_ratio = clampf(float(hp_before) / float(maxi(1, unit.max_hp)), 0.0, 1.0)
+	var target_ratio := clampf(float(hp_after) / float(maxi(1, unit.max_hp)), 0.0, 1.0)
+	queue_redraw()
+	_hp_preview_tween = create_tween()
+	_hp_preview_tween.tween_property(self, "_hp_preview_ratio", target_ratio, 0.16)
+	_hp_preview_tween.tween_callback(clear_hp_prestrip)
+
+func clear_hp_prestrip() -> void:
+	_hp_preview_ratio = -1.0
+	queue_redraw()
+
 func _default_state_duration(state: StringName) -> float:
 	match state:
 		&"attack": return 0.24
@@ -303,6 +352,13 @@ func _draw_hp_bar(radius: int) -> void:
 	var hp_ratio := float(unit.current_hp) / float(maxi(1, unit.max_hp))
 	var hp_color := GameTheme.get_hp_color(unit.current_hp, unit.max_hp)
 	draw_rect(Rect2(-bar_width / 2.0, bar_y, bar_width * hp_ratio, bar_height), hp_color, true)
+	# V2: 短暂叠加提交前的生命条，随后收缩到真实值。
+	if _hp_preview_ratio >= 0.0:
+		draw_rect(
+			Rect2(-bar_width / 2.0, bar_y, bar_width * _hp_preview_ratio, bar_height),
+			Color(1.0, 0.72, 0.24, 0.88),
+			true
+		)
 	draw_rect(Rect2(-bar_width / 2.0, bar_y, bar_width, bar_height), Color(1, 1, 1, 0.72), false, 1)
 
 func _draw_shield_bar(radius: int) -> void:
