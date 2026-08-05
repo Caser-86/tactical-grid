@@ -333,13 +333,13 @@ git commit -m "feat(v2): stage M1 enemy encounters"
 - Modify: `tactical-grid/client/scripts/game/alert_state.gd`
 - Modify: `tactical-grid/client/scripts/game/visibility_state.gd`
 - Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
-- Modify: `tactical-grid/client/scripts/v2/presentation/v2_hud_presenter.gd`
+- Modify: `tactical-grid/client/scripts/ui/hud.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Front states: `hidden/searching` mapped from backend 0/1；M1 backend level cannot exceed 1。
 
-- [ ] **Step 1: 写非自动增长和 M1 上限测试**
+- [x] **Step 1: 写非自动增长和 M1 上限测试**
 
 ```gdscript
 alert.setup({"front_stage_cap": 1, "story_grace_events": 0})
@@ -351,18 +351,20 @@ alert.apply_event("camera_identified_player")
 t.check(alert.get_alert_level() == 1, "M1 不进入封锁")
 ```
 
-- [ ] **Step 2: 确认旧警戒按回合或可升至 3 的行为失败**
+- [x] **Step 2: 确认旧警戒按回合或可升至 3 的行为被 V2 配置隔离**
 
-- [ ] **Step 3: 增加任务配置上限和具体下一后果**
+- [x] **Step 3: 增加任务配置上限和具体下一后果**
 
-M1 事件只有摄像头完整识别和无人机扫描完成可升警戒。HUD 潜伏时显示“被识别后进入搜索”，搜索时显示“巡逻路线已改变”；不显示封锁。移动、扫描和摄像头操作后立即刷新三态迷雾。
+M1 事件只有摄像头完整识别和无人机扫描完成可升警戒，后端上限为搜索级；HUD 潜伏时显示“被识别后进入搜索”，搜索时显示“巡逻路线已改变”；不显示封锁。移动、扫描和摄像头操作后立即刷新迷雾，并返回本次新增探索格和新揭示敌人摘要。故事难度首个识别事件宽限一次，标准难度不宽限。
 
-- [ ] **Step 4: 运行标准/故事难度首事件宽限与摄像头测试**
+- [x] **Step 4: 运行标准/故事难度首事件宽限与摄像头测试**
 
-- [ ] **Step 5: 提交**
+验证结果：M107 独立契约 16/16；V1 AlertState 17/17；V2 HUD 11/11；迷雾事务 9/9；玩家回合真实输入 41/41；救援集成 13/13；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
+
+- [x] **Step 5: 提交**
 
 ```powershell
-git add tactical-grid/client/scripts/game/alert_state.gd tactical-grid/client/scripts/game/visibility_state.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/scripts/v2/presentation/v2_hud_presenter.gd tactical-grid/client/tests/v2
+git add tactical-grid/client/scripts/game/alert_state.gd tactical-grid/client/scripts/game/visibility_state.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/scripts/ui/hud.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): simplify M1 stealth states"
 ```
 

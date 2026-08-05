@@ -52,7 +52,6 @@ func _run() -> void:
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")
 	t.check(not battle.hud.move_button.visible and not battle.hud.attack_button.visible and not battle.hud.skill_button.visible and not battle.hud.item_button.visible and not battle.hud.overwatch_button.visible, "V2 HUD 不暴露旧动作按钮")
 	t.check(battle.hud.end_turn_button.visible and not battle.hud.end_turn_button.disabled, "V2 HUD 保留可用结束回合入口")
-
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
@@ -65,6 +64,19 @@ func _run() -> void:
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "选中角色后保持单位选择状态")
 	t.check(battle.v2_affordance_presenter.get_child_count() > 0, "选中角色后显示移动/攻击范围")
 	t.check(battle.hud.context_label.text.contains("蓝色") and battle.hud.context_label.text.contains("红色"), "选中角色后提示蓝色移动与红色攻击")
+
+	# M107 bridge: a completed camera observation changes the real battle front
+	# state and immediately reaches the V2 HUD snapshot.
+	t.check(battle.alert_state.get_front_state() == &"hidden", "M1 实战初始警戒为潜伏")
+	battle.call("_apply_v2_interaction_result", {
+		"success": true,
+		"facility_id": "facility_camera_console_south",
+		"action_id": "view_camera_east",
+		"reveal_radius": 0,
+		"consequence": "摄像头测试",
+	})
+	t.check(battle.alert_state.get_front_state() == &"searching", "M1 实战摄像头识别进入搜索")
+	t.check(battle.hud.get_node("TopBar/AlertLabel").text.contains("搜索"), "M1 HUD 立即显示搜索状态")
 
 	# 2. 左键蓝色安全格：一次点击完成移动，不依赖底部按钮。
 	var move_target := _find_safe_move_target(battle, player)

@@ -8,6 +8,7 @@
     "res://tests/v2/v2_m1_flow_test.gd",
     "res://tests/v2/v2_m1_interaction_test.gd",
     "res://tests/v2/v2_m1_enemy_activation_test.gd",
+    "res://tests/v2/v2_m1_stealth_state_test.gd",
     "res://tests/v2/v2_rescue_character_test.gd",
     "res://tests/v2/v2_schema_reference_test.gd",
     "res://tests/v2/v2_map_schema_test.gd",

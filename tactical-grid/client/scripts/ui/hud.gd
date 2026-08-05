@@ -289,10 +289,17 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 
 	var alert := String(snapshot.get("alert", ""))
 	var next_consequence := String(snapshot.get("next_consequence", ""))
+	var visibility_summary: Dictionary = snapshot.get("visibility_summary", {})
 	if _alert_label:
 		var alert_text := "警戒：%s" % alert if alert != "" else ""
 		if next_consequence != "":
 			alert_text += " | 下一步：%s" % next_consequence
+		var newly_observed_cells := int(visibility_summary.get("newly_observed_cells", 0))
+		var newly_revealed_enemies := int(visibility_summary.get("newly_revealed_enemies", 0))
+		if newly_observed_cells > 0:
+			alert_text += " | 视野 +%d格" % newly_observed_cells
+		if newly_revealed_enemies > 0:
+			alert_text += " | 发现敌人 %d" % newly_revealed_enemies
 		_alert_label.text = alert_text
 		_alert_label.visible = alert_text != ""
 

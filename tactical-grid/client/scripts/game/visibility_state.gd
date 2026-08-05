@@ -38,6 +38,8 @@ var _current_turn: int = 0
 ## CH1-040: Camera zones: zone_id -> Array[Vector2i].
 ## Cells covered by an active camera zone stay observed until the zone is removed.
 var _camera_zones: Dictionary = {}
+## Summary of the latest visibility transaction for immediate HUD feedback.
+var _last_update_summary: Dictionary = {}
 
 
 ## Initialize for a map of the given dimensions.
@@ -51,6 +53,7 @@ func setup(width: int, height: int) -> void:
 	_previously_observed.clear()
 	_current_turn = 0
 	_camera_zones.clear()
+	_last_update_summary.clear()
 
 
 ## CH1-040: Advance the internal turn counter. Called by the battle controller
@@ -62,7 +65,8 @@ func set_turn(turn: int) -> void:
 ## Update visibility from the current player sight.
 ## visible_cells: cells currently in sight of any player unit.
 ## visible_enemies: array of dictionaries with at least {entity_id, pos, hp}.
-func update_visibility(visible_cells: Array[Vector2i], visible_enemies: Array) -> void:
+func update_visibility(visible_cells: Array[Vector2i], visible_enemies: Array) -> Dictionary:
+	var newly_observed_cells := 0
 	# Demote previously observed cells to recorded (unless covered by a camera zone)
 	for cell in _cell_states.keys():
 		if _cell_states[cell] == STATE_OBSERVED:
@@ -71,6 +75,10 @@ func update_visibility(visible_cells: Array[Vector2i], visible_enemies: Array) -
 
 	# Mark currently visible cells as observed
 	for cell in visible_cells:
+		# Count only unexplored -> observed transitions as new exploration.
+		# Recorded -> observed is a refreshed sightline, not new map knowledge.
+		if get_cell_state(cell) == STATE_UNEXPLORED:
+			newly_observed_cells += 1
 		_cell_states[cell] = STATE_OBSERVED
 
 	# Re-assert camera zone cells as observed (camera keeps them lit)
@@ -113,6 +121,20 @@ func update_visibility(visible_cells: Array[Vector2i], visible_enemies: Array) -
 
 	# Remember currently observed for next turn's newly-revealed check
 	_previously_observed = _observed_enemies.duplicate(true)
+	var observed_enemy_ids: Array = _observed_enemies.keys()
+	observed_enemy_ids.sort()
+	_last_update_summary = {
+		"newly_observed_cells": newly_observed_cells,
+		"newly_revealed_enemies": _newly_revealed.size(),
+		"observed_enemy_ids": observed_enemy_ids,
+		"turn": _current_turn,
+	}
+	return _last_update_summary.duplicate(true)
+
+## Return the result of the most recent visibility transaction without
+## recomputing sight. BattleController uses this to render immediate feedback.
+func get_last_update_summary() -> Dictionary:
+	return _last_update_summary.duplicate(true)
 
 
 ## CH1-040: Mark a last-known snapshot as uncertain (stale) once the enemy
@@ -261,6 +283,7 @@ func clear() -> void:
 	_previously_observed.clear()
 	_current_turn = 0
 	_camera_zones.clear()
+	_last_update_summary.clear()
 
 
 ## CODE-CH1-020: 序列化迷雾记忆状态为可 JSON 化字典（供 EncounterCheckpointState 使用）。

@@ -123,6 +123,7 @@ var v2_pending_interaction_facility_id: String = ""
 var v2_last_checkpoint: Dictionary = {}
 var v2_rescue_marker: Node2D = null
 var _v2_units_rendered := false
+var v2_visibility_summary: Dictionary = {}
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -395,6 +396,7 @@ func _cleanup_units() -> void:
 	v2_mission_flow = null
 	v2_rescue_controller = null
 	v2_encounter_activation = null
+	v2_visibility_summary.clear()
 	v2_last_checkpoint.clear()
 	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
 		v2_rescue_marker.free()
@@ -581,6 +583,8 @@ func _setup_v2_services() -> void:
 		var loaded_mission: Dictionary = v2_data.get_mission(StringName(level_id))
 		if not loaded_mission.is_empty():
 			v2_mission = loaded_mission
+	if _is_v2_battle() and String(v2_mission.get("id", level_id)) == "ch1_m1":
+		_configure_v2_m1_alert()
 	var v2_map_result := V2MapLoaderScript.load_map(StringName(String(v2_mission.get("map_id", level_id))))
 	if not bool(v2_map_result.get("success", false)):
 		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
@@ -617,6 +621,19 @@ func _setup_v2_services() -> void:
 	v2_interaction_service.setup(interaction_map, tactical_network_state, visibility_state, alert_state, v2_mission_flow)
 	if camera:
 		camera.set_input_router_mode(_is_v2_battle())
+
+## M1 intentionally has one readable front escalation: hidden -> searching.
+## Story difficulty grants one ignored recognition event; standard does not.
+func _configure_v2_m1_alert() -> void:
+	if not alert_state:
+		return
+	var difficulty := String(GameManager.get_settings().get("difficulty", "standard"))
+	alert_state.setup({
+		"front_stage_cap": AlertState.LEVEL_SUSPICIOUS,
+		"allowed_events": ["camera_identified_player", "drone_scan_completed"],
+		"decay_enabled": false,
+		"story_grace_events": 1 if difficulty == "story" else 0,
+	})
 
 ## Replace the V1 enemy templates with all six V2 M1 stable entities. Inactive
 ## entities remain as non-alive nodes so save identity stays stable, while the
@@ -799,10 +816,13 @@ func _render_v2_hud(context_override: String = "") -> void:
 	var alert_name := "平静"
 	var next_text := ""
 	if alert_state:
-		var alert_names := ["平静", "可疑", "警戒", "战斗"]
-		var alert_level := alert_state.get_alert_level()
-		if alert_level >= 0 and alert_level < alert_names.size():
-			alert_name = alert_names[alert_level]
+		if _is_v2_battle():
+			alert_name = alert_state.get_front_state_label()
+		else:
+			var alert_names := ["平静", "可疑", "警戒", "战斗"]
+			var alert_level := alert_state.get_alert_level()
+			if alert_level >= 0 and alert_level < alert_names.size():
+				alert_name = alert_names[alert_level]
 		var next_consequence: Dictionary = alert_state.get_next_consequence()
 		next_text = String(next_consequence.get("description", ""))
 		var turns_until := int(next_consequence.get("turns_until", 0))
@@ -831,6 +851,7 @@ func _render_v2_hud(context_override: String = "") -> void:
 		"ability": "",
 		"interaction": interaction_text,
 		"attack_preview": hud.get_attack_preview_text(),
+		"visibility_summary": v2_visibility_summary.duplicate(true),
 	}
 	v2_hud_presenter.render(snapshot)
 
@@ -3192,11 +3213,19 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 	elif result.has("camera_zone_id"):
 		_sync_camera_zone_cells()
 		_update_visibility()
+	var v2_alert_result: Dictionary = {}
+	if _is_v2_battle() and String(result.get("action_id", "")) == "view_camera_east" and alert_state:
+		v2_alert_result = alert_state.apply_event("camera_identified_player")
+
 	if bool(result.get("raises_alert", false)) and alert_state:
 		alert_state.apply_event("overload_triggered")
 		if hud:
 			hud.update_alert_display(alert_state)
 	var consequence := String(result.get("consequence", "操作完成"))
+	if bool(v2_alert_result.get("changed", false)):
+		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
+	elif bool(v2_alert_result.get("grace", false)):
+		consequence = "故事宽限：摄像头暂未触发搜索；%s" % consequence
 	_log("设施 %s：%s" % [facility_id, consequence])
 	if String(result.get("reward_module", "")) != "":
 		_log("可选目标完成：已登记模块 %s" % String(result.get("reward_module", "")))
@@ -4289,7 +4318,10 @@ func _update_visibility() -> void:
 				"pos": enemy.grid_pos,
 				"hp": enemy.current_hp,
 			})
-	visibility_state.update_visibility(visible_cells, visible_enemies)
+	if _is_v2_battle():
+		v2_visibility_summary = visibility_state.update_visibility(visible_cells, visible_enemies)
+	else:
+		visibility_state.update_visibility(visible_cells, visible_enemies)
 	_refresh_enemy_sprite_visibility()
 	_refresh_last_known_ghosts()
 	if visibility_renderer:
