@@ -7,6 +7,7 @@ const ATTACK_COLOR := Color(1.0, 0.16, 0.18, 0.20)
 const ATTACK_BORDER := Color(1.0, 0.36, 0.25, 0.92)
 const DANGER_COLOR := Color(1.0, 0.58, 0.12, 0.32)
 const DANGER_BORDER := Color(1.0, 0.78, 0.24, 0.98)
+const HOVER_BORDER := Color(1.0, 0.88, 0.30, 0.98)
 
 @export var cell_size: float = 64.0
 
@@ -47,6 +48,41 @@ func show_path(path: Array[Vector2i], dangerous: bool) -> void:
 func clear_preview() -> void:
 	for child in get_children():
 		if bool(child.get_meta("v2_preview", false)):
+			child.free()
+
+## V2: 将攻击目标分为临时悬停焦点和已锁定焦点，避免玩家误以为悬停就是开火。
+func show_attack_focus(cell: Vector2i, locked: bool) -> void:
+	if locked:
+		clear_attack_focus()
+	else:
+		clear_temporary_attack_focus()
+	var panel := Panel.new()
+	panel.position = _cell_origin(cell) + Vector2(1, 1)
+	panel.size = Vector2(cell_size - 2, cell_size - 2)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = 7
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1.0, 0.72, 0.12, 0.08 if locked else 0.03)
+	style.border_color = ATTACK_BORDER if locked else HOVER_BORDER
+	style.set_border_width_all(5 if locked else 3)
+	style.corner_radius_top_left = 9
+	style.corner_radius_top_right = 9
+	style.corner_radius_bottom_left = 9
+	style.corner_radius_bottom_right = 9
+	panel.add_theme_stylebox_override("panel", style)
+	panel.add_to_group("v2_attack_focus")
+	panel.set_meta("v2_focus_locked", locked)
+	panel.set_meta("v2_preview", not locked)
+	add_child(panel)
+
+func clear_attack_focus() -> void:
+	for child in get_children():
+		if child.is_in_group("v2_attack_focus"):
+			child.free()
+
+func clear_temporary_attack_focus() -> void:
+	for child in get_children():
+		if child.is_in_group("v2_attack_focus") and not bool(child.get_meta("v2_focus_locked", false)):
 			child.free()
 
 func clear_all() -> void:

@@ -102,6 +102,10 @@ var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_input_router: V2BattleInputRouter = null
 var v2_pending_move_preview: Dictionary = {}
+## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
+var v2_hover_attack_preview: Dictionary = {}
+var v2_locked_attack_preview: Dictionary = {}
+var v2_locked_attack_target_id: String = ""
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -517,6 +521,8 @@ func _init_subsystems() -> void:
 	v2_input_router = V2BattleInputRouterScript.new()
 	v2_input_router.cell_left_clicked.connect(_on_v2_cell_left_clicked)
 	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
+	v2_input_router.cancel_requested.connect(_on_v2_cancel_requested)
+	v2_input_router.pointer_cancel_requested.connect(_on_v2_cancel_requested)
 	v2_input_router.end_turn_requested.connect(_end_player_turn)
 	v2_input_router.next_unit_requested.connect(_on_next_unit)
 
@@ -527,6 +533,9 @@ func _setup_v2_services() -> void:
 	v2_mission_flow["mission_id"] = level_id
 	v2_mission_flow["state_revision"] = 1
 	v2_pending_move_preview.clear()
+	v2_hover_attack_preview.clear()
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -2386,12 +2395,20 @@ func _deselect_unit() -> void:
 	reachable_cells.clear()
 	attack_targets.clear()
 	v2_attack_range_cells.clear()
+	_cancel_v2_preview(v2_pending_move_preview)
+	_cancel_v2_preview(v2_hover_attack_preview)
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_pending_move_preview.clear()
+	v2_hover_attack_preview.clear()
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
 	path_preview.clear()
 	_clear_layer(move_highlight)
 	_clear_layer(path_preview_layer)
 	_clear_layer(attack_highlight)
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
+	hud.clear_attack_preview()
 	hud.update_unit_info(null)
 	hud.set_action_buttons_visible(false)
 	hud.set_context_state(HUD.ContextState.NONE)
@@ -2494,18 +2511,51 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 
 func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
-	if not _is_v2_battle() or selected_unit == null:
+	if not _is_v2_battle():
 		return
 	var clicked_unit: Unit = _get_unit_at(cell)
 	if clicked_unit != null and clicked_unit.team == "player":
 		if clicked_unit != selected_unit:
 			_select_unit(clicked_unit)
 		return
+	if selected_unit == null:
+		return
+	if clicked_unit != null and clicked_unit.team != "player":
+		if not v2_locked_attack_preview.is_empty() and String(clicked_unit.entity_id) == v2_locked_attack_target_id:
+			confirm_locked_attack(clicked_unit)
+		else:
+			request_attack_preview(clicked_unit)
+		return
+	if not v2_locked_attack_preview.is_empty():
+		if hud:
+			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消")
+		return
 	request_move(cell)
 
 func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	if not _is_v2_battle() or selected_unit == null or v2_affordance_presenter == null:
 		return
+	var hovered_unit: Unit = _get_unit_at(cell)
+	if hovered_unit != null and hovered_unit.team != "player":
+		var hover_preview := _query_v2_attack_preview(hovered_unit)
+		if bool(hover_preview.get("valid", false)):
+			_cancel_v2_preview(v2_hover_attack_preview)
+			v2_hover_attack_preview = hover_preview.duplicate(true)
+			v2_affordance_presenter.show_attack_focus(cell, false)
+			if hud:
+				hud.show_attack_preview(hover_preview, hovered_unit, false)
+			return
+	_clear_v2_hover_preview()
+	if not v2_locked_attack_preview.is_empty():
+		var locked_target := _get_v2_unit_by_id(v2_locked_attack_target_id)
+		if locked_target:
+			if hud:
+				hud.show_attack_preview(v2_locked_attack_preview, locked_target, true)
+			return
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_temporary_attack_focus()
+	if hud:
+		hud.clear_attack_preview()
 	if not reachable_cells.has(cell):
 		v2_affordance_presenter.clear_preview()
 		return
@@ -2517,6 +2567,134 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	)
 	if path.size() >= 2:
 		v2_affordance_presenter.show_path(path, false)
+
+## V2: 第一次点击只锁定攻击预览，不结算伤害。
+func request_attack_preview(target: Unit) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "success": false, "reason": &"no_selected_unit"}
+	if target == null or not is_instance_valid(target):
+		return {"valid": false, "success": false, "reason": &"invalid_target"}
+	var preview := _query_v2_attack_preview(target)
+	if not bool(preview.get("valid", false)):
+		preview["success"] = false
+		if hud:
+			hud.show_action_reason(preview.get("reason", &"invalid_attack"))
+		return preview
+	_clear_v2_hover_preview()
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_locked_attack_preview = preview.duplicate(true)
+	v2_locked_attack_target_id = String(target.entity_id)
+	if v2_input_router:
+		if v2_input_router.get_state() == V2BattleInputRouter.State.FREE_SELECT:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		v2_input_router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED)
+	if v2_affordance_presenter:
+		v2_affordance_presenter.show_attack_focus(target.grid_pos, true)
+	if hud:
+		hud.show_attack_preview(preview, target, true)
+	return preview
+
+## V2: 只有稳定 ID 与锁定目标一致时，第二次点击才提交攻击。
+func confirm_locked_attack(target: Unit) -> Dictionary:
+	if target == null or not is_instance_valid(target):
+		return {"success": false, "reason": &"invalid_target"}
+	if v2_locked_attack_preview.is_empty() or String(target.entity_id) != v2_locked_attack_target_id:
+		return request_attack_preview(target)
+	var result := v2_action_service.commit_action(v2_locked_attack_preview) if v2_action_service else {"success": false, "reason": &"v2_action_service_unavailable"}
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", &"invalid_attack"))
+		_clear_v2_locked_attack()
+		if selected_unit:
+			_refresh_selected_unit_affordances(selected_unit)
+		return result
+	_finalize_v2_attack(target, result)
+	return result
+
+func _query_v2_attack_preview(target: Unit) -> Dictionary:
+	if target == null or not target.is_alive:
+		return {"valid": false, "reason": &"target_dead"}
+	if selected_unit == null or selected_unit.team != "player":
+		return {"valid": false, "reason": &"no_selected_unit"}
+	if target.team == selected_unit.team:
+		return {"valid": false, "reason": &"same_team"}
+	if visibility_state and not visibility_state.is_cell_observed(target.grid_pos):
+		return {"valid": false, "reason": &"target_hidden"}
+	var context := {
+		"has_los": VisionSystem.has_line_of_sight(
+			selected_unit.grid_pos, target.grid_pos,
+			map_width, map_height, _is_vision_blocking
+		),
+		"distance": GridSystem.manhattan_distance(selected_unit.grid_pos, target.grid_pos),
+		"cover": VisionSystem.calculate_cover(
+			target.grid_pos, selected_unit.grid_pos,
+			func(pos: Vector2i): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+		),
+		"flanked": false,
+	}
+	return v2_action_service.query_action({
+		"action": &"attack",
+		"unit": selected_unit,
+		"target": target,
+		"context": context,
+	}) if v2_action_service else {"valid": false, "reason": &"v2_action_service_unavailable"}
+
+func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
+	_clear_v2_locked_attack()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_all()
+	if target and is_instance_valid(target):
+		_update_unit_sprite_pos(target, true)
+	if selected_unit and is_instance_valid(selected_unit):
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	if hud:
+		hud.set_context_prompt("攻击结算：%s 受到 %d 点伤害，HP %d/%d" % [
+		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
+		])
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	_update_visibility()
+
+func _clear_v2_hover_preview() -> void:
+	_cancel_v2_preview(v2_hover_attack_preview)
+	v2_hover_attack_preview.clear()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_temporary_attack_focus()
+
+func _clear_v2_locked_attack() -> void:
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
+	if hud:
+		hud.clear_attack_preview()
+
+func _cancel_v2_preview(preview: Dictionary) -> void:
+	if v2_action_service and not preview.is_empty():
+		v2_action_service.cancel_preview(int(preview.get("preview_id", 0)))
+
+func _get_v2_unit_by_id(target_id: String) -> Unit:
+	if target_id.is_empty():
+		return null
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit and String(unit.entity_id) == target_id and unit.is_alive:
+			return unit
+	return null
+
+func _on_v2_cancel_requested() -> void:
+	var previous_state := v2_input_router.get_last_cancelled_state() if v2_input_router else V2BattleInputRouter.State.FREE_SELECT
+	_cancel_v2_preview(v2_pending_move_preview)
+	v2_pending_move_preview.clear()
+	_clear_v2_hover_preview()
+	_clear_v2_locked_attack()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	if previous_state == V2BattleInputRouter.State.UNIT_SELECTED and selected_unit != null:
+		_deselect_unit()
+	elif selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
 
 ## ===== 行动执行 =====
 

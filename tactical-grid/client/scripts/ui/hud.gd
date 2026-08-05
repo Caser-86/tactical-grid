@@ -34,6 +34,8 @@ var _action_picker_callback: Callable = Callable()
 enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
 var _context_state: ContextState = ContextState.NONE
 var _context_prompt: Label = null
+## V2: 当前攻击预览卡片文本。单独保留，便于输入测试和结果回显使用同一份数据。
+var _attack_preview_text: String = ""
 ## CODE-P2-02: 警报显示标签和网络覆盖层
 var _alert_label: Label = null
 var _network_overlay: Control = null
@@ -172,6 +174,8 @@ func update_turn_display(turn: int, phase: int) -> void:
 			phase_label.text = "..."
 
 func update_unit_info(unit: Node) -> void:
+	if unit_info_label == null:
+		return
 	if not unit or not unit.is_alive:
 		unit_info_label.text = ""
 		set_action_buttons_visible(false)
@@ -255,6 +259,55 @@ func set_context_prompt(text: String) -> void:
 	if _context_prompt:
 		_context_prompt.text = text
 		_context_prompt.visible = true
+
+## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
+func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:
+	if target == null:
+		return
+	var hp_before := int(preview.get("hp_before", target.current_hp))
+	var hp_after := int(preview.get("hp_after", target.current_hp))
+	var shield_before := int(preview.get("shield_before", target.current_shield))
+	var shield_after := int(preview.get("shield_after", target.current_shield))
+	var damage := int(preview.get("hp_damage", maxi(0, hp_before - hp_after)))
+	var mode := "已锁定" if locked else "悬停预览"
+	var text := "%s %s：伤害 %d · HP %d → %d" % [mode, target.unit_name, damage, hp_before, hp_after]
+	if shield_before != shield_after:
+		text += " · 护盾 %d → %d" % [shield_before, shield_after]
+	text += " · %s" % ("再次点击确认" if locked else "点击锁定")
+	_attack_preview_text = text
+	set_context_prompt(text)
+
+func get_attack_preview_text() -> String:
+	return _attack_preview_text
+
+func clear_attack_preview() -> void:
+	_attack_preview_text = ""
+
+## V2: 将服务层错误转换为玩家可理解的操作反馈。
+func show_action_reason(reason: Variant) -> void:
+	var text := "无法执行该操作"
+	match String(reason):
+		"action_unavailable":
+			text = "本单位本回合已经攻击过"
+		"out_of_range":
+			text = "目标超出攻击范围"
+		"no_line_of_sight":
+			text = "目标被墙体或掩体遮挡"
+		"full_cover":
+			text = "目标处于完全掩体后，无法从当前位置攻击"
+		"stale_preview":
+			text = "目标状态已变化，请重新选择目标"
+		"same_team":
+			text = "不能攻击友方单位"
+		"target_dead":
+			text = "目标已经失去战斗能力"
+		"move_unavailable":
+			text = "本单位本回合已经移动过"
+		"blocked":
+			text = "目标格不可通行"
+		"move_too_far":
+			text = "目标格超出移动范围"
+	set_context_prompt(text)
 
 func get_context_prompt_text() -> String:
 	return _context_prompt.text if _context_prompt else ""

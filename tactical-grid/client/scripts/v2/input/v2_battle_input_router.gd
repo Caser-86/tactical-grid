@@ -4,6 +4,7 @@ class_name V2BattleInputRouter
 signal cell_left_clicked(cell: Vector2i)
 signal cell_hovered(cell: Vector2i)
 signal cancel_requested()
+signal pointer_cancel_requested()
 signal end_turn_requested()
 signal next_unit_requested()
 signal focus_requested()
@@ -34,6 +35,7 @@ const TRANSITIONS := {
 var _state: State = State.FREE_SELECT
 var _middle_dragging := false
 var _last_pointer_position := Vector2.ZERO
+var _last_cancelled_state: State = State.FREE_SELECT
 
 func set_state(next_state: State) -> Dictionary:
 	if _state == next_state:
@@ -65,6 +67,9 @@ func get_state_name() -> String:
 
 func get_state() -> State:
 	return _state
+
+func get_last_cancelled_state() -> State:
+	return _last_cancelled_state
 
 func handle_event(event: InputEvent, screen_to_cell: Callable) -> bool:
 	if event is InputEventMouseButton:
@@ -126,11 +131,14 @@ func _handle_left_click(position: Vector2, screen_to_cell: Callable) -> bool:
 	return true
 
 func _handle_cancel() -> bool:
+	_last_cancelled_state = _state
 	match _state:
 		State.ATTACK_LOCKED, State.ABILITY_TARGETING, State.INTERACTION_MENU:
 			set_state(State.UNIT_SELECTED)
+			pointer_cancel_requested.emit()
 		State.UNIT_SELECTED:
 			set_state(State.FREE_SELECT)
+			pointer_cancel_requested.emit()
 		State.FREE_SELECT, State.ENEMY_TURN, State.PAUSED:
 			return true
 	return true
