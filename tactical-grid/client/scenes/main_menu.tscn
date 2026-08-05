@@ -48,7 +48,7 @@ offset_left = -200.0
 offset_top = 80.0
 offset_right = 200.0
 offset_bottom = 160.0
-text = "TACTICAL GRID"
+text = "TACTICAL GRID // V2"
 label_settings = SubResource("LabelSettings_1")
 horizontal_alignment = 1
 
@@ -61,7 +61,7 @@ offset_left = -200.0
 offset_top = 160.0
 offset_right = 200.0
 offset_bottom = 190.0
-text = "战术回合制战棋"
+text = "渗透行动 // V1 原作与 V2 独立存档"
 horizontal_alignment = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
@@ -72,20 +72,44 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -120.0
-offset_top = -100.0
+offset_top = -210.0
 offset_right = 120.0
-offset_bottom = 100.0
+offset_bottom = 210.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="V2Header" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 20
+text = "V2 渗透行动"
+horizontal_alignment = 1
+
+[node name="ContinueV2Button" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "继续 V2"
+custom_minimum_size = Vector2(240, 50)
+
+[node name="NewV2GameButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "新游戏 V2"
+custom_minimum_size = Vector2(240, 50)
+
+[node name="V1Header" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "V1 原作兼容入口"
+horizontal_alignment = 1
+
 [node name="ContinueButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-text = "继续游戏"
+text = "继续 V1 原作"
 custom_minimum_size = Vector2(240, 50)
 
 [node name="NewGameButton" type="Button" parent="VBoxContainer"]
 layout_mode = 2
-text = "新游戏"
+text = "新游戏 V1 原作"
 custom_minimum_size = Vector2(240, 50)
 
 [node name="SettingsButton" type="Button" parent="VBoxContainer"]
