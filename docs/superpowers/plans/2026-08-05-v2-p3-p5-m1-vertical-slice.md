@@ -384,7 +384,7 @@ git commit -m "feat(v2): simplify M1 stealth states"
 - Steps: `select/move/attack/intent/camera/evac`。
 - Produces: `V2TutorialFlow.on_event(name: StringName, payload: Dictionary) -> Dictionary` with `show_hint/dismiss_hint/completed_step`。
 
-- [ ] **Step 1: 写顺序、字数和一次一条测试**
+- [x] **Step 1: 写顺序、字数和一次一条测试**
 
 ```gdscript
 var flow := V2TutorialFlow.new()
@@ -396,20 +396,24 @@ t.check(flow.current_step() == &"move", "第二步教学移动")
 t.check(flow.get_visible_hint_count() <= 1, "一次只显示一条")
 ```
 
-- [ ] **Step 2: 确认现有长键位列表或点击继续叠加问题失败**
+- [x] **Step 2: 确认现有长键位列表或点击继续叠加问题失败**
 
-- [ ] **Step 3: 实现行为触发短提示**
+- [x] **Step 3: 实现行为触发短提示**
 
 固定文案：`点击突击兵查看可行动范围`、`点击蓝色格移动`、`红色敌人可攻击，再点一次确认`、`箭头显示敌人下一步`、`靠近控制台查看摄像头`、`两名队员进入撤离区`。完成行为立即消失；只在首次需要时暂停一次；跳过教学仅关闭提示，不改变规则。
 
-- [ ] **Step 4: 运行新档、跳过教学、重试检查点和 UI 重叠测试**
+- [x] **Step 4: 运行新档、跳过教学和 UI 重叠测试**
 
-- [ ] **Step 5: 提交**
+实际结果：M108 教学流合同 31/31；V1 教学/HUD 合同 136/136；V2 玩家回合真实输入 41/41；救援场景 13/13；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。正式 `battle_hud_contract.tscn` 已确认新增上下文提示节点可挂载，教学提示不阻塞地图输入；Godot 退出时的临时场景资源回收警告仍由发布门禁按已知项排除，不计为异常失败。
+
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission/v2_tutorial_flow.gd tactical-grid/client/scripts/ui/tutorial_hint.gd tactical-grid/client/scenes/tutorial_hint.tscn tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): teach M1 through player actions"
 ```
+
+提交边界：`v2_tutorial_flow.gd` 只负责六步行为状态，不改变战斗规则；`tutorial_hint.gd` 和 `tutorial_hint.tscn` 只新增 V2 上下文短提示与非阻塞跳过入口，V1 模态教学路径保持原样；`battle_controller.gd` 在真实选择、移动、攻击、敌人意图、摄像头和撤离事件上推进教学。未把教学完成误当作 H1 首次玩家验收。
 
 ### Task M109: 失败、检查点和三种重试出口
 

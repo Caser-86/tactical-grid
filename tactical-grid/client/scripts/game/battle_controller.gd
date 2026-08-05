@@ -15,6 +15,7 @@ const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_inpu
 const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
 const V2RescueControllerScript = preload("res://scripts/v2/mission/v2_rescue_controller.gd")
 const V2EncounterActivationScript = preload("res://scripts/v2/mission/v2_encounter_activation.gd")
+const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.gd")
 const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 
@@ -108,6 +109,7 @@ var v2_action_service: V2ActionService = null
 var v2_mission_flow: RefCounted = null
 var v2_rescue_controller: RefCounted = null
 var v2_encounter_activation: RefCounted = null
+var v2_tutorial_flow: RefCounted = null
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
@@ -396,6 +398,7 @@ func _cleanup_units() -> void:
 	v2_mission_flow = null
 	v2_rescue_controller = null
 	v2_encounter_activation = null
+	v2_tutorial_flow = null
 	v2_visibility_summary.clear()
 	v2_last_checkpoint.clear()
 	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
@@ -463,6 +466,9 @@ func _on_tutorial_hint_closed() -> void:
 
 ## CH1-030: 战斗开始后启动上下文教学提示序列（伴随式、非阻断）
 func _begin_context_tutorials() -> void:
+	if _is_v2_battle() and v2_tutorial_flow != null:
+		_show_v2_tutorial_step()
+		return
 	_context_hint_queue.clear()
 	for f in level_config.get("context_tutorial_flags", []):
 		_context_hint_queue.append(String(f))
@@ -486,6 +492,25 @@ func _show_context_hint(flag: String) -> void:
 	_active_context_flag = flag
 	_active_context_hint.show_context_hint(flag)
 
+## V2 M1 uses the compact six-step flow instead of the V1 flag queue.
+func _show_v2_tutorial_step() -> void:
+	_dismiss_context_hint()
+	if v2_tutorial_flow == null or v2_tutorial_flow.get_visible_hint_count() <= 0:
+		return
+	_active_context_hint = TutorialHintScene.instantiate()
+	hud.add_child(_active_context_hint)
+	_active_context_flag = "v2_%s" % String(v2_tutorial_flow.current_step())
+	_active_context_hint.show_v2_context_hint(
+		v2_tutorial_flow.current_text(),
+		Callable(self, "_skip_v2_tutorial"),
+	)
+
+func _skip_v2_tutorial() -> void:
+	if v2_tutorial_flow:
+		v2_tutorial_flow.skip()
+	_dismiss_context_hint()
+	_render_v2_hud()
+
 ## CH1-030: 清理当前上下文提示实例
 func _dismiss_context_hint() -> void:
 	if _active_context_hint != null and is_instance_valid(_active_context_hint):
@@ -496,12 +521,26 @@ func _dismiss_context_hint() -> void:
 ## CH1-030: 玩家完成动作后推进上下文提示
 ## action_type: "move" / "attack" / "interact" / "network" / "end_turn"
 func _advance_context_hint(action_type: String) -> void:
+	if _is_v2_battle() and v2_tutorial_flow != null:
+		return
 	if _active_context_flag == "":
 		return
 	var expected: String = String(CONTEXT_HINT_ACTION.get(_active_context_flag, ""))
 	if expected == "" or expected == action_type:
 		TutorialHint.mark_known(_active_context_flag)
 		_show_next_context_hint()
+
+func _advance_v2_tutorial(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	if not _is_v2_battle() or v2_tutorial_flow == null:
+		return {"advanced": false, "reason": &"v2_tutorial_unavailable"}
+	var result: Dictionary = v2_tutorial_flow.on_event(event_name, payload)
+	if bool(result.get("advanced", false)):
+		if v2_tutorial_flow.get_visible_hint_count() > 0:
+			_show_v2_tutorial_step()
+		else:
+			_dismiss_context_hint()
+		_render_v2_hud()
+	return result
 
 func _init_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -585,6 +624,8 @@ func _setup_v2_services() -> void:
 			v2_mission = loaded_mission
 	if _is_v2_battle() and String(v2_mission.get("id", level_id)) == "ch1_m1":
 		_configure_v2_m1_alert()
+		v2_tutorial_flow = V2TutorialFlowScript.new()
+		v2_tutorial_flow.setup()
 	var v2_map_result := V2MapLoaderScript.load_map(StringName(String(v2_mission.get("map_id", level_id))))
 	if not bool(v2_map_result.get("success", false)):
 		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
@@ -2287,6 +2328,8 @@ func _apply_v2_mission_event(event_name: StringName, payload: Dictionary = {}) -
 	if not _is_v2_battle() or v2_mission_flow == null:
 		return {"success": false, "reason": &"v2_mission_flow_unavailable"}
 	var result: Dictionary = v2_mission_flow.apply_event(event_name, payload)
+	if event_name == &"evac_checked" and bool(result.get("victory", false)):
+		_advance_v2_tutorial(&"evac_completed")
 	if hud:
 		hud.update_objective(_get_objective_text())
 	_render_v2_hud()
@@ -2748,6 +2791,8 @@ func _select_unit(unit: Unit) -> void:
 	else:
 		_advance_context_hint("observe")
 	_refresh_selected_unit_affordances(unit)
+	if unit.team == "player":
+		_advance_v2_tutorial(&"unit_selected", {"unit_id": unit.entity_id})
 	_render_v2_hud()
 
 ## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
@@ -2907,6 +2952,10 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
 			_apply_v2_mission_event(&"evac_checked")
 	_update_v2_encounters([])
+	_advance_v2_tutorial(&"unit_moved", {
+		"unit_id": selected_unit.entity_id if selected_unit else "",
+		"position": selected_unit.grid_pos if selected_unit else Vector2i(-1, -1),
+	})
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_render_v2_hud()
@@ -3089,6 +3138,9 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 	last_player_attack_result = result.duplicate(true)
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	_advance_v2_tutorial(&"attack_committed", {
+		"target_id": target.entity_id if target else "",
+	})
 	_update_visibility()
 	_render_v2_hud()
 
@@ -3226,6 +3278,8 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
 	elif bool(v2_alert_result.get("grace", false)):
 		consequence = "故事宽限：摄像头暂未触发搜索；%s" % consequence
+	if String(result.get("action_id", "")) == "view_camera_east":
+		_advance_v2_tutorial(&"camera_viewed", {"facility_id": facility_id})
 	_log("设施 %s：%s" % [facility_id, consequence])
 	if String(result.get("reward_module", "")) != "":
 		_log("可选目标完成：已登记模块 %s" % String(result.get("reward_module", "")))
@@ -3825,6 +3879,7 @@ func _plan_enemy_intents() -> void:
 			intent = {"type": "wait"}
 		enemy_intent_state.set_intent(enemy.entity_id, intent)
 	_enemy_intents_planned = true
+	_advance_v2_tutorial(&"enemy_intent_observed")
 
 
 ## CH1-050: Refresh the intent renderer and HUD threat summary after a plan
