@@ -287,28 +287,16 @@ func _stop_test_audio() -> void:
 	var audio: Node = get_node_or_null("/root/AudioManager")
 	if audio == null:
 		return
-	audio.call("stop_bgm")
-	audio.call("stop_ambient")
-	var bgm_player: Node = audio.get("bgm_player")
-	if bgm_player and is_instance_valid(bgm_player):
-		bgm_player.call("stop")
-		bgm_player.set("stream", null)
-	var ambient_player: Node = audio.get("ambient_player")
-	if ambient_player and is_instance_valid(ambient_player):
-		ambient_player.call("stop")
-		ambient_player.set("stream", null)
-	var sfx_player: Node = audio.get("sfx_player")
-	if sfx_player and is_instance_valid(sfx_player):
-		sfx_player.call("stop")
-		sfx_player.set("stream", null)
-	var pool: Array = audio.get("_sfx_pool")
-	for player in pool:
-		if player and is_instance_valid(player):
-			player.call("stop")
-			player.set("stream", null)
-	audio.set("audio_cache", {})
-	audio.set("current_bgm", "")
-	audio.set("battle_music_layer", -1)
+	AudioManager.stop_bgm()
+	AudioManager.stop_ambient()
+	for child in audio.get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+			child.stream = null
+	AudioManager.audio_cache.clear()
+	AudioManager.current_bgm = ""
+	AudioManager.battle_music_layer = -1
+	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
 

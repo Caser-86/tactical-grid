@@ -47,6 +47,13 @@ func setup(player_units: Array, enemy_units: Array, max_t: int = 20) -> void:
 	battle_over = false
 	current_phase = TurnPhase.PLAYER_START
 
+## Register a unit that joins during the current mission.
+## The array is normally shared with BattleController, but this explicit method
+## keeps the ownership contract safe if a caller supplies a copied roster.
+func register_player_unit(unit: Unit) -> void:
+	if unit != null and not _player_units.has(unit):
+		_player_units.append(unit)
+
 func start_battle() -> void:
 	turn_number = 1
 	set_phase(TurnPhase.PLAYER_START)

@@ -13,6 +13,8 @@ const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_prese
 const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
+const V2RescueControllerScript = preload("res://scripts/v2/mission/v2_rescue_controller.gd")
+const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
@@ -103,6 +105,7 @@ var enemy_planner: EnemyPlanner
 ## V2 P1 服务槽位。正式输入仍使用旧 ActionSystem，P2 逐合同切换。
 var v2_action_service: V2ActionService = null
 var v2_mission_flow: RefCounted = null
+var v2_rescue_controller: RefCounted = null
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
@@ -115,6 +118,8 @@ var v2_hover_attack_preview: Dictionary = {}
 var v2_locked_attack_preview: Dictionary = {}
 var v2_locked_attack_target_id: String = ""
 var v2_pending_interaction_facility_id: String = ""
+var v2_last_checkpoint: Dictionary = {}
+var v2_rescue_marker: Node2D = null
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -275,6 +280,7 @@ func _ready() -> void:
 	_setup_victory_conditions()
 	_init_telemetry()
 	_render_map()
+	_render_v2_rescue_marker()
 	_configure_viewport_layout()
 	get_viewport().size_changed.connect(_configure_viewport_layout)
 	_render_units()
@@ -383,6 +389,11 @@ func _cleanup_units() -> void:
 	_dismiss_context_hint()
 	# Release V2 RefCounted mission state before temporary battle scenes are freed.
 	v2_mission_flow = null
+	v2_rescue_controller = null
+	v2_last_checkpoint.clear()
+	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
+		v2_rescue_marker.free()
+	v2_rescue_marker = null
 	selected_unit = null
 	boss_unit = null
 	boss_data.clear()
@@ -571,6 +582,18 @@ func _setup_v2_services() -> void:
 	var v2_map: Dictionary = v2_map_result.get("data", {}) if bool(v2_map_result.get("success", false)) else {}
 	v2_mission_flow.setup(v2_mission, v2_map, player_units, enemy_units)
 	v2_mission_flow.apply_event(&"mission_started")
+	v2_rescue_controller = V2RescueControllerScript.new()
+	v2_rescue_controller.setup(
+		v2_map,
+		player_units,
+		enemy_units,
+		v2_action_service,
+		v2_mission_flow,
+		Callable(self, "_create_v2_rescue_unit"),
+		Callable(self, "_register_v2_rescued_unit"),
+	)
+	v2_rescue_controller.rescue_committed.connect(_on_v2_rescue_committed)
+	v2_rescue_controller.checkpoint_requested.connect(_on_v2_checkpoint_requested)
 	v2_pending_move_preview.clear()
 	v2_hover_attack_preview.clear()
 	v2_locked_attack_preview.clear()
@@ -579,6 +602,81 @@ func _setup_v2_services() -> void:
 	v2_interaction_service.setup(map_data, tactical_network_state, visibility_state, alert_state)
 	if camera:
 		camera.set_input_router_mode(_is_v2_battle())
+
+## Create rescued characters from the V2 data contract, never from V1 job data.
+func _create_v2_rescue_unit(character_id: StringName, entity_id: String, position: Vector2i) -> Unit:
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data == null or not v2_data.has_method("get_character"):
+		return null
+	var character_data: Dictionary = v2_data.get_character(character_id)
+	if character_data.is_empty():
+		return null
+	var unit := GameData.create_v2_player_unit(character_data)
+	unit.entity_id = entity_id
+	unit.grid_pos = position
+	unit.height = MapLoader.get_height_at(map_data, position.x, position.y)
+	return unit
+
+## Register a same-mission rescue in every runtime owner that can observe units.
+func _register_v2_rescued_unit(unit: Unit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	unit.enable_v2_turn_mode()
+	if not player_units.has(unit):
+		player_units.append(unit)
+	if turn_manager:
+		turn_manager.register_player_unit(unit)
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service and v2_action_service.has_method("refresh_units"):
+		v2_action_service.refresh_units(player_units, enemy_units)
+	if _get_unit_sprite(unit) == null:
+		_create_unit_sprite(unit)
+	_update_visibility()
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	if hud:
+		hud.update_unit_info(selected_unit)
+	_render_v2_hud()
+
+func _on_v2_rescue_committed(result: Dictionary) -> void:
+	if hud:
+		hud.set_context_prompt("营救成功：侦察兵已加入小队，可立即选择行动")
+		hud.update_objective(_get_objective_text())
+	_advance_context_hint("interact")
+	_render_v2_rescue_marker()
+	_render_v2_hud()
+
+func _on_v2_checkpoint_requested(checkpoint_id: StringName, _result: Dictionary) -> void:
+	_save_v2_checkpoint(checkpoint_id)
+
+## Persist the rescue checkpoint through the V2 save identity while retaining
+## the shared checkpoint schema used by retry and restore tests.
+func _save_v2_checkpoint(checkpoint_id: StringName) -> bool:
+	if not _is_v2_battle() or GameManager.current_save.is_empty():
+		return false
+	current_encounter_id = String(checkpoint_id)
+	var snapshot := V2CheckpointAdapterScript.capture({
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(checkpoint_id),
+		"turn": turn_manager.turn_number if turn_manager else 0,
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+		"alert_state": alert_state.serialize() if alert_state else {},
+		"visibility_state": {"turn": visibility_state._current_turn} if visibility_state else {},
+		"facilities": v2_mission_flow.map_data.get("facilities", []) if v2_mission_flow else [],
+		"mission_flow": v2_mission_flow.get_snapshot() if v2_mission_flow else {},
+		"enemy_intents": {},
+		"turn_state": {"phase": turn_manager.current_phase if turn_manager else 0},
+		"extra": {"checkpoint_id": String(checkpoint_id)},
+	})
+	SaveManager.set_encounter_checkpoint(GameManager.current_save, snapshot)
+	v2_last_checkpoint = snapshot
+	var saved := GameManager.save_current_v2()
+	if not saved:
+		_log("V2 检查点写入失败：%s" % checkpoint_id)
+	return saved
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -1327,6 +1425,49 @@ func _render_map() -> void:
 		elif obj.type == "resource":
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "resource")
 	_render_evac_zone()
+
+## Programmatic neutral rescue marker. It is hidden by fog until the player
+## observes the captive cell, then provides a clear name and interaction cue.
+func _render_v2_rescue_marker() -> void:
+	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
+		v2_rescue_marker.queue_free()
+	v2_rescue_marker = null
+	if not _is_v2_battle() or v2_rescue_controller == null or map_layer == null:
+		return
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(&"rescue_scout")
+	if rescue_pos.x < 0:
+		return
+	v2_rescue_marker = Node2D.new()
+	v2_rescue_marker.name = "V2RescueMarker"
+	v2_rescue_marker.position = _get_cell_center(rescue_pos)
+	v2_rescue_marker.z_index = 1
+	var diamond := Polygon2D.new()
+	diamond.polygon = PackedVector2Array([
+		Vector2(0, -18), Vector2(18, 0), Vector2(0, 18), Vector2(-18, 0),
+	])
+	diamond.color = Color(0.22, 0.92, 0.88, 0.58)
+	v2_rescue_marker.add_child(diamond)
+	var label := Label.new()
+	label.text = "侦察兵\n点击营救"
+	label.position = Vector2(-48, -58)
+	label.size = Vector2(96, 42)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(0.62, 1.0, 0.96, 0.98))
+	label.add_theme_color_override("font_shadow_color", Color(0.02, 0.08, 0.10, 0.95))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v2_rescue_marker.add_child(label)
+	map_layer.add_child(v2_rescue_marker)
+	_update_v2_rescue_marker_visibility()
+
+func _update_v2_rescue_marker_visibility() -> void:
+	if not v2_rescue_marker or not is_instance_valid(v2_rescue_marker) or v2_rescue_controller == null:
+		return
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(&"rescue_scout")
+	var captive: bool = v2_rescue_controller.get_rescue_state(&"rescue_scout") == "captive"
+	v2_rescue_marker.visible = captive and (visibility_state == null or visibility_state.is_cell_observed(rescue_pos))
 
 
 ## 常驻撤离区域提示，既标出队伍可分散站立的位置，也不阻挡地图点击。
@@ -2591,6 +2732,10 @@ func request_move(cell: Vector2i) -> Dictionary:
 		return {"success": false, "committed": false, "reason": &"no_selected_unit"}
 	if v2_action_service == null:
 		return {"success": false, "committed": false, "reason": &"v2_action_service_unavailable"}
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(cell):
+		if hud:
+			hud.set_context_prompt("靠近侦察兵后点击其标记营救，不能直接走到目标格")
+		return {"success": false, "committed": false, "reason": &"rescue_interaction_required"}
 
 	if not v2_pending_move_preview.is_empty():
 		var pending_target: Vector2i = v2_pending_move_preview.get("target", Vector2i(-1, -1))
@@ -2667,6 +2812,18 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 		else:
 			request_attack_preview(clicked_unit)
 		return
+	if v2_rescue_controller:
+		var rescue_id: String = v2_rescue_controller.get_rescue_id_at(cell)
+		if not rescue_id.is_empty():
+			var rescue_preview: Dictionary = v2_rescue_controller.query_rescue(selected_unit, StringName(rescue_id))
+			if bool(rescue_preview.get("valid", false)):
+				var rescue_result: Dictionary = v2_rescue_controller.commit_rescue(rescue_preview)
+				if not bool(rescue_result.get("success", false)) and hud:
+					hud.show_action_reason(rescue_result.get("reason", &"rescue_failed"))
+			else:
+				if hud:
+					hud.show_action_reason(rescue_preview.get("reason", &"rescue_unavailable"))
+			return
 	if v2_interaction_service:
 		var facility: Dictionary = v2_interaction_service.get_facility_at(cell)
 		if not facility.is_empty():
@@ -4039,6 +4196,7 @@ func _update_visibility() -> void:
 		visibility_renderer.refresh()
 	if hud and hud.is_network_overlay_visible():
 		_update_network_node_visibility()
+	_update_v2_rescue_marker_visibility()
 	# CH1-050: Visibility changes affect which intents are public. Refresh the
 	# intent renderer so newly observed/lost enemies update their display.
 	_refresh_enemy_intent_display()

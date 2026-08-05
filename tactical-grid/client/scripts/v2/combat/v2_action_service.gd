@@ -21,6 +21,14 @@ func setup(map_data: Dictionary, players: Array, enemies: Array) -> void:
 	_state_revision = 0
 	_next_preview_id = 1
 
+## Refresh runtime unit membership after a mission event adds or removes a unit.
+## Existing previews are invalidated because occupancy and target identity changed.
+func refresh_units(players: Array, enemies: Array) -> void:
+	_players = players.duplicate()
+	_enemies = enemies.duplicate()
+	_previews.clear()
+	_state_revision += 1
+
 func query_action(request: Dictionary) -> Dictionary:
 	var action := StringName(String(request.get("action", "")))
 	match action:

@@ -195,15 +195,20 @@ git commit -m "feat(v2): implement rescue and extraction flow"
 **Files:**
 - Create: `tactical-grid/client/scripts/v2/mission/v2_rescue_controller.gd`
 - Create: `tactical-grid/client/tests/v2/v2_rescue_character_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_rescue_battle_integration_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_rescue_battle_integration_test.tscn`
 - Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
 - Modify: `tactical-grid/client/scripts/data/game_data.gd`
+- Modify: `tactical-grid/client/scripts/game/turn_manager.gd`
+- Modify: `tactical-grid/client/scripts/v2/combat/v2_action_service.gd`
+- Modify: `tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Produces: `V2RescueController.query_rescue(actor: Unit, rescue_id: StringName) -> Dictionary`、`V2RescueController.commit_rescue(preview: Dictionary) -> Dictionary`。
 - Rescue preview cost: `{action=true}`；result includes `new_unit: Unit` and `character_id="scout"`。
 
-- [ ] **Step 1: 写相邻营救与立即可选测试**
+- [x] **Step 1: 写相邻营救与立即可选测试**
 
 ```gdscript
 var preview := rescue.query_rescue(assault, "rescue_scout")
@@ -216,15 +221,15 @@ t.check(not battle.v2_action_service.query_action({"action": &"attack", "unit": 
     "未营救对象不能被攻击")
 ```
 
-- [ ] **Step 2: 确认当前地图无可营救角色而失败**
+- [x] **Step 2: 确认当前地图无可营救角色而失败**
 
-- [ ] **Step 3: 实现环境保护、角色创建和系统注册**
+- [x] **Step 3: 实现环境保护、角色创建和系统注册**
 
 营救前显示侦察轮廓和名字但不属于任何战斗阵营。提交后从 `V2Data.get_character("scout")` 创建 Unit，稳定 ID 为 `player_scout`，注册 ActionService、Visibility、TurnManager、UnitSprite 和 HUD；触发 `scout_rescued` 并保存检查点。重复营救返回 `already_rescued`。
 
-- [ ] **Step 4: 运行营救距离、重复提交、检查点恢复和存档测试**
+- [x] **Step 4: 运行营救距离、重复提交、检查点恢复和存档测试**
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission/v2_rescue_controller.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/scripts/data/game_data.gd tactical-grid/client/tests/v2
