@@ -324,9 +324,11 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 	var ability := String(snapshot.get("ability", ""))
 	var interaction := String(snapshot.get("interaction", ""))
 	var side_hint := ability if ability != "" else interaction
+	if side_hint == "":
+		side_hint = "蓝格移动 · 红色敌人攻击\n右键取消 · 中键拖动地图"
 	if action_hint_label:
 		action_hint_label.text = side_hint
-		action_hint_label.visible = selected_valid and side_hint != ""
+		action_hint_label.visible = selected_valid
 
 	var prompt := String(snapshot.get("context_prompt", ""))
 	var attack_preview: Variant = snapshot.get("attack_preview", "")

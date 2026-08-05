@@ -7,9 +7,13 @@ config/description="Tactical Grid V2 独立潜入探索冒险版本"
 config/version="2.0.0-v2"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="TacticalGrid_V2_Infiltration"
-run/main_scene="res://scenes/boot.tscn"
+run/main_scene="res://scenes/v2_boot.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[tactical_grid]
+
+product_line="v2_infiltration"
 
 [autoload]
 

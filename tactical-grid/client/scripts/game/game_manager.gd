@@ -43,6 +43,11 @@ var pending_achievement_notifications: Array[Dictionary] = []
 ## 进度管理器实例
 var progression = null
 
+## The V2 executable is a distinct product line. Route only its own entry
+## scenes here; V1 keeps its original routes on the V1 branch.
+func is_v2_runtime() -> bool:
+	return String(ProjectSettings.get_setting("tactical_grid/product_line", "")) == "v2_infiltration"
+
 func _ready() -> void:
 	current_save = SaveManager.create_default_save()
 	progression = ProgressionManagerScript.new()
@@ -607,7 +612,8 @@ func get_difficulty_params() -> Dictionary:
 ## 场景切换
 func go_to_main_menu() -> void:
 	current_state = GameState.MAIN_MENU
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	var menu_scene := "res://scenes/v2_main_menu.tscn" if is_v2_runtime() else "res://scenes/main_menu.tscn"
+	get_tree().change_scene_to_file(menu_scene)
 
 func go_to_base() -> void:
 	current_state = GameState.BASE
@@ -617,7 +623,8 @@ func go_to_battle(level_id: String) -> void:
 	current_state = GameState.BATTLE
 	pending_level_id = level_id
 	current_level_id = level_id
-	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+	var battle_scene := "res://scenes/v2_battle.tscn" if is_v2_runtime() and String(current_save.get("game_line", "")) == "v2_infiltration" else "res://scenes/battle.tscn"
+	get_tree().change_scene_to_file(battle_scene)
 
 ## CH1-080: 从遭遇检查点重试战斗（当前实现为重开关卡，完整状态恢复见 CH1-020）
 func go_to_battle_from_encounter(level_id: String) -> void:

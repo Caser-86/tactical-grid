@@ -26,6 +26,7 @@ func _initialize() -> void:
 	})
 	t.check(_group_count(presenter, "v2_move_overlay") == 2, "选择后生成蓝色移动格")
 	t.check(_group_count(presenter, "v2_attack_overlay") >= 4, "选择后同时生成红色攻击范围和目标")
+	t.check(_group_count(presenter, "v2_attack_target_label") == 2, "每个红色目标都有明确攻击标牌")
 	t.check(_group_count(presenter, "v2_danger_overlay") == 0, "普通选择不显示危险路径")
 
 	presenter.show_path([Vector2i(2, 2), Vector2i(2, 3), Vector2i(2, 4)], true)

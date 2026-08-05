@@ -33,6 +33,7 @@ func _initialize() -> void:
 	t.check(hud.objective_label.text == "找到侦察兵并撤离", "顶部只显示一句主目标")
 	t.check(hud.context_label != null and hud.context_label.text.contains("点击一次攻击"), "当前状态有明确文字提示")
 	t.check(hud.action_budget_label != null and hud.action_budget_label.text.contains("移动") and hud.action_budget_label.text.contains("行动"), "右侧显示移动与行动两项预算")
+	t.check(hud.action_hint_label != null and hud.action_hint_label.visible and hud.action_hint_label.text.contains("蓝格") and hud.action_hint_label.text.contains("红色敌人") and hud.action_hint_label.text.contains("右键"), "右侧常驻显示 V2 直接操作摘要")
 	t.check(not hud.move_button.visible and not hud.attack_button.visible, "V2 不显示常驻移动攻击按钮")
 	t.check(hud.phase_label.text.contains("已选中"), "回合栏显示当前输入状态")
 	t.check(hud.get_node("TopBar/AlertLabel").visible and hud.get_node("TopBar/AlertLabel").text.contains("下一步"), "顶部显示警戒和下一步后果")

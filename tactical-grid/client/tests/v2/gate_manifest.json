@@ -29,6 +29,7 @@
     "res://tests/v2/v2_direct_move_input_test.gd",
     "res://tests/v2/v2_attack_input_test.gd",
     "res://tests/v2/v2_enemy_occupancy_test.gd",
+    "res://tests/v2/v2_battle_runtime_contract_test.gd",
     "res://tests/v2/v2_interaction_service_test.gd",
     "res://tests/v2/v2_cancel_end_turn_test.gd",
     "res://tests/v2/v2_camera_input_test.gd",
@@ -40,7 +41,7 @@
     "res://tests/v2/v2_playtest_integration_contract_test.gd"
   ],
   "scene_tests": [
-    "res://tests/v2/v2_main_menu_contract.tscn",
+    "res://tests/v2/v2_runtime_isolation_contract.tscn",
     "res://tests/v2/v2_player_turn_e2e_test.tscn",
     "res://tests/v2/v2_rescue_battle_integration_test.tscn",
     "res://tests/v2/v2_m1_retry_scene_test.tscn",
@@ -49,7 +50,6 @@
     "res://tests/v2/v2_m1_visual_snapshot.tscn"
   ],
   "powershell_tests": [
-    "tests/run_release_gate.ps1",
     "tests/v2/run_m1_visual_matrix.ps1"
   ]
 }

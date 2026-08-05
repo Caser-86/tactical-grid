@@ -53,6 +53,8 @@ static func _execute_move(intent: Dictionary, enemy: Unit, context: Dictionary, 
 		return _fallback(enemy.entity_id, revision, &"invalid_path")
 	if _is_blocked(target_cell, context):
 		return _fallback(enemy.entity_id, revision, &"blocked_path")
+	if _is_occupied(target_cell, context, enemy):
+		return _fallback(enemy.entity_id, revision, &"occupied")
 	return _success(intent, enemy.entity_id, revision, {"target_cell": target_cell, "path": path})
 
 static func _execute_telegraph(intent: Dictionary, enemy: Unit, context: Dictionary, revision: int) -> Dictionary:
@@ -112,5 +114,12 @@ static func _find_unit(raw_units: Variant, entity_id: String) -> Unit:
 static func _is_blocked(cell: Vector2i, context: Dictionary) -> bool:
 	for blocked in context.get("blocked_cells", []):
 		if blocked is Vector2i and blocked == cell:
+			return true
+	return false
+
+static func _is_occupied(cell: Vector2i, context: Dictionary, except_unit: Unit) -> bool:
+	for raw_unit in context.get("players", []) + context.get("enemies", []):
+		var unit: Unit = raw_unit
+		if unit != null and unit != except_unit and unit.is_alive and unit.grid_pos == cell:
 			return true
 	return false

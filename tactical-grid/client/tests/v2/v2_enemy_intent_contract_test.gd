@@ -75,6 +75,19 @@ func _initialize() -> void:
 	t.check(fallback.get("type", &"") in [&"move", &"guard", &"wait"], "阻断攻击降级为安全后备")
 	t.check(int(fallback.get("damage", 0)) == 0, "阻断后备行为不比原意图更致命")
 
+	scout.grid_pos = sentry.grid_pos + Vector2i(-1, 0)
+	var occupied_move := {
+		"enemy_id": "enemy_sentry",
+		"type": "move",
+		"path": [scout.grid_pos],
+		"revision": 9,
+	}
+	var occupied_result: Dictionary = V2IntentExecutor.execute(occupied_move, context)
+	t.check(
+		not bool(occupied_result.get("success", true)) and occupied_result.get("reason", &"") == &"occupied",
+		"V2 执行器拒绝移动到任意活单位占用的格子"
+	)
+
 	var stale_context := context.duplicate(true)
 	stale_context["state_revision"] = 10
 	var stale_result: Dictionary = V2IntentExecutor.execute(blocked_attack, stale_context)

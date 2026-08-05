@@ -1,7 +1,7 @@
 extends Node
 
-const BattleScene = preload("res://scenes/battle.tscn")
-const BattleControllerScript = preload("res://scripts/game/battle_controller.gd")
+const BattleScene = preload("res://scenes/v2_battle.tscn")
+const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
 const Runner = preload("res://tests/v2/test_runner.gd")
 
 var t := Runner.new()
@@ -26,7 +26,7 @@ func _run() -> void:
 	manager.set("current_save", _with_known_tutorials(manager.get("current_save")))
 
 	var battle := BattleScene.instantiate() as BattleController
-	t.check(battle != null and battle.get_script() == BattleControllerScript, "V2 E2E 实例化正式 battle.tscn")
+	t.check(battle != null and battle.get_script() == BattleControllerScript, "V2 E2E 实例化独立 v2_battle.tscn")
 	if battle == null:
 		t.finish(get_tree())
 		return
@@ -44,14 +44,21 @@ func _run() -> void:
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
 	t.check(battle.hud.objective_label.text == "找到失联侦察兵", "V2 HUD 显示营救主目标而非旧上传目标")
+	t.check(battle.map_layer.get_node_or_null("V2EvacMarker") != null, "V2 地图按 entities 数据渲染撤离标记")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
 	var player: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	t.check(player != null and player.team == "player", "V2 M1 实战只部署一名玩家角色")
+	t.check(player != null and player.max_hp == 7 and player.current_hp == 7, "V2 M1 突击兵使用 V2 角色数值")
 	t.check(player != null and player.v2_turn_mode_enabled, "V2 实战单位启用移动/行动双预算")
+	t.check(battle._active_tutorial_hint == null, "V2 开场不显示 V1 模态教学")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")
 	t.check(not battle.hud.move_button.visible and not battle.hud.attack_button.visible and not battle.hud.skill_button.visible and not battle.hud.item_button.visible and not battle.hud.overwatch_button.visible, "V2 HUD 不暴露旧动作按钮")
 	t.check(battle.hud.end_turn_button.visible and not battle.hud.end_turn_button.disabled, "V2 HUD 保留可用结束回合入口")
+	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
+	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
+	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
+	t.check(v2_guide != null and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键"), "V2 底栏固定显示直接操作指南")
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
@@ -134,6 +141,7 @@ func _run() -> void:
 		await get_tree().process_frame
 	t.check(_saw_enemy_turn, "Space 结束回合经过敌方行动阶段")
 	t.check(battle.turn_manager.turn_number == 2 and battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION, "敌方行动后进入下一玩家回合")
+	t.check(_has_unique_live_positions(battle), "V2 敌方行动后不存在任何单位重合")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "下一玩家回合自动恢复单位选择状态")
 	t.check(battle.hud.context_label.visible and battle.hud.phase_label.text.contains("玩家回合"), "下一玩家回合 HUD 恢复可操作提示")
 	get_window().size = Vector2i(1920, 1080)
@@ -154,6 +162,17 @@ func _with_known_tutorials(save: Dictionary) -> Dictionary:
 	progress["story_flags"] = flags
 	next["campaign_progress"] = progress
 	return next
+
+func _has_unique_live_positions(battle: BattleController) -> bool:
+	var occupied: Dictionary = {}
+	for raw_unit in battle.player_units + battle.enemy_units:
+		var unit: Unit = raw_unit
+		if unit == null or not unit.is_alive:
+			continue
+		if occupied.has(unit.grid_pos):
+			return false
+		occupied[unit.grid_pos] = unit.entity_id
+	return true
 
 func _dismiss_intro(manager: Node) -> void:
 	for _i in range(30):

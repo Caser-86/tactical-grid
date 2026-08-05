@@ -35,6 +35,7 @@ func show_for_unit(unit: Unit, move_query: Dictionary, attack_query: Dictionary)
 			var target_cell := _target_cell(target)
 			if target_cell != Vector2i(-1, -1):
 				_outline_target(target_cell, ATTACK_BORDER)
+				_add_attack_target_label(target_cell)
 
 func show_path(path: Array[Vector2i], dangerous: bool) -> void:
 	clear_preview()
@@ -156,6 +157,23 @@ func _outline_target(cell: Vector2i, color: Color) -> void:
 	panel.add_to_group("v2_attack_overlay")
 	panel.set_meta("v2_preview", false)
 	add_child(panel)
+
+func _add_attack_target_label(cell: Vector2i) -> void:
+	var label := Label.new()
+	label.position = _cell_origin(cell) + Vector2(4, 4)
+	label.size = Vector2(cell_size - 8, 22)
+	label.text = "攻击"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(1.0, 0.93, 0.82, 1.0))
+	label.add_theme_color_override("font_outline_color", Color(0.35, 0.02, 0.02, 0.95))
+	label.add_theme_constant_override("outline_size", 4)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 6
+	label.add_to_group("v2_attack_target_label")
+	label.set_meta("v2_preview", false)
+	add_child(label)
 
 func _target_cell(target: Variant) -> Vector2i:
 	if target is Unit:
