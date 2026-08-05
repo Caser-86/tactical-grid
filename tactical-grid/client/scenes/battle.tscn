@@ -27,6 +27,8 @@ script = ExtResource("9")
 
 [node name="AttackHighlightLayer" type="Node2D" parent="."]
 
+[node name="V2AffordanceLayer" type="Node2D" parent="."]
+
 [node name="UnitLayer" type="Node2D" parent="."]
 
 [node name="EffectLayer" type="Node2D" parent="."]

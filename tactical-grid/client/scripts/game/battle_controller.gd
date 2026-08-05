@@ -7,6 +7,7 @@ const CELL_SIZE = 64
 const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
+const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -38,6 +39,7 @@ var _active_context_flag: String = ""
 @onready var move_highlight: Node2D = $MoveHighlightLayer
 @onready var path_preview_layer: Node2D = $PathPreviewLayer
 @onready var attack_highlight: Node2D = $AttackHighlightLayer
+@onready var v2_affordance_layer: Node2D = $V2AffordanceLayer
 @onready var unit_layer: Node2D = $UnitLayer
 @onready var effect_layer: Node2D = $EffectLayer
 @onready var hud: HUD = $HUD
@@ -70,6 +72,7 @@ var selected_unit: Unit = null
 var selected_action: String = ""  # "", "move", "attack", "skill", "item", "targeting"
 var reachable_cells: Dictionary = {}
 var attack_targets: Array = []
+var v2_attack_range_cells: Array[Vector2i] = []
 ## 直接点击敌人时的二次确认目标，避免误触立即结算攻击。
 var attack_preview_target: Unit = null
 var attack_preview_data: Dictionary = {}
@@ -95,6 +98,7 @@ var enemy_planner: EnemyPlanner
 var v2_action_service: V2ActionService = null
 var v2_mission_flow: Dictionary = {}
 var v2_interaction_service: RefCounted = null
+var v2_affordance_presenter: V2AffordancePresenter = null
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -248,6 +252,7 @@ func _ready() -> void:
 	_setup_enemy_intent_renderer()
 	_spawn_units()
 	_setup_v2_services()
+	_setup_v2_affordance_presenter()
 	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
@@ -513,6 +518,17 @@ func _setup_v2_services() -> void:
 	v2_action_service.setup(map_data, player_units, enemy_units)
 	v2_mission_flow["mission_id"] = level_id
 	v2_mission_flow["state_revision"] = 1
+
+func _setup_v2_affordance_presenter() -> void:
+	if v2_affordance_layer == null:
+		return
+	v2_affordance_presenter = V2AffordancePresenterScript.new()
+	v2_affordance_presenter.name = "V2AffordancePresenter"
+	v2_affordance_presenter.cell_size = float(CELL_SIZE)
+	v2_affordance_layer.add_child(v2_affordance_presenter)
+
+func _is_v2_battle() -> bool:
+	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。
@@ -2344,10 +2360,13 @@ func _deselect_unit() -> void:
 	_pending_action_kind = ""
 	reachable_cells.clear()
 	attack_targets.clear()
+	v2_attack_range_cells.clear()
 	path_preview.clear()
 	_clear_layer(move_highlight)
 	_clear_layer(path_preview_layer)
 	_clear_layer(attack_highlight)
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_all()
 	hud.update_unit_info(null)
 	hud.set_action_buttons_visible(false)
 	hud.set_context_state(HUD.ContextState.NONE)
@@ -2407,8 +2426,9 @@ func _show_move_range(unit: Unit) -> void:
 	for cell in reachable_cells:
 		if cell == unit.grid_pos:
 			continue
-		var move_color := _highlight_color("move", COLOR_MOVE)
-		_highlight_range_cell(move_highlight, cell, move_color, _highlight_edge_color(move_color))
+		if not _is_v2_battle():
+			var move_color := _highlight_color("move", COLOR_MOVE)
+			_highlight_range_cell(move_highlight, cell, move_color, _highlight_edge_color(move_color))
 
 	# 标记选中单位本回合能进入的撤离区域格。
 	if mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
@@ -2437,6 +2457,11 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 		hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
 		return
 	_show_attack_range(unit)
+	if _is_v2_battle() and v2_affordance_presenter:
+		v2_affordance_presenter.show_for_unit(unit, {"reachable": reachable_cells}, {
+			"range_cells": v2_attack_range_cells,
+			"targets": attack_targets,
+		})
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
@@ -2499,6 +2524,7 @@ func _draw_path_line(path: Array) -> void:
 func _show_attack_range(unit: Unit) -> void:
 	_clear_layer(attack_highlight)
 	attack_targets.clear()
+	v2_attack_range_cells.clear()
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	# 先显示完整可射击区域，再用更亮的格子标出真实敌人/目标，
@@ -2510,8 +2536,10 @@ func _show_attack_range(unit: Unit) -> void:
 			if dist < min_range or dist > max_range:
 				continue
 			if VisionSystem.has_line_of_sight(unit.grid_pos, cell, map_width, map_height, _is_vision_blocking):
-				var attack_range_color := _highlight_color("attack", COLOR_ATTACK_RANGE)
-				_highlight_range_cell(attack_highlight, cell, attack_range_color, _highlight_edge_color(attack_range_color))
+				v2_attack_range_cells.append(cell)
+				if not _is_v2_battle():
+					var attack_range_color := _highlight_color("attack", COLOR_ATTACK_RANGE)
+					_highlight_range_cell(attack_highlight, cell, attack_range_color, _highlight_edge_color(attack_range_color))
 	# 敌方单位
 	# CH1-040: 只能攻击处于正在观察格子的敌人；隐藏敌人不可被选中
 	for enemy in enemy_units:
@@ -2527,9 +2555,10 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(enemy)
-				var target_color := _highlight_color("attack", COLOR_ATTACK)
-				var target_border := _highlight_color("target", Color(1.0, 0.78, 0.16, 0.95))
-				_highlight_range_cell(attack_highlight, enemy.grid_pos, target_color, _highlight_edge_color(target_border))
+				if not _is_v2_battle():
+					var target_color := _highlight_color("attack", COLOR_ATTACK)
+					var target_border := _highlight_color("target", Color(1.0, 0.78, 0.16, 0.95))
+					_highlight_range_cell(attack_highlight, enemy.grid_pos, target_color, _highlight_edge_color(target_border))
 	# 可破坏目标（destroy 任务）
 	for tpos in destructible_targets:
 		var state = destructible_target_states.get(tpos, {})
@@ -2543,8 +2572,9 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(tpos)  # 混合类型：Unit 和 Vector2i
-				var destructible_color := _highlight_color("target", COLOR_TARGET)
-				_highlight_range_cell(attack_highlight, tpos, destructible_color, _highlight_edge_color(destructible_color))
+				if not _is_v2_battle():
+					var destructible_color := _highlight_color("target", COLOR_TARGET)
+					_highlight_range_cell(attack_highlight, tpos, destructible_color, _highlight_edge_color(destructible_color))
 
 ## 直接点击敌人后进入可读的二次确认预览，不执行攻击。
 func _begin_direct_attack_preview(target: Unit) -> void:
