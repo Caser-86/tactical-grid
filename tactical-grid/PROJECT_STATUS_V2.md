@@ -1,7 +1,7 @@
 # Tactical Grid V2 当前状态
 
 > version: V2 Infiltration
-> status: P2 passed; M1 vertical slice ready to start
+> status: M101 passed; M102 map graybox next
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
 
@@ -22,6 +22,7 @@
 - V2 实战单位已统一启用移动/行动双预算；G 键网络覆盖层、敌方回合状态和攻击结算后的 HUD 状态已接入真实场景。
 - V2 真实输入集成测试 `v2_player_turn_e2e_test.tscn` 已通过 37 个断言，覆盖 battle.tscn、角色选择、蓝格移动、敌人悬停、双击攻击、HP 预览/结算、镜头、取消、G、Space、敌方回合和下一回合恢复。
 - V2 P2 全门已通过：V2 脚本合同全部通过，其中设置合同包含 18 个断言；真实输入场景 37 个断言；V1 稳定断言 1816、章节一 E2E 190，失败数 0，发布门禁异常警告/错误 0。
+- M101 已完成：M1 任务合同、正式地图稳定 ID、单人突击开场、侦察兵营救解锁、6 敌/3 活跃上限、12-18 分钟目标和非强制可选事故记录均已锁定；配置测试 15/15 通过。
 
 ## 尚未开始
 
@@ -36,4 +37,4 @@ V1 的 `PROJECT_STATUS.md`、`docs/PROJECT_TAKEOVER_ROADMAP.md` 和 2026-07-30 �
 
 ## 下一步
 
-P1 和 P2 已完成。下一步从 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M101 开始，先锁定 M1 任务数据、正式目标流和地图灰盒，再进入角色/敌人美术批量制作。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。
+P1、P2 和 M101 已完成。下一步执行 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M102，创建 22×16 两路线 schema v3 地图并锁定三批遭遇。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。

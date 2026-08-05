@@ -52,14 +52,14 @@
 
 **Files:**
 - Modify: `tactical-grid/client/data/v2/missions.json`
-- Modify: `tactical-grid/client/data/v2/characters.json`
+- Verify: `tactical-grid/client/data/v2/characters.json`
 - Create: `tactical-grid/client/tests/v2/v2_m1_config_test.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Produces mission fields: `id/map_id/name/starting_roster/rescue_character/deployment_limit/primary/optional/enemy_total/active_cap/duration_minutes/tutorial_steps`。
 
-- [ ] **Step 1: 写 M1 固定配置测试**
+- [x] **Step 1: 写 M1 固定配置测试**
 
 ```gdscript
 var m1 := V2Data.get_mission(&"ch1_m1")
@@ -71,15 +71,15 @@ t.check(m1.enemy_total == 6 and m1.active_cap == 3, "六敌且同时最多三敌
 t.check(m1.duration_minutes == [12, 18], "首次时长目标固定")
 ```
 
-- [ ] **Step 2: 确认当前基础数据缺少完整 M1 字段而失败**
+- [x] **Step 2: 审核当前基础数据，确认正式地图 ID 仍需锁定**
 
-- [ ] **Step 3: 写入确定配置并删除旧强制上传字段**
+- [x] **Step 3: 写入确定配置并删除旧强制上传字段**
 
 `missions.json.ch1_m1` 不包含 `upload_turns_required`、`evac_locked_until_upload`、信用点和三星回合字段。`characters.json.scout.unlock` 固定为 `{mission="ch1_m1", event="scout_rescued"}`。
 
-- [ ] **Step 4: 运行配置测试和数据仓库测试**
+- [x] **Step 4: 运行配置测试和数据仓库测试**
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/data/v2 tactical-grid/client/tests/v2

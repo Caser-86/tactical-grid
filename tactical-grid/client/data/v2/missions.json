@@ -1,7 +1,7 @@
 {
   "ch1_m1": {
     "id": "ch1_m1",
-    "map_id": "ch1_m1",
+    "map_id": "ch1_m1_echo_yard_v3",
     "name": "回声失联",
     "starting_roster": ["assault"],
     "rescue_character": "scout",
