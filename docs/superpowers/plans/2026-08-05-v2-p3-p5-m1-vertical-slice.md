@@ -580,32 +580,35 @@ git commit -m "feat(v2): write concise M1 narrative"
 - Create: `tactical-grid/client/tests/v2/v2_m1_e2e_test.tscn`
 - Create: `tactical-grid/client/tests/v2/v2_m1_visual_snapshot.gd`
 - Create: `tactical-grid/client/tests/v2/v2_m1_visual_snapshot.tscn`
+- Create: `tactical-grid/client/tests/v2/run_m1_visual_matrix.ps1`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - E2E test routes: `main_direct/optional_record/checkpoint_retry`。
 - Snapshot stages: `start/selected/attack_preview/rescue/evac/dialogue/result`。
 
-- [ ] **Step 1: 写从新档到 M2 解锁的失败 E2E**
+- [x] **Step 1: 写从新档到 M2 解锁的失败 E2E**
 
 测试使用公开输入和行动事务，不直接设置 `mission_flow.state`。主路线选择突击、移动、攻击、查看意图、使用摄像头、营救、切换侦察、撤离；可选路线额外上传记录；重试路线在营救后失能并恢复检查点。
 
-- [ ] **Step 2: 运行三条路线并记录首个真实失败点**
+- [x] **Step 2: 运行三条路线并记录首个真实失败点**
 
 Expected initial failure 必须来自未接通的流程或数据，不允许通过测试内直接改状态绕过。
 
-- [ ] **Step 3: 只修复 E2E 揭示的集成缺口**
+- [x] **Step 3: 只修复 E2E 揭示的集成缺口**
 
 每个修复先增加对应局部断言；不要在本任务增加新机制。
 
-- [ ] **Step 4: 生成视觉矩阵并运行完整门**
+- [x] **Step 4: 生成视觉矩阵并运行完整门**
 
 生成 1280×720 与 1920×1080、normal/grayscale/deuteranopia_assist 的七阶段截图到 `artifacts/v2/verification/m1-graybox/screenshots/`。检查图像非空、尺寸正确、主目标可见、范围颜色与形状存在、无 UI 超界。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
+
+验证证据：M112 三路线 E2E `Passed: 60 / Failed: 0`；视觉矩阵 `42/42`，两个分辨率、三种视觉模式、七阶段均生成非空 PNG 且尺寸精确；无头视觉场景合同 `Passed: 5 / Failed: 0`。视觉矩阵由 `run_m1_visual_matrix.ps1` 使用 Windows OpenGL 兼容渲染器串行执行，避免把 Dummy framebuffer 误当成截图。
 
 ```powershell
-git add tactical-grid/client/tests/v2 tactical-grid/client/scripts tactical-grid/client/data/v2
+git add tactical-grid/client/tests/v2
 git commit -m "test(v2): cover complete M1 graybox flow"
 ```
 

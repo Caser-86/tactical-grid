@@ -41,9 +41,11 @@
     "res://tests/v2/v2_rescue_battle_integration_test.tscn",
     "res://tests/v2/v2_m1_retry_scene_test.tscn",
     "res://tests/v2/v2_m1_dialogue_scene_test.tscn",
-    "res://tests/v2/v2_base_progression_scene_test.tscn"
+    "res://tests/v2/v2_base_progression_scene_test.tscn",
+    "res://tests/v2/v2_m1_visual_snapshot.tscn"
   ],
   "powershell_tests": [
-    "tests/run_release_gate.ps1"
+    "tests/run_release_gate.ps1",
+    "tests/v2/run_m1_visual_matrix.ps1"
   ]
 }
