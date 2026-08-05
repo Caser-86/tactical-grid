@@ -1,7 +1,7 @@
 # Tactical Grid V2 当前状态
 
 > version: V2 Infiltration
-> status: M112 passed; M113 playtest recorder next
+> status: M113 passed; H1 first-player gate next
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
 
@@ -34,10 +34,11 @@
 - M110 已完成：M1 结算会写入 V2 进度，营救侦察兵并按可选事故记录解锁 `scout_a/scout_b`；基地 V2 分支隐藏旧商店、军械库、信用点、六属性和技能树，提供已解锁队员编队、兼容模块装备和下一任务入口；角色面板与结算页均使用 V2 数据。M110 进度合同 16/16；基地/角色面板/结算正式场景合同 24/24；完整 V2 release gate 通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
 - M111 已完成：M1 战前简报、任务介绍、营救回应、事故记录和撤离结语均有短文本；战前提供两个可点击方针，V2 选项只写入独立 `story_flags`；V2 对话仓库优先读取 V2 数据且不回退 V1；营救和事故记录事件已接入正式 battle。M111 内容合同 29/29；正式对话场景 7/7；完整 V2 release gate 通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
 - M112 已完成：三条正式 M1 E2E 路线 `main_direct/optional_record/checkpoint_retry` 共 60/60 断言通过，覆盖摄像头、移动、攻击预览/结算、营救入队、可选记录、撤离胜利、失败和检查点恢复；视觉矩阵在 Windows OpenGL 兼容渲染器下生成 42/42 张 PNG（1280×720/1920×1080 × normal/grayscale/deuteranopia_assist × 7 阶段），逐张核验非空和精确尺寸。无头门禁会明确跳过不可读取的 Dummy framebuffer，不伪造截图；Godot 退出时仍有已知资源泄漏提示，未计入测试失败。
+- M113 已完成：建立匿名 `V2PlaytestRecorder`，只记录相对时间、匿名编号、玩法事件和结果；隐私字段与未知事件拒绝；完成后写入独立 `user://playtests/m1/Pxx.json` 并可重新解析。记录器合同 16/16，门清单合同 1/1；真人测试协议和记录表已落在 `docs/v2/playtests/`，负责人自测不计入 H1。
 
 ## 尚未开始
 
-- M113-M114：首次玩家记录、H1 修正和 M1 灰盒锁。
+- H1、M114：三名首次玩家门、问题修正和 M1 灰盒锁。
 - A01-A14：V2 角色、敌人、环境、肖像、图标、特效、音频和运行时资源门。
 - H1：三名首次玩家真人验收。
 - V2 首次玩家测试、章节正式内容和发布包。
@@ -48,4 +49,4 @@ V1 的 `PROJECT_STATUS.md`、`docs/PROJECT_TAKEOVER_ROADMAP.md` 和 2026-07-30 �
 
 ## 下一步
 
-P1、P2、M101-M112 已完成。下一步执行 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M113，加入匿名首次玩家记录工具和测试协议；随后执行 H1，依据三名首次玩家的真实卡点修正 M114。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。
+P1、P2、M101-M113 已完成。下一步执行 H1：严格按 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 组织三名首次玩家，保存匿名 JSON 和人工记录；随后依据真实卡点执行 M114。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。

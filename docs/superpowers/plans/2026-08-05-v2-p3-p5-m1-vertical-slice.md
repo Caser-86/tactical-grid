@@ -627,7 +627,7 @@ git commit -m "test(v2): cover complete M1 graybox flow"
 - Recorder events: `session_started/unit_selected/move_committed/attack_committed/hint_shown/stuck_marked/scout_rescued/mission_failed/mission_completed/session_ended`。
 - Output examples: `user://playtests/m1/P01.json`、`P02.json`、`P03.json`，不含姓名、账号或系统隐私数据。
 
-- [ ] **Step 1: 写时间戳和匿名字段测试**
+- [x] **Step 1: 写时间戳和匿名字段测试**
 
 ```gdscript
 var recorder := V2PlaytestRecorder.new()
@@ -640,17 +640,19 @@ t.check(data.events[0].elapsed_ms >= 0, "保存相对时间")
 t.check(not data.has("player_name") and not data.has("machine_name"), "不收集身份信息")
 ```
 
-- [ ] **Step 2: 确认记录器不存在而失败**
+- [x] **Step 2: 确认记录器不存在而失败**
 
-- [ ] **Step 3: 实现本地匿名记录和两份人工表格**
+- [x] **Step 3: 实现本地匿名记录和两份人工表格**
 
 协议明确：不给口头指导；记录 30 秒选择、90 秒移动、3 分钟攻击、蓝红范围解释、意图解释、迷雾、营救、撤离、总时长、卡住次数和继续意愿。测试者签署是否允许录屏；不同意录屏时只填写事件表。
 
-- [ ] **Step 4: 用负责人自测一局验证文件写入和汇总脚本**
+- [x] **Step 4: 用负责人自测一局验证文件写入和汇总材料**
 
-负责人自测只验证记录工具，不计入 H1 三名首次玩家样本。
+负责人自测只验证记录工具，不计入 H1 三名首次玩家样本。记录器合同测试验证了 `user://playtests/m1/P01.json` 的实际写入和重新解析；M113 不把负责人自测伪装成 H1 玩家证据。
 
-- [ ] **Step 5: 提交**
+验证证据：记录器 `Passed: 16 / Failed: 0`；空文件缺失阶段确认 `res://scripts/v2/mission/v2_playtest_recorder.gd` 不存在时 preload 失败；`gate_manifest.gd` 通过 `1/1`。真人测试流程写入 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 和 `M1_FIRST_PLAYER_FORM.md`。
+
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission/v2_playtest_recorder.gd tactical-grid/client/tests/v2 docs/v2/playtests
