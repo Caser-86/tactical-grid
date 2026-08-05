@@ -282,6 +282,10 @@ func _ready() -> void:
 ## CH1-040: 创建并挂载 VisibilityRenderer，置于 EvacZoneLayer 与 MoveHighlightLayer 之间。
 ## 雾层遮挡地形与撤离区，但不遮挡玩家高亮、单位与特效。
 func _setup_visibility_renderer() -> void:
+	# VisibilityState needs map dimensions before camera zones or same-frame
+	# movement updates can be merged; without setup, bounds checks silently fail.
+	if visibility_state:
+		visibility_state.setup(map_width, map_height)
 	visibility_renderer = VisibilityRenderer.new()
 	visibility_renderer.name = "VisibilityRenderer"
 	# Fog must cover unexplored environment props, while UnitSprite/FX keep their
@@ -2587,8 +2591,7 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		_refresh_selected_unit_affordances(selected_unit)
 		if hud:
 			hud.update_unit_info(selected_unit)
-	_update_visibility()
-	_refresh_enemy_intent_display()
+	refresh_visibility_transaction(&"unit_moved")
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 
@@ -3134,7 +3137,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 
 	# 移动会改变玩家视野，不能等到下一回合才更新战争迷雾。
 	# 放在陷阱和警戒结算后，保证最终存活状态与最终位置都已写入。
-	_update_visibility()
+	refresh_visibility_transaction(&"unit_moved")
 
 	_log("%s 移动到 (%d,%d)" % [selected_unit.unit_name, grid_pos.x, grid_pos.y])
 	_clear_layer(path_preview_layer)
@@ -3980,6 +3983,26 @@ func _update_visibility() -> void:
 	# CH1-050: Visibility changes affect which intents are public. Refresh the
 	# intent renderer so newly observed/lost enemies update their display.
 	_refresh_enemy_intent_display()
+
+## V2: 在移动事务返回前完成状态、精灵和迷雾渲染刷新。
+## 不使用延迟计时器，调用方可以立即读取 focus_cell 的状态和渲染状态。
+func refresh_visibility_transaction(reason: StringName) -> Dictionary:
+	if visibility_state == null:
+		return {"success": false, "reason": &"visibility_unavailable"}
+	_update_visibility()
+	var focus_cell := selected_unit.grid_pos if selected_unit and is_instance_valid(selected_unit) else Vector2i(-1, -1)
+	var cell_state := visibility_state.get_cell_state(focus_cell) if focus_cell.x >= 0 else VisibilityState.STATE_UNEXPLORED
+	var render_state := VisibilityState.RENDER_HIDDEN
+	if visibility_renderer and focus_cell.x >= 0:
+		render_state = visibility_renderer.get_render_state_for_cell(focus_cell)
+	return {
+		"success": true,
+		"reason": reason,
+		"focus_cell": focus_cell,
+		"cell_state": cell_state,
+		"render_state": render_state,
+		"renderer_refreshed": visibility_renderer != null,
+	}
 
 ## CODE-P2-01: Hide enemy sprites not currently observed; show observed ones.
 ## CH1-040: 实时敌人精灵只在正在观察时显示；离开视野后隐藏，由幽灵标记取代。
