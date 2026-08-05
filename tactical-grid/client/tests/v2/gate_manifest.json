@@ -9,7 +9,8 @@
     "res://tests/v2/v2_unit_turn_state_test.gd",
     "res://tests/v2/v2_combat_rules_test.gd",
     "res://tests/v2/v2_action_service_test.gd",
-    "res://tests/v2/v2_ability_rules_test.gd"
+    "res://tests/v2/v2_ability_rules_test.gd",
+    "res://tests/v2/v2_checkpoint_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [
