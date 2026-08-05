@@ -407,6 +407,22 @@ func show_action_picker(title: String, items: Array, on_selected: Callable) -> v
 		var vp_size = get_viewport().get_visible_rect().size
 		popup.position = Vector2i(int((vp_size.x - popup.size.x) * 0.5), int(vp_size.y - popup.size.y - 90))
 
+## V2: 设施交互复用同一张选择卡，但把结果、持续时间和警戒影响写进描述。
+func show_interaction_actions(facility_name: String, actions: Array, on_selected: Callable) -> void:
+	var items: Array = []
+	for action in actions:
+		var duration := int(action.get("duration_turns", -1))
+		var duration_text := "持续%d回合" % duration if duration > 0 else "持续到任务结束"
+		var alert_text := "会提高警戒" if bool(action.get("raises_alert", false)) else "不提高警戒"
+		items.append({
+			"id": String(action.get("id", "")),
+			"name": "%s（1行动）" % String(action.get("label", "操作")),
+			"description": "结果：%s · %s · %s" % [String(action.get("consequence", "")), duration_text, alert_text],
+			"disabled": not bool(action.get("enabled", false)),
+			"disabled_reason": String(action.get("reason", "不可用")),
+		})
+	show_action_picker("交互：%s" % facility_name, items, on_selected)
+
 ## 隐藏行动选择面板
 func hide_action_picker() -> void:
 	if _action_picker != null and is_instance_valid(_action_picker):

@@ -7,6 +7,7 @@ const CELL_SIZE = 64
 const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
+const V2InteractionServiceScript = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
 const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 
@@ -106,6 +107,7 @@ var v2_pending_move_preview: Dictionary = {}
 var v2_hover_attack_preview: Dictionary = {}
 var v2_locked_attack_preview: Dictionary = {}
 var v2_locked_attack_target_id: String = ""
+var v2_pending_interaction_facility_id: String = ""
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -517,7 +519,7 @@ func _init_subsystems() -> void:
 	# V2 P1 只创建依赖槽位，不切换 V1 正式输入路径。
 	v2_action_service = V2ActionServiceScript.new()
 	v2_mission_flow = {"game_line": "v2_infiltration", "state_revision": 0}
-	v2_interaction_service = RefCounted.new()
+	v2_interaction_service = V2InteractionServiceScript.new()
 	v2_input_router = V2BattleInputRouterScript.new()
 	v2_input_router.cell_left_clicked.connect(_on_v2_cell_left_clicked)
 	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
@@ -536,6 +538,8 @@ func _setup_v2_services() -> void:
 	v2_hover_attack_preview.clear()
 	v2_locked_attack_preview.clear()
 	v2_locked_attack_target_id = ""
+	v2_pending_interaction_facility_id = ""
+	v2_interaction_service.setup(map_data, tactical_network_state, visibility_state, alert_state)
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -2402,6 +2406,7 @@ func _deselect_unit() -> void:
 	v2_hover_attack_preview.clear()
 	v2_locked_attack_preview.clear()
 	v2_locked_attack_target_id = ""
+	v2_pending_interaction_facility_id = ""
 	path_preview.clear()
 	_clear_layer(move_highlight)
 	_clear_layer(path_preview_layer)
@@ -2526,6 +2531,11 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 		else:
 			request_attack_preview(clicked_unit)
 		return
+	if v2_interaction_service:
+		var facility: Dictionary = v2_interaction_service.get_facility_at(cell)
+		if not facility.is_empty():
+			_open_v2_interaction_menu(String(facility.get("id", "")))
+			return
 	if not v2_locked_attack_preview.is_empty():
 		if hud:
 			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消")
@@ -2685,6 +2695,9 @@ func _get_v2_unit_by_id(target_id: String) -> Unit:
 
 func _on_v2_cancel_requested() -> void:
 	var previous_state := v2_input_router.get_last_cancelled_state() if v2_input_router else V2BattleInputRouter.State.FREE_SELECT
+	if hud:
+		hud.hide_action_picker()
+	v2_pending_interaction_facility_id = ""
 	_cancel_v2_preview(v2_pending_move_preview)
 	v2_pending_move_preview.clear()
 	_clear_v2_hover_preview()
@@ -2695,6 +2708,76 @@ func _on_v2_cancel_requested() -> void:
 		_deselect_unit()
 	elif selected_unit:
 		_refresh_selected_unit_affordances(selected_unit)
+
+## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
+func _open_v2_interaction_menu(entity_id: String) -> void:
+	if selected_unit == null or selected_unit.team != "player" or v2_interaction_service == null:
+		return
+	var facility: Dictionary = v2_interaction_service.get_facility(entity_id)
+	var actions: Array = v2_interaction_service.query_actions(selected_unit, entity_id)
+	if facility.is_empty() or actions.is_empty():
+		if hud:
+			hud.set_context_prompt("这里没有可用的设施操作")
+		return
+	v2_pending_interaction_facility_id = entity_id
+	_clear_v2_hover_preview()
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.INTERACTION_MENU)
+	if hud:
+		hud.show_interaction_actions(
+			String(facility.get("name", facility.get("type", "设施"))),
+			actions,
+			Callable(self, "_on_v2_interaction_action_selected").bind(entity_id)
+		)
+		hud.set_context_prompt("选择设施操作；右键取消")
+
+func _on_v2_interaction_action_selected(action_id: String, entity_id: String) -> void:
+	if v2_interaction_service == null or selected_unit == null:
+		return
+	var result: Dictionary = v2_interaction_service.commit_action(
+		selected_unit, entity_id, action_id, v2_interaction_service.get_state_revision()
+	)
+	v2_pending_interaction_facility_id = ""
+	if hud:
+		hud.hide_action_picker()
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", "interaction_unavailable"))
+		if v2_input_router:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		return
+	_apply_v2_interaction_result(result)
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	_advance_context_hint("interact")
+
+func _apply_v2_interaction_result(result: Dictionary) -> void:
+	var facility_id := String(result.get("facility_id", ""))
+	var facility: Dictionary = v2_interaction_service.get_facility(facility_id) if v2_interaction_service else {}
+	var reveal_radius := int(result.get("reveal_radius", 0))
+	if reveal_radius > 0 and visibility_state:
+		var center: Vector2i = facility.get("position", selected_unit.grid_pos)
+		var cells := VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
+		visibility_state.reveal_cells(cells)
+		_update_visibility()
+		_log("%s 揭示了 %d 个格子" % [facility_id, cells.size()])
+	if bool(result.get("raises_alert", false)) and alert_state:
+		alert_state.apply_event("overload_triggered")
+		if hud:
+			hud.update_alert_display(alert_state)
+	var consequence := String(result.get("consequence", "操作完成"))
+	_log("设施 %s：%s" % [facility_id, consequence])
+	if hud:
+		hud.set_context_prompt("设施操作完成：%s" % consequence)
+	if tactical_network_state:
+		_render_network_nodes()
 
 ## ===== 行动执行 =====
 
