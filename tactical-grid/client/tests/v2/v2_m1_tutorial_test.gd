@@ -19,7 +19,7 @@ func _initialize() -> void:
 	t.check(flow.current_text() == "点击蓝色格移动", "移动提示使用短文案")
 
 	for expected in [
-		{"event": &"unit_moved", "step": &"attack", "text": "红色敌人可攻击，再点一次确认"},
+		{"event": &"unit_moved", "step": &"attack", "text": "悬停查看伤害，点击红色敌人攻击"},
 		{"event": &"attack_committed", "step": &"intent", "text": "箭头显示敌人下一步"},
 		{"event": &"enemy_intent_observed", "step": &"camera", "text": "靠近控制台查看摄像头"},
 		{"event": &"camera_viewed", "step": &"evac", "text": "两名队员进入撤离区"},

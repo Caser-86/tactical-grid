@@ -257,7 +257,7 @@ func set_context_state(state: ContextState) -> void:
 		ContextState.ATTACK_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击敌人查看攻击结果，再次点击确认，右键取消"
+				_context_prompt.text = "悬停敌人查看伤害，点击一次攻击，右键取消"
 		ContextState.FACILITY_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
@@ -367,7 +367,7 @@ func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true)
 	var text := "%s %s：伤害 %d · HP %d → %d" % [mode, target.unit_name, damage, hp_before, hp_after]
 	if shield_before != shield_after:
 		text += " · 护盾 %d → %d" % [shield_before, shield_after]
-	text += " · %s" % ("再次点击确认" if locked else "点击锁定")
+	text += " · %s" % ("再次点击确认" if locked else "点击攻击")
 	_attack_preview_text = text
 	set_context_prompt(text)
 

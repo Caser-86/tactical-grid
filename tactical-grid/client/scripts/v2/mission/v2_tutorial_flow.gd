@@ -15,7 +15,7 @@ const STEPS: Array[StringName] = [
 const COPY := {
 	&"select": "点击突击兵查看可行动范围",
 	&"move": "点击蓝色格移动",
-	&"attack": "红色敌人可攻击，再点一次确认",
+	&"attack": "悬停查看伤害，点击红色敌人攻击",
 	&"intent": "箭头显示敌人下一步",
 	&"camera": "靠近控制台查看摄像头",
 	&"evac": "两名队员进入撤离区",

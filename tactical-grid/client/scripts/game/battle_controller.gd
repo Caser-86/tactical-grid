@@ -772,6 +772,7 @@ func _update_v2_encounters(mission_events: Array) -> Dictionary:
 		_refresh_enemy_sprite_visibility()
 		_refresh_enemy_intent_display()
 		_update_visibility()
+	_reconcile_v2_unit_occupancy()
 	return result
 
 func _set_v2_enemy_active(entity_id: String, active: bool) -> void:
@@ -2145,6 +2146,8 @@ func _start_battle() -> void:
 	var restored_v2_checkpoint := false
 	if _is_v2_battle():
 		restored_v2_checkpoint = _restore_v2_checkpoint()
+		if restored_v2_checkpoint:
+			_reconcile_v2_unit_occupancy()
 		if not restored_v2_checkpoint:
 			_save_v2_checkpoint(&"cp_start")
 	hud.update_objective(_get_objective_text())
@@ -2790,6 +2793,9 @@ func _consume_planned_action(enemy: Unit) -> Dictionary:
 	return planned
 
 func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
+	if _is_occupied_by_other_unit(target_pos, enemy):
+		_log("%s 移动目标被占用，保持原位" % enemy.unit_name)
+		return
 	var path = Pathfinding.find_path(
 		enemy.grid_pos, target_pos,
 		map_width, map_height,
@@ -2802,6 +2808,8 @@ func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
 	var cost = 0
 	var last_pos = enemy.grid_pos
 	for cell in path:
+		if _is_occupied_by_other_unit(cell, enemy):
+			break
 		var terrain = MapLoader.get_terrain_at(map_data, cell.x, cell.y)
 		var step_cost = 1
 		match terrain:
@@ -3142,10 +3150,10 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	if selected_unit == null:
 		return
 	if clicked_unit != null and clicked_unit.team != "player":
-		if not v2_locked_attack_preview.is_empty() and String(clicked_unit.entity_id) == v2_locked_attack_target_id:
+		# 基础攻击采用单击提交：悬停已经展示伤害，点击敌人即完成攻击。
+		var preview := request_attack_preview(clicked_unit)
+		if bool(preview.get("valid", false)):
 			confirm_locked_attack(clicked_unit)
-		else:
-			request_attack_preview(clicked_unit)
 		return
 	if v2_rescue_controller:
 		var rescue_id: String = v2_rescue_controller.get_rescue_id_at(cell)
@@ -3208,7 +3216,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	if path.size() >= 2:
 		v2_affordance_presenter.show_path(path, false)
 
-## V2: 第一次点击只锁定攻击预览，不结算伤害。
+## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
 func request_attack_preview(target: Unit) -> Dictionary:
 	if selected_unit == null or not is_instance_valid(selected_unit):
 		return {"valid": false, "success": false, "reason": &"no_selected_unit"}
@@ -3235,7 +3243,7 @@ func request_attack_preview(target: Unit) -> Dictionary:
 	_render_v2_hud()
 	return preview
 
-## V2: 只有稳定 ID 与锁定目标一致时，第二次点击才提交攻击。
+## V2 内部提交 API：校验稳定 ID 后消费锁定快照并提交攻击。
 func confirm_locked_attack(target: Unit) -> Dictionary:
 	if target == null or not is_instance_valid(target):
 		return {"success": false, "reason": &"invalid_target"}
@@ -3530,8 +3538,8 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	else:
 		if hud:
 			hud.set_context_prompt(
-				"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
-			)
+			"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % range_text
+		)
 	_render_v2_hud()
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
@@ -4485,6 +4493,53 @@ func _get_unit_at(pos: Vector2i) -> Unit:
 		if unit and unit.is_alive and unit.grid_pos == pos:
 			return unit
 	return null
+
+func _is_occupied_by_other_unit(pos: Vector2i, except_unit: Unit = null) -> bool:
+	for raw_unit in player_units + enemy_units:
+		var unit: Unit = raw_unit
+		if unit == null or unit == except_unit or not unit.is_alive:
+			continue
+		if unit.grid_pos == pos:
+			return true
+	return false
+
+func _reconcile_v2_unit_occupancy() -> void:
+	if not _is_v2_battle():
+		return
+	var occupied: Dictionary = {}
+	for raw_player in player_units:
+		var player: Unit = raw_player
+		if player and player.is_alive:
+			occupied[player.grid_pos] = player.entity_id
+	for raw_enemy in enemy_units:
+		var enemy: Unit = raw_enemy
+		if enemy == null or not enemy.is_alive:
+			continue
+		if not occupied.has(enemy.grid_pos):
+			occupied[enemy.grid_pos] = enemy.entity_id
+			continue
+		var replacement := _find_v2_free_cell(enemy.grid_pos, occupied)
+		if replacement.x < 0:
+			_log("%s 与其他单位重合且没有可用空格，禁止移动" % enemy.unit_name)
+			continue
+		var previous := enemy.grid_pos
+		enemy.grid_pos = replacement
+		occupied[replacement] = enemy.entity_id
+		_update_unit_sprite_pos(enemy)
+		_log("修复单位重合：%s 从 (%d,%d) 移至 (%d,%d)" % [enemy.unit_name, previous.x, previous.y, replacement.x, replacement.y])
+
+func _find_v2_free_cell(origin: Vector2i, occupied: Dictionary) -> Vector2i:
+	var max_distance := maxi(map_width, map_height)
+	for distance in range(1, max_distance + 1):
+		for dx in range(-distance, distance + 1):
+			var dy := distance - absi(dx)
+			for candidate in [origin + Vector2i(dx, dy), origin + Vector2i(dx, -dy)]:
+				if not GridSystem.is_in_bounds(candidate, map_width, map_height):
+					continue
+				if occupied.has(candidate) or not MapLoader.is_passable(map_data, candidate.x, candidate.y):
+					continue
+				return candidate
+	return Vector2i(-1, -1)
 
 func _update_unit_sprite_pos(unit: Unit, animate: bool = false) -> void:
 	var sprite := _get_unit_sprite(unit)

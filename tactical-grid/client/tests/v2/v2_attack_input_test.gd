@@ -15,6 +15,7 @@ func _initialize() -> void:
 	if battle_script == null:
 		t.finish(self)
 		return
+	_set_v2_game_line()
 
 	var first_battle := _make_battle(battle_script, [
 		_make_unit("player_assault", "player", Vector2i(1, 1), 7),
@@ -26,16 +27,14 @@ func _initialize() -> void:
 	var battle: Node = first_battle.get("battle")
 	var hud: HUD = first_battle.get("hud")
 
-	var first: Dictionary = battle.call("request_attack_preview", target)
-	t.check(bool(first.get("valid", false)) and battle.v2_input_router.get_state_name() == "attack_locked", "第一次点击锁定攻击预览")
-	t.check(target.current_hp == 7, "第一次点击不造成伤害")
-	t.check(hud.get_attack_preview_text().contains("7 → 4"), "预览显示 HP 前后变化")
-
-	var second: Dictionary = battle.call("confirm_locked_attack", target)
-	t.check(bool(second.get("success", false)) and target.current_hp == 4, "第二次点击同目标提交攻击")
+	battle.call("_on_v2_cell_hovered", target.grid_pos)
+	t.check(hud.get_attack_preview_text().contains("7 → 4"), "悬停显示 HP 前后变化")
+	battle.call("_on_v2_cell_left_clicked", target.grid_pos)
+	t.check(target.current_hp == 4, "单击敌人立即提交攻击")
 	t.check(not attacker.v2_turn_state.action_available, "攻击提交消费行动预算")
-	var repeat: Dictionary = battle.call("confirm_locked_attack", target)
-	t.check(not bool(repeat.get("success", true)) and repeat.get("reason", &"") == &"action_unavailable", "已攻击单位不能再次锁定攻击")
+	t.check(battle.v2_locked_attack_preview.is_empty() and battle.v2_input_router.get_state_name() == "unit_selected", "单击攻击后清除锁定状态")
+	var repeat: Dictionary = battle.call("request_attack_preview", target)
+	t.check(not bool(repeat.get("valid", true)) and repeat.get("reason", &"") == &"action_unavailable", "已攻击单位不能再次攻击")
 
 	var hover_battle_data := _make_battle(battle_script, [
 		_make_unit("player_hover", "player", Vector2i(1, 1), 7),

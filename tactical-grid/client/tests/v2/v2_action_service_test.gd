@@ -36,6 +36,10 @@ func _initialize() -> void:
 	var stale_commit: Dictionary = service.commit_action(attack)
 	t.check(not bool(stale_commit.get("success", true)) and stale_commit.get("reason", &"") == &"stale_preview", "提交陈旧预览返回失败")
 
+	target.grid_pos = attacker.grid_pos
+	var overlap_result: Dictionary = service.query_action({"action": &"attack", "unit": attacker, "target": target})
+	t.check(not bool(overlap_result.get("valid", true)) and overlap_result.get("reason", &"") == &"same_position", "同格攻击被明确拒绝")
+
 	target.grid_pos = Vector2i(3, 1)
 	var valid_attack: Dictionary = service.query_action({"action": &"attack", "unit": attacker, "target": target})
 	var attack_result: Dictionary = service.commit_action(valid_attack)

@@ -6,6 +6,8 @@ static func preview_attack(attacker: Unit, target: Unit, context: Dictionary) ->
 		return {"valid": false, "reason": &"invalid_unit"}
 	if attacker == target:
 		return {"valid": false, "reason": &"same_unit"}
+	if attacker.grid_pos == target.grid_pos:
+		return {"valid": false, "reason": &"same_position"}
 	if not attacker.is_alive:
 		return {"valid": false, "reason": &"attacker_dead"}
 	if not target.is_alive:

@@ -99,17 +99,11 @@ func _run() -> void:
 		var hp_before := target.current_hp
 		await _move_mouse_to_cell(battle, attack_cell)
 		t.check(battle.hud.get_attack_preview_text().contains("悬停预览"), "悬停敌人显示攻击预览")
+		var expected_hp_after := int(battle.v2_hover_attack_preview.get("hp_after", hp_before))
 		await _click_left()
 		await get_tree().process_frame
-		t.check(battle.v2_input_router.get_state_name() == "attack_locked", "第一次左键敌人锁定攻击预览")
-		t.check(target.current_hp == hp_before, "攻击预览不提前扣除生命")
-		t.check(battle.hud.get_attack_preview_text().contains("HP %d" % hp_before), "攻击预览显示目标当前生命")
-		var expected_hp_after := int(battle.v2_locked_attack_preview.get("hp_after", hp_before))
-		await _click_left()
-		await get_tree().process_frame
-		await get_tree().process_frame
-		t.check(target.current_hp < hp_before, "第二次左键同一敌人完成攻击")
-		t.check(target.current_hp == expected_hp_after, "攻击结算严格等于锁定预览的 HP 结果")
+		t.check(target.current_hp < hp_before, "单次左键敌人完成攻击")
+		t.check(target.current_hp == expected_hp_after, "攻击结算严格等于悬停预览的 HP 结果")
 		t.check(not player.v2_turn_state.action_available, "攻击只消耗行动预算")
 		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "攻击完成后回到单位选择状态")
 		t.check(battle.hud.phase_label.text.contains("已选中"), "攻击完成后 HUD 状态同步回已选中")

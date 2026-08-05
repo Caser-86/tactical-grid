@@ -9,6 +9,8 @@ var t := Runner.new()
 func _initialize() -> void:
 	var attacker = _make_unit("attacker", "player", 10, 0)
 	var target = _make_unit("target", "enemy", 4, 0)
+	attacker.grid_pos = Vector2i(1, 1)
+	target.grid_pos = Vector2i(4, 1)
 	attacker.weapon_range = [1, 5]
 	attacker.weapon_damage = [3, 3]
 
@@ -57,6 +59,7 @@ func _initialize() -> void:
 	t.check(not bool(self_result.get("valid", true)) and self_result.get("reason", &"") == &"same_unit", "自身目标拒绝攻击")
 
 	var same_team = _make_unit("ally", "player", 4, 0)
+	same_team.grid_pos = Vector2i(4, 2)
 	var same_result: Dictionary = V2CombatRules.preview_attack(attacker, same_team, {
 		"has_los": true, "distance": 3, "cover": &"none", "flanked": false, "state_revision": 1,
 	})

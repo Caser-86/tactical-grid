@@ -12,7 +12,7 @@
 
 - 依赖 F01-F12 全部通过；不在 P2 修改 M1 正式目标、美术或后五关内容。
 - 左键角色后同时显示蓝色移动范围和红色攻击范围；普通移动和攻击不依赖底部“移动/攻击”按钮。
-- 安全移动一次点击提交；攻击第一次点击锁定预览，第二次点击同一目标提交。
+- 安全移动一次点击提交；悬停敌人显示伤害，点击一次提交攻击。
 - 右键取消当前预览并回到直接选择；Space 在玩家回合始终尝试结束回合。
 - 中键拖动平移，滚轮缩放，Home 聚焦当前队员，Tab 切换仍可行动队员。
 - HUD 始终显示当前输入状态、主目标、警戒后果和行动预算；不能只靠颜色表达状态。
@@ -201,7 +201,7 @@ git add tactical-grid/client/scripts/v2/input tactical-grid/client/scripts/v2/pr
 git commit -m "feat(v2): enable direct map movement"
 ```
 
-### Task I04: 悬停、锁定和二次确认攻击
+### Task I04: 悬停预览和单击攻击
 
 **Executor:** Sol xhigh。
 
@@ -217,22 +217,20 @@ git commit -m "feat(v2): enable direct map movement"
 - Produces: `request_attack_preview(target: Unit) -> Dictionary`、`confirm_locked_attack(target: Unit) -> Dictionary`。
 - Locked target is identified by stable `entity_id`, not node reference alone.
 
-- [ ] **Step 1: 写两次点击和精确预览测试**
+- [x] **Step 1: 写单击和精确预览测试**
 
 ```gdscript
 var hp_before := target.current_hp
-var first := battle.request_attack_preview(target)
-t.check(first.valid and battle.v2_input_router.get_state_name() == "attack_locked", "第一次点击锁定预览")
-t.check(target.current_hp == hp_before, "第一次点击不造成伤害")
-t.check(battle.hud.get_attack_preview_text().contains("%d → %d" % [first.hp_before, first.hp_after]), "显示生命变化")
-var second := battle.confirm_locked_attack(target)
-t.check(second.success and target.current_hp == first.hp_after, "第二次点击同目标提交")
+battle._on_v2_cell_hovered(target.grid_pos)
+var expected_hp_after := int(battle.v2_hover_attack_preview.hp_after)
+battle._on_v2_cell_left_clicked(target.grid_pos)
+t.check(target.current_hp == expected_hp_after, "单击敌人提交攻击并应用预览伤害")
 t.check(not attacker.v2_turn_state.action_available, "攻击消费行动")
 ```
 
-- [ ] **Step 2: 确认现有攻击按钮/隐藏模式合同失败**
+- [x] **Step 2: 确认现有攻击按钮/隐藏模式合同失败**
 
-- [ ] **Step 3: 实现稳定目标锁定**
+- [x] **Step 3: 实现稳定目标锁定**
 
 ```gdscript
 func request_attack_preview(target: Unit) -> Dictionary:
@@ -251,11 +249,11 @@ func confirm_locked_attack(target: Unit) -> Dictionary:
     return v2_action_service.commit_action(_locked_attack_preview)
 ```
 
-悬停只显示临时预览；离开目标清除临时卡但保留已锁定卡。点击另一个红色敌人改锁定对象，不直接开火。
+悬停只显示临时预览；离开目标清除临时卡。点击红色敌人直接开火。
 
-- [ ] **Step 4: 运行悬停、双击、换目标、右键和陈旧预览测试**
+- [x] **Step 4: 运行悬停、单击、换目标、右键和陈旧预览测试**
 
-Expected: 没有攻击按钮依赖；失去视线、目标移动或行动已消耗时第二次点击被拒绝并刷新范围。
+Expected: 没有攻击按钮依赖；失去视线、目标移动或行动已消耗时单击被拒绝并刷新范围。
 
 - [ ] **Step 5: 提交**
 
@@ -430,12 +428,12 @@ git commit -m "feat(v2): add direct battle camera controls"
 - [ ] **Step 1: 写 HUD 内容和布局合同**
 
 ```gdscript
-presenter.render({"turn": 2, "phase": "玩家回合", "state": "attack_locked",
+presenter.render({"turn": 2, "phase": "玩家回合", "state": "unit_selected",
     "primary_objective": "找到侦察兵并撤离", "alert": "潜伏",
     "next_consequence": "被摄像头识别后进入搜索", "selected": unit,
-    "context_prompt": "再次点击哨兵，造成 2 点伤害", "action_budget": {"move": true, "action": true}})
+    "context_prompt": "悬停敌人查看伤害，点击一次攻击", "action_budget": {"move": true, "action": true}})
 t.check(hud.objective_label.text == "找到侦察兵并撤离", "顶部只有一句主目标")
-t.check(hud.context_label.text.contains("再次点击"), "当前状态有文字提示")
+t.check(hud.context_label.text.contains("点击一次攻击"), "当前状态有文字提示")
 t.check(hud.action_budget_label.text.contains("移动") and hud.action_budget_label.text.contains("行动"), "显示两项预算")
 t.check(not hud.move_button.visible and not hud.attack_button.visible, "不显示常驻移动攻击按钮")
 ```

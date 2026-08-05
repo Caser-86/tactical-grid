@@ -18,12 +18,12 @@ func _initialize() -> void:
 	presenter.render({
 		"turn": 2,
 		"phase": "玩家回合",
-		"state": "attack_locked",
+		"state": "unit_selected",
 		"primary_objective": "找到侦察兵并撤离",
 		"alert": "潜伏",
 		"next_consequence": "被摄像头识别后进入搜索",
 		"selected": selected,
-		"context_prompt": "再次点击哨兵，造成 2 点伤害",
+		"context_prompt": "悬停敌人查看伤害，点击一次攻击",
 		"action_budget": {"move": true, "action": true},
 		"ability": "",
 		"interaction": "",
@@ -31,10 +31,10 @@ func _initialize() -> void:
 	})
 
 	t.check(hud.objective_label.text == "找到侦察兵并撤离", "顶部只显示一句主目标")
-	t.check(hud.context_label != null and hud.context_label.text.contains("再次点击"), "当前状态有明确文字提示")
+	t.check(hud.context_label != null and hud.context_label.text.contains("点击一次攻击"), "当前状态有明确文字提示")
 	t.check(hud.action_budget_label != null and hud.action_budget_label.text.contains("移动") and hud.action_budget_label.text.contains("行动"), "右侧显示移动与行动两项预算")
 	t.check(not hud.move_button.visible and not hud.attack_button.visible, "V2 不显示常驻移动攻击按钮")
-	t.check(hud.phase_label.text.contains("攻击已锁定"), "回合栏显示当前输入状态")
+	t.check(hud.phase_label.text.contains("已选中"), "回合栏显示当前输入状态")
 	t.check(hud.get_node("TopBar/AlertLabel").visible and hud.get_node("TopBar/AlertLabel").text.contains("下一步"), "顶部显示警戒和下一步后果")
 	t.check(hud.get_node("RightPanel").visible, "选中单位时显示右侧信息")
 
