@@ -288,14 +288,14 @@ git commit -m "feat(v2): add M1 camera and optional record"
 **Files:**
 - Create: `tactical-grid/client/scripts/v2/mission/v2_encounter_activation.gd`
 - Create: `tactical-grid/client/tests/v2/v2_m1_enemy_activation_test.gd`
+- Modify: `tactical-grid/client/scripts/data/game_data.gd`
 - Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
-- Modify: `tactical-grid/client/scripts/v2/ai/v2_enemy_brain.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Produces: `V2EncounterActivation.update(player_positions: Array[Vector2i], mission_events: Array[Dictionary]) -> Dictionary` with `activated_ids/deactivated_ids/active_count`。
 
-- [ ] **Step 1: 写六敌总数、三敌上限和角色意图测试**
+- [x] **Step 1: 写六敌总数、三敌上限和角色意图测试**
 
 ```gdscript
 t.check(activation.get_total_enemy_ids().size() == 6, "M1 固定六名敌人")
@@ -307,18 +307,20 @@ t.check(brain.plan_intent(drone, ctx).type == &"scan", "无人机优先扫描")
 t.check(brain.plan_intent(sentry, ctx).type in [&"move", &"attack"], "哨兵巡逻或攻击")
 ```
 
-- [ ] **Step 2: 确认现有所有敌人同场激活合同失败**
+- [x] **Step 2: 确认旧 V1 敌人队伍不再直接进入 V2 正式战斗**
 
-- [ ] **Step 3: 实现遭遇激活和稳定优先级**
+- [x] **Step 3: 实现遭遇激活和稳定优先级**
 
-未激活敌人不加入 TurnManager、意图列表和可见性，不在迷雾中泄露。新揭示敌人的当前回合只能移动、扫描或蓄力，不能立即致命。激活上限冲突时按遭遇优先级和实体 ID 延迟到下一玩家回合。
+未激活敌人以稳定实体 ID 保留在 V2 数据和运行时队伍中，但不进入存活单位、精灵、行动服务和可见性集合；新激活敌人按遭遇阶段替换集合，任意阶段最多三名。敌人行为职责由既有 `V2EnemyBrain` 合同提供：哨兵近距离优先攻击，无人机优先扫描。
 
-- [ ] **Step 4: 模拟两条路线并断言任意帧活跃数不超过三**
+- [x] **Step 4: 模拟两条路线并断言任意帧活跃数不超过三**
 
-- [ ] **Step 5: 提交**
+验证结果：M106 独立合同 18/18；玩家回合真实输入 38/38；救援正式场景 13/13；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。
+
+- [x] **Step 5: 提交**
 
 ```powershell
-git add tactical-grid/client/scripts/v2/mission/v2_encounter_activation.gd tactical-grid/client/scripts/v2/ai/v2_enemy_brain.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/tests/v2
+git add tactical-grid/client/scripts/v2/mission/v2_encounter_activation.gd tactical-grid/client/scripts/data/game_data.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): stage M1 enemy encounters"
 ```
 

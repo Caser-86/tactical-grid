@@ -14,6 +14,7 @@ const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
 const V2RescueControllerScript = preload("res://scripts/v2/mission/v2_rescue_controller.gd")
+const V2EncounterActivationScript = preload("res://scripts/v2/mission/v2_encounter_activation.gd")
 const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 
@@ -106,6 +107,7 @@ var enemy_planner: EnemyPlanner
 var v2_action_service: V2ActionService = null
 var v2_mission_flow: RefCounted = null
 var v2_rescue_controller: RefCounted = null
+var v2_encounter_activation: RefCounted = null
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
@@ -120,6 +122,7 @@ var v2_locked_attack_target_id: String = ""
 var v2_pending_interaction_facility_id: String = ""
 var v2_last_checkpoint: Dictionary = {}
 var v2_rescue_marker: Node2D = null
+var _v2_units_rendered := false
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -377,6 +380,7 @@ func _cleanup_units() -> void:
 			unit.free()
 	player_units.clear()
 	enemy_units.clear()
+	_v2_units_rendered = false
 	# CH1-040: 清理最后已知位置幽灵标记及其临时 Unit 占位
 	for ghost in _last_known_ghosts.values():
 		if ghost and is_instance_valid(ghost):
@@ -390,6 +394,7 @@ func _cleanup_units() -> void:
 	# Release V2 RefCounted mission state before temporary battle scenes are freed.
 	v2_mission_flow = null
 	v2_rescue_controller = null
+	v2_encounter_activation = null
 	v2_last_checkpoint.clear()
 	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
 		v2_rescue_marker.free()
@@ -580,8 +585,17 @@ func _setup_v2_services() -> void:
 	if not bool(v2_map_result.get("success", false)):
 		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
 	var v2_map: Dictionary = v2_map_result.get("data", {}) if bool(v2_map_result.get("success", false)) else {}
+	if _is_v2_battle() and not v2_map.is_empty():
+		_setup_v2_enemy_roster(v2_map)
+		v2_action_service.setup(v2_map, player_units, enemy_units)
+		if enemy_planner:
+			enemy_planner.setup(v2_map)
 	v2_mission_flow.setup(v2_mission, v2_map, player_units, enemy_units)
 	v2_mission_flow.apply_event(&"mission_started")
+	if _is_v2_battle() and not v2_map.is_empty():
+		v2_encounter_activation = V2EncounterActivationScript.new()
+		v2_encounter_activation.setup(v2_map)
+		_update_v2_encounters([])
 	v2_rescue_controller = V2RescueControllerScript.new()
 	v2_rescue_controller.setup(
 		v2_map,
@@ -603,6 +617,80 @@ func _setup_v2_services() -> void:
 	v2_interaction_service.setup(interaction_map, tactical_network_state, visibility_state, alert_state, v2_mission_flow)
 	if camera:
 		camera.set_input_router_mode(_is_v2_battle())
+
+## Replace the V1 enemy templates with all six V2 M1 stable entities. Inactive
+## entities remain as non-alive nodes so save identity stays stable, while the
+## encounter service decides when they become part of the live battle.
+func _setup_v2_enemy_roster(v2_map: Dictionary) -> void:
+	for raw_enemy in enemy_units:
+		if raw_enemy is Unit and is_instance_valid(raw_enemy):
+			(raw_enemy as Unit).free()
+	enemy_units.clear()
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data == null or not v2_data.has_method("get_enemy"):
+		return
+	for raw_entity in v2_map.get("entities", []):
+		if not raw_entity is Dictionary or String(raw_entity.get("type", "")) != "spawn_enemy":
+			continue
+		var entity: Dictionary = raw_entity
+		var enemy_id := String(entity.get("enemy_id", ""))
+		var entity_id := String(entity.get("id", ""))
+		var enemy_data: Dictionary = v2_data.get_enemy(StringName(enemy_id))
+		if enemy_data.is_empty() or entity_id.is_empty():
+			continue
+		var unit := GameData.create_v2_enemy_unit(enemy_data)
+		unit.entity_id = entity_id
+		unit.grid_pos = Vector2i(int(entity.get("x", -1)), int(entity.get("y", -1)))
+		unit.height = MapLoader.get_height_at(v2_map, unit.grid_pos.x, unit.grid_pos.y)
+		unit.is_alive = false
+		unit.is_downed = false
+		enemy_units.append(unit)
+
+func _get_v2_player_positions() -> Array:
+	var positions: Array = []
+	for unit in player_units:
+		if unit and unit.is_alive:
+			positions.append(unit.grid_pos)
+	return positions
+
+## Apply only activation deltas to the live Unit/Sprite/visibility owners.
+func _update_v2_encounters(mission_events: Array) -> Dictionary:
+	if not _is_v2_battle() or v2_encounter_activation == null:
+		return {"success": false, "reason": &"encounter_activation_unavailable"}
+	var result: Dictionary = v2_encounter_activation.update(_get_v2_player_positions(), mission_events)
+	for raw_id in result.get("deactivated_ids", []):
+		_set_v2_enemy_active(String(raw_id), false)
+	for raw_id in result.get("activated_ids", []):
+		_set_v2_enemy_active(String(raw_id), true)
+	if not result.get("activated_ids", []).is_empty() or not result.get("deactivated_ids", []).is_empty():
+		if action_system:
+			action_system.set_units(player_units, enemy_units)
+		if v2_action_service:
+			v2_action_service.refresh_units(player_units, enemy_units)
+		_refresh_enemy_sprite_visibility()
+		_refresh_enemy_intent_display()
+		_update_visibility()
+	return result
+
+func _set_v2_enemy_active(entity_id: String, active: bool) -> void:
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit == null or unit.entity_id != entity_id:
+			continue
+		if active:
+			if not unit.is_alive:
+				unit.is_alive = true
+				unit.is_downed = false
+				unit.current_hp = unit.max_hp
+			if _v2_units_rendered and _get_unit_sprite(unit) == null:
+				_create_unit_sprite(unit)
+		else:
+			unit.is_alive = false
+			unit.is_downed = false
+			var sprite := _get_unit_sprite(unit)
+			if sprite:
+				sprite.queue_free()
+		return
 
 ## Create rescued characters from the V2 data contract, never from V1 job data.
 func _create_v2_rescue_unit(character_id: StringName, entity_id: String, position: Vector2i) -> Unit:
@@ -641,6 +729,7 @@ func _register_v2_rescued_unit(unit: Unit) -> void:
 	_render_v2_hud()
 
 func _on_v2_rescue_committed(result: Dictionary) -> void:
+	_update_v2_encounters([&"scout_rescued"])
 	if hud:
 		hud.set_context_prompt("营救成功：侦察兵已加入小队，可立即选择行动")
 		hud.update_objective(_get_objective_text())
@@ -1515,7 +1604,10 @@ func _render_units() -> void:
 		_create_unit_sprite(unit)
 
 	for unit in enemy_units:
+		if _is_v2_battle() and not unit.is_alive:
+			continue
 		_create_unit_sprite(unit)
+	_v2_units_rendered = true
 
 func _create_unit_sprite(unit: Unit) -> void:
 	var sprite := UnitSprite.new()
@@ -2793,6 +2885,7 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		})
 		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
 			_apply_v2_mission_event(&"evac_checked")
+	_update_v2_encounters([])
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_render_v2_hud()
