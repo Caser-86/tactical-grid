@@ -523,7 +523,10 @@ func get_settings() -> Dictionary:
 func update_settings(settings: Dictionary) -> void:
 	InputBindings.apply_settings(settings)
 	current_save["settings"] = settings
-	SaveManager.save_game(current_save, current_slot)
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		SaveManager.save_game_v2(current_save, current_slot)
+	else:
+		SaveManager.save_game(current_save, current_slot)
 
 ## 获取当前难度参数
 ## 故事难度：敌人弱化、奖励加成；标准难度：原值；困难难度：敌人强化、奖励削减

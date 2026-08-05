@@ -1,13 +1,15 @@
 ## 保存、恢复并显示玩家可修改的菜单与战斗快捷键。
 extends Node
 
-const ACTIONS := ["pause", "end_turn", "next_unit", "toggle_overview", "toggle_network"]
+const ACTIONS := ["pause", "end_turn", "next_unit", "toggle_overview", "toggle_network", "focus_unit"]
+const V2_ACTIONS := ["pause", "end_turn", "next_unit", "focus_unit", "toggle_network"]
 const DEFAULT_BINDINGS := {
 	"pause": {"keycode": 0, "physical_keycode": 4194305},
 	"end_turn": {"keycode": 0, "physical_keycode": 32},
 	"next_unit": {"keycode": 0, "physical_keycode": 4194306},
 	"toggle_overview": {"keycode": 0, "physical_keycode": 4194333},  # KEY_BACKTAB (Shift+Tab) 浣滀负 overview
 	"toggle_network": {"keycode": 0, "physical_keycode": 71},  # KEY_G
+	"focus_unit": {"keycode": 0, "physical_keycode": 4194331},  # KEY_HOME
 }
 
 func ensure_settings(settings: Dictionary) -> void:
@@ -43,6 +45,15 @@ func get_binding_label(action: String) -> String:
 	if events.is_empty():
 		return "未设置"
 	return events[0].as_text_physical_keycode()
+
+func find_conflict(action: String, binding: Dictionary, actions: Array = ACTIONS) -> String:
+	for other in actions:
+		var other_action := String(other)
+		if other_action == action:
+			continue
+		if get_binding_data(other_action) == binding:
+			return other_action
+	return ""
 
 func restore_defaults() -> Dictionary:
 	var restored := DEFAULT_BINDINGS.duplicate(true)

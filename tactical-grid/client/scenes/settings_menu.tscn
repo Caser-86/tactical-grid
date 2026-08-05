@@ -99,6 +99,35 @@ text = "难度"
 [node name="DifficultyOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 
+[node name="UIScaleLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+text = "V2 文字缩放"
+
+[node name="UIScaleOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="VisualModeLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+text = "V2 视觉模式"
+
+[node name="VisualModeOption" type="OptionButton" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="PanSpeedLabel" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+text = "V2 镜头平移速度"
+
+[node name="PanSpeedSlider" type="HSlider" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+min_value = 0.5
+max_value = 2.0
+step = 0.1
+value = 1.0
+
+[node name="ScreenShakeCheck" type="CheckBox" parent="Panel/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+text = "屏幕震动"
+
 [node name="AccessibilityHeader" type="Label" parent="Panel/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 text = "可访问性"

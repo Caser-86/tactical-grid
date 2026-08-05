@@ -325,7 +325,11 @@ func create_default_save() -> Dictionary:
 			"fullscreen": false,
 			"resolution": "1280x720",
 			"large_text": false,
+			"ui_scale": 1.0,
+			"visual_mode": "normal",
 			"reduce_motion": false,
+			"pan_speed": 1.0,
+			"screen_shake": true,
 			"colorblind_mode": "none",
 			"subtitle_speed": 1.0,
 			"keybindings": {
@@ -385,8 +389,16 @@ func _migrate_settings(data: Dictionary) -> void:
 	# 可访问性字段
 	if not settings.has("large_text"):
 		settings["large_text"] = false
+	if not settings.has("ui_scale"):
+		settings["ui_scale"] = 1.0
+	if not settings.has("visual_mode"):
+		settings["visual_mode"] = "normal"
 	if not settings.has("reduce_motion"):
 		settings["reduce_motion"] = false
+	if not settings.has("pan_speed"):
+		settings["pan_speed"] = 1.0
+	if not settings.has("screen_shake"):
+		settings["screen_shake"] = true
 	if not settings.has("colorblind_mode"):
 		settings["colorblind_mode"] = "none"
 	if not settings.has("subtitle_speed"):
