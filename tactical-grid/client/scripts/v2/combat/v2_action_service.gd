@@ -296,7 +296,10 @@ func _layer_value(layer: Variant, cell: Vector2i) -> Variant:
 func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
 	for raw_unit in _players + _enemies:
 		var unit: Unit = raw_unit
-		if unit != null and unit != except_unit and unit.is_alive and unit.grid_pos == cell:
+		# Encounter enemies are inactive before discovery, but their authored spawn
+		# cells are reserved. A downed enemy is the only non-living unit that frees a cell.
+		var reserves_cell := unit != null and unit.team == "enemy" and not unit.is_downed
+		if unit != null and unit != except_unit and (unit.is_alive or reserves_cell) and unit.grid_pos == cell:
 			return true
 	return false
 

@@ -29,6 +29,19 @@ func _initialize() -> void:
 	var repeat_result: Dictionary = battle.call("request_move", Vector2i(3, 1))
 	t.check(not bool(repeat_result.get("success", true)) and repeat_result.get("reason", &"") == &"move_unavailable", "重复移动返回明确预算错误")
 
+	var reserve_unit: Unit = _make_unit("player_reserve", Vector2i(1, 1), 5)
+	var pending_enemy: Unit = _make_unit("enemy_pending", Vector2i(2, 1), 3)
+	pending_enemy.team = "enemy"
+	pending_enemy.is_alive = false
+	pending_enemy.is_downed = false
+	var reserve_service := V2ActionService.new()
+	reserve_service.setup(_make_map(), [reserve_unit], [pending_enemy])
+	battle.set("v2_action_service", reserve_service)
+	battle.set("selected_unit", reserve_unit)
+	var reserved_result: Dictionary = battle.call("request_move", pending_enemy.grid_pos)
+	t.check(not bool(reserved_result.get("success", true)) and reserved_result.get("reason", &"") == &"occupied", "待激活敌人的出生格不能成为玩家移动落点")
+	t.check(reserve_unit.grid_pos == Vector2i(1, 1), "出生格被保留时玩家不移动")
+
 	var dangerous_unit: Unit = _make_unit("player_danger", Vector2i(1, 1), 5)
 	var dangerous_service := V2ActionService.new()
 	dangerous_service.setup(_make_map([Vector2i(2, 1)]), [dangerous_unit], [])
@@ -49,6 +62,8 @@ func _initialize() -> void:
 
 	battle.free()
 	safe_unit.free()
+	reserve_unit.free()
+	pending_enemy.free()
 	dangerous_unit.free()
 	t.finish(self)
 
