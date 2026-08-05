@@ -6,7 +6,8 @@
     "res://tests/v2/v2_schema_reference_test.gd",
     "res://tests/v2/v2_map_schema_test.gd",
     "res://tests/v2/v2_save_identity_test.gd",
-    "res://tests/v2/v2_unit_turn_state_test.gd"
+    "res://tests/v2/v2_unit_turn_state_test.gd",
+    "res://tests/v2/v2_combat_rules_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [
