@@ -7,6 +7,8 @@ class_name HUD
 @onready var phase_label = $TopBar/PhaseLabel
 @onready var objective_label = $TopBar/ObjectiveLabel
 @onready var unit_info_label = $RightPanel/UnitInfoLabel
+@onready var action_budget_label = $RightPanel/V2ActionBudgetLabel
+@onready var action_hint_label = $RightPanel/V2ActionHintLabel
 @onready var move_button = $BottomBar/ActionBar/MoveButton
 @onready var attack_button = $BottomBar/ActionBar/AttackButton
 @onready var skill_button = $BottomBar/ActionBar/SkillButton
@@ -34,6 +36,10 @@ var _action_picker_callback: Callable = Callable()
 enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
 var _context_state: ContextState = ContextState.NONE
 var _context_prompt: Label = null
+## V2 使用统一名称暴露当前操作提示，避免测试和其他表现层依赖内部节点名。
+var context_label: Label = null
+var _pending_v2_snapshot: Dictionary = {}
+var _v2_hud_active := false
 ## V2: 当前攻击预览卡片文本。单独保留，便于输入测试和结果回显使用同一份数据。
 var _attack_preview_text: String = ""
 ## CODE-P2-02: 警报显示标签和网络覆盖层
@@ -65,6 +71,7 @@ func _ready() -> void:
 	_context_prompt.offset_bottom = -60.0
 	_context_prompt.visible = false
 	add_child(_context_prompt)
+	context_label = _context_prompt
 	set_context_state(ContextState.NONE)
 	# CODE-P2-02: Alert display label (top bar second row)
 	_alert_label = Label.new()
@@ -106,6 +113,8 @@ func _ready() -> void:
 	_threat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_threat_label.visible = false
 	$RightPanel.add_child(_threat_label)
+	if not _pending_v2_snapshot.is_empty():
+		render_v2_snapshot(_pending_v2_snapshot)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -259,6 +268,84 @@ func set_context_prompt(text: String) -> void:
 	if _context_prompt:
 		_context_prompt.text = text
 		_context_prompt.visible = true
+
+## V2: 以一个快照驱动整块战斗 HUD，保证目标、预算和下一步后果不会互相覆盖。
+## 该入口只改变 V2 显示状态，V1 仍使用原有的 update_* 方法。
+func render_v2_snapshot(snapshot: Dictionary) -> void:
+	if not is_node_ready() or context_label == null:
+		_pending_v2_snapshot = snapshot.duplicate(true)
+		return
+	_v2_hud_active = true
+	_pending_v2_snapshot.clear()
+
+	var objective := String(snapshot.get("primary_objective", ""))
+	if objective != "":
+		objective_label.text = objective
+
+	var phase := String(snapshot.get("phase", "玩家回合"))
+	var state := String(snapshot.get("state", "free_select"))
+	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if state != "" else phase
+	phase_label.modulate = Color.CYAN if phase.contains("玩家") else Color.RED if phase.contains("敌人") else Color.GOLD
+
+	var alert := String(snapshot.get("alert", ""))
+	var next_consequence := String(snapshot.get("next_consequence", ""))
+	if _alert_label:
+		var alert_text := "警戒：%s" % alert if alert != "" else ""
+		if next_consequence != "":
+			alert_text += " | 下一步：%s" % next_consequence
+		_alert_label.text = alert_text
+		_alert_label.visible = alert_text != ""
+
+	var selected: Node = snapshot.get("selected", null) as Node
+	var selected_valid := selected != null and is_instance_valid(selected) and bool(selected.get("is_alive"))
+	$RightPanel.visible = selected_valid
+	if selected_valid:
+		update_unit_info(selected)
+	else:
+		unit_info_label.text = ""
+
+	# V2 直接地图交互不显示常驻移动/攻击/技能按钮，玩家从地图高亮和提示中行动。
+	set_action_buttons_visible(false)
+	var budget: Dictionary = snapshot.get("action_budget", {})
+	if action_budget_label:
+		action_budget_label.visible = selected_valid
+		if selected_valid:
+			action_budget_label.text = "行动预算\n移动 %s   行动 %s" % [
+				"可用" if bool(budget.get("move", false)) else "已用",
+				"可用" if bool(budget.get("action", false)) else "已用",
+			]
+	var ability := String(snapshot.get("ability", ""))
+	var interaction := String(snapshot.get("interaction", ""))
+	var side_hint := ability if ability != "" else interaction
+	if action_hint_label:
+		action_hint_label.text = side_hint
+		action_hint_label.visible = selected_valid and side_hint != ""
+
+	var prompt := String(snapshot.get("context_prompt", ""))
+	var attack_preview: Variant = snapshot.get("attack_preview", "")
+	if prompt == "" and attack_preview is String:
+		prompt = String(attack_preview)
+	context_label.text = prompt if prompt != "" else "选择一个单位开始行动"
+	context_label.visible = true
+
+func _v2_state_label(state: String) -> String:
+	match state:
+		"free_select":
+			return "选择单位"
+		"unit_selected":
+			return "已选中"
+		"attack_locked":
+			return "攻击已锁定"
+		"ability_targeting":
+			return "选择技能目标"
+		"interaction_menu":
+			return "选择设施操作"
+		"enemy_turn":
+			return "敌人行动"
+		"paused":
+			return "已暂停"
+		_:
+			return state
 
 ## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
 func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:

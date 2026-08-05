@@ -9,6 +9,7 @@ const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
 const V2InteractionServiceScript = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
 const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
+const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
@@ -101,6 +102,7 @@ var v2_action_service: V2ActionService = null
 var v2_mission_flow: Dictionary = {}
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
+var v2_hud_presenter: RefCounted = null
 var v2_input_router: V2BattleInputRouter = null
 var v2_pending_move_preview: Dictionary = {}
 ## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
@@ -262,6 +264,7 @@ func _ready() -> void:
 	_spawn_units()
 	_setup_v2_services()
 	_setup_v2_affordance_presenter()
+	_setup_v2_hud_presenter()
 	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
@@ -553,6 +556,61 @@ func _setup_v2_affordance_presenter() -> void:
 	v2_affordance_presenter.name = "V2AffordancePresenter"
 	v2_affordance_presenter.cell_size = float(CELL_SIZE)
 	v2_affordance_layer.add_child(v2_affordance_presenter)
+
+func _setup_v2_hud_presenter() -> void:
+	if hud == null:
+		return
+	v2_hud_presenter = V2HudPresenterScript.new()
+	v2_hud_presenter.setup(hud)
+
+## V2: 将战斗状态压缩成一个可读快照，HUD 不需要理解回合系统或服务层对象。
+func _render_v2_hud(context_override: String = "") -> void:
+	if not _is_v2_battle() or v2_hud_presenter == null or hud == null:
+		return
+	var phase_text := "玩家回合"
+	if turn_manager:
+		match turn_manager.current_phase:
+			TurnManager.TurnPhase.ENEMY_ACTION:
+				phase_text = "敌人回合"
+			TurnManager.TurnPhase.BATTLE_OVER:
+				phase_text = "战斗结束"
+	var alert_name := "平静"
+	var next_text := ""
+	if alert_state:
+		var alert_names := ["平静", "可疑", "警戒", "战斗"]
+		var alert_level := alert_state.get_alert_level()
+		if alert_level >= 0 and alert_level < alert_names.size():
+			alert_name = alert_names[alert_level]
+		var next_consequence: Dictionary = alert_state.get_next_consequence()
+		next_text = String(next_consequence.get("description", ""))
+		var turns_until := int(next_consequence.get("turns_until", 0))
+		if turns_until > 0:
+			next_text += "（%d回合后）" % turns_until
+	var budget := {"move": false, "action": false}
+	if selected_unit and is_instance_valid(selected_unit) and selected_unit.team == "player":
+		budget["move"] = selected_unit.can_move()
+		budget["action"] = selected_unit.can_act()
+	var prompt := context_override
+	if prompt == "":
+		prompt = hud.get_context_prompt_text()
+	var interaction_text := ""
+	if not v2_pending_interaction_facility_id.is_empty():
+		interaction_text = "设施菜单：选择一个操作"
+	var snapshot := {
+		"turn": turn_manager.turn_number if turn_manager else 1,
+		"phase": phase_text,
+		"state": v2_input_router.get_state_name() if v2_input_router else "free_select",
+		"primary_objective": _get_objective_text(),
+		"alert": alert_name,
+		"next_consequence": next_text,
+		"selected": selected_unit,
+		"context_prompt": prompt,
+		"action_budget": budget,
+		"ability": "",
+		"interaction": interaction_text,
+		"attack_preview": hud.get_attack_preview_text(),
+	}
+	v2_hud_presenter.render(snapshot)
 
 func _is_v2_battle() -> bool:
 	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
@@ -1626,6 +1684,7 @@ func _start_battle() -> void:
 	# Keep the first actionable frame self-explanatory; calm alert is still useful
 	# context when the player has not triggered any alarm yet.
 	hud.update_alert_display(alert_state)
+	_render_v2_hud()
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
 	# CH1-030: 战斗开始后启动上下文教学提示序列
 	_begin_context_tutorials()
@@ -1699,6 +1758,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 		TurnManager.TurnPhase.BATTLE_OVER:
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
+	_render_v2_hud()
 
 ## 每回合处理增援触发：更新存活计数，检查触发器，生成增援单位
 func _process_reinforcements(turn_number: int) -> void:
@@ -2375,6 +2435,7 @@ func _select_unit(unit: Unit) -> void:
 	else:
 		_advance_context_hint("observe")
 	_refresh_selected_unit_affordances(unit)
+	_render_v2_hud()
 
 ## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
 func _auto_select_player_unit() -> void:
@@ -2426,6 +2487,7 @@ func _deselect_unit() -> void:
 		hud.set_context_state(HUD.ContextState.NONE)
 		hud.set_targeting_hint("")
 		hud.update_objective(_get_objective_text())
+	_render_v2_hud()
 
 ## CH1-030: 是否有活跃的目标选择或动作模式（Esc 逐级取消 vs 暂停的判定）
 func _has_active_input_mode() -> bool:
@@ -2499,6 +2561,7 @@ func request_move(cell: Vector2i) -> Dictionary:
 			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消")
 		if v2_affordance_presenter:
 			v2_affordance_presenter.show_path([selected_unit.grid_pos, cell], true)
+		_render_v2_hud()
 		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
 
 	var result: Dictionary = v2_action_service.commit_action(preview)
@@ -2561,6 +2624,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 			v2_affordance_presenter.show_attack_focus(cell, false)
 			if hud:
 				hud.show_attack_preview(hover_preview, hovered_unit, false)
+			_render_v2_hud()
 			return
 	_clear_v2_hover_preview()
 	if not v2_locked_attack_preview.is_empty():
@@ -2568,6 +2632,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		if locked_target:
 			if hud:
 				hud.show_attack_preview(v2_locked_attack_preview, locked_target, true)
+			_render_v2_hud()
 			return
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_temporary_attack_focus()
@@ -2609,6 +2674,7 @@ func request_attack_preview(target: Unit) -> Dictionary:
 		v2_affordance_presenter.show_attack_focus(target.grid_pos, true)
 	if hud:
 		hud.show_attack_preview(preview, target, true)
+	_render_v2_hud()
 	return preview
 
 ## V2: 只有稳定 ID 与锁定目标一致时，第二次点击才提交攻击。
@@ -2670,6 +2736,7 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 		hud.set_context_prompt("攻击结算：%s 受到 %d 点伤害，HP %d/%d" % [
 		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
 		])
+	_render_v2_hud()
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_update_visibility()
@@ -2715,6 +2782,7 @@ func _on_v2_cancel_requested() -> void:
 		_deselect_unit()
 	elif selected_unit:
 		_refresh_selected_unit_affordances(selected_unit)
+	_render_v2_hud()
 
 func _on_v2_camera_pan(delta: Vector2) -> void:
 	if camera:
@@ -2752,6 +2820,7 @@ func _open_v2_interaction_menu(entity_id: String) -> void:
 			Callable(self, "_on_v2_interaction_action_selected").bind(entity_id)
 		)
 		hud.set_context_prompt("选择设施操作；右键取消")
+	_render_v2_hud()
 
 func _on_v2_interaction_action_selected(action_id: String, entity_id: String) -> void:
 	if v2_interaction_service == null or selected_unit == null:
@@ -2776,6 +2845,7 @@ func _on_v2_interaction_action_selected(action_id: String, entity_id: String) ->
 		if hud:
 			hud.update_unit_info(selected_unit)
 	_advance_context_hint("interact")
+	_render_v2_hud()
 
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	var facility_id := String(result.get("facility_id", ""))
@@ -2844,6 +2914,7 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	if unit.current_ap <= 0:
 		if hud:
 			hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+		_render_v2_hud()
 		return
 	_show_attack_range(unit)
 	if _is_v2_battle() and v2_affordance_presenter:
@@ -2864,6 +2935,7 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 			hud.set_context_prompt(
 				"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
 			)
+	_render_v2_hud()
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
 ## 仅在 move 模式下、目标格可达时绘制路径线条和途径格子高亮
@@ -3360,6 +3432,7 @@ func cancel_current_preview() -> Dictionary:
 		_refresh_selected_unit_affordances(selected_unit)
 		if hud:
 			hud.update_unit_info(selected_unit)
+	_render_v2_hud()
 	return {"success": true, "state": v2_input_router.get_state_name() if v2_input_router else "unit_selected"}
 
 
