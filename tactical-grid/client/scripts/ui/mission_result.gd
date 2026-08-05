@@ -29,6 +29,7 @@ func _ready() -> void:
 ## 显示结算结果
 func show_result(data: Dictionary) -> void:
 	var is_victory = data.get("result", "defeat") == "victory"
+	var is_v2 := String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
 
 	if is_victory:
 		title_label.text = "任务完成"
@@ -101,7 +102,13 @@ func show_result(data: Dictionary) -> void:
 	retry_button.modulate = Color("f4b45a") if not is_victory else Color.WHITE
 	# "从遭遇重试"仅在失败且有遭遇检查点时显示（不在 zone_a 失败）
 	var has_checkpoint: bool = bool(data.get("has_encounter_checkpoint", false))
+	if is_v2:
+		has_checkpoint = not GameManager.get_v2_encounter_checkpoint().is_empty()
 	encounter_retry_button.visible = not is_victory and has_checkpoint
+	if is_v2:
+		encounter_retry_button.text = "从检查点重试"
+		retry_button.text = "重新开始任务"
+		base_button.text = "返回基地"
 
 func _apply_visual_theme() -> void:
 	var panel_style := StyleBoxFlat.new()
@@ -202,6 +209,9 @@ func _format_time(seconds: int) -> String:
 	return "%d:%02d" % [m, s]
 
 func _on_retry() -> void:
+	if String(GameManager.current_save.get("game_line", "")) == "v2_infiltration":
+		GameManager.restart_v2_mission(GameManager.current_level_id)
+		return
 	GameManager.go_to_battle(GameManager.current_level_id)
 
 ## CH1-080: 从遭遇检查点重试（当前为重开关卡，完整状态恢复见 CH1-020）
@@ -217,6 +227,15 @@ func _on_next() -> void:
 		GameManager.go_to_battle(next_id)
 	else:
 		GameManager.go_to_base()
+
+## Stable contract consumed by V2 retry tests and future result-screen variants.
+func get_failure_actions(has_checkpoint: bool) -> Array[StringName]:
+	var actions: Array[StringName] = []
+	if has_checkpoint:
+		actions.append(&"retry_checkpoint")
+	actions.append(&"restart_mission")
+	actions.append(&"return_base")
+	return actions
 
 ## CH1-080: 失败原因文案
 func _get_defeat_reason_text(reason: String) -> String:

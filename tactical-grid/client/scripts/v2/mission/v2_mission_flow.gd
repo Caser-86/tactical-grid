@@ -1,6 +1,8 @@
 extends RefCounted
 class_name V2MissionFlow
 
+const CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
+
 signal state_changed(state_name: StringName, result: Dictionary)
 
 enum State {
@@ -25,6 +27,7 @@ var enemy_units: Array = []
 var rescued_characters: Dictionary = {}
 var optional_complete := false
 var optional_reward_flags: Dictionary = {}
+var evac_route_opened := false
 var event_history: Array[Dictionary] = []
 
 var _rescue_character_id := "scout"
@@ -43,6 +46,7 @@ func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, ene
 	rescued_characters.clear()
 	optional_complete = false
 	optional_reward_flags.clear()
+	evac_route_opened = false
 	event_history.clear()
 	_rescued_units.clear()
 	_positions.clear()
@@ -84,6 +88,14 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			result["optional_record_uploaded"] = true
 			result["reward_module"] = "scout_b"
 			result["unlocked_modules"] = ["scout_b"]
+		&"evac_route_opened":
+			if evac_route_opened:
+				result["changed"] = false
+				result["route_already_open"] = true
+			else:
+				evac_route_opened = true
+				result["changed"] = true
+				result["evac_route_opened"] = true
 		&"unit_moved":
 			_remember_moved_payload(payload)
 			result["changed"] = true
@@ -152,10 +164,32 @@ func get_snapshot() -> Dictionary:
 		"rescued_characters": rescued_characters.duplicate(true),
 		"optional_complete": optional_complete,
 		"optional_reward_flags": optional_reward_flags.duplicate(true),
+		"evac_route_opened": evac_route_opened,
 		"evac_center": _evac_center,
 		"evac_radius": _evac_radius,
 		"event_count": event_history.size(),
 	}
+
+func restore_snapshot(snapshot: Dictionary) -> Dictionary:
+	if snapshot.is_empty():
+		return {"success": false, "reason": &"empty_snapshot"}
+	var state_name := String(snapshot.get("state", "SEARCH_SCOUT"))
+	var restored_state := -1
+	for candidate in STATE_NAMES.keys():
+		if String(STATE_NAMES[candidate]) == state_name:
+			restored_state = int(candidate)
+			break
+	if restored_state < 0:
+		return {"success": false, "reason": &"unknown_state"}
+	state = restored_state
+	rescued_characters = (snapshot.get("rescued_characters", {}) as Dictionary).duplicate(true)
+	optional_complete = bool(snapshot.get("optional_complete", false))
+	optional_reward_flags = (snapshot.get("optional_reward_flags", {}) as Dictionary).duplicate(true)
+	evac_route_opened = bool(snapshot.get("evac_route_opened", false))
+	return {"success": true, "state": get_state_name()}
+
+func get_retry_actions(has_checkpoint: bool) -> Array[StringName]:
+	return CheckpointAdapterScript.get_retry_actions(has_checkpoint)
 
 func _find_mission_entities() -> void:
 	for raw_entity in map_data.get("entities", []):

@@ -123,6 +123,7 @@ var v2_locked_attack_preview: Dictionary = {}
 var v2_locked_attack_target_id: String = ""
 var v2_pending_interaction_facility_id: String = ""
 var v2_last_checkpoint: Dictionary = {}
+var v2_last_checkpoint_id: String = ""
 var v2_rescue_marker: Node2D = null
 var _v2_units_rendered := false
 var v2_visibility_summary: Dictionary = {}
@@ -401,6 +402,7 @@ func _cleanup_units() -> void:
 	v2_tutorial_flow = null
 	v2_visibility_summary.clear()
 	v2_last_checkpoint.clear()
+	v2_last_checkpoint_id = ""
 	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
 		v2_rescue_marker.free()
 	v2_rescue_marker = null
@@ -803,28 +805,113 @@ func _on_v2_checkpoint_requested(checkpoint_id: StringName, _result: Dictionary)
 func _save_v2_checkpoint(checkpoint_id: StringName) -> bool:
 	if not _is_v2_battle() or GameManager.current_save.is_empty():
 		return false
-	current_encounter_id = String(checkpoint_id)
 	var snapshot := V2CheckpointAdapterScript.capture({
 		"game_line": "v2_infiltration",
 		"level_id": level_id,
 		"encounter_id": String(checkpoint_id),
+		"checkpoint_id": String(checkpoint_id),
 		"turn": turn_manager.turn_number if turn_manager else 0,
 		"player_units": player_units,
 		"enemy_units": enemy_units,
 		"alert_state": alert_state.serialize() if alert_state else {},
-		"visibility_state": {"turn": visibility_state._current_turn} if visibility_state else {},
+		"visibility_state": visibility_state.serialize() if visibility_state else {},
 		"facilities": v2_mission_flow.map_data.get("facilities", []) if v2_mission_flow else [],
 		"mission_flow": v2_mission_flow.get_snapshot() if v2_mission_flow else {},
 		"enemy_intents": {},
 		"turn_state": {"phase": turn_manager.current_phase if turn_manager else 0},
 		"extra": {"checkpoint_id": String(checkpoint_id)},
 	})
-	SaveManager.set_encounter_checkpoint(GameManager.current_save, snapshot)
-	v2_last_checkpoint = snapshot
-	var saved := GameManager.save_current_v2()
-	if not saved:
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点无效：%s" % "; ".join(validation.get("errors", [])))
+		return false
+	if not GameManager.set_v2_encounter_checkpoint(snapshot):
 		_log("V2 检查点写入失败：%s" % checkpoint_id)
-	return saved
+		return false
+	v2_last_checkpoint = snapshot
+	v2_last_checkpoint_id = String(checkpoint_id)
+	return true
+
+## Restore a pending V2 checkpoint after TurnManager has initialized the first
+## player phase. Invalid snapshots are discarded and safely fall back to cp_start.
+func _restore_v2_checkpoint() -> bool:
+	var snapshot: Dictionary = GameManager.consume_v2_checkpoint_request()
+	if snapshot.is_empty():
+		return false
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点校验失败，回退任务起点：%s" % "; ".join(validation.get("errors", [])))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	var player_ids: Dictionary = {}
+	for unit in player_units:
+		if unit:
+			player_ids[unit.entity_id] = true
+	for raw_unit in snapshot.get("player_units", []):
+		if not raw_unit is Dictionary:
+			continue
+		var data: Dictionary = raw_unit
+		var entity_id := String(data.get("entity_id", ""))
+		if entity_id.is_empty() or player_ids.has(entity_id):
+			continue
+		var position_data: Dictionary = data.get("grid_pos", {})
+		var rescued := _create_v2_rescue_unit(&"scout", entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
+		if rescued == null:
+			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
+			GameManager.clear_v2_encounter_checkpoint()
+			return false
+		player_units.append(rescued)
+		player_ids[entity_id] = true
+		if turn_manager:
+			turn_manager.register_player_unit(rescued)
+	var context := {
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(snapshot.get("encounter_id", "")),
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+	}
+	var restored: Dictionary = V2CheckpointAdapterScript.restore(snapshot, context)
+	if not bool(restored.get("success", false)):
+		_log("V2 检查点恢复失败，回退任务起点：%s" % String(restored.get("reason", "unknown")))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	if v2_mission_flow:
+		var flow_restore: Dictionary = v2_mission_flow.restore_snapshot(snapshot.get("mission_flow", {}))
+		if not bool(flow_restore.get("success", false)):
+			_log("V2 任务状态恢复失败，回退任务起点")
+			GameManager.clear_v2_encounter_checkpoint()
+			return false
+	if v2_rescue_controller and v2_mission_flow and bool(v2_mission_flow.rescued_characters.get("scout", false)):
+		v2_rescue_controller.restore_rescued_state(&"rescue_scout")
+	if alert_state:
+		alert_state.deserialize(snapshot.get("alert_state", {}))
+	if visibility_state and snapshot.get("visibility_state", {}) is Dictionary:
+		visibility_state.deserialize(snapshot.get("visibility_state", {}))
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service:
+		v2_action_service.refresh_units(player_units, enemy_units)
+	if turn_manager:
+		turn_manager.turn_number = maxi(1, int(snapshot.get("turn", 1)))
+		turn_manager.current_phase = TurnManager.TurnPhase.PLAYER_ACTION
+		turn_manager.battle_over = false
+	current_encounter_id = String(snapshot.get("encounter_id", "zone_a"))
+	v2_last_checkpoint = snapshot.duplicate(true)
+	v2_last_checkpoint_id = String(snapshot.get("checkpoint_id", ""))
+	_sync_v2_enemy_sprites_after_restore()
+	_update_visibility()
+	return true
+
+func _sync_v2_enemy_sprites_after_restore() -> void:
+	if not _v2_units_rendered or unit_layer == null:
+		return
+	for unit in enemy_units:
+		var sprite := _get_unit_sprite(unit)
+		if unit.is_alive and sprite == null:
+			_create_unit_sprite(unit)
+		elif not unit.is_alive and sprite != null:
+			sprite.queue_free()
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -2009,6 +2096,11 @@ func _start_battle() -> void:
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
 	hud.set_battle_controller(self)
 	turn_manager.start_battle()
+	var restored_v2_checkpoint := false
+	if _is_v2_battle():
+		restored_v2_checkpoint = _restore_v2_checkpoint()
+		if not restored_v2_checkpoint:
+			_save_v2_checkpoint(&"cp_start")
 	hud.update_objective(_get_objective_text())
 	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
 	# Keep the first actionable frame self-explanatory; calm alert is still useful
@@ -2430,7 +2522,8 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 
 	# CH1-080: 失败原因和遭遇检查点可用性
 	var defeat_reason := String(result.get("reason", ""))
-	var has_encounter_checkpoint := not victory and current_encounter_id != "" and current_encounter_id != "zone_a"
+	var v2_checkpoint := GameManager.get_v2_encounter_checkpoint() if _is_v2_battle() else {}
+	var has_encounter_checkpoint := not victory and (not v2_checkpoint.is_empty() if _is_v2_battle() else (current_encounter_id != "" and current_encounter_id != "zone_a"))
 
 	var battle_result = {
 		"result": "victory" if victory else "defeat",
@@ -2446,18 +2539,24 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"optional_resource_collected": bool(modifiers.get("optional_resource_collected", false)),
 		"defeat_reason": defeat_reason,
 		"has_encounter_checkpoint": has_encounter_checkpoint,
-		"encounter_id": current_encounter_id,
+		"encounter_id": String(v2_checkpoint.get("checkpoint_id", current_encounter_id)) if _is_v2_battle() else current_encounter_id,
 	}
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
 
 	if victory:
-		GameManager.complete_mission(battle_result)
+		if _is_v2_battle():
+			GameManager.complete_v2_mission(battle_result)
+		else:
+			GameManager.complete_mission(battle_result)
 		# 胜利时播放 outro 对话，结束后再跳转到结算界面
 		_play_outro_then_finish(battle_result)
 	else:
-		# 失败时仅记录失败统计，不修改关卡进度，确保不会产生不可逆死档
-		GameManager.fail_mission(battle_result)
+		# V2 失败只更新 V2 statistics；V1 继续使用旧版存档路径。
+		if _is_v2_battle():
+			GameManager.fail_v2_mission(battle_result)
+		else:
+			GameManager.fail_mission(battle_result)
 		GameManager.go_to_mission_result(battle_result)
 
 func _play_outro_then_finish(battle_result: Dictionary) -> void:
@@ -3676,6 +3775,10 @@ func _check_encounter_zone(grid_pos: Vector2i) -> void:
 				if trigger_pos == grid_pos and current_encounter_id != eid:
 					current_encounter_id = eid
 					_log("进入遭遇区：%s" % String(encounter.get("name", eid)))
+					if _is_v2_battle() and eid == "encounter_evac" and v2_mission_flow:
+						var route_result: Dictionary = _apply_v2_mission_event(&"evac_route_opened")
+						if bool(route_result.get("changed", false)):
+							_save_v2_checkpoint(&"cp_pre_evac")
 					return
 
 ## Task 3: calculate star rating (0=defeat, 1=victory, 2=no casualty, 3=fast+optional)

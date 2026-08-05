@@ -459,16 +459,24 @@ func _migrate_campaign_progress(data: Dictionary) -> void:
 ## CODE-CH1-020: 写入遭遇检查点到 campaign_progress。
 ## snapshot 由 EncounterCheckpointState.snapshot() 生成。
 func set_encounter_checkpoint(save_data: Dictionary, snapshot: Dictionary) -> void:
+	if String(save_data.get("game_line", "")) == "v2_infiltration":
+		save_data["encounter_checkpoint"] = snapshot.duplicate(true)
+		return
 	if not save_data.has("campaign_progress"):
 		save_data["campaign_progress"] = create_default_campaign_progress()
 	save_data["campaign_progress"]["encounter_checkpoint"] = snapshot.duplicate(true)
 
 ## CODE-CH1-020: 读取当前遭遇检查点；无检查点返回空字典。
 func get_encounter_checkpoint(save_data: Dictionary) -> Dictionary:
+	if String(save_data.get("game_line", "")) == "v2_infiltration":
+		return save_data.get("encounter_checkpoint", {}).duplicate(true)
 	var progress = save_data.get("campaign_progress", {})
 	return progress.get("encounter_checkpoint", {}).duplicate(true)
 
 ## CODE-CH1-020: 清除遭遇检查点（成功完成遭遇或任务后调用）。
 func clear_encounter_checkpoint(save_data: Dictionary) -> void:
+	if String(save_data.get("game_line", "")) == "v2_infiltration":
+		save_data["encounter_checkpoint"] = {}
+		return
 	if save_data.has("campaign_progress"):
 		save_data["campaign_progress"]["encounter_checkpoint"] = {}

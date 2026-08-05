@@ -421,10 +421,14 @@ git commit -m "feat(v2): teach M1 through player actions"
 
 **Files:**
 - Create: `tactical-grid/client/tests/v2/v2_m1_retry_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_m1_retry_scene_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_m1_retry_scene_test.tscn`
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_checkpoint_adapter.gd`
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd`
+- Modify: `tactical-grid/client/scripts/v2/mission/v2_rescue_controller.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
+- Modify: `tactical-grid/client/scripts/network/save_manager.gd`
 - Modify: `tactical-grid/client/scripts/ui/mission_result.gd`
-- Modify: `tactical-grid/client/scenes/mission_result.tscn`
 - Modify: `tactical-grid/client/scripts/game/game_manager.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
@@ -432,7 +436,7 @@ git commit -m "feat(v2): teach M1 through player actions"
 - Checkpoints: task start, `scout_rescued`, `evac_route_opened`。
 - Failure actions: `retry_checkpoint/restart_mission/return_base`。
 
-- [ ] **Step 1: 写稳定点保存和失败菜单测试**
+- [x] **Step 1: 写稳定点保存和失败菜单测试**
 
 ```gdscript
 battle.emit_mission_event_for_test(&"scout_rescued")
@@ -444,20 +448,24 @@ t.check(result_screen.has_action(&"restart_mission"), "提供重新开始")
 t.check(result_screen.has_action(&"return_base"), "提供返回基地")
 ```
 
-- [ ] **Step 2: 复现动作未完成时写快照或菜单缺按钮问题**
+- [x] **Step 2: 复现动作未完成时写快照或菜单缺按钮问题**
 
-- [ ] **Step 3: 只在玩家稳定控制点写检查点**
+- [x] **Step 3: 只在玩家稳定控制点写检查点**
 
 检查 `TurnManager` 为玩家阶段、输入不是动画/对话/暂停、无待执行表现事件。检查点重试恢复所有 V2 状态；重新开始清检查点并加载地图初始状态；返回基地不结算奖励且保留任务未完成。
 
-- [ ] **Step 4: 运行三种出口、损坏检查点回退和营救后恢复测试**
+- [x] **Step 4: 运行三种出口、损坏检查点回退和营救后恢复测试**
 
-- [ ] **Step 5: 提交**
+实际结果：M109 纯合同 15/15；正式结算/战斗重试场景 14/14；V2 检查点合同 13/13；营救集成 13/13；玩家回合 41/41；完整 V2 门禁通过，V1 稳定断言 1816，失败 0，意外警告/错误 0。正式 battle 已验证快照恢复位置、生命、行动状态、警戒、迷雾和任务阶段；损坏或无法恢复的快照会清除并安全回到 `cp_start`，不会卡死在失败页。
+
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission tactical-grid/client/scripts/ui/mission_result.gd tactical-grid/client/scenes/mission_result.tscn tactical-grid/client/scripts/game/game_manager.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): close M1 failure and retry flow"
 ```
+
+提交边界：V2 通过 `SaveManager` 的游戏线分流和 `GameManager` 专属 API 写入顶层 `encounter_checkpoint`，不再把 V2 检查点写进 V1 `campaign_progress`；结算页只负责出口与跳转，快照恢复由 `BattleController`、`V2CheckpointAdapter`、`V2MissionFlow` 和营救状态共同完成。V1 失败、V1 检查点和 V1 结算路径保持原行为。
 
 ### Task M110: 基地解锁、编队、模块和结算
 

@@ -184,6 +184,19 @@ func get_rescue_state(rescue_id: StringName) -> String:
 func get_state_revision() -> int:
 	return _state_revision
 
+## Restore the captive marker after loading a V2 rescue checkpoint. The Unit
+## itself is restored by V2CheckpointAdapter; this method only synchronizes the
+## map-side interaction state so the rescued character cannot be rescued twice.
+func restore_rescued_state(rescue_id: StringName) -> bool:
+	var id := String(rescue_id)
+	var entity := _get_rescue_entity(id)
+	if entity.is_empty():
+		return false
+	entity["state"] = "rescued"
+	_rescued[id] = true
+	_state_revision += 1
+	return true
+
 func _validate_preview(stored: Dictionary, submitted: Dictionary) -> Dictionary:
 	if int(submitted.get("state_revision", -1)) != int(stored.get("state_revision", -1)):
 		return {"valid": false, "reason": &"stale_preview"}

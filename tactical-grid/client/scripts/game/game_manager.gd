@@ -5,6 +5,7 @@ extends Node
 const ProgressionManagerScript = preload("res://scripts/game/progression_manager.gd")
 const DialogueScene = preload("res://scenes/dialogue.tscn")
 const V2CampaignProgressScript = preload("res://scripts/v2/mission/v2_campaign_progress.gd")
+const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 
 signal save_loaded(slot: int)
 signal save_created(slot: int)
@@ -34,6 +35,7 @@ var v2_boot_errors: Array[String] = []
 ## 流程状态：仅用于记录，不持有战斗单位
 var battle_result: Dictionary = {}
 var pending_level_id: String = ""
+var pending_v2_checkpoint: Dictionary = {}
 
 ## 待展示的成就通知队列（场景切换间保留）
 var pending_achievement_notifications: Array[Dictionary] = []
@@ -86,6 +88,7 @@ func begin_new_game_for_test(slot: int) -> Dictionary:
 func new_v2_game(slot: int = 0) -> bool:
 	current_slot = slot
 	current_save = SaveManager.create_v2_save()
+	pending_v2_checkpoint.clear()
 	current_state = GameState.BASE
 	var saved: bool = SaveManager.save_game_v2(current_save, current_slot)
 	if saved:
@@ -131,7 +134,52 @@ func complete_v2_mission(result: Dictionary) -> bool:
 	if mission_id == StringName(""):
 		return false
 	current_save = V2CampaignProgressScript.complete_mission(current_save, mission_id, result)
+	SaveManager.clear_encounter_checkpoint(current_save)
 	return save_current_v2()
+
+## V2 失败只写 V2 statistics，绝不调用 V1 campaign_progress 或 V1 存档目录。
+func fail_v2_mission(result: Dictionary) -> bool:
+	if current_save.is_empty() or String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	var statistics: Dictionary = current_save.get("statistics", {}).duplicate(true)
+	statistics["missions_failed"] = int(statistics.get("missions_failed", 0)) + 1
+	var failure_counts: Dictionary = statistics.get("failure_counts", {}).duplicate(true)
+	var mission_id := String(result.get("mission_id", result.get("level_id", current_level_id)))
+	failure_counts[mission_id] = int(failure_counts.get(mission_id, 0)) + 1
+	statistics["failure_counts"] = failure_counts
+	statistics["last_failed_mission"] = mission_id
+	current_save["statistics"] = statistics
+	return save_current_v2()
+
+## V2 checkpoint API. Snapshot validation happens before it can enter the save.
+func set_v2_encounter_checkpoint(snapshot: Dictionary) -> bool:
+	if current_save.is_empty() or String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		return false
+	SaveManager.set_encounter_checkpoint(current_save, snapshot)
+	return save_current_v2()
+
+func get_v2_encounter_checkpoint() -> Dictionary:
+	if String(current_save.get("game_line", "")) != "v2_infiltration":
+		return {}
+	return SaveManager.get_encounter_checkpoint(current_save)
+
+func clear_v2_encounter_checkpoint() -> bool:
+	if String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	SaveManager.clear_encounter_checkpoint(current_save)
+	pending_v2_checkpoint.clear()
+	return save_current_v2()
+
+func get_v2_retry_actions() -> Array[StringName]:
+	return V2CheckpointAdapterScript.get_retry_actions(not get_v2_encounter_checkpoint().is_empty())
+
+func consume_v2_checkpoint_request() -> Dictionary:
+	var requested := pending_v2_checkpoint.duplicate(true)
+	pending_v2_checkpoint.clear()
+	return requested
 
 ## 继续游戏（读取最新有效存档）
 func continue_game() -> bool:
@@ -573,6 +621,15 @@ func go_to_battle(level_id: String) -> void:
 
 ## CH1-080: 从遭遇检查点重试战斗（当前实现为重开关卡，完整状态恢复见 CH1-020）
 func go_to_battle_from_encounter(level_id: String) -> void:
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		pending_v2_checkpoint = get_v2_encounter_checkpoint()
+	go_to_battle(level_id)
+
+## V2 从任务起点重新开始，清除旧检查点但不修改战役进度。
+func restart_v2_mission(level_id: String) -> void:
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		clear_v2_encounter_checkpoint()
+	pending_v2_checkpoint.clear()
 	go_to_battle(level_id)
 
 func go_to_settings(caller: String = "main_menu") -> void:

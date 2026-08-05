@@ -4,6 +4,28 @@ class_name V2CheckpointAdapter
 const SCHEMA_VERSION := 3
 const GAME_LINE := "v2_infiltration"
 const V2UnitTurnStateScript = preload("res://scripts/v2/combat/v2_unit_turn_state.gd")
+const CHECKPOINT_IDS := [&"cp_start", &"cp_rescue", &"cp_pre_evac"]
+
+static func checkpoint_for_event(event_name: StringName) -> StringName:
+	match event_name:
+		&"mission_started":
+			return &"cp_start"
+		&"scout_rescued":
+			return &"cp_rescue"
+		&"evac_route_opened":
+			return &"cp_pre_evac"
+	return &""
+
+static func is_valid_checkpoint_id(checkpoint_id: StringName) -> bool:
+	return checkpoint_id in CHECKPOINT_IDS
+
+static func get_retry_actions(has_checkpoint: bool) -> Array[StringName]:
+	var actions: Array[StringName] = []
+	if has_checkpoint:
+		actions.append(&"retry_checkpoint")
+	actions.append(&"restart_mission")
+	actions.append(&"return_base")
+	return actions
 
 static func capture(context: Dictionary) -> Dictionary:
 	var snapshot := {
@@ -11,6 +33,7 @@ static func capture(context: Dictionary) -> Dictionary:
 		"game_line": String(context.get("game_line", GAME_LINE)),
 		"level_id": String(context.get("level_id", "")),
 		"encounter_id": String(context.get("encounter_id", "")),
+		"checkpoint_id": String(context.get("checkpoint_id", "")),
 		"turn": int(context.get("turn", 0)),
 		"player_units": _serialize_units(context.get("player_units", [])),
 		"enemy_units": _serialize_units(context.get("enemy_units", [])),
@@ -39,6 +62,9 @@ static func validate(snapshot: Dictionary) -> Dictionary:
 		errors.append("level_id is required")
 	if String(snapshot.get("encounter_id", "")).is_empty():
 		errors.append("encounter_id is required")
+	var checkpoint_id := String(snapshot.get("checkpoint_id", ""))
+	if not checkpoint_id.is_empty() and not is_valid_checkpoint_id(StringName(checkpoint_id)):
+		errors.append("unknown checkpoint_id: %s" % checkpoint_id)
 	if not snapshot.get("player_units", []) is Array:
 		errors.append("player_units must be an array")
 	if not snapshot.get("enemy_units", []) is Array:
