@@ -3,6 +3,8 @@
 extends Node2D
 class_name Unit
 
+const V2UnitTurnStateScript = preload("res://scripts/v2/combat/v2_unit_turn_state.gd")
+
 signal unit_selected(unit)
 signal unit_moved(unit, from: Vector2i, to: Vector2i)
 signal unit_attacked(attacker, target, result: Dictionary)
@@ -64,6 +66,13 @@ var learned_skills: Array = []
 # 可用物品列表（从库存传入，用于战斗中物品按钮配置驱动）
 var available_items: Array = []
 
+## V2 使用布尔行动预算；未启用时保留 V1 AP/移动点语义。
+var v2_turn_state: RefCounted
+var v2_turn_mode_enabled: bool = false
+
+func _init() -> void:
+	v2_turn_state = V2UnitTurnStateScript.new()
+
 func _ready() -> void:
 	add_to_group(team + "_units")
 	add_to_group("units")
@@ -82,6 +91,7 @@ func setup(data: Dictionary) -> void:
 	armor = data.get("armor", 0)
 	max_shield = maxi(0, int(data.get("shield", 0)))
 	current_shield = max_shield
+	v2_turn_state = V2UnitTurnStateScript.new()
 
 ## 刷新 AP（回合开始时）
 func refresh_ap() -> void:
@@ -182,11 +192,31 @@ func get_stat(stat_name: String) -> int:
 
 ## 是否可以行动
 func can_act() -> bool:
+	if v2_turn_mode_enabled:
+		return is_alive and v2_turn_state.can_act() and not has_status("stun")
 	return is_alive and current_ap > 0 and not has_status("stun")
 
 ## 是否可以移动
 func can_move() -> bool:
+	if v2_turn_mode_enabled:
+		return is_alive and v2_turn_state.can_move() and not has_status("stun") and not has_status("rooted")
 	return is_alive and not has_status("stun") and not has_status("rooted")
+
+func enable_v2_turn_mode() -> void:
+	v2_turn_mode_enabled = true
+
+func disable_v2_turn_mode() -> void:
+	v2_turn_mode_enabled = false
+
+func begin_v2_turn() -> void:
+	if v2_turn_mode_enabled and is_alive:
+		v2_turn_state.begin_turn()
+
+func spend_v2_move() -> bool:
+	return v2_turn_mode_enabled and is_alive and v2_turn_state.spend_move()
+
+func spend_v2_action() -> bool:
+	return v2_turn_mode_enabled and is_alive and v2_turn_state.spend_action()
 
 ## 是否有某状态
 func has_status(effect_id: String) -> bool:

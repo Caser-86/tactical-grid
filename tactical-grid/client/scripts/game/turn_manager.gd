@@ -102,6 +102,8 @@ func _refresh_units(units: Array) -> void:
 			continue
 		unit.refresh_ap()
 		unit.on_turn_start()
+		if unit.v2_turn_mode_enabled:
+			unit.begin_v2_turn()
 
 func _end_battle(victory: bool, reason: String = "") -> void:
 	battle_over = true
