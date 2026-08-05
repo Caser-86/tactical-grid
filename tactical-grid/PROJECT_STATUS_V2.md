@@ -1,7 +1,7 @@
 # Tactical Grid V2 当前状态
 
 > version: V2 Infiltration
-> status: M104 passed; M105 optional interaction next
+> status: M105 passed; M106 enemy activation next
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
 
@@ -26,10 +26,11 @@
 - M102 已完成：`ch1_m1.json` schema v3 灰盒地图、22×16 五层矩阵、南侧主线/西侧记录线、7 个核心对象、6 名敌人、4 个分批激活节点和 3 个检查点已锁定；地图合同 40/40 通过，100 次加载哈希一致。
 - M103 已完成：V2 主目标状态机已切换为搜索侦察兵、护送撤离、完成/失败四态；BattleController 已桥接移动、失能和撤离检查；状态机合同 13/13，真实场景 38/38。
 - M104 已完成：相邻营救、侦察兵同关加入、完整双预算、稳定 ID、营救前不可攻击、队伍/行动服务/回合/精灵/HUD 注册、`cp_rescue` V2 检查点和中立营救标记已接入；独立合同 17/17，正式场景集成 13/13。
+- M105 已完成：V2 摄像头控制台使用 `view_camera_east`，注册 `camera_east_zone` 持久观察区并支持关闭回收；事故记录使用一次性 `upload_incident_record`，完成可选目标并返回 `scout_b` 奖励标志，不锁定撤离；正式锁定地图设施已接入 battle 初始化。M105 交互合同 23/23，既有交互合同 26/26，完整 V2 门禁通过。
 
 ## 尚未开始
 
-- M105-M114：M1 可选交互、敌人激活、潜伏警戒、教学、失败重试、基地成长、对话、自动 E2E、首次玩家记录和 H1 修正。
+- M106-M114：M1 敌人激活、潜伏警戒、教学、失败重试、基地成长、对话、自动 E2E、首次玩家记录和 H1 修正。
 - A01-A14：V2 角色、敌人、环境、肖像、图标、特效、音频和运行时资源门。
 - H1：三名首次玩家真人验收。
 - V2 首次玩家测试、章节正式内容和发布包。
@@ -40,4 +41,4 @@ V1 的 `PROJECT_STATUS.md`、`docs/PROJECT_TAKEOVER_ROADMAP.md` 和 2026-07-30 �
 
 ## 下一步
 
-P1、P2、M101-M104 已完成。下一步执行 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M105，实现摄像头和事故记录可选目标。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。
+P1、P2、M101-M105 已完成。下一步执行 `docs/superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md` 的 M106，实现哨兵、无人机和分批敌人激活。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。

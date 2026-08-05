@@ -599,7 +599,8 @@ func _setup_v2_services() -> void:
 	v2_locked_attack_preview.clear()
 	v2_locked_attack_target_id = ""
 	v2_pending_interaction_facility_id = ""
-	v2_interaction_service.setup(map_data, tactical_network_state, visibility_state, alert_state)
+	var interaction_map: Dictionary = v2_map if not v2_map.is_empty() else map_data
+	v2_interaction_service.setup(interaction_map, tactical_network_state, visibility_state, alert_state, v2_mission_flow)
 	if camera:
 		camera.set_input_router_mode(_is_v2_battle())
 
@@ -3088,17 +3089,24 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 	var facility: Dictionary = v2_interaction_service.get_facility(facility_id) if v2_interaction_service else {}
 	var reveal_radius := int(result.get("reveal_radius", 0))
 	if reveal_radius > 0 and visibility_state:
-		var center: Vector2i = facility.get("position", selected_unit.grid_pos)
+		var center: Vector2i = result.get("reveal_center", facility.get("position", selected_unit.grid_pos))
 		var cells := VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
 		visibility_state.reveal_cells(cells)
+		if result.has("camera_zone_id"):
+			_sync_camera_zone_cells()
 		_update_visibility()
 		_log("%s 揭示了 %d 个格子" % [facility_id, cells.size()])
+	elif result.has("camera_zone_id"):
+		_sync_camera_zone_cells()
+		_update_visibility()
 	if bool(result.get("raises_alert", false)) and alert_state:
 		alert_state.apply_event("overload_triggered")
 		if hud:
 			hud.update_alert_display(alert_state)
 	var consequence := String(result.get("consequence", "操作完成"))
 	_log("设施 %s：%s" % [facility_id, consequence])
+	if String(result.get("reward_module", "")) != "":
+		_log("可选目标完成：已登记模块 %s" % String(result.get("reward_module", "")))
 	if hud:
 		hud.set_context_prompt("设施操作完成：%s" % consequence)
 	if tactical_network_state:

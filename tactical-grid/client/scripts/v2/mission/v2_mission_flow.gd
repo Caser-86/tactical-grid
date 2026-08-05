@@ -24,6 +24,7 @@ var player_units: Array = []
 var enemy_units: Array = []
 var rescued_characters: Dictionary = {}
 var optional_complete := false
+var optional_reward_flags: Dictionary = {}
 var event_history: Array[Dictionary] = []
 
 var _rescue_character_id := "scout"
@@ -41,6 +42,7 @@ func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, ene
 	state = State.SEARCH_SCOUT
 	rescued_characters.clear()
 	optional_complete = false
+	optional_reward_flags.clear()
 	event_history.clear()
 	_rescued_units.clear()
 	_positions.clear()
@@ -72,6 +74,16 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			state = State.ESCORT_TO_EVAC
 			result["changed"] = true
 			result["character_id"] = character_id
+		&"optional_record_uploaded":
+			if optional_complete:
+				return _finish_event(event_name, _fail(&"optional_already_complete"))
+			optional_complete = true
+			optional_reward_flags["scout_b"] = true
+			result["changed"] = true
+			result["optional_complete"] = true
+			result["optional_record_uploaded"] = true
+			result["reward_module"] = "scout_b"
+			result["unlocked_modules"] = ["scout_b"]
 		&"unit_moved":
 			_remember_moved_payload(payload)
 			result["changed"] = true
@@ -139,6 +151,7 @@ func get_snapshot() -> Dictionary:
 		"primary_text": get_primary_text(),
 		"rescued_characters": rescued_characters.duplicate(true),
 		"optional_complete": optional_complete,
+		"optional_reward_flags": optional_reward_flags.duplicate(true),
 		"evac_center": _evac_center,
 		"evac_radius": _evac_radius,
 		"event_count": event_history.size(),

@@ -126,9 +126,9 @@
     {"id":"cp_pre_evac", "x":16, "y":5, "encounter_id":"encounter_evac"}
   ],
   "facilities": [
-    {"id":"facility_camera_console_south", "type":"camera", "x":7, "y":11, "entity_id":"camera_console_south", "action_id":"view_camera_east"},
-    {"id":"facility_camera_east", "type":"camera", "x":15, "y":5, "entity_id":"camera_east", "action_id":"view_camera_east"},
-    {"id":"facility_optional_record", "type":"record", "x":4, "y":4, "entity_id":"optional_record", "action_id":"upload_incident_record"}
+    {"id":"facility_camera_console_south", "type":"camera", "x":7, "y":11, "entity_id":"camera_console_south", "name":"东侧摄像头", "action_id":"view_camera_east", "camera_zone_id":"camera_east_zone", "reveal_center":[15,5], "reveal_radius":3},
+    {"id":"facility_camera_east", "type":"camera", "x":15, "y":5, "entity_id":"camera_east", "name":"东侧摄像头", "action_id":"view_camera_east", "camera_zone_id":"camera_east_zone", "reveal_center":[15,5], "reveal_radius":3},
+    {"id":"facility_optional_record", "type":"record", "x":4, "y":4, "entity_id":"optional_record", "name":"事故记录终端", "action_id":"upload_incident_record"}
   ],
   "main_routes": [
     {"id":"route_south_rescue", "name":"南侧主线", "required_ids":["spawn_assault","camera_console_south","rescue_scout","evac_northeast"], "cells":[[3,14],[7,11],[10,9],[13,7],[16,5],[19,2]]},

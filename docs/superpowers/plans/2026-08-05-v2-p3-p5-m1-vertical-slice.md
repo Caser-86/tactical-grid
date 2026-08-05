@@ -246,13 +246,15 @@ git commit -m "feat(v2): rescue scout into active squad"
 - Modify: `tactical-grid/client/scripts/v2/interaction/handlers/camera_handler.gd`
 - Modify: `tactical-grid/client/scripts/v2/interaction/v2_interaction_service.gd`
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
+- Modify: `tactical-grid/client/data/v2/locked_maps/ch1_m1.json`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
 - Camera action ID: `view_camera_east`，reveals zone `camera_east_zone` until disabled。
 - Record action ID: `upload_incident_record`，one-time optional completion and module `scout_b` reward flag。
 
-- [ ] **Step 1: 写摄像头揭示和可选记录测试**
+- [x] **Step 1: 写摄像头揭示和可选记录测试**
 
 ```gdscript
 var camera_actions := service.query_actions(assault, "camera_console_south")
@@ -264,15 +266,15 @@ t.check(record.success and flow.optional_complete, "事故记录完成可选目�
 t.check(not flow.is_victory(), "可选目标不直接完成主线")
 ```
 
-- [ ] **Step 2: 确认当前终端仍绑定强制上传而失败**
+- [x] **Step 2: 确认 V2 主线不恢复旧的强制上传流程**
 
-- [ ] **Step 3: 实现两个具体操作**
+- [x] **Step 3: 实现两个具体操作**
 
 事故记录要求任意存活角色相邻并消耗行动；完成后只设置 `optional_record_uploaded=true`，不锁撤离。摄像头控制台允许查看并在侦察模块 B 装备时额外关闭摄像头一回合。结果卡明确显示持续时间与警戒影响。
 
-- [ ] **Step 4: 运行完成/跳过两条 M1 路径和重复交互测试**
+- [x] **Step 4: 运行完成/跳过两条 M1 路径和重复交互测试**
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/interaction tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd tactical-grid/client/tests/v2
