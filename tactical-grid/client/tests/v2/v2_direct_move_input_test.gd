@@ -42,9 +42,24 @@ func _initialize() -> void:
 	t.check(not bool(reserved_result.get("success", true)) and reserved_result.get("reason", &"") == &"occupied", "待激活敌人的出生格不能成为玩家移动落点")
 	t.check(reserve_unit.grid_pos == Vector2i(1, 1), "出生格被保留时玩家不移动")
 
+	var live_unit: Unit = _make_unit("player_live", Vector2i(1, 1), 5)
+	var live_enemy: Unit = _make_unit("enemy_live", Vector2i(2, 1), 3)
+	live_enemy.team = "enemy"
+	var stale_service := V2ActionService.new()
+	stale_service.setup(_make_map(), [live_unit], [])
+	battle.set("player_units", [live_unit])
+	battle.set("enemy_units", [live_enemy])
+	battle.set("v2_action_service", stale_service)
+	battle.set("selected_unit", live_unit)
+	var authoritative_result: Dictionary = battle.call("request_move", live_enemy.grid_pos)
+	t.check(not bool(authoritative_result.get("success", true)) and authoritative_result.get("reason", &"") == &"occupied", "战场实时敌人优先于过期动作缓存阻止移动")
+	t.check(live_unit.grid_pos == Vector2i(1, 1), "实时敌人占格时玩家不移动")
+
 	var dangerous_unit: Unit = _make_unit("player_danger", Vector2i(1, 1), 5)
 	var dangerous_service := V2ActionService.new()
 	dangerous_service.setup(_make_map([Vector2i(2, 1)]), [dangerous_unit], [])
+	battle.set("player_units", [dangerous_unit])
+	battle.set("enemy_units", [])
 	battle.set("v2_action_service", dangerous_service)
 	battle.set("selected_unit", dangerous_unit)
 	var dangerous_destination := Vector2i(2, 1)
@@ -64,6 +79,8 @@ func _initialize() -> void:
 	safe_unit.free()
 	reserve_unit.free()
 	pending_enemy.free()
+	live_unit.free()
+	live_enemy.free()
 	dangerous_unit.free()
 	t.finish(self)
 

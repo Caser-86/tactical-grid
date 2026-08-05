@@ -50,6 +50,9 @@ func _run() -> void:
 	var player: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	t.check(player != null and player.team == "player", "V2 M1 实战只部署一名玩家角色")
 	t.check(player != null and player.max_hp == 7 and player.current_hp == 7, "V2 M1 突击兵使用 V2 角色数值")
+	var player_sprite: UnitSprite = battle.call("_get_unit_sprite", player)
+	var player_texture_path := String(player_sprite.art_sprite.texture.resource_path) if player_sprite != null and player_sprite.art_sprite != null and player_sprite.art_sprite.texture != null else ""
+	t.check(player_sprite != null and player_sprite.unit == player and player_texture_path.ends_with("units/assault_96.png"), "V2 玩家绑定蓝色突击兵贴图而非敌人贴图")
 	t.check(player != null and player.v2_turn_mode_enabled, "V2 实战单位启用移动/行动双预算")
 	t.check(battle._active_tutorial_hint == null, "V2 开场不显示 V1 模态教学")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")
@@ -71,6 +74,10 @@ func _run() -> void:
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "选中角色后保持单位选择状态")
 	t.check(battle.v2_affordance_presenter.get_child_count() > 0, "选中角色后显示移动/攻击范围")
 	t.check(battle.hud.context_label.text.contains("蓝色") and battle.hud.context_label.text.contains("红色"), "选中角色后提示蓝色移动与红色攻击")
+	var hover_move_target := _find_safe_move_target(battle, player)
+	if hover_move_target.x >= 0:
+		await _move_mouse_to_cell(battle, hover_move_target)
+		t.check(_group_count(battle.v2_affordance_presenter, "v2_path_overlay") > 0, "悬停蓝色移动格在地面显示路径")
 
 	# M107 bridge: a completed camera observation changes the real battle front
 	# state and immediately reaches the V2 HUD snapshot.
@@ -102,6 +109,7 @@ func _run() -> void:
 	var attack_cell := _prepare_adjacent_target(battle, player, target)
 	t.check(target != null and attack_cell.x >= 0, "V2 E2E 准备可见且可攻击的真实敌人")
 	if target != null and attack_cell.x >= 0:
+		t.check(not battle.reachable_cells.has(attack_cell), "敌人占用格不显示为蓝色可移动格")
 		await get_tree().process_frame
 		var hp_before := target.current_hp
 		await _move_mouse_to_cell(battle, attack_cell)
@@ -112,8 +120,13 @@ func _run() -> void:
 		t.check(target.current_hp < hp_before, "单次左键敌人完成攻击")
 		t.check(target.current_hp == expected_hp_after, "攻击结算严格等于悬停预览的 HP 结果")
 		t.check(not player.v2_turn_state.action_available, "攻击只消耗行动预算")
+		t.check(battle.effect_layer.get_node_or_null("V2AttackFeedback") != null, "攻击在地面显示弹道与命中反馈")
 		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "攻击完成后回到单位选择状态")
 		t.check(battle.hud.phase_label.text.contains("已选中"), "攻击完成后 HUD 状态同步回已选中")
+		target.grid_pos = player.grid_pos
+		battle.call("_update_unit_sprite_pos", target, false)
+		battle.call("_on_v2_cell_left_clicked", player.grid_pos)
+		t.check(_has_unique_live_positions(battle), "地图交互立即修正旧状态造成的单位重合")
 
 	# 4. 中键拖动与滚轮缩放由真实输入路由到镜头。
 	var camera_before := battle.camera.position
@@ -173,6 +186,13 @@ func _has_unique_live_positions(battle: BattleController) -> bool:
 			return false
 		occupied[unit.grid_pos] = unit.entity_id
 	return true
+
+func _group_count(node: Node, group_name: StringName) -> int:
+	var count := 0
+	for child in node.get_children():
+		if child.is_in_group(group_name):
+			count += 1
+	return count
 
 func _dismiss_intro(manager: Node) -> void:
 	for _i in range(30):

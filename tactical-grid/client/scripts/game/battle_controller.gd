@@ -3069,6 +3069,16 @@ func request_move(cell: Vector2i) -> Dictionary:
 		if hud:
 			hud.set_context_prompt("靠近侦察兵后点击其标记营救，不能直接走到目标格")
 		return {"success": false, "committed": false, "reason": &"rescue_interaction_required"}
+	# The controller owns the live roster. Validate it before consulting the
+	# action-service snapshot so restored or newly activated enemies cannot be
+	# crossed during a stale service frame.
+	if _is_occupied_by_other_unit(cell, selected_unit):
+		if not v2_pending_move_preview.is_empty():
+			v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+			v2_pending_move_preview.clear()
+		if hud:
+			hud.set_context_prompt("该格已有单位，不能移动到同一位置")
+		return {"success": false, "committed": false, "reason": &"occupied"}
 
 	if not v2_pending_move_preview.is_empty():
 		var pending_target: Vector2i = v2_pending_move_preview.get("target", Vector2i(-1, -1))
@@ -3142,6 +3152,9 @@ func _finalize_v2_move(result: Dictionary) -> void:
 func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	if not _is_v2_battle():
 		return
+	# Heal any legacy/checkpoint overlap before resolving the clicked occupant.
+	# Otherwise _get_unit_at can select the wrong object and preserve the bad state.
+	_reconcile_v2_unit_occupancy()
 	var clicked_unit: Unit = _get_unit_at(cell)
 	if clicked_unit != null and clicked_unit.team == "player":
 		if clicked_unit != selected_unit:
@@ -3213,8 +3226,12 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		_get_move_cost.bind(selected_unit.job),
 		_is_blocked
 	)
-	if path.size() >= 2:
-		v2_affordance_presenter.show_path(path, false)
+	if not path.is_empty():
+		# Pathfinding returns steps without the start cell, while the V2 presenter
+		# intentionally skips index 0 so the unit's own tile is never highlighted.
+		var display_path: Array[Vector2i] = [selected_unit.grid_pos]
+		display_path.append_array(path)
+		v2_affordance_presenter.show_path(display_path, false)
 
 ## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
 func request_attack_preview(target: Unit) -> Dictionary:
@@ -3301,6 +3318,8 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 			event["target_sprite"] = target_sprite
 		var reduce_motion := bool(GameManager.get_settings().get("reduce_motion", false))
 		v2_damage_presenter.play_attack(events, reduce_motion)
+	if _is_v2_battle() and selected_unit and target:
+		_play_v2_attack_world_feedback(selected_unit, target)
 	_clear_v2_locked_attack()
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
@@ -3326,6 +3345,46 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 	})
 	_update_visibility()
 	_render_v2_hud()
+
+## V2 combat needs a legible world-space event in addition to numbers and the
+## short UnitSprite recoil, especially when units are small on a wide map.
+func _play_v2_attack_world_feedback(attacker: Unit, target: Unit) -> void:
+	if effect_layer == null or attacker == null or target == null:
+		return
+	var previous := effect_layer.get_node_or_null("V2AttackFeedback")
+	if previous != null:
+		previous.queue_free()
+	var feedback := Node2D.new()
+	feedback.name = "V2AttackFeedback"
+	feedback.z_index = 30
+	effect_layer.add_child(feedback)
+	var source := _get_cell_center(attacker.grid_pos)
+	var impact := _get_cell_center(target.grid_pos)
+	var trace := Line2D.new()
+	trace.name = "Tracer"
+	trace.width = 3.5
+	trace.default_color = Color(0.24, 0.92, 1.0, 0.95)
+	trace.add_point(source)
+	trace.add_point(impact)
+	feedback.add_child(trace)
+	_add_v2_attack_effect_sprite(feedback, "Muzzle", &"muzzle", source, Color(0.72, 0.96, 1.0, 1.0))
+	_add_v2_attack_effect_sprite(feedback, "Impact", &"hit", impact, Color(1.0, 0.52, 0.26, 1.0))
+	var tween := feedback.create_tween()
+	tween.tween_interval(0.26 if not GameManager.get_settings().get("reduce_motion", false) else 0.12)
+	tween.tween_callback(feedback.queue_free)
+
+func _add_v2_attack_effect_sprite(parent: Node2D, effect_name: String, art_key: StringName, position: Vector2, tint: Color) -> void:
+	var texture: Texture2D = ArtCatalog.get_texture(&"effect", art_key)
+	if texture == null:
+		return
+	var sprite := Sprite2D.new()
+	sprite.name = effect_name
+	sprite.texture = texture
+	sprite.position = position
+	sprite.scale = Vector2(0.42, 0.42)
+	sprite.modulate = tint
+	sprite.z_index = 1
+	parent.add_child(sprite)
 
 func _clear_v2_hover_preview() -> void:
 	_cancel_v2_preview(v2_hover_attack_preview)
