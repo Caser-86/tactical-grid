@@ -1,0 +1,83 @@
+{
+  "sentry": {
+    "id": "sentry",
+    "name": "巡逻哨兵",
+    "hp": 4,
+    "move": 4,
+    "vision": 5,
+    "attack_range": [1, 5],
+    "damage": 2,
+    "role": "巡逻、守点、直线射击",
+    "art_key": "sentry"
+  },
+  "drone": {
+    "id": "drone",
+    "name": "侦察无人机",
+    "hp": 3,
+    "move": 6,
+    "vision": 7,
+    "scan_radius": 3,
+    "attack_range": [1, 3],
+    "damage": 1,
+    "role": "扫描并标记玩家",
+    "art_key": "drone"
+  },
+  "sniper_sentry": {
+    "id": "sniper_sentry",
+    "name": "狙击哨兵",
+    "hp": 3,
+    "move": 3,
+    "vision": 6,
+    "attack_range": [3, 8],
+    "damage": 3,
+    "role": "蓄力一回合后直线射击",
+    "art_key": "sniper_sentry"
+  },
+  "shield_guard": {
+    "id": "shield_guard",
+    "name": "盾卫",
+    "hp": 6,
+    "move": 3,
+    "vision": 5,
+    "attack_range": [1, 3],
+    "damage": 2,
+    "protect_reduction": 1,
+    "role": "保护相邻敌人",
+    "art_key": "shield_guard"
+  },
+  "protocol_engineer": {
+    "id": "protocol_engineer",
+    "name": "协议工程师",
+    "hp": 4,
+    "move": 4,
+    "vision": 5,
+    "attack_range": [1, 4],
+    "damage": 1,
+    "role": "夺回或启用具名设施",
+    "art_key": "protocol_engineer"
+  },
+  "hunter": {
+    "id": "hunter",
+    "name": "猎手",
+    "hp": 5,
+    "move": 7,
+    "vision": 6,
+    "attack_range": [1, 2],
+    "damage": 2,
+    "role": "追踪距离主队最远的角色",
+    "art_key": "hunter",
+    "mission_only": "ch1_m5"
+  },
+  "data_sentinel": {
+    "id": "data_sentinel",
+    "name": "数据哨兵",
+    "hp": 12,
+    "move": 0,
+    "vision": 8,
+    "attack_range": [2, 7],
+    "damage": 3,
+    "role": "护盾终端与预告危险区 Boss",
+    "art_key": "data_sentinel",
+    "phases": ["shielded", "exposed"]
+  }
+}
