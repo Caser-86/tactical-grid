@@ -2541,6 +2541,24 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"has_encounter_checkpoint": has_encounter_checkpoint,
 		"encounter_id": String(v2_checkpoint.get("checkpoint_id", current_encounter_id)) if _is_v2_battle() else current_encounter_id,
 	}
+	if _is_v2_battle() and v2_mission_flow:
+		var v2_result_snapshot: Dictionary = v2_mission_flow.get_snapshot()
+		var rescued_ids: Array = []
+		for rescued_id in v2_result_snapshot.get("rescued_characters", {}).keys():
+			rescued_ids.append(String(rescued_id))
+		var v2_rescued_scout := "scout" in rescued_ids
+		var v2_unlocked_modules: Array[String] = []
+		if v2_rescued_scout:
+			v2_unlocked_modules.append("scout_a")
+			if bool(v2_result_snapshot.get("optional_complete", false)):
+				v2_unlocked_modules.append("scout_b")
+		battle_result["mission_id"] = level_id
+		battle_result["primary_objective"] = "找到失联侦察兵并一起撤离"
+		battle_result["optional_objective"] = "上传事故记录"
+		battle_result["optional_record"] = bool(v2_result_snapshot.get("optional_complete", false))
+		battle_result["rescued"] = rescued_ids
+		battle_result["rescue_character"] = "scout" if v2_rescued_scout else ""
+		battle_result["unlocked_modules"] = v2_unlocked_modules
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
 

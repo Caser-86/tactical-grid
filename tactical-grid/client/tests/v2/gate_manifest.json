@@ -11,6 +11,7 @@
     "res://tests/v2/v2_m1_stealth_state_test.gd",
     "res://tests/v2/v2_m1_tutorial_test.gd",
     "res://tests/v2/v2_m1_retry_test.gd",
+    "res://tests/v2/v2_m1_progression_test.gd",
     "res://tests/v2/v2_rescue_character_test.gd",
     "res://tests/v2/v2_schema_reference_test.gd",
     "res://tests/v2/v2_map_schema_test.gd",
@@ -37,7 +38,8 @@
   "scene_tests": [
     "res://tests/v2/v2_player_turn_e2e_test.tscn",
     "res://tests/v2/v2_rescue_battle_integration_test.tscn",
-    "res://tests/v2/v2_m1_retry_scene_test.tscn"
+    "res://tests/v2/v2_m1_retry_scene_test.tscn",
+    "res://tests/v2/v2_base_progression_scene_test.tscn"
   ],
   "powershell_tests": [
     "tests/run_release_gate.ps1"

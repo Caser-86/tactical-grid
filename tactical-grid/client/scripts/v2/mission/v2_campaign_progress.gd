@@ -72,16 +72,30 @@ static func complete_mission(data: Dictionary, mission_id: StringName, result: D
 	ratings[mission] = int(result.get("rating", 0))
 	next["mission_ratings"] = ratings
 	var rescue_character := String(result.get("rescue_character", ""))
+	var rescued_ids: Array = result.get("rescued", [])
+	if rescue_character.is_empty() and not rescued_ids.is_empty():
+		rescue_character = String(rescued_ids[0])
 	var rescued: Array = next.get("rescued_characters", []).duplicate()
 	if rescue_character in ROLE_IDS and not rescue_character in rescued:
 		rescued.append(rescue_character)
 	next["rescued_characters"] = rescued
 	var unlocked: Array = next.get("unlocked_modules", []).duplicate()
+	# A rescued role always unlocks its first module; the optional M1 record
+	# unlocks the alternate scout module without becoming a progression gate.
+	if rescue_character == "scout":
+		if not "scout_a" in unlocked:
+			unlocked.append("scout_a")
+		if bool(result.get("optional_record", false)) and not "scout_b" in unlocked:
+			unlocked.append("scout_b")
 	for module_id in result.get("unlocked_modules", []):
 		var module := String(module_id)
 		if not module.is_empty() and not module in unlocked:
 			unlocked.append(module)
 	next["unlocked_modules"] = unlocked
+	if bool(result.get("optional_record", false)):
+		var flags: Dictionary = next.get("story_flags", {}).duplicate(true)
+		flags["ch1_m1_optional_record"] = true
+		next["story_flags"] = flags
 	var index := MISSION_ORDER.find(mission)
 	if index >= 0 and index + 1 < MISSION_ORDER.size():
 		next["current_mission"] = MISSION_ORDER[index + 1]

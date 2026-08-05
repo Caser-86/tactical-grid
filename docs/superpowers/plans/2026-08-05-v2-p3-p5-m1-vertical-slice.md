@@ -475,10 +475,14 @@ git commit -m "feat(v2): close M1 failure and retry flow"
 - Create: `tactical-grid/client/scripts/v2/mission/v2_squad_selection.gd`
 - Create: `tactical-grid/client/scripts/v2/mission/v2_module_loadout.gd`
 - Create: `tactical-grid/client/tests/v2/v2_m1_progression_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_base_progression_scene_test.gd`
+- Create: `tactical-grid/client/tests/v2/v2_base_progression_scene_test.tscn`
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_campaign_progress.gd`
 - Modify: `tactical-grid/client/scripts/ui/base_controller.gd`
 - Modify: `tactical-grid/client/scenes/base.tscn`
 - Modify: `tactical-grid/client/scripts/ui/character_panel.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
+- Modify: `tactical-grid/client/scripts/ui/mission_result.gd`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 
 **Interfaces:**
@@ -486,7 +490,7 @@ git commit -m "feat(v2): close M1 failure and retry flow"
 - Produces: `V2SquadSelection.validate_squad(mission: Dictionary, character_ids: Array[String]) -> Dictionary`。
 - Produces: `V2ModuleLoadout.equip(save: Dictionary, character_id: StringName, module_id: StringName) -> Dictionary`。
 
-- [ ] **Step 1: 写 M1 完成后的角色和模块测试**
+- [x] **Step 1: 写 M1 完成后的角色和模块测试**
 
 ```gdscript
 var save := V2CampaignProgress.create_default()
@@ -500,20 +504,24 @@ t.check(V2ModuleLoadout.equip(save, &"scout", &"scout_b").success, "已解锁侦
 t.check(not V2ModuleLoadout.equip(save, &"scout", &"assault_b").success, "突击模块不能装给侦察")
 ```
 
-- [ ] **Step 2: 确认旧基地仍显示商店、军械库和六属性而失败**
+- [x] **Step 2: 确认旧基地仍显示商店、军械库和六属性而失败**
 
-- [ ] **Step 3: 收口基地流程**
+- [x] **Step 3: 收口基地流程**
 
 基地只显示短对话、下一任务、队员、模块和开始。隐藏商店、军械库、信用点、技能树和六属性柱；角色面板显示身份、HP、移动、射程、被动、主动和当前模块。M1 结算显示主目标、可选记录、侦察加入和新模块。
 
-- [ ] **Step 4: 运行完成/跳过可选目标、保存重启和基地 UI 合同**
+- [x] **Step 4: 运行完成/跳过可选目标、保存重启和基地 UI 合同**
 
-- [ ] **Step 5: 提交**
+验证结果：M110 进度合同 16/16；基地/角色面板/结算正式场景合同 24/24；V2 玩家真实输入 41/41；营救场景 13/13；M109 重试合同 15/15、正式场景 14/14；完整 V2 release gate 通过，V1 稳定断言 1816、失败 0，意外警告/错误 0。V2 基地复用原有外壳但隐藏旧商店、军械库、信用点、六属性和技能树；队员编队、模块装备和结算摘要使用 V2 独立数据与存档字段。
+
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission tactical-grid/client/scripts/ui/base_controller.gd tactical-grid/client/scenes/base.tscn tactical-grid/client/scripts/ui/character_panel.gd tactical-grid/client/tests/v2
 git commit -m "feat(v2): unlock scout through M1 progression"
 ```
+
+提交结果：`feat(v2): unlock scout through M1 progression`。
 
 ### Task M111: M1 短对话和事故记录
 

@@ -46,8 +46,12 @@ func show_result(data: Dictionary) -> void:
 		reason_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		loot_container.add_child(reason_label)
 
-	# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
-	_show_badges(data)
+	# V2 uses clear mission feedback instead of the V1 star/rating panel.
+	if is_v2:
+		_show_v2_summary(data)
+	else:
+		# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
+		_show_badges(data)
 
 	# 显示统计
 	turns_label.text = "回合数  %s" % str(data.get("turns", 0))
@@ -109,6 +113,33 @@ func show_result(data: Dictionary) -> void:
 		encounter_retry_button.text = "从检查点重试"
 		retry_button.text = "重新开始任务"
 		base_button.text = "返回基地"
+
+func _show_v2_summary(data: Dictionary) -> void:
+	stars_container.visible = false
+	var header := Label.new()
+	header.text = "行动回顾"
+	header.modulate = Color("6dd6e5")
+	header.add_theme_font_size_override("font_size", 19)
+	loot_container.add_child(header)
+	var primary := Label.new()
+	primary.text = "主目标：%s" % ("已完成" if data.get("result", "defeat") == "victory" else "未完成")
+	primary.modulate = Color("7ee68a") if data.get("result", "defeat") == "victory" else Color("f4b45a")
+	loot_container.add_child(primary)
+	var optional := Label.new()
+	optional.text = "可选记录：%s" % ("已上传" if bool(data.get("optional_record", false)) else "未上传")
+	optional.modulate = Color("7ee68a") if bool(data.get("optional_record", false)) else Color("9aa9ad")
+	loot_container.add_child(optional)
+	var rescued: Array = data.get("rescued", [])
+	if "scout" in rescued:
+		var rescued_label := Label.new()
+		rescued_label.text = "新队员：侦察兵已加入基地"
+		rescued_label.modulate = Color("6dd6e5")
+		loot_container.add_child(rescued_label)
+	for module_id in data.get("unlocked_modules", []):
+		var module_label := Label.new()
+		module_label.text = "新模块：%s" % String(module_id)
+		module_label.modulate = Color("f4b45a")
+		loot_container.add_child(module_label)
 
 func _apply_visual_theme() -> void:
 	var panel_style := StyleBoxFlat.new()
