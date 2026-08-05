@@ -8,6 +8,7 @@ const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
 const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
+const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -99,6 +100,8 @@ var v2_action_service: V2ActionService = null
 var v2_mission_flow: Dictionary = {}
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
+var v2_input_router: V2BattleInputRouter = null
+var v2_pending_move_preview: Dictionary = {}
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -511,6 +514,11 @@ func _init_subsystems() -> void:
 	v2_action_service = V2ActionServiceScript.new()
 	v2_mission_flow = {"game_line": "v2_infiltration", "state_revision": 0}
 	v2_interaction_service = RefCounted.new()
+	v2_input_router = V2BattleInputRouterScript.new()
+	v2_input_router.cell_left_clicked.connect(_on_v2_cell_left_clicked)
+	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
+	v2_input_router.end_turn_requested.connect(_end_player_turn)
+	v2_input_router.next_unit_requested.connect(_on_next_unit)
 
 func _setup_v2_services() -> void:
 	if v2_action_service == null:
@@ -518,6 +526,7 @@ func _setup_v2_services() -> void:
 	v2_action_service.setup(map_data, player_units, enemy_units)
 	v2_mission_flow["mission_id"] = level_id
 	v2_mission_flow["state_revision"] = 1
+	v2_pending_move_preview.clear()
 
 func _setup_v2_affordance_presenter() -> void:
 	if v2_affordance_layer == null:
@@ -1499,6 +1508,8 @@ func _network_cell_is_observed(pos: Vector2i) -> bool:
 	return visibility_state == null or visibility_state.is_cell_observed(pos)
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
+	if layer == null:
+		return
 	var rect = ColorRect.new()
 	rect.color = color
 	rect.size = Vector2(CELL_SIZE - 2, CELL_SIZE - 2)
@@ -1509,6 +1520,8 @@ func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 
 ## 范围格使用“填充 + 边框”双重编码，避免玩家只能靠颜色猜动作类型。
 func _highlight_range_cell(layer: Node2D, pos: Vector2i, fill_color: Color, border_color: Color, border_width: int = 2) -> void:
+	if layer == null:
+		return
 	var origin := GridSystem.grid_to_world(pos)
 
 	var inner := ColorRect.new()
@@ -1536,6 +1549,8 @@ func _highlight_edge_color(color: Color, alpha: float = 0.9) -> Color:
 	return Color(color.r, color.g, color.b, alpha)
 
 func _clear_layer(layer: Node2D) -> void:
+	if layer == null:
+		return
 	for child in layer.get_children():
 		child.queue_free()
 
@@ -2209,6 +2224,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION:
 		return
+	if _is_v2_battle() and v2_input_router and v2_input_router.handle_event(event, _screen_to_cell):
+		return
 
 	if event.is_action_pressed("pause"):
 		# CH1-030: Esc 只在无目标模式时暂停；否则逐级取消当前动作
@@ -2245,6 +2262,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_handle_left_click(click_world)
 		elif mouse_btn.button_index == MOUSE_BUTTON_RIGHT:
 			_handle_right_click(click_world)
+
+func _screen_to_cell(screen_position: Vector2) -> Vector2i:
+	var world_position := get_viewport().canvas_transform.affine_inverse() * screen_position
+	return GridSystem.world_to_grid(world_position)
 
 ## 右键是移动快捷键：点击友军立即显示可达范围；移动模式下再次右键取消。
 func _handle_right_click(world_pos: Vector2) -> void:
@@ -2324,6 +2345,8 @@ func _handle_left_click(world_pos: Vector2) -> void:
 func _select_unit(unit: Unit) -> void:
 	_deselect_unit()
 	selected_unit = unit
+	if _is_v2_battle() and v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_update_unit_sprite_selection(unit, true)
 	hud.update_unit_info(unit)
 	if unit.team == "player":
@@ -2351,6 +2374,8 @@ func _deselect_unit() -> void:
 	if selected_unit:
 		_update_unit_sprite_selection(selected_unit, false)
 	selected_unit = null
+	if _is_v2_battle() and v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.FREE_SELECT)
 	selected_action = ""
 	attack_preview_target = null
 	attack_preview_data.clear()
@@ -2410,6 +2435,89 @@ func _cancel_action() -> void:
 	else:
 		_deselect_unit()
 
+## V2 直接地图移动：安全格一次点击，危险格同格二次确认。
+## 该入口不依赖底部 MoveButton，也不调用 V1 ActionSystem。
+func request_move(cell: Vector2i) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"success": false, "committed": false, "reason": &"no_selected_unit"}
+	if v2_action_service == null:
+		return {"success": false, "committed": false, "reason": &"v2_action_service_unavailable"}
+
+	if not v2_pending_move_preview.is_empty():
+		var pending_target: Vector2i = v2_pending_move_preview.get("target", Vector2i(-1, -1))
+		if pending_target == cell:
+			var confirmed: Dictionary = v2_action_service.commit_action(v2_pending_move_preview)
+			v2_pending_move_preview.clear()
+			if bool(confirmed.get("success", false)):
+				_finalize_v2_move(confirmed)
+				confirmed["committed"] = true
+			return confirmed
+		v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+		v2_pending_move_preview.clear()
+
+	var preview: Dictionary = v2_action_service.query_action({
+		"action": &"move",
+		"unit": selected_unit,
+		"target": cell,
+	})
+	if not bool(preview.get("valid", false)):
+		return {"success": false, "committed": false, "reason": preview.get("reason", &"invalid_move"), "preview": preview}
+	if bool(preview.get("dangerous", false)):
+		v2_pending_move_preview = preview
+		if v2_input_router:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		if hud:
+			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消")
+		if v2_affordance_presenter:
+			v2_affordance_presenter.show_path([selected_unit.grid_pos, cell], true)
+		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
+
+	var result: Dictionary = v2_action_service.commit_action(preview)
+	if bool(result.get("success", false)):
+		_finalize_v2_move(result)
+		result["committed"] = true
+	else:
+		result["committed"] = false
+	return result
+
+func _finalize_v2_move(result: Dictionary) -> void:
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	if selected_unit:
+		_update_unit_sprite_pos(selected_unit, true)
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	_update_visibility()
+	_refresh_enemy_intent_display()
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+
+func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
+	if not _is_v2_battle() or selected_unit == null:
+		return
+	var clicked_unit: Unit = _get_unit_at(cell)
+	if clicked_unit != null and clicked_unit.team == "player":
+		if clicked_unit != selected_unit:
+			_select_unit(clicked_unit)
+		return
+	request_move(cell)
+
+func _on_v2_cell_hovered(cell: Vector2i) -> void:
+	if not _is_v2_battle() or selected_unit == null or v2_affordance_presenter == null:
+		return
+	if not reachable_cells.has(cell):
+		v2_affordance_presenter.clear_preview()
+		return
+	var path: Array[Vector2i] = Pathfinding.find_path(
+		selected_unit.grid_pos, cell,
+		map_width, map_height,
+		_get_move_cost.bind(selected_unit.job),
+		_is_blocked
+	)
+	if path.size() >= 2:
+		v2_affordance_presenter.show_path(path, false)
+
 ## ===== 行动执行 =====
 
 func _highlight_color(role: String, fallback: Color) -> Color:
@@ -2454,7 +2562,8 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	if unit.team != "player":
 		return
 	if unit.current_ap <= 0:
-		hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+		if hud:
+			hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
 		return
 	_show_attack_range(unit)
 	if _is_v2_battle() and v2_affordance_presenter:
@@ -2466,13 +2575,15 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
 	if attack_targets.is_empty():
-		hud.set_context_prompt(
-			"蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % range_text
-		)
+		if hud:
+			hud.set_context_prompt(
+				"蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % range_text
+			)
 	else:
-		hud.set_context_prompt(
-			"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
-		)
+		if hud:
+			hud.set_context_prompt(
+				"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
+			)
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
 ## 仅在 move 模式下、目标格可达时绘制路径线条和途径格子高亮
@@ -3374,6 +3485,8 @@ func _play_unit_state(unit: Unit, state: StringName, direction: Vector2 = Vector
 		sprite.play_state(state, direction)
 
 func _get_unit_sprite(unit: Unit) -> UnitSprite:
+	if unit_layer == null:
+		return null
 	for sprite in unit_layer.get_children():
 		if sprite is UnitSprite and sprite.unit == unit:
 			return sprite
@@ -3383,6 +3496,8 @@ func _get_cell_center(pos: Vector2i) -> Vector2:
 	return GridSystem.grid_to_world(pos) + Vector2(CELL_SIZE, CELL_SIZE) * 0.5
 
 func _update_unit_sprite_selection(unit: Unit, selected: bool) -> void:
+	if unit_layer == null:
+		return
 	for sprite in unit_layer.get_children():
 		if sprite is UnitSprite and sprite.unit == unit:
 			sprite.set_selected(selected)

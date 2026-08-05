@@ -113,6 +113,7 @@ func _query_move(request: Dictionary) -> Dictionary:
 		"from": unit.grid_pos,
 		"target": target,
 		"distance": distance,
+		"dangerous": _is_dangerous(target),
 		"cost": {"move": true},
 	}
 	return _store_preview(preview)
@@ -288,6 +289,14 @@ func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
 	for raw_unit in _players + _enemies:
 		var unit: Unit = raw_unit
 		if unit != null and unit != except_unit and unit.is_alive and unit.grid_pos == cell:
+			return true
+	return false
+
+func _is_dangerous(cell: Vector2i) -> bool:
+	for raw_cell in _map_data.get("danger_cells", []):
+		if raw_cell is Vector2i and raw_cell == cell:
+			return true
+		if raw_cell is Array and raw_cell.size() >= 2 and Vector2i(int(raw_cell[0]), int(raw_cell[1])) == cell:
 			return true
 	return false
 

@@ -14,7 +14,8 @@
     "res://tests/v2/v2_enemy_intent_contract_test.gd",
     "res://tests/v2/v2_foundation_integration_test.gd",
     "res://tests/v2/v2_input_router_test.gd",
-    "res://tests/v2/v2_affordance_contract_test.gd"
+    "res://tests/v2/v2_affordance_contract_test.gd",
+    "res://tests/v2/v2_direct_move_input_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [
