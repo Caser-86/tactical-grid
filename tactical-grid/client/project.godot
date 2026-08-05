@@ -13,6 +13,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+V2Data="*res://scripts/v2/content/v2_data_repository.gd"
 GameManager="*res://scripts/game/game_manager.gd"
 GameData="*res://scripts/data/game_data.gd"
 ArtCatalog="*res://scripts/data/art_catalog.gd"

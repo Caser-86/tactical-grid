@@ -11,7 +11,8 @@
     "res://tests/v2/v2_action_service_test.gd",
     "res://tests/v2/v2_ability_rules_test.gd",
     "res://tests/v2/v2_checkpoint_test.gd",
-    "res://tests/v2/v2_enemy_intent_contract_test.gd"
+    "res://tests/v2/v2_enemy_intent_contract_test.gd",
+    "res://tests/v2/v2_foundation_integration_test.gd"
   ],
   "scene_tests": [],
   "powershell_tests": [

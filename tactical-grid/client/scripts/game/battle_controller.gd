@@ -6,6 +6,7 @@ class_name BattleController
 const CELL_SIZE = 64
 const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
+const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -90,6 +91,10 @@ var mission_objective_state: MissionObjectiveState
 var visibility_state: VisibilityState
 var enemy_intent_state: EnemyIntentState
 var enemy_planner: EnemyPlanner
+## V2 P1 服务槽位。正式输入仍使用旧 ActionSystem，P2 逐合同切换。
+var v2_action_service: V2ActionService = null
+var v2_mission_flow: Dictionary = {}
+var v2_interaction_service: RefCounted = null
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -242,6 +247,7 @@ func _ready() -> void:
 	_setup_visibility_renderer()
 	_setup_enemy_intent_renderer()
 	_spawn_units()
+	_setup_v2_services()
 	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
@@ -495,6 +501,18 @@ func _init_subsystems() -> void:
 	tactical_network_state.alert_requested.connect(_on_network_alert_requested)
 	tactical_network_state.network_operation_performed.connect(_on_network_operation)
 	action_system.set_tactical_network_state(tactical_network_state)
+
+	# V2 P1 只创建依赖槽位，不切换 V1 正式输入路径。
+	v2_action_service = V2ActionServiceScript.new()
+	v2_mission_flow = {"game_line": "v2_infiltration", "state_revision": 0}
+	v2_interaction_service = RefCounted.new()
+
+func _setup_v2_services() -> void:
+	if v2_action_service == null:
+		return
+	v2_action_service.setup(map_data, player_units, enemy_units)
+	v2_mission_flow["mission_id"] = level_id
+	v2_mission_flow["state_revision"] = 1
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。

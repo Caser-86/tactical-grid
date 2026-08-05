@@ -27,6 +27,10 @@ var current_slot: int = 0
 var current_level_id: String = ""
 var current_map_data: Dictionary = {}
 
+## V2 启动状态。V2 数据失败时只阻止 V2 入口，不回退读取 V1 数据。
+var v2_data_ready: bool = false
+var v2_boot_errors: Array[String] = []
+
 ## 流程状态：仅用于记录，不持有战斗单位
 var battle_result: Dictionary = {}
 var pending_level_id: String = ""
@@ -41,6 +45,19 @@ func _ready() -> void:
 	current_save = SaveManager.create_default_save()
 	progression = ProgressionManagerScript.new()
 	add_child(progression)
+	_initialize_v2_boot()
+
+func _initialize_v2_boot() -> void:
+	var repository: Node = get_parent().get_node_or_null("V2Data") if get_parent() != null else null
+	if repository == null:
+		v2_boot_errors = ["V2Data autoload is missing"]
+		push_error("V2 data bootstrap failed: V2Data autoload is missing")
+		return
+	var result: Dictionary = repository.call("reload_all")
+	v2_data_ready = bool(result.get("success", false))
+	v2_boot_errors = result.get("errors", []).duplicate()
+	if not v2_data_ready:
+		push_error("V2 data bootstrap failed: %s" % "; ".join(v2_boot_errors))
 
 ## 开始新游戏（槽位 0 为自动存档）
 func new_game(slot: int = 0) -> void:
