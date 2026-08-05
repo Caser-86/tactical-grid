@@ -100,7 +100,7 @@ git commit -m "feat(v2): lock M1 mission contract"
 - Produces encounter IDs: `encounter_south/encounter_rescue/encounter_evac`。
 - Produces checkpoint IDs: `cp_start/cp_rescue/cp_pre_evac`。
 
-- [ ] **Step 1: 写地图对象、路线和激活上限测试**
+- [x] **Step 1: 写地图对象、路线和激活上限测试**
 
 ```gdscript
 var loaded := V2MapLoader.load_map(&"ch1_m1")
@@ -115,17 +115,17 @@ t.check(V2MapValidator.has_route(map, Vector2i(3,14), Vector2i(13,7)), "出生�
 t.check(V2MapValidator.has_route(map, Vector2i(13,7), Vector2i(19,2)), "营救点可达撤离点")
 ```
 
-- [ ] **Step 2: 确认地图不存在而失败**
+- [x] **Step 2: 确认地图不存在而失败**
 
-- [ ] **Step 3: 按 Locked Layout Contract 写完整矩阵和对象**
+- [x] **Step 3: 按 Locked Layout Contract 写完整矩阵和对象**
 
 `layers` 必须有 16 行、每行 22 项的 `base_terrain/blocker/vision/height/cover`。遭遇 A 初始激活南侧两敌；进入以 `(13,7)` 为中心半径 5 的触发区激活营救两敌；营救完成且进入 `(16,5)` 触发区后激活撤离敌人；事故记录哨兵只在西路进入 `(4,4)` 半径 4 时激活。任何组合同时不超过 3。
 
-- [ ] **Step 4: 运行地图验证、两路线寻路和 100 次固定加载哈希测试**
+- [x] **Step 4: 运行地图验证、两路线寻路和 100 次固定加载哈希测试**
 
 Expected: 100 次 JSON 规范化哈希一致，所有主目标可达。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/data/v2/locked_maps/ch1_m1.json tactical-grid/client/tests/v2
@@ -146,7 +146,7 @@ git commit -m "feat(v2): build M1 two-route graybox map"
 - States: `SEARCH_SCOUT/ESCORT_TO_EVAC/COMPLETE/FAILED`。
 - Events: `mission_started/scout_rescued/unit_moved/unit_downed/evac_checked/primary_irreversible_failure`。
 
-- [ ] **Step 1: 写主目标状态转换测试**
+- [x] **Step 1: 写主目标状态转换测试**
 
 ```gdscript
 flow.setup(mission, map, [assault], enemies)
@@ -159,9 +159,9 @@ flow.apply_event(&"unit_moved", {"unit_id": "scout", "position": Vector2i(18,2)}
 t.check(flow.apply_event(&"evac_checked").victory, "两名存活角色进入撤离区后胜利")
 ```
 
-- [ ] **Step 2: 确认现有 infiltrate 强制上传流程失败**
+- [x] **Step 2: 确认现有 infiltrate 强制上传流程已被 V2 主目标替换**
 
-- [ ] **Step 3: 实现单一主目标状态机**
+- [x] **Step 3: 实现单一主目标状态机**
 
 ```gdscript
 func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
@@ -179,9 +179,9 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
     return {"success": true, "victory": state == State.COMPLETE, "defeat": state == State.FAILED}
 ```
 
-- [ ] **Step 4: 运行非法转换、全队失能、部分失能和撤离测试**
+- [x] **Step 4: 运行非法转换、全队失能、部分失能和撤离测试**
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd tactical-grid/client/scripts/game/battle_controller.gd tactical-grid/client/tests/v2

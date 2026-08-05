@@ -12,6 +12,8 @@ const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_af
 const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
 const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
+const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
+const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -100,7 +102,7 @@ var enemy_intent_state: EnemyIntentState
 var enemy_planner: EnemyPlanner
 ## V2 P1 服务槽位。正式输入仍使用旧 ActionSystem，P2 逐合同切换。
 var v2_action_service: V2ActionService = null
-var v2_mission_flow: Dictionary = {}
+var v2_mission_flow: RefCounted = null
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
@@ -379,6 +381,8 @@ func _cleanup_units() -> void:
 	_last_known_ghosts.clear()
 	_camera_zone_cells.clear()
 	_dismiss_context_hint()
+	# Release V2 RefCounted mission state before temporary battle scenes are freed.
+	v2_mission_flow = null
 	selected_unit = null
 	boss_unit = null
 	boss_data.clear()
@@ -529,7 +533,7 @@ func _init_subsystems() -> void:
 
 	# V2 P1 只创建依赖槽位，不切换 V1 正式输入路径。
 	v2_action_service = V2ActionServiceScript.new()
-	v2_mission_flow = {"game_line": "v2_infiltration", "state_revision": 0}
+	v2_mission_flow = V2MissionFlowScript.new()
 	v2_interaction_service = V2InteractionServiceScript.new()
 	v2_input_router = V2BattleInputRouterScript.new()
 	add_child(v2_input_router)
@@ -555,8 +559,18 @@ func _setup_v2_services() -> void:
 		if unit and not unit.v2_turn_mode_enabled:
 			unit.enable_v2_turn_mode()
 	v2_action_service.setup(map_data, player_units, enemy_units)
-	v2_mission_flow["mission_id"] = level_id
-	v2_mission_flow["state_revision"] = 1
+	var v2_mission: Dictionary = {"id": level_id, "map_id": level_id, "rescue_character": "scout"}
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data and v2_data.has_method("get_mission"):
+		var loaded_mission: Dictionary = v2_data.get_mission(StringName(level_id))
+		if not loaded_mission.is_empty():
+			v2_mission = loaded_mission
+	var v2_map_result := V2MapLoaderScript.load_map(StringName(String(v2_mission.get("map_id", level_id))))
+	if not bool(v2_map_result.get("success", false)):
+		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
+	var v2_map: Dictionary = v2_map_result.get("data", {}) if bool(v2_map_result.get("success", false)) else {}
+	v2_mission_flow.setup(v2_mission, v2_map, player_units, enemy_units)
+	v2_mission_flow.apply_event(&"mission_started")
 	v2_pending_move_preview.clear()
 	v2_hover_attack_preview.clear()
 	v2_locked_attack_preview.clear()
@@ -1711,6 +1725,8 @@ func _start_battle() -> void:
 
 func _get_objective_text() -> String:
 	var objective_text := "目标：消灭所有敌人"
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.get_primary_text()
 	if mission_objective_state:
 		objective_text = mission_objective_state.get_status_text()
 	if boss_unit and boss_unit.is_alive and not boss_phases.is_empty():
@@ -1728,11 +1744,15 @@ func _get_objective_text() -> String:
 	return objective_text
 
 func _check_victory() -> bool:
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.is_victory()
 	if mission_objective_state:
 		return mission_objective_state.is_victory()
 	return enemy_units.filter(func(u): return u.is_alive).is_empty()
 
 func _check_defeat() -> bool:
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.is_defeat()
 	if mission_objective_state:
 		return mission_objective_state.is_defeat()
 	return player_units.filter(func(u): return u.is_alive).is_empty()
@@ -2006,6 +2026,18 @@ func _on_toggle_network() -> void:
 	var scan_pos: Vector2i = selected_unit.grid_pos if selected_unit else Vector2i(map_width / 2, map_height / 2)
 	_spawn_effect("scan", scan_pos)
 	_advance_context_hint("network")
+
+## V2 主目标事件桥接；V1 MissionObjectiveState 仍由下方旧事件桥处理。
+func _apply_v2_mission_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	if not _is_v2_battle() or v2_mission_flow == null:
+		return {"success": false, "reason": &"v2_mission_flow_unavailable"}
+	var result: Dictionary = v2_mission_flow.apply_event(event_name, payload)
+	if hud:
+		hud.update_objective(_get_objective_text())
+	_render_v2_hud()
+	if bool(result.get("victory", false)):
+		_check_victory_instant()
+	return result
 
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
 ## 单位生成由 reinforcement_spawned 信号统一驱动，这里不直接 spawn
@@ -2607,6 +2639,14 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		if hud:
 			hud.update_unit_info(selected_unit)
 	refresh_visibility_transaction(&"unit_moved")
+	if v2_mission_flow and selected_unit:
+		_apply_v2_mission_event(&"unit_moved", {
+			"unit": selected_unit,
+			"unit_id": selected_unit.entity_id,
+			"position": selected_unit.grid_pos,
+		})
+		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
+			_apply_v2_mission_event(&"evac_checked")
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_render_v2_hud()
@@ -3873,6 +3913,8 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 		hud.update_unit_info(unit)
 
 func _on_unit_died(unit: Unit) -> void:
+	if _is_v2_battle() and v2_mission_flow:
+		_apply_v2_mission_event(&"unit_downed", {"unit": unit, "unit_id": unit.entity_id})
 	if _is_v2_battle() and v2_damage_signal_suppressed:
 		_record_death_telemetry(unit)
 		if unit == boss_unit:

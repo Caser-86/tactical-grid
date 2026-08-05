@@ -43,6 +43,7 @@ func _run() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
+	t.check(battle.hud.objective_label.text == "找到失联侦察兵", "V2 HUD 显示营救主目标而非旧上传目标")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
 	var player: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
@@ -290,7 +291,12 @@ func _stop_test_audio() -> void:
 	audio.call("stop_ambient")
 	var bgm_player: Node = audio.get("bgm_player")
 	if bgm_player and is_instance_valid(bgm_player):
+		bgm_player.call("stop")
 		bgm_player.set("stream", null)
+	var ambient_player: Node = audio.get("ambient_player")
+	if ambient_player and is_instance_valid(ambient_player):
+		ambient_player.call("stop")
+		ambient_player.set("stream", null)
 	var sfx_player: Node = audio.get("sfx_player")
 	if sfx_player and is_instance_valid(sfx_player):
 		sfx_player.call("stop")
@@ -301,6 +307,8 @@ func _stop_test_audio() -> void:
 			player.call("stop")
 			player.set("stream", null)
 	audio.set("audio_cache", {})
+	audio.set("current_bgm", "")
+	audio.set("battle_music_layer", -1)
 	await get_tree().process_frame
 	await get_tree().process_frame
 
