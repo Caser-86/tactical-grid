@@ -30,10 +30,10 @@
 - Consumes: `V2Data.get_enemy`, `ArtCatalog.get_environment_component_paths`, and `MapLoader.load_locked_map`.
 - Produces: assertions for five enemy roles, three environment kits, nine stable enemy entities, and active-cap compliance.
 
-- [ ] **Step 1: Add failing assertions** for `sniper_sentry`, `shield_guard`, and `protocol_engineer` data plus their art keys.
-- [ ] **Step 2: Add failing assertions** that M1 contains 9 enemy IDs and never activates more than 3 in any schedule or encounter.
-- [ ] **Step 3: Add failing assertions** that `cooling_works`, `transit_hub`, and `sentinel_core` have complete floor/edge/prop/decal/landmark runtime sets.
-- [ ] **Step 4: Run the focused test** and record the expected failures before changing data.
+- [x] **Step 1: Add failing assertions** for `sniper_sentry`, `shield_guard`, and `protocol_engineer` data plus their art keys.
+- [x] **Step 2: Add failing assertions** that M1 contains 9 enemy IDs and never activates more than 3 in any schedule or encounter.
+- [x] **Step 3: Add failing assertions** that `cooling_works`, `transit_hub`, and `sentinel_core` have complete floor/edge/prop/decal/landmark runtime sets.
+- [x] **Step 4: Run the focused test** and record the expected failures before changing data.
 
 ### Task 2: Recompose M1 with reused environment kits and props
 
@@ -48,11 +48,11 @@
 - Consumes: `environment.kit`, `environment.decorations`, `ArtCatalog.get_environment_component_texture`, and `_draw_tactical_tile`.
 - Produces: `_get_environment_kit_for_cell(cell, default_kit) -> String` and deterministic multi-kit M1 rendering with explicit prop placements.
 
-- [ ] **Step 1: Add `kit_overrides` and 15 fixed prop/decal placements** to the locked M1 map without changing blockers, routes, or objective coordinates.
-- [ ] **Step 2: Implement `_get_environment_kit_for_cell`** using rectangle records `{x, y, width, height, kit}` and defaulting to `echo_yard`.
-- [ ] **Step 3: Render each tile with its selected kit** and allow each decoration to specify an optional kit and scale, defaulting to the map kit and `1.0`.
-- [ ] **Step 4: Run the map and art tests** and confirm all component textures load from `res://assets/generated/chapter1/runtime/`.
-- [ ] **Step 5: Run the visual matrix** and inspect start, selected, rescue, and evac screenshots for prop overlap with units, objectives, and HUD.
+- [x] **Step 1: Add `kit_overrides` and 15 fixed prop/decal placements** to the locked M1 map without changing blockers, routes, or objective coordinates.
+- [x] **Step 2: Implement `_get_environment_kit_for_cell`** using rectangle records `{x, y, width, height, kit}` and defaulting to `echo_yard`.
+- [x] **Step 3: Render each tile with its selected kit** and allow each decoration to specify an optional kit and scale, defaulting to the map kit and `1.0`.
+- [x] **Step 4: Run the map and art tests** and confirm all component textures load from `res://assets/generated/chapter1/runtime/`.
+- [x] **Step 5: Run the visual matrix** and inspect start, selected, rescue, and evac screenshots for prop overlap with units, objectives, and HUD.
 
 ### Task 3: Activate additional enemy models and roles
 
@@ -68,11 +68,11 @@
 - Consumes: existing `sentry_sniper_96.png`, `shield_bot_64.png`, and `protocol_engineer_96.png` assets plus existing V2 intent types `telegraph`, `protect`, and `operate`.
 - Produces: stable M1 entities `enemy_sniper_east`, `enemy_shield_rescue`, and `enemy_engineer_record` with distinct art and deterministic stage activation.
 
-- [ ] **Step 1: Add stable art aliases** for `sniper_sentry` and `shield_guard` so their runtime job IDs resolve to distinct textures.
-- [ ] **Step 2: Add the three new enemy entities** and assign them to rescue, record, and pre-evac schedules while keeping every active count at or below 3.
-- [ ] **Step 3: Make the V2 brain explicitly classify the three roles** with the existing telegraph/protect/operate intent contracts and safe movement fallback.
-- [ ] **Step 4: Run enemy activation and intent tests** and require deterministic output over repeated calls.
-- [ ] **Step 5: Run the player-turn E2E** and confirm the additional unit textures render only when their encounter activates.
+- [x] **Step 1: Add stable art aliases** for `sniper_sentry` and `shield_guard` so their runtime job IDs resolve to distinct textures.
+- [x] **Step 2: Add the three new enemy entities** and assign them to rescue, record, and pre-evac schedules while keeping every active count at or below 3.
+- [x] **Step 3: Make the V2 brain explicitly classify the three roles** with the existing telegraph/protect/operate intent contracts and safe movement fallback.
+- [x] **Step 4: Run enemy activation and intent tests** and require deterministic output over repeated calls.
+- [x] **Step 5: Run the player-turn E2E** and confirm the additional unit textures render only when their encounter activates.
 
 ### Task 4: Balance, documentation, and release verification
 
@@ -87,8 +87,8 @@
 - Consumes: the expanded map and enemy contracts from Tasks 1-3.
 - Produces: updated M1 content counts, documented art provenance, and release evidence.
 
-- [ ] **Step 1: Update M1 content counts and role descriptions** without changing the 12-18 minute target or 3-enemy active cap.
-- [ ] **Step 2: Document reused V1-generated source sheets and runtime kits** with project-owned provenance.
-- [ ] **Step 3: Run `git diff --check`, focused expansion tests, and the full `tests/v2/run_v2_gate.ps1` gate.**
-- [ ] **Step 4: Review the 42-snapshot matrix** for clipping, hidden objective markers, indistinguishable enemies, and unreadable props.
+- [x] **Step 1: Update M1 content counts and role descriptions** without changing the 12-18 minute target or 3-enemy active cap.
+- [x] **Step 2: Document reused V1-generated source sheets and runtime kits** with project-owned provenance.
+- [x] **Step 3: Run `git diff --check`, focused expansion tests, and the full `tests/v2/run_v2_gate.ps1` gate.**
+- [x] **Step 4: Review the 42-snapshot matrix** for clipping, hidden objective markers, indistinguishable enemies, and unreadable props.
 - [ ] **Step 5: Commit** with `art(v2): expand M1 environment and enemy variety`.

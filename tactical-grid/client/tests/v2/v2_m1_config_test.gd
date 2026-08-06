@@ -23,7 +23,7 @@ func _initialize() -> void:
 	t.check(int(mission.get("rescue_recovery_hp", 0)) == 4, "M1 营救时提供一次 4 HP 医疗恢复")
 	t.check(String(mission.get("primary", "")) == "找到失联侦察兵并一起撤离", "主目标文案固定")
 	t.check(String(mission.get("optional", "")) == "上传事故记录", "事故记录为可选目标")
-	t.check(int(mission.get("enemy_total", 0)) == 6 and int(mission.get("active_cap", 0)) == 3, "六敌且同时最多三敌")
+	t.check(int(mission.get("enemy_total", 0)) == 9 and int(mission.get("active_cap", 0)) == 3, "九敌编制且同时最多三敌")
 	t.check(duration.size() == 2 and int(duration[0]) == 12 and int(duration[1]) == 18, "首次时长目标固定为 12 到 18 分钟")
 	t.check(tutorial_steps == ["select", "move", "attack", "intent", "camera", "evac"], "教学步骤按单条信息递进")
 	t.check(String(scout.get("name", "")) == "侦察兵", "营救角色名称固定")

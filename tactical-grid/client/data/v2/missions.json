@@ -9,7 +9,7 @@
     "deployment_limit": 2,
     "primary": "找到失联侦察兵并一起撤离",
     "optional": "上传事故记录",
-    "enemy_total": 6,
+    "enemy_total": 9,
     "active_cap": 3,
     "duration_minutes": [12, 18],
     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],

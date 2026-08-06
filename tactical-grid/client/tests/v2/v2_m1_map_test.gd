@@ -31,10 +31,10 @@ func _initialize() -> void:
 	t.check(int(size.get("width", 0)) == 22 and int(size.get("height", 0)) == 16, "M1 尺寸 22×16")
 	for id in ["spawn_assault", "rescue_scout", "evac_northeast", "camera_console_south", "camera_east", "optional_record", "landmark_crane"]:
 		t.check(entity_ids.has(id), "存在稳定对象 %s" % id)
-	t.check(enemy_ids.size() == 6, "M1 固定六名敌人")
-	for id in ["enemy_sentry_south", "enemy_drone_south", "enemy_sentry_rescue", "enemy_drone_rescue", "enemy_sentry_record", "enemy_sentry_evac"]:
+	t.check(enemy_ids.size() == 9, "M1 固定九名敌人")
+	for id in ["enemy_sentry_south", "enemy_drone_south", "enemy_sentry_rescue", "enemy_drone_rescue", "enemy_shield_rescue", "enemy_sentry_record", "enemy_engineer_record", "enemy_sentry_evac", "enemy_sniper_evac"]:
 		t.check(enemy_ids.has(id), "存在敌人实体 %s" % id)
-	for id in ["encounter_south", "encounter_rescue", "encounter_evac"]:
+	for id in ["encounter_south", "encounter_rescue", "encounter_record", "encounter_evac"]:
 		t.check(encounter_ids.has(id), "存在遭遇 %s" % id)
 	for id in ["cp_start", "cp_rescue", "cp_pre_evac"]:
 		t.check(checkpoint_ids.has(id), "存在检查点 %s" % id)

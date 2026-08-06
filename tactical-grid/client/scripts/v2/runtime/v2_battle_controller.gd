@@ -99,10 +99,23 @@ func _render_map() -> void:
 			var terrain := int(base_terrain[y][x]) if y < base_terrain.size() and x < base_terrain[y].size() else 0
 			var blocker := int(blockers[y][x]) if y < blockers.size() and x < blockers[y].size() else 0
 			var cell := Vector2i(x, y)
-			_draw_tactical_tile(cell, terrain, blocker, "", environment_kit, _get_environment_variant(cell, "floor", 8), _get_terrain_edge_variants(cell, terrain), _get_blocker_variant(cell, blocker))
+			var cell_kit := _get_environment_kit_for_cell(cell, environment_kit)
+			_draw_tactical_tile(cell, terrain, blocker, "", cell_kit, _get_environment_variant(cell, "floor", 8), _get_terrain_edge_variants(cell, terrain), _get_blocker_variant(cell, blocker))
 	_render_environment_decorations(environment_kit, environment.get("decorations", []))
 	_render_v2_map_entities()
 	_render_evac_zone()
+
+func _get_environment_kit_for_cell(cell: Vector2i, default_kit: String) -> String:
+	var environment: Dictionary = map_data.get("environment", {})
+	for raw_override in environment.get("kit_overrides", []):
+		if not raw_override is Dictionary:
+			continue
+		var override: Dictionary = raw_override
+		var origin := Vector2i(int(override.get("x", -1)), int(override.get("y", -1)))
+		var size := Vector2i(maxi(1, int(override.get("width", 1))), maxi(1, int(override.get("height", 1))))
+		if Rect2i(origin, size).has_point(cell):
+			return String(override.get("kit", default_kit))
+	return default_kit
 
 func _render_v2_map_entities() -> void:
 	for raw_entity in map_data.get("entities", []):

@@ -7,13 +7,32 @@
   "theme": "echo_yard",
   "environment": {
     "kit": "echo_yard",
+    "kit_overrides": [
+      {"x":0, "y":0, "width":5, "height":5, "kit":"cooling_works"},
+      {"x":17, "y":1, "width":5, "height":5, "kit":"transit_hub"},
+      {"x":8, "y":8, "width":5, "height":4, "kit":"sentinel_core"}
+    ],
     "decorations": [
-        {"component_type":"landmark", "variant":0, "x":10, "y":1, "z":1},
-        {"component_type":"landmark", "variant":1, "x":18, "y":5, "z":1},
-        {"component_type":"landmark", "variant":2, "x":2, "y":8, "z":1},
+      {"component_type":"landmark", "variant":0, "x":10, "y":1, "z":1},
+      {"component_type":"landmark", "variant":1, "x":18, "y":5, "z":1},
+      {"component_type":"landmark", "variant":2, "x":2, "y":8, "z":1},
       {"component_type":"decal", "variant":0, "x":5, "y":12, "z":1},
       {"component_type":"decal", "variant":1, "x":12, "y":10, "z":1},
-      {"component_type":"decal", "variant":2, "x":17, "y":8, "z":1}
+      {"component_type":"decal", "variant":2, "x":17, "y":8, "z":1},
+      {"component_type":"prop", "variant":0, "x":1, "y":1, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":1, "x":5, "y":1, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":2, "x":7, "y":3, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":3, "x":13, "y":2, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":4, "x":16, "y":1, "z":1, "scale":0.55, "kit":"transit_hub"},
+      {"component_type":"prop", "variant":5, "x":20, "y":7, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":0, "x":1, "y":6, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":1, "x":4, "y":9, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":2, "x":8, "y":8, "z":1, "scale":0.55, "kit":"sentinel_core"},
+      {"component_type":"prop", "variant":3, "x":11, "y":12, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":4, "x":15, "y":11, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":5, "x":19, "y":13, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":0, "x":2, "y":15, "z":1, "scale":0.55},
+      {"component_type":"prop", "variant":1, "x":17, "y":14, "z":1, "scale":0.55}
     ]
   },
   "mission_type": "rescue_extract",
@@ -123,13 +142,16 @@
     {"id":"enemy_sentry_rescue", "type":"spawn_enemy", "x":14, "y":8, "team":"enemy", "enemy_id":"sentry", "active_on_start":false},
     {"id":"enemy_drone_rescue", "type":"spawn_enemy", "x":16, "y":7, "team":"enemy", "enemy_id":"drone", "active_on_start":false},
     {"id":"enemy_sentry_record", "type":"spawn_enemy", "x":6, "y":5, "team":"enemy", "enemy_id":"sentry", "active_on_start":false},
-    {"id":"enemy_sentry_evac", "type":"spawn_enemy", "x":18, "y":3, "team":"enemy", "enemy_id":"sentry", "active_on_start":false}
+    {"id":"enemy_sentry_evac", "type":"spawn_enemy", "x":18, "y":3, "team":"enemy", "enemy_id":"sentry", "active_on_start":false},
+    {"id":"enemy_shield_rescue", "type":"spawn_enemy", "x":12, "y":6, "team":"enemy", "enemy_id":"shield_guard", "active_on_start":false},
+    {"id":"enemy_engineer_record", "type":"spawn_enemy", "x":3, "y":5, "team":"enemy", "enemy_id":"protocol_engineer", "active_on_start":false},
+    {"id":"enemy_sniper_evac", "type":"spawn_enemy", "x":17, "y":4, "team":"enemy", "enemy_id":"sniper_sentry", "active_on_start":false}
   ],
   "encounters": [
     {"id":"encounter_south", "name":"南区巡逻", "trigger":"start", "trigger_cells":[[3,14],[4,14]], "active_enemy_ids":["enemy_sentry_south","enemy_drone_south"], "active_count":2, "active_cap":3},
-    {"id":"encounter_rescue", "name":"营救区搜索", "trigger":"enter_rescue_radius", "center":[13,7], "radius":5, "trigger_cells":[[12,7],[13,7],[14,7]], "active_enemy_ids":["enemy_sentry_rescue","enemy_drone_rescue"], "deactivate_on_trigger":["enemy_sentry_south"], "active_count":2, "active_cap":3},
-    {"id":"encounter_record", "name":"事故记录哨戒", "trigger":"enter_record_radius", "center":[4,4], "radius":4, "trigger_cells":[[4,4]], "active_enemy_ids":["enemy_sentry_record"], "deactivate_on_trigger":["enemy_sentry_south","enemy_drone_south"], "active_count":1, "active_cap":3},
-    {"id":"encounter_evac", "name":"撤离拦截", "trigger":"pre_evac", "trigger_cells":[[16,5]], "active_enemy_ids":["enemy_sentry_evac"], "deactivate_on_trigger":["enemy_sentry_rescue","enemy_drone_rescue"], "active_count":1, "active_cap":3}
+    {"id":"encounter_rescue", "name":"营救区搜索", "trigger":"enter_rescue_radius", "center":[13,7], "radius":5, "trigger_cells":[[12,7],[13,7],[14,7]], "active_enemy_ids":["enemy_sentry_rescue","enemy_drone_rescue","enemy_shield_rescue"], "deactivate_on_trigger":["enemy_sentry_south","enemy_drone_south"], "active_count":3, "active_cap":3},
+    {"id":"encounter_record", "name":"事故记录哨戒", "trigger":"enter_record_radius", "center":[4,4], "radius":4, "trigger_cells":[[4,4]], "active_enemy_ids":["enemy_sentry_record","enemy_engineer_record"], "deactivate_on_trigger":["enemy_sentry_south","enemy_drone_south","enemy_sentry_rescue","enemy_drone_rescue","enemy_shield_rescue"], "active_count":2, "active_cap":3},
+    {"id":"encounter_evac", "name":"撤离拦截", "trigger":"pre_evac", "trigger_cells":[[16,5]], "active_enemy_ids":["enemy_sentry_evac","enemy_sniper_evac"], "deactivate_on_trigger":["enemy_sentry_rescue","enemy_drone_rescue","enemy_shield_rescue","enemy_sentry_record","enemy_engineer_record"], "active_count":2, "active_cap":3}
   ],
   "checkpoints": [
     {"id":"cp_start", "x":3, "y":14, "encounter_id":"encounter_south", "next_encounter_id":"encounter_rescue"},
@@ -147,8 +169,8 @@
   ],
   "activation_schedule": [
     {"stage":"start", "active_ids":["enemy_sentry_south","enemy_drone_south"], "active_count":2},
-    {"stage":"rescue", "active_ids":["enemy_sentry_south","enemy_sentry_rescue","enemy_drone_rescue"], "active_count":3},
-    {"stage":"record", "active_ids":["enemy_sentry_record"], "active_count":1},
-    {"stage":"pre_evac", "active_ids":["enemy_sentry_evac"], "active_count":1}
+    {"stage":"rescue", "active_ids":["enemy_sentry_rescue","enemy_drone_rescue","enemy_shield_rescue"], "active_count":3},
+    {"stage":"record", "active_ids":["enemy_sentry_record","enemy_engineer_record"], "active_count":2},
+    {"stage":"pre_evac", "active_ids":["enemy_sentry_evac","enemy_sniper_evac"], "active_count":2}
   ]
 }

@@ -16,7 +16,7 @@ func _initialize() -> void:
 		return
 	var activation := Activation.new()
 	activation.setup(loaded.get("data", {}))
-	t.check(activation.get_total_enemy_ids().size() == 6, "M1 总敌人数固定为六名")
+	t.check(activation.get_total_enemy_ids().size() == 9, "M1 总敌人数固定为九名")
 	var start: Dictionary = activation.update([Vector2i(3, 14)], [])
 	t.check(start.get("active_count", 0) == 2, "开场只激活南区两名敌人")
 	t.check(activation.get_active_enemy_ids().has("enemy_sentry_south"), "开场激活南区哨兵")
@@ -27,12 +27,14 @@ func _initialize() -> void:
 	t.check(rescue.get("active_count", 0) <= 3, "进入营救区同时最多三名敌人")
 	t.check(activation.get_active_enemy_ids().has("enemy_sentry_rescue"), "进入营救区激活营救哨兵")
 	t.check(activation.get_active_enemy_ids().has("enemy_drone_rescue"), "进入营救区激活营救无人机")
+	t.check(activation.get_active_enemy_ids().has("enemy_shield_rescue"), "进入营救区激活营救盾卫")
 	t.check(not activation.get_active_enemy_ids().has("enemy_sentry_record"), "未进入记录路线不激活记录哨兵")
 
 	var record: Dictionary = activation.update([Vector2i(4, 4)], [])
 	t.check(record.get("active_count", 0) <= 3, "进入记录路线同时最多三名敌人")
-	t.check(record.get("active_count", 0) == 1, "记录路线只激活一名哨兵")
-	t.check(activation.get_active_enemy_ids() == ["enemy_sentry_record"], "记录路线替换南区巡逻")
+	t.check(record.get("active_count", 0) == 2, "记录路线激活两名职责不同的敌人")
+	t.check(activation.get_active_enemy_ids().has("enemy_sentry_record"), "记录路线激活记录哨兵")
+	t.check(activation.get_active_enemy_ids().has("enemy_engineer_record"), "记录路线激活协议工程师")
 
 	var fresh := Activation.new()
 	fresh.setup(loaded.get("data", {}))
@@ -41,6 +43,7 @@ func _initialize() -> void:
 	var evac: Dictionary = fresh.update([Vector2i(16, 5)], [&"scout_rescued"])
 	t.check(evac.get("active_count", 0) <= 3, "撤离前同时最多三名敌人")
 	t.check(fresh.get_active_enemy_ids().has("enemy_sentry_evac"), "撤离前激活拦截哨兵")
+	t.check(fresh.get_active_enemy_ids().has("enemy_sniper_evac"), "撤离前激活狙击哨兵")
 
 	var sentry := _make_enemy("sentry", "sentry_test", Vector2i(8, 12))
 	var player := _make_player("player_test", Vector2i(8, 13))

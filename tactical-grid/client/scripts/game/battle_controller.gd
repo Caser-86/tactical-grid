@@ -1888,7 +1888,8 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 	for decoration in decorations:
 		var component_type := String(decoration.get("component_type", ""))
 		var variant := int(decoration.get("variant", 0))
-		var texture := ArtCatalog.get_environment_component_texture(environment_kit, component_type, variant)
+		var decoration_kit := String(decoration.get("kit", environment_kit))
+		var texture := ArtCatalog.get_environment_component_texture(decoration_kit, component_type, variant)
 		if not texture:
 			continue
 		var instance_index := int(type_counts.get(component_type, 0))
@@ -1897,6 +1898,7 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 		sprite.name = "Environment_%s_%d" % [component_type, instance_index]
 		sprite.texture = texture
 		sprite.centered = false
+		sprite.scale = Vector2.ONE * clampf(float(decoration.get("scale", 1.0)), 0.25, 2.0)
 		var requested_position := GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
 		# Large landmarks are anchored to a grid cell but must stay inside the
 		# map rectangle so hidden props cannot spill beyond the fog boundary.
