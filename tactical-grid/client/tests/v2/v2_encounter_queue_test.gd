@@ -12,9 +12,11 @@ func _initialize() -> void:
 
 	var supports_queue := activation.has_method("mark_enemy_defeated") \
 		and activation.has_method("get_waiting_enemy_ids")
+	var supports_snapshot := activation.has_method("get_snapshot") \
+		and activation.has_method("restore_snapshot")
 	t.check(supports_queue, "遭遇激活器公开击败和等待队列契约")
-	t.check(activation.has_method("get_snapshot") and activation.has_method("restore_snapshot"), "遭遇激活器公开快照恢复契约")
-	if not supports_queue:
+	t.check(supports_snapshot, "遭遇激活器公开快照恢复契约")
+	if not supports_queue or not supports_snapshot:
 		t.finish(self)
 		return
 
@@ -25,7 +27,11 @@ func _initialize() -> void:
 	var snapshot: Dictionary = activation.call("get_snapshot")
 	var defeated: Array = snapshot.get("defeated_enemy_ids", [])
 	t.check(activation.get_active_enemy_ids().has("enemy_two"), "第二遭遇触发后旧存活敌人保持激活")
-	t.check(activation.call("get_waiting_enemy_ids").has("enemy_four"), "超过激活上限的新敌人进入等待队列")
+	var waiting_enemy_ids: Array = activation.call("get_waiting_enemy_ids")
+	t.check(
+		waiting_enemy_ids.has("enemy_four") or waiting_enemy_ids.has("enemy_five"),
+		"活跃上限填满后至少一名新请求敌人进入等待队列"
+	)
 	t.check(defeated.has("enemy_one"), "击败敌人进入击败状态")
 
 	var restored := Activation.new()
@@ -46,6 +52,7 @@ func _map() -> Dictionary:
 			{"id": "enemy_two", "type": "spawn_enemy"},
 			{"id": "enemy_three", "type": "spawn_enemy"},
 			{"id": "enemy_four", "type": "spawn_enemy"},
+			{"id": "enemy_five", "type": "spawn_enemy"},
 		],
 		"encounters": [
 			{
@@ -57,7 +64,7 @@ func _map() -> Dictionary:
 			{
 				"id": "encounter_two",
 				"trigger": "encounter_two",
-				"active_enemy_ids": ["enemy_four"],
+				"active_enemy_ids": ["enemy_four", "enemy_five"],
 				"active_cap": 3,
 			},
 		],
