@@ -11,7 +11,9 @@ func _initialize() -> void:
 	activation.update([], [])
 
 	var supports_queue := activation.has_method("mark_enemy_defeated") \
-		and activation.has_method("get_waiting_enemy_ids")
+		and activation.has_method("mark_enemy_departed") \
+		and activation.has_method("get_waiting_enemy_ids") \
+		and activation.has_method("get_defeated_enemy_ids")
 	var supports_snapshot := activation.has_method("get_snapshot") \
 		and activation.has_method("restore_snapshot")
 	t.check(supports_queue, "遭遇激活器公开击败和等待队列契约")
@@ -21,19 +23,32 @@ func _initialize() -> void:
 		return
 
 	t.check(activation.get_active_enemy_ids().has("enemy_two"), "第一遭遇的存活敌人初始激活")
-	activation.call("mark_enemy_defeated", &"enemy_one")
+	var defeated_result: Dictionary = activation.call("mark_enemy_defeated", "enemy_one")
+	t.check(bool(defeated_result.get("success", false)), "击倒活动敌人成功登记")
+	var repeated_defeat: Dictionary = activation.call("mark_enemy_defeated", "enemy_one")
+	t.check(not bool(repeated_defeat.get("success", true)) and repeated_defeat.get("reason") == &"already_defeated", "重复击倒返回幂等拒绝")
 	activation.update([], [&"encounter_two"])
 
 	var active_enemy_ids: Array = activation.get_active_enemy_ids()
 	var waiting_enemy_ids: Array = activation.call("get_waiting_enemy_ids")
+	var defeated_enemy_ids: Array = activation.call("get_defeated_enemy_ids")
+	var departed_result: Dictionary = activation.call("mark_enemy_departed", "enemy_five")
+	var repeated_departure: Dictionary = activation.call("mark_enemy_departed", "enemy_five")
 	var snapshot: Dictionary = activation.call("get_snapshot")
-	var defeated_enemy_ids: Array = snapshot.get("defeated_enemy_ids", [])
+	active_enemy_ids = activation.get_active_enemy_ids()
+	waiting_enemy_ids = activation.call("get_waiting_enemy_ids")
 	t.check(active_enemy_ids.has("enemy_two"), "第二遭遇触发后旧存活敌人保持激活")
 	t.check(
 		waiting_enemy_ids.has("enemy_four") or waiting_enemy_ids.has("enemy_five"),
 		"活跃上限填满后至少一名新请求敌人进入等待队列"
 	)
 	t.check(defeated_enemy_ids.has("enemy_one"), "击败敌人进入击败状态")
+	t.check(bool(departed_result.get("success", false)) and not bool(repeated_departure.get("success", true)), "离场登记和重复离场均有明确结果")
+	t.check(_states_are_disjoint(snapshot), "遭遇 active/waiting/defeated/departed 集合互斥")
+	t.check(
+		activation.call("get_retreat_cells", "enemy_two") == [Vector2i(2, 1)],
+		"缺少 retreat_cells 时使用敌人原始位置作为确定性撤离回退"
+	)
 
 	var restored := Activation.new()
 	restored.setup(_map())
@@ -43,7 +58,8 @@ func _initialize() -> void:
 		bool(restore_result.get("success", false))
 		and _same_ids(restored.get_active_enemy_ids(), active_enemy_ids)
 		and _same_ids(restored.call("get_waiting_enemy_ids"), waiting_enemy_ids)
-		and _same_ids(restored_snapshot.get("defeated_enemy_ids", []), defeated_enemy_ids),
+		and _same_ids(restored_snapshot.get("defeated_enemy_ids", []), defeated_enemy_ids)
+		and _same_ids(restored_snapshot.get("departed_enemy_ids", []), snapshot.get("departed_enemy_ids", [])),
 		"遭遇队列快照恢复保留活跃、等待和击败敌人集合"
 	)
 	t.finish(self)
@@ -55,14 +71,30 @@ func _same_ids(left: Array, right: Array) -> bool:
 	sorted_right.sort()
 	return sorted_left == sorted_right
 
+func _states_are_disjoint(snapshot: Dictionary) -> bool:
+	var buckets: Array = [
+		snapshot.get("active_ids", []),
+		snapshot.get("waiting_ids", []),
+		snapshot.get("defeated_ids", []),
+		snapshot.get("departed_ids", []),
+	]
+	var seen := {}
+	for bucket in buckets:
+		for raw_id in bucket:
+			var id := String(raw_id)
+			if seen.has(id):
+				return false
+			seen[id] = true
+	return true
+
 func _map() -> Dictionary:
 	return {
 		"entities": [
-			{"id": "enemy_one", "type": "spawn_enemy"},
-			{"id": "enemy_two", "type": "spawn_enemy"},
-			{"id": "enemy_three", "type": "spawn_enemy"},
-			{"id": "enemy_four", "type": "spawn_enemy"},
-			{"id": "enemy_five", "type": "spawn_enemy"},
+			{"id": "enemy_one", "type": "spawn_enemy", "x": 1, "y": 1},
+			{"id": "enemy_two", "type": "spawn_enemy", "x": 2, "y": 1},
+			{"id": "enemy_three", "type": "spawn_enemy", "x": 3, "y": 1},
+			{"id": "enemy_four", "type": "spawn_enemy", "x": 4, "y": 1},
+			{"id": "enemy_five", "type": "spawn_enemy", "x": 5, "y": 1},
 		],
 		"encounters": [
 			{

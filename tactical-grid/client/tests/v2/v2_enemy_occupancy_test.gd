@@ -3,6 +3,7 @@ extends SceneTree
 const Runner = preload("res://tests/v2/test_runner.gd")
 const UtilityAI = preload("res://scripts/ai/utility_ai.gd")
 const UnitScript = preload("res://scripts/game/unit.gd")
+const Activation = preload("res://scripts/v2/mission/v2_encounter_activation.gd")
 
 var t := Runner.new()
 
@@ -21,6 +22,30 @@ func _initialize() -> void:
 
 	player.free()
 	enemy.free()
+
+	var activation := Activation.new()
+	activation.setup(_encounter_map())
+	var blocked: Dictionary = activation.update([Vector2i(2, 1)], [])
+	t.check(
+		blocked.get("waiting_ids", []).has("enemy_spawn")
+		and blocked.get("spawn_cell_occupied", []).has("enemy_spawn"),
+		"占用出生格的敌人保持等待并记录 spawn_cell_occupied"
+	)
+	var promoted: Dictionary = activation.update([], [])
+	t.check(
+		promoted.get("activated_ids", []).has("enemy_spawn")
+		and activation.get_active_enemy_ids().has("enemy_spawn"),
+		"出生格释放后按稳定顺序晋升等待敌人"
+	)
+
+	var blocked_live_enemy := Activation.new()
+	blocked_live_enemy.setup(_encounter_map())
+	var blocked_by_enemy: Dictionary = blocked_live_enemy.update([], [], [], [Vector2i(2, 1)])
+	t.check(
+		blocked_by_enemy.get("waiting_ids", []).has("enemy_spawn")
+		and blocked_by_enemy.get("spawn_cell_occupied", []).has("enemy_spawn"),
+		"存活敌人占用出生格时等待队列不生成重叠敌人"
+	)
 	t.finish(self)
 
 func _make_unit(id: String, team: String, position: Vector2i) -> Unit:
@@ -49,4 +74,19 @@ func _make_map() -> Dictionary:
 	return {
 		"size": {"width": 5, "height": 3},
 		"layers": {"base_terrain": terrain, "blocker": blockers},
+	}
+
+func _encounter_map() -> Dictionary:
+	return {
+		"entities": [
+			{"id": "enemy_spawn", "type": "spawn_enemy", "x": 1, "y": 1},
+		],
+		"encounters": [
+			{
+				"id": "encounter_spawn",
+				"trigger": "start",
+				"active_enemy_ids": ["enemy_spawn"],
+				"spawn_cells": [[2, 1]],
+			},
+		],
 	}

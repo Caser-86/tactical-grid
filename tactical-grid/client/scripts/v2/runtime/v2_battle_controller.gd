@@ -219,6 +219,134 @@ func run_v2_enemy_turn() -> void:
 		_refresh_v2_runtime_state()
 		turn_manager.end_enemy_turn()
 
+func _update_v2_encounters(mission_events: Array) -> Dictionary:
+	if not _is_v2_battle() or v2_encounter_activation == null:
+		return {"success": false, "reason": &"encounter_activation_unavailable"}
+	var result: Dictionary = v2_encounter_activation.update(
+		_get_v2_player_positions(),
+		mission_events,
+		_get_v2_live_enemy_ids(),
+		_get_v2_occupied_positions()
+	)
+	_apply_encounter_delta(result)
+	return result
+
+func _apply_encounter_delta(delta: Dictionary) -> void:
+	if v2_encounter_activation == null:
+		return
+	var changed := false
+	var defeated_ids: Array = v2_encounter_activation.get_defeated_enemy_ids()
+	var departed_ids: Array = v2_encounter_activation.get_departed_enemy_ids()
+	for raw_id in delta.get("deactivated_ids", []):
+		var entity_id := String(raw_id)
+		if not departed_ids.has(entity_id):
+			continue
+		var departed_unit := _get_v2_enemy_unit(entity_id)
+		if departed_unit == null or not departed_unit.is_alive:
+			if departed_unit != null:
+				_remove_v2_enemy_sprite(_get_unit_sprite(departed_unit))
+			continue
+		departed_unit.is_alive = false
+		departed_unit.is_downed = false
+		_remove_v2_enemy_sprite(_get_unit_sprite(departed_unit))
+		changed = true
+	for raw_id in defeated_ids:
+		var defeated_id := String(raw_id)
+		var defeated_unit := _get_v2_enemy_unit(defeated_id)
+		if defeated_unit == null:
+			continue
+		if defeated_unit.is_alive:
+			defeated_unit.is_alive = false
+			defeated_unit.is_downed = true
+			changed = true
+		var corpse_sprite := _get_unit_sprite(defeated_unit)
+		if corpse_sprite != null:
+			_remove_v2_enemy_sprite(corpse_sprite)
+			changed = true
+	for raw_id in delta.get("activated_ids", []):
+		var entity_id := String(raw_id)
+		var unit := _get_v2_enemy_unit(entity_id)
+		if unit == null or not v2_encounter_activation.is_active(entity_id):
+			continue
+		if unit.is_alive:
+			continue
+		var spawn_cell := _find_v2_spawn_cell(entity_id, unit)
+		if spawn_cell.x < 0:
+			v2_encounter_activation.defer_enemy_spawn(entity_id)
+			continue
+		unit.grid_pos = spawn_cell
+		unit.is_alive = true
+		unit.is_downed = false
+		unit.current_hp = unit.max_hp
+		if _v2_units_rendered and _get_unit_sprite(unit) == null:
+			_create_unit_sprite(unit)
+		changed = true
+	if not changed:
+		return
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service:
+		v2_action_service.refresh_units(player_units, enemy_units)
+	_reconcile_v2_unit_occupancy()
+	_refresh_enemy_sprite_visibility()
+	_update_visibility()
+	_refresh_enemy_intent_display()
+
+func _on_unit_died(unit: Unit) -> void:
+	super._on_unit_died(unit)
+	if not _is_v2_battle() or v2_encounter_activation == null or unit == null:
+		return
+	var result: Dictionary = v2_encounter_activation.mark_enemy_defeated(unit.entity_id)
+	if not bool(result.get("success", false)):
+		return
+	var delta: Dictionary = v2_encounter_activation.update(
+		_get_v2_player_positions(),
+		[],
+		_get_v2_live_enemy_ids(),
+		_get_v2_occupied_positions()
+	)
+	_apply_encounter_delta(delta)
+
+func _get_v2_enemy_unit(entity_id: String) -> Unit:
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit != null and unit.entity_id == entity_id:
+			return unit
+	return null
+
+func _get_v2_live_enemy_ids() -> Array:
+	var ids: Array = []
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit != null and unit.is_alive:
+			ids.append(unit.entity_id)
+	ids.sort()
+	return ids
+
+func _get_v2_occupied_positions() -> Array:
+	var positions: Array = []
+	for raw_unit in player_units + enemy_units:
+		var unit: Unit = raw_unit
+		if unit != null and unit.is_alive:
+			positions.append(unit.grid_pos)
+	return positions
+
+func _find_v2_spawn_cell(entity_id: String, unit: Unit) -> Vector2i:
+	var occupied := {}
+	for raw_unit in player_units + enemy_units:
+		var other: Unit = raw_unit
+		if other != null and other != unit and other.is_alive:
+			occupied[other.grid_pos] = true
+	if v2_encounter_activation.has_method("get_spawn_cells"):
+		for raw_cell in v2_encounter_activation.get_spawn_cells(entity_id):
+			var cell: Vector2i = raw_cell if raw_cell is Vector2i else Vector2i(-1, -1)
+			if cell.x < 0 or not GridSystem.is_in_bounds(cell, map_width, map_height) or occupied.has(cell):
+				continue
+			if not map_data.is_empty() and not MapLoader.is_passable(map_data, cell.x, cell.y):
+				continue
+			return cell
+	return Vector2i(-1, -1)
+
 func _execute_v2_enemy_action(enemy: Unit) -> void:
 	var context := _build_v2_enemy_context()
 	var intent: Dictionary = V2EnemyBrainScript.plan_intent(enemy, context)
