@@ -13,6 +13,7 @@ const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_prese
 const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
+const V2MissionEventBridgeScript = preload("res://scripts/v2/mission/v2_mission_event_bridge.gd")
 const V2RescueControllerScript = preload("res://scripts/v2/mission/v2_rescue_controller.gd")
 const V2EncounterActivationScript = preload("res://scripts/v2/mission/v2_encounter_activation.gd")
 const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.gd")
@@ -108,6 +109,7 @@ var enemy_planner: EnemyPlanner
 ## V2 P1 服务槽位。正式输入仍使用旧 ActionSystem，P2 逐合同切换。
 var v2_action_service: V2ActionService = null
 var v2_mission_flow: RefCounted = null
+var v2_mission_event_bridge: RefCounted = null
 var v2_rescue_controller: RefCounted = null
 var v2_encounter_activation: RefCounted = null
 var v2_tutorial_flow: RefCounted = null
@@ -403,6 +405,7 @@ func _cleanup_units() -> void:
 	_dismiss_context_hint()
 	# Release V2 RefCounted mission state before temporary battle scenes are freed.
 	v2_mission_flow = null
+	v2_mission_event_bridge = null
 	v2_rescue_controller = null
 	v2_encounter_activation = null
 	v2_tutorial_flow = null
@@ -637,6 +640,7 @@ func _init_subsystems() -> void:
 	# V2 P1 只创建依赖槽位，不切换 V1 正式输入路径。
 	v2_action_service = V2ActionServiceScript.new()
 	v2_mission_flow = V2MissionFlowScript.new()
+	v2_mission_event_bridge = V2MissionEventBridgeScript.new()
 	v2_interaction_service = V2InteractionServiceScript.new()
 	v2_input_router = V2BattleInputRouterScript.new()
 	add_child(v2_input_router)
@@ -2498,7 +2502,9 @@ func _on_toggle_network() -> void:
 func _apply_v2_mission_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
 	if not _is_v2_battle() or v2_mission_flow == null:
 		return {"success": false, "reason": &"v2_mission_flow_unavailable"}
-	var result: Dictionary = v2_mission_flow.apply_event(event_name, payload)
+	if v2_mission_event_bridge == null:
+		v2_mission_event_bridge = V2MissionEventBridgeScript.new()
+	var result: Dictionary = v2_mission_event_bridge.apply_event(v2_mission_flow, event_name, payload)
 	if event_name == &"evac_checked" and bool(result.get("victory", false)):
 		_advance_v2_tutorial(&"evac_completed")
 	if hud:

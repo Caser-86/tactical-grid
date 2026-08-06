@@ -4,6 +4,7 @@
     "res://tests/v2/gate_manifest_test.gd",
     "res://tests/v2/v2_data_repository_test.gd",
     "res://tests/v2/v2_mission_flow_contract_test.gd",
+    "res://tests/v2/v2_m1_evacuation_bridge_test.gd",
     "res://tests/v2/v2_encounter_queue_test.gd",
     "res://tests/v2/v2_hazard_controller_test.gd",
     "res://tests/v2/v2_checkpoint_migration_test.gd",

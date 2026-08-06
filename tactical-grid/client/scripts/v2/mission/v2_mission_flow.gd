@@ -151,6 +151,9 @@ func get_state_name() -> StringName:
 func get_current_step_id() -> String:
 	return String(_current_objective_step().get("id", ""))
 
+func get_current_step_complete_event() -> StringName:
+	return StringName(_current_objective_step().get("complete_event", ""))
+
 func get_objective_step_index() -> int:
 	return _objective_step_index
 
