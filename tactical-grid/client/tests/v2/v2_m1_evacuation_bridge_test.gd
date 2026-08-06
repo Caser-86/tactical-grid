@@ -18,6 +18,7 @@ func _run() -> void:
 	t.check(missions.has("ch1_m1") and missions.has("ch1_m2"), "回归使用 shipped M1/M2 mission 数据")
 	if missions.has("ch1_m1"):
 		_run_m1_controller_flow(missions["ch1_m1"])
+	_run_legacy_controller_flow()
 	if missions.has("ch1_m2"):
 		_run_m2_terminal_regression(missions["ch1_m2"])
 	t.finish(get_tree())
@@ -60,6 +61,42 @@ func _run_m1_controller_flow(mission: Dictionary) -> void:
 
 	var duplicate: Dictionary = battle.call("_apply_v2_mission_event", &"evac_checked")
 	t.check(not bool(duplicate.get("success", true)) and not bool(duplicate.get("final_event_submitted", false)), "M1 重复撤离不重复提交终端事件")
+	_dispose_battle(battle)
+
+func _run_legacy_controller_flow() -> void:
+	var evac_center := Vector2i(4, 4)
+	var legacy_mission := {"id": "legacy_m1", "rescue_character": "scout"}
+	var legacy_steps: Array = legacy_mission.get("objective_steps", [])
+	var map := {
+		"size": {"width": 8, "height": 8},
+		"entities": [{"id": "evac_legacy", "type": "evac", "x": evac_center.x, "y": evac_center.y, "radius": 1}],
+	}
+	var assault := _unit("legacy_assault", evac_center + Vector2i.LEFT)
+	var scout := _unit("legacy_scout", evac_center + Vector2i(-3, 0))
+	var battle := _build_battle(legacy_mission, map, [assault], [assault])
+	var flow: RefCounted = battle.v2_mission_flow
+	t.check(legacy_steps.is_empty() and flow.get_objective_step_count() == 2, "legacy mission fixture 使用两步兼容回退")
+
+	var rescue_result: Dictionary = flow.apply_event(&"scout_rescued", {
+		"character_id": "scout",
+		"unit": scout,
+	})
+	t.check(bool(rescue_result.get("success", false)), "controller legacy 路径接受 scout_rescued 兼容事件")
+	battle.player_units.append(scout)
+	battle.turn_manager.register_player_unit(scout)
+	battle.v2_action_service.refresh_units(battle.player_units, battle.enemy_units)
+
+	battle.selected_unit = assault
+	var first_move: Dictionary = battle.request_move(evac_center)
+	t.check(bool(first_move.get("success", false)) and bool(first_move.get("committed", false)), "controller legacy 路径提交首个撤离移动")
+	t.check(not flow.is_victory(), "legacy 首名队员撤离时任务仍未完成")
+
+	battle.selected_unit = scout
+	var final_move: Dictionary = battle.request_move(evac_center + Vector2i.UP)
+	t.check(bool(final_move.get("success", false)) and bool(final_move.get("committed", false)), "controller legacy 路径提交最后撤离移动")
+	t.check(flow.is_victory() and _has_event(flow, &"evac_checked"), "legacy 两步任务在 evac_checked 上真实完成")
+	t.check(not _has_event(flow, &"mission_completed"), "legacy evac_checked 完成不合成 mission_completed")
+	t.check(battle.turn_manager.current_phase == TurnManagerScript.TurnPhase.BATTLE_OVER and battle.turn_manager.battle_over, "legacy 真实完成交接 TurnManager.BATTLE_OVER")
 	_dispose_battle(battle)
 
 func _run_m2_terminal_regression(mission: Dictionary) -> void:
