@@ -238,8 +238,8 @@ func _apply_encounter_delta(delta: Dictionary) -> void:
 	var defeated_ids: Array = v2_encounter_activation.get_defeated_enemy_ids()
 	var departed_ids: Array = v2_encounter_activation.get_departed_enemy_ids()
 	# The encounter state is authoritative for both active and waiting departures.
-	# Waiting IDs are not present in deactivated_ids, but their stable Units still
-	# need the same lifecycle/occupancy cleanup as active IDs.
+	# Trigger deltas report both, while the persistent departed set also covers
+	# cleanup on repeated refreshes.
 	for raw_id in departed_ids:
 		var entity_id := String(raw_id)
 		var departed_unit := _get_v2_enemy_unit(entity_id)

@@ -236,9 +236,8 @@ func _apply_encounter(encounter: Dictionary, live_enemy_ids: Array, deactivated:
 		if protected.has(departing_id):
 			continue
 		if _active_ids.has(departing_id) or _waiting_ids.has(departing_id):
-			var was_active := _active_ids.has(departing_id)
 			_move_to_state(departing_id, _departed_ids)
-			if was_active and not deactivated.has(departing_id):
+			if not deactivated.has(departing_id):
 				deactivated.append(departing_id)
 	for raw_id in encounter.get("active_enemy_ids", []):
 		var entity_id := String(raw_id)

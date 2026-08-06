@@ -42,6 +42,25 @@ func _run() -> void:
 	t.check(second_active.has(old_live_id) and old_live.is_alive and battle.call("_get_unit_sprite", old_live) != null, "第二遭遇保留旧存活 Unit 和精灵")
 	t.check(second_active.size() == 3 and second_waiting.size() == 2, "第二遭遇严格遵守 active_cap 并保留等待溢出")
 
+	var first_waiting_departed_id := String(second_waiting[0]) if not second_waiting.is_empty() else ""
+	var second_waiting_departed_id := String(second_waiting[1]) if second_waiting.size() > 1 else ""
+	var first_waiting_departed := _find_enemy(battle, first_waiting_departed_id)
+	var second_waiting_departed := _find_enemy(battle, second_waiting_departed_id)
+	var first_waiting_cell: Vector2i = first_waiting_departed.grid_pos if first_waiting_departed != null else Vector2i(-1, -1)
+	var second_waiting_cell: Vector2i = second_waiting_departed.grid_pos if second_waiting_departed != null else Vector2i(-1, -1)
+	var record_delta: Dictionary = battle.call("_update_v2_encounters", [{"event": "enter_record_radius"}])
+	var record_waiting: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
+	t.check(record_delta.get("success", false), "事故记录遭遇通过真实控制器事件触发")
+	t.check(record_delta.get("deactivated_ids", []).has(first_waiting_departed_id) and record_delta.get("deactivated_ids", []).has(second_waiting_departed_id), "真实遭遇 delta 报告 waiting 离场 deactivated_ids")
+	t.check(first_waiting_departed != null and not first_waiting_departed.is_alive and first_waiting_departed.is_downed, "第一名真实触发离场 Unit 变为 occupancy-free")
+	t.check(second_waiting_departed != null and not second_waiting_departed.is_alive and second_waiting_departed.is_downed, "第二名真实触发离场 Unit 变为 occupancy-free")
+	t.check(not _service_occupies(battle, first_waiting_cell) and not _service_occupies(battle, second_waiting_cell), "真实触发离场释放 V2ActionService occupancy")
+	t.check(record_waiting.size() >= 2, "真实离场后仍保留额外 waiting 敌人")
+	await get_tree().process_frame
+	t.check(battle.call("_get_v2_enemy_unit", first_waiting_departed_id) == first_waiting_departed and battle.call("_get_unit_sprite", first_waiting_departed) == null, "真实触发离场保留稳定 Unit 身份且不生成精灵")
+	t.check(battle.call("_get_v2_enemy_unit", second_waiting_departed_id) == second_waiting_departed and battle.call("_get_unit_sprite", second_waiting_departed) == null, "第二名真实触发离场保留稳定 Unit 身份且不生成精灵")
+	t.check(not battle.call("_get_v2_live_enemy_ids").has(first_waiting_departed_id) and not battle.call("_get_v2_live_enemy_ids").has(second_waiting_departed_id), "活动运行时 roster 排除真实触发离场 Unit")
+
 	var defeated := _find_live_enemy_other_than(battle, old_live_id)
 	var defeated_id := defeated.entity_id if defeated != null else ""
 	defeated.take_damage(defeated.current_hp + defeated.current_shield + 1)
@@ -50,50 +69,41 @@ func _run() -> void:
 		"success": battle.v2_encounter_activation.get_defeated_enemy_ids().has(defeated_id),
 	}
 	var defeated_cell: Vector2i = defeated.grid_pos if defeated != null else Vector2i(-1, -1)
-	battle.call("_update_v2_encounters", [])
 	t.check(bool(defeated_result.get("success", false)), "活动敌人击败状态登记成功")
 	t.check(defeated != null and not defeated.is_alive and defeated.is_downed, "击败 Unit 保留 defeated 生命周期")
 	t.check(battle.call("_get_unit_sprite", defeated) == null and not battle.call("_get_v2_live_enemy_ids").has(defeated_id), "击败清理移除精灵并退出活动运行时 roster")
 	t.check(not _service_occupies(battle, defeated_cell), "击败 Unit 释放 V2ActionService occupancy")
 
-	var promoted: Array = battle.v2_encounter_activation.get_active_enemy_ids()
-	var waiting_after_defeat: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
-	var promoted_waiting_id := ""
-	for raw_id in second_waiting:
+	var promoted_after_departure: Array = battle.v2_encounter_activation.get_active_enemy_ids()
+	var waiting_after_departure: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
+	var promoted_after_departure_id := ""
+	for raw_id in record_waiting:
 		var candidate_id := String(raw_id)
-		if promoted.has(candidate_id):
-			promoted_waiting_id = candidate_id
+		if promoted_after_departure.has(candidate_id):
+			promoted_after_departure_id = candidate_id
 			break
-	t.check(not promoted_waiting_id.is_empty() and not waiting_after_defeat.has(promoted_waiting_id), "击败后等待队列按稳定顺序晋升")
-	t.check(_live_positions_are_unique_and_player_safe(battle), "等待晋升只使用不与玩家和存活敌人重叠的格子")
+	t.check(not promoted_after_departure_id.is_empty() and not waiting_after_departure.has(promoted_after_departure_id), "真实离场后的新 waiting 敌人通过控制器填充释放的 active 槽位")
+	t.check(not promoted_after_departure.has(defeated_id) and not promoted_after_departure.has(first_waiting_departed_id) and not promoted_after_departure.has(second_waiting_departed_id), "击败和真实离场 ID 不被后续晋升重新激活")
+	t.check(old_live.is_alive and battle.call("_get_unit_sprite", old_live) != null, "后续晋升仍保留旧存活 Unit 身份和精灵")
+	t.check(_live_positions_are_unique_and_player_safe(battle), "真实触发后的等待晋升只使用不与玩家和存活敌人重叠的格子")
+	t.check(battle.enemy_units.has(first_waiting_departed) and battle.enemy_units.has(second_waiting_departed), "真实触发离场仍保留稳定 enemy_units roster 身份")
+	t.check(_active_runtime_matches_service(battle), "新 active roster 的精灵和 V2ActionService occupancy 一致")
 
-	var waiting_departed_id := String(waiting_after_defeat[0]) if not waiting_after_defeat.is_empty() else ""
-	var waiting_departed := _find_enemy(battle, waiting_departed_id)
-	var active_departed := old_live
-	var waiting_cell: Vector2i = waiting_departed.grid_pos if waiting_departed != null else Vector2i(-1, -1)
-	var active_cell: Vector2i = active_departed.grid_pos if active_departed != null else Vector2i(-1, -1)
-	var waiting_departure_result: Dictionary = battle.v2_encounter_activation.mark_enemy_departed(waiting_departed_id)
-	var active_departure_result: Dictionary = battle.v2_encounter_activation.mark_enemy_departed(old_live_id)
-	t.check(bool(waiting_departure_result.get("success", false)) and bool(active_departure_result.get("success", false)), "活动和等待敌人均可登记离场")
-	t.check(_service_occupies(battle, waiting_cell) and _service_occupies(battle, active_cell), "离场清理前真实 V2ActionService 仍观察到待释放的旧占位")
-	battle.call("_update_v2_encounters", [])
-	t.check(waiting_departed != null and not waiting_departed.is_alive and waiting_departed.is_downed, "等待离场 Unit 在真实控制器事务中变为 occupancy-free")
-	t.check(active_departed != null and not active_departed.is_alive and active_departed.is_downed, "活动离场 Unit 在真实控制器事务中变为 occupancy-free")
-	t.check(not _service_occupies(battle, waiting_cell) and not _service_occupies(battle, active_cell), "活动和等待离场均释放 V2ActionService occupancy")
-	await get_tree().process_frame
-	t.check(battle.call("_get_unit_sprite", waiting_departed) == null and battle.call("_get_unit_sprite", active_departed) == null, "活动和等待离场均移除精灵")
-	t.check(not battle.call("_get_v2_live_enemy_ids").has(waiting_departed_id) and not battle.call("_get_v2_live_enemy_ids").has(old_live_id), "活动运行时 roster 排除活动和等待离场 Unit")
-	t.check(battle.enemy_units.has(waiting_departed) and battle.enemy_units.has(active_departed), "稳定 enemy_units roster 仍保留可存档 Unit 身份")
+	var evac_delta: Dictionary = battle.call("_update_v2_encounters", [{"event": "pre_evac"}])
+	var evac_waiting: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
+	t.check(evac_delta.get("success", false) and not evac_waiting.is_empty(), "后续撤离遭遇通过真实控制器事件触发并保留 waiting")
+	t.check(_active_runtime_matches_service(battle), "后续遭遇后 active roster 与精灵和 occupancy 保持一致")
 
 	var active_before_repeat: Array = battle.v2_encounter_activation.get_active_enemy_ids()
 	var waiting_before_repeat: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
 	var defeated_before_repeat: Array = battle.v2_encounter_activation.get_defeated_enemy_ids()
 	var departed_before_repeat: Array = battle.v2_encounter_activation.get_departed_enemy_ids()
-	battle.call("_update_v2_encounters", [])
+	battle.call("_update_v2_encounters", [{"event": "pre_evac"}])
 	t.check(active_before_repeat == battle.v2_encounter_activation.get_active_enemy_ids(), "重复 update 不改变活动集合")
 	t.check(waiting_before_repeat == battle.v2_encounter_activation.get_waiting_enemy_ids(), "重复 update 不改变等待集合")
 	t.check(defeated_before_repeat == battle.v2_encounter_activation.get_defeated_enemy_ids() and departed_before_repeat == battle.v2_encounter_activation.get_departed_enemy_ids(), "重复 update 不复活击败/离场敌人")
-	t.check(_sprite_count(battle, defeated_id) == 0 and _sprite_count(battle, old_live_id) == 0 and _sprite_count(battle, promoted_waiting_id) == 1, "重复 update 不重复生成或恢复精灵")
+	t.check(_sprite_count(battle, defeated_id) == 0 and _sprite_count(battle, first_waiting_departed_id) == 0 and _sprite_count(battle, second_waiting_departed_id) == 0 and _sprite_count(battle, old_live_id) == 1 and _sprite_count(battle, promoted_after_departure_id) == 1, "重复 update 不重复生成或恢复精灵")
+	t.check(_active_runtime_matches_service(battle), "重复 update 不改变 active roster 与服务占位")
 
 	await _cleanup_battle(battle)
 	t.finish(get_tree())
@@ -131,6 +141,19 @@ func _live_positions_are_unique_and_player_safe(battle: Node) -> bool:
 		if occupied.has(unit.grid_pos):
 			return false
 		occupied[unit.grid_pos] = true
+	return true
+
+func _active_runtime_matches_service(battle: Node) -> bool:
+	for raw_id in battle.v2_encounter_activation.get_active_enemy_ids():
+		var entity_id := String(raw_id)
+		var unit := _find_enemy(battle, entity_id)
+		if unit == null or not unit.is_alive or _sprite_count(battle, entity_id) != 1 or not _service_occupies(battle, unit.grid_pos):
+			return false
+	for raw_id in battle.v2_encounter_activation.get_defeated_enemy_ids() + battle.v2_encounter_activation.get_departed_enemy_ids():
+		var entity_id := String(raw_id)
+		var unit := _find_enemy(battle, entity_id)
+		if unit != null and (_sprite_count(battle, entity_id) != 0 or _service_occupies(battle, unit.grid_pos)):
+			return false
 	return true
 
 func _dismiss_intro(manager: Node) -> void:
