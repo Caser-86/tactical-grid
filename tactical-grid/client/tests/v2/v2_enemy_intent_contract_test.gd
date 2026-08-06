@@ -35,6 +35,11 @@ func _initialize() -> void:
 	t.check(sentry_intent.get("type", &"") in [&"move", &"attack"], "哨兵巡逻或攻击")
 	t.check(sentry_intent.get("enemy_id", "") == "enemy_sentry", "哨兵意图绑定稳定 ID")
 
+	var blocked_los_context := context.duplicate(true)
+	blocked_los_context["los_check"] = Callable(self, "_no_line_of_sight")
+	var blocked_los_intent: Dictionary = V2EnemyBrain.plan_intent(sentry, blocked_los_context)
+	t.check(blocked_los_intent.get("type", &"") != &"attack", "哨兵隔墙不得生成攻击意图")
+
 	var drone_intent: Dictionary = V2EnemyBrain.plan_intent(drone, context)
 	t.check(drone_intent.get("type", &"") == &"scan", "无人机优先扫描")
 	t.check(int(drone_intent.get("radius", 0)) == 3, "无人机扫描半径来自职责数据")
@@ -74,6 +79,10 @@ func _initialize() -> void:
 	var fallback: Dictionary = V2IntentExecutor.execute(blocked_attack, blocked_context)
 	t.check(fallback.get("type", &"") in [&"move", &"guard", &"wait"], "阻断攻击降级为安全后备")
 	t.check(int(fallback.get("damage", 0)) == 0, "阻断后备行为不比原意图更致命")
+	var blocked_los_attack_context := context.duplicate(true)
+	blocked_los_attack_context["los_check"] = Callable(self, "_no_line_of_sight")
+	var blocked_los_result: Dictionary = V2IntentExecutor.execute(blocked_attack, blocked_los_attack_context)
+	t.check(blocked_los_result.get("reason", &"") == &"blocked_line_of_sight", "攻击提交阶段拒绝隔墙旧意图")
 
 	scout.grid_pos = sentry.grid_pos + Vector2i(-1, 0)
 	var occupied_move := {
@@ -118,3 +127,6 @@ func _make_unit(id: String, role: String, team: String, position: Vector2i, hp: 
 	unit.is_alive = true
 	unit.enable_v2_turn_mode()
 	return unit
+
+func _no_line_of_sight(_from: Vector2i, _to: Vector2i) -> bool:
+	return false

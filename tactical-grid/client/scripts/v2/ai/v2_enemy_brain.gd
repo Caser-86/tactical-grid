@@ -21,7 +21,7 @@ static func plan_intent(enemy: Unit, context: Dictionary) -> Dictionary:
 
 	match enemy.job:
 		"sentry":
-			if target != null and _can_attack(enemy, target, profile):
+			if target != null and _can_attack(enemy, target, profile, context):
 				intent["type"] = &"attack"
 				intent["target_id"] = target.entity_id
 				intent["target_cell"] = target.grid_pos
@@ -35,7 +35,7 @@ static func plan_intent(enemy: Unit, context: Dictionary) -> Dictionary:
 			if target != null:
 				intent["target_id"] = target.entity_id
 		"sniper_sentry":
-			if target != null:
+			if target != null and _can_attack(enemy, target, profile, context):
 				intent["type"] = &"telegraph"
 				intent["target_id"] = target.entity_id
 				intent["target_cell"] = target.grid_pos
@@ -142,10 +142,15 @@ static func _profile(enemy: Unit, context: Dictionary) -> Dictionary:
 		profile = DEFAULT_PROFILES.get(enemy.job, {})
 	return profile
 
-static func _can_attack(enemy: Unit, target: Unit, profile: Dictionary) -> bool:
+static func _can_attack(enemy: Unit, target: Unit, profile: Dictionary, context: Dictionary) -> bool:
 	var attack_range: Array = profile.get("attack_range", [1, 0])
 	var distance: int = enemy.grid_pos.distance_to(target.grid_pos)
-	return distance >= int(attack_range[0]) and distance <= int(attack_range[1])
+	if distance < int(attack_range[0]) or distance > int(attack_range[1]):
+		return false
+	var los_check: Variant = context.get("los_check", null)
+	if los_check is Callable:
+		return bool(los_check.call(enemy.grid_pos, target.grid_pos))
+	return true
 
 static func _move_toward(enemy: Unit, target: Unit, intent: Dictionary, context: Dictionary) -> Dictionary:
 	if target == null:

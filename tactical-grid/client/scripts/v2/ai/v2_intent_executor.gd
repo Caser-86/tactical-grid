@@ -39,6 +39,9 @@ static func _execute_attack(intent: Dictionary, enemy: Unit, context: Dictionary
 		return _fallback(enemy.entity_id, revision, &"blocked_path")
 	if intent.has("target_cell") and intent.get("target_cell") != target.grid_pos:
 		return _fallback(enemy.entity_id, revision, &"stale_target")
+	var los_check: Variant = context.get("los_check", null)
+	if los_check is Callable and not bool(los_check.call(enemy.grid_pos, target.grid_pos)):
+		return _fallback(enemy.entity_id, revision, &"blocked_line_of_sight")
 	return _success(intent, enemy.entity_id, revision, {
 		"target_id": target.entity_id,
 		"damage": maxi(0, int(intent.get("damage", 0))),

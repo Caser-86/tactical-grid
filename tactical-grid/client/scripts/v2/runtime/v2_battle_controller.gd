@@ -224,6 +224,7 @@ func _build_v2_enemy_context() -> Dictionary:
 		"turn": turn_manager.turn_number if turn_manager else 0,
 		"players": player_units,
 		"enemies": enemy_units,
+		"los_check": Callable(self, "_has_los_for_targeting"),
 		"blocked_cells": blocked_cells,
 		"enemy_profiles": profiles,
 		"facilities": facilities,
