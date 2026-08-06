@@ -5,8 +5,8 @@ func query(_actor: Unit, facility: Dictionary, context: Dictionary) -> Array:
 	var name := String(facility.get("name", "摄像头"))
 	var view_action_id := String(facility.get("action_id", "observe"))
 	return [
-		_action(view_action_id, "查看" + name, "揭示周围区域并持续观察", -1, false, context),
-		_action("disable_camera", "关闭" + name, "停止监控，移除它提供的观察", -1, false, context),
+		_action(view_action_id, "查看" + name + "（揭示区域）", "揭示周围区域并持续保持视野；可能触发搜索", -1, false, context),
+		_action("disable_camera", "关闭" + name + "（收回视野）", "停止监控并收回该区域的持续观察", -1, false, context),
 	]
 
 func commit(actor: Unit, facility: Dictionary, action_id: String, _context: Dictionary) -> Dictionary:

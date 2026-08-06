@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var scout := _make_unit("scout", Vector2i(1, 1))
 	var camera_actions: Array = service.query_actions(scout, "camera_east")
 	t.check(camera_actions.size() <= 2 and camera_actions.size() == 2, "单设施最多提供两个操作")
-	t.check(String(camera_actions[0].get("label", "")) == "查看东侧摄像头", "操作名称描述具体摄像头")
+	t.check(String(camera_actions[0].get("label", "")) == "查看东侧摄像头（揭示区域）", "操作名称描述具体摄像头")
 	t.check(String(camera_actions[0].get("consequence", "")).contains("揭示"), "提交前说明摄像头结果")
 	t.check(camera_actions[0].has("raises_alert") and camera_actions[0].has("duration_turns"), "操作预览说明警戒和持续时间")
 	t.check(bool(camera_actions[0].get("enabled", false)), "相邻队员可以操作设施")

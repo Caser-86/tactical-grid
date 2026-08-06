@@ -96,6 +96,7 @@ func _run() -> void:
 	})
 	t.check(battle.alert_state.get_front_state() == &"searching", "M1 实战摄像头识别进入搜索")
 	t.check(battle.hud.get_node("TopBar/AlertLabel").text.contains("搜索"), "M1 HUD 立即显示搜索状态")
+	t.check(battle.hud.get_context_prompt_text().contains("摄像头用途") and battle.hud.get_context_prompt_text().contains("持续保持视野"), "M1 摄像头结果明确说明实际用途")
 
 	# 2. 左键蓝色安全格：一次点击完成移动，不依赖底部按钮。
 	var move_target := _find_safe_move_target(battle, player)

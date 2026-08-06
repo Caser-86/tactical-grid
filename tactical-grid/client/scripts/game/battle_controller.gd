@@ -3562,14 +3562,26 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 		_sync_camera_zone_cells()
 		_update_visibility()
 	var v2_alert_result: Dictionary = {}
+	var consequence := String(result.get("consequence", "操作完成"))
 	if _is_v2_battle() and String(result.get("action_id", "")) == "view_camera_east" and alert_state:
 		v2_alert_result = alert_state.apply_event("camera_identified_player")
+	if String(result.get("action_id", "")) == "view_camera_east":
+		var camera_effect := "摄像头用途：揭示东侧区域并持续保持视野"
+		if reveal_radius > 0:
+			var revealed_count := VisionSystem.get_visible_cells(
+				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)),
+				reveal_radius,
+				map_width,
+				map_height,
+				_is_vision_blocking
+			).size()
+			camera_effect = "摄像头已揭示东侧区域 %d 格，并持续保持视野" % revealed_count
+		consequence = camera_effect
 
 	if bool(result.get("raises_alert", false)) and alert_state:
 		alert_state.apply_event("overload_triggered")
 		if hud:
 			hud.update_alert_display(alert_state)
-	var consequence := String(result.get("consequence", "操作完成"))
 	if bool(v2_alert_result.get("changed", false)):
 		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
 	elif bool(v2_alert_result.get("grace", false)):
