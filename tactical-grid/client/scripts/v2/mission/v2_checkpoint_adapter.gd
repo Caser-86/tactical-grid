@@ -147,27 +147,59 @@ static func restore_v2_layers(snapshot: Dictionary, context: Dictionary) -> Dict
 	context["level_id"] = String(working.get("level_id", context.get("level_id", "")))
 	context["encounter_id"] = String(working.get("encounter_id", context.get("encounter_id", "")))
 	order.append("units")
-	var unit_restore := restore(working, context)
-	if not bool(unit_restore.get("success", false)):
-		unit_restore["enter_battle"] = false
-		return unit_restore
 	var stages := [
 		{"name": "encounter", "service": context.get("encounter_service", null), "snapshot": working.get("encounter_state", {})},
 		{"name": "facilities", "service": context.get("facility_service", null), "snapshot": working.get("facility_state", {})},
 		{"name": "hazards", "service": context.get("hazard_service", null), "snapshot": working.get("hazard_state", {})},
 		{"name": "mission", "service": context.get("mission_flow", null), "snapshot": working.get("mission_flow", {})},
 	]
+	var rollback_state := _capture_restore_rollback_state(context, stages)
+	var unit_restore := restore(working, context)
+	if not bool(unit_restore.get("success", false)):
+		_rollback_restore_state(context, rollback_state, stages)
+		unit_restore["enter_battle"] = false
+		return unit_restore
 	for stage in stages:
 		var service: Variant = stage.get("service", null)
 		if service == null:
 			continue
 		if not service.has_method("restore_snapshot"):
+			_rollback_restore_state(context, rollback_state, stages)
 			return {"success": false, "reason": StringName("%s_restore_unavailable" % String(stage.get("name", ""))), "enter_battle": false}
 		var result: Dictionary = service.restore_snapshot(stage.get("snapshot", {}))
 		if not bool(result.get("success", false)):
+			_rollback_restore_state(context, rollback_state, stages)
 			result["enter_battle"] = false
 			return result
 	return {"success": true, "enter_battle": true, "hash": working.get("hash", ""), "snapshot": working}
+
+static func _capture_restore_rollback_state(context: Dictionary, stages: Array) -> Dictionary:
+	var service_snapshots: Dictionary = {}
+	for stage in stages:
+		var service: Variant = stage.get("service", null)
+		var name := String(stage.get("name", ""))
+		if service != null and service.has_method("get_snapshot"):
+			service_snapshots[name] = service.get_snapshot()
+	return {
+		"player_units": _serialize_units(context.get("player_units", [])),
+		"enemy_units": _serialize_units(context.get("enemy_units", [])),
+		"service_snapshots": service_snapshots,
+	}
+
+static func _rollback_restore_state(context: Dictionary, rollback_state: Dictionary, stages: Array) -> void:
+	_restore_units(rollback_state.get("player_units", []), context.get("player_units", []))
+	_restore_units(rollback_state.get("enemy_units", []), context.get("enemy_units", []))
+	var service_snapshots: Dictionary = rollback_state.get("service_snapshots", {})
+	var reversed_stages := stages.duplicate()
+	reversed_stages.reverse()
+	for stage in reversed_stages:
+		var service: Variant = stage.get("service", null)
+		var name := String(stage.get("name", ""))
+		if service == null or not service.has_method("restore_snapshot") or not service_snapshots.has(name):
+			continue
+		var snapshot: Dictionary = (service_snapshots[name] as Dictionary).duplicate(true)
+		snapshot["_rollback_restore"] = true
+		service.restore_snapshot(snapshot)
 
 static func _serialize_units(units: Variant) -> Array:
 	var result: Array = []
@@ -300,12 +332,22 @@ static func _legacy_facility_state(raw_facilities: Variant) -> Dictionary:
 			var facility: Dictionary = raw_facility
 			facilities.append({
 				"id": String(facility.get("id", "")),
-				"type": String(facility.get("type", "")),
+				"type": _normalize_facility_type(String(facility.get("type", facility.get("action", "")))),
 				"state": String(facility.get("state", "neutral")),
 				"used_actions": (facility.get("used_actions", []) as Array).duplicate() if facility.get("used_actions", []) is Array else [],
 				"revision": int(facility.get("revision", 0)),
 			})
 	return {"state_revision": 0, "facilities": facilities}
+
+static func _normalize_facility_type(raw_type: String) -> String:
+	match raw_type:
+		"power_conduit":
+			return "power"
+		"reinforcement_beacon":
+			return "beacon"
+		"terminal":
+			return "boss_terminal"
+	return raw_type
 
 static func _default_hazard_state() -> Dictionary:
 	return {"schema_version": 1, "closed_ids": {}, "resolved_damage_keys": {}, "last_turn": 0}

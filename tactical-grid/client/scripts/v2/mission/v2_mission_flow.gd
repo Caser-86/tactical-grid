@@ -172,10 +172,23 @@ func get_current_guide_text() -> String:
 		return "任务完成：小队已进入撤离区，系统正在打开结算。"
 	if state == State.FAILED:
 		return "任务失败：重新开始后完成当前任务目标。"
-	return String(_current_objective_step().get("guide_text", ""))
+	var guide := String(_current_objective_step().get("guide_text", ""))
+	if guide.is_empty() or guide.contains("流程"):
+		return guide
+	var display_total := _get_display_step_count()
+	var display_index := mini(_objective_step_index + 1, display_total)
+	return "流程 %d/%d：%s" % [display_index, display_total, guide]
 
 func get_guide_text() -> String:
 	return get_current_guide_text()
+
+func _get_display_step_count() -> int:
+	var count := _objective_steps.size()
+	if count > 1:
+		var last_step: Dictionary = _objective_steps[count - 1]
+		if String(last_step.get("complete_event", "")) == "mission_completed":
+			count -= 1
+	return maxi(1, count)
 
 func is_victory() -> bool:
 	return state == State.COMPLETE

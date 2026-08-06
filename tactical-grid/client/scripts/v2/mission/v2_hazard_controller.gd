@@ -30,7 +30,6 @@ func advance_player_turn(turn: int) -> Dictionary:
 	_last_turn = maxi(_last_turn, turn)
 	var warning_cells: Array[Vector2i] = []
 	var active_cells: Array[Vector2i] = []
-	var damage_events: Array[Dictionary] = []
 	var cycle: Dictionary = {}
 	for hazard_id in _hazard_order:
 		if _closed_ids.has(hazard_id):
@@ -47,23 +46,36 @@ func advance_player_turn(turn: int) -> Dictionary:
 			for cell in hazard.get("cells", []):
 				if not active_cells.has(cell):
 					active_cells.append(cell)
-			var damage_key := "%s:%d" % [hazard_id, cycle_index]
-			if not _resolved_damage_keys.has(damage_key):
-				_resolved_damage_keys[damage_key] = true
-				damage_events.append({
-					"hazard_id": hazard_id,
-					"cells": (hazard.get("cells", []) as Array).duplicate(),
-					"damage": int(hazard.get("damage", 0)),
-					"turn": turn,
-					"cycle": cycle_index,
-				})
 	return {
 		"warning_cells": warning_cells,
 		"active_cells": active_cells,
-		"damage_events": damage_events,
+		"damage_events": [],
 		"closed": _sorted_ids(_closed_ids.keys()),
 		"cycle": cycle,
 	}
+
+func consume_enemy_phase_damage(turn: int) -> Array:
+	_last_turn = maxi(_last_turn, turn)
+	var damage_events: Array[Dictionary] = []
+	for hazard_id in _hazard_order:
+		if _closed_ids.has(hazard_id):
+			continue
+		var hazard: Dictionary = _hazards_by_id[hazard_id]
+		if not _is_damage_turn(hazard, turn):
+			continue
+		var cycle_index := _cycle_index_for_turn(hazard, turn)
+		var damage_key := "%s:%d" % [hazard_id, cycle_index]
+		if _resolved_damage_keys.has(damage_key):
+			continue
+		_resolved_damage_keys[damage_key] = true
+		damage_events.append({
+			"hazard_id": hazard_id,
+			"cells": (hazard.get("cells", []) as Array).duplicate(),
+			"damage": int(hazard.get("damage", 0)),
+			"turn": turn,
+			"cycle": cycle_index,
+		})
+	return damage_events
 
 func commit_close_action(action_id: String) -> Dictionary:
 	if action_id.is_empty():

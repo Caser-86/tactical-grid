@@ -28,11 +28,15 @@ func _initialize() -> void:
 	var active: Dictionary = hazards.advance_player_turn(2)
 	t.check(_has_turn_result_contract(active), "危险区生效回合保持完整结果字段")
 	t.check(active.get("active_cells", []).has(Vector2i(3, 3)), "警告后的下一玩家回合返回生效危险格")
-	t.check(active.get("damage_events", []).size() == 1 and int(active.damage_events[0].get("damage", 0)) == 2, "生效危险区只登记一次敌方阶段伤害")
+	t.check((active.get("damage_events", []) as Array).is_empty(), "玩家回合只展示生效危险格，不提前结算伤害")
+
+	var damage_events: Array = hazards.consume_enemy_phase_damage(2)
+	t.check(damage_events.size() == 1 and int(damage_events[0].get("damage", 0)) == 2, "敌方阶段只登记一次生效危险区伤害")
 
 	var active_repeat: Dictionary = hazards.advance_player_turn(2)
 	t.check(active_repeat.get("active_cells", []).has(Vector2i(3, 3)), "同一回合重复查询仍保留生效危险格用于表现")
 	t.check((active_repeat.get("damage_events", []) as Array).is_empty(), "同一危险周期重复查询不会重复结算伤害")
+	t.check((hazards.consume_enemy_phase_damage(2) as Array).is_empty(), "同一敌方阶段重复消费不会重复结算伤害")
 
 	var close_result: Dictionary = hazards.commit_close_action("seal_arc_field")
 	t.check(bool(close_result.get("success", false)) and close_result.get("closed", []).has("arc_field"), "关闭动作永久关闭对应危险区")

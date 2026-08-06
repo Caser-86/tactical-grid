@@ -150,43 +150,56 @@ func get_snapshot() -> Dictionary:
 
 func restore_snapshot(snapshot: Dictionary) -> Dictionary:
 	if snapshot.is_empty():
-		return {"success": true, "restored": true, "state_revision": _state_revision}
+		if _facilities_by_id.is_empty():
+			return {"success": true, "restored": true, "state_revision": _state_revision}
+		return {"success": false, "reason": &"invalid_facility_snapshot", "state_revision": _state_revision}
+	var rollback_restore := bool(snapshot.get("_rollback_restore", false))
 	var incoming_revision := int(snapshot.get("state_revision", 0))
-	if incoming_revision < _state_revision:
+	if incoming_revision < _state_revision and not rollback_restore:
 		return {"success": false, "reason": &"stale_facility_snapshot", "state_revision": _state_revision}
 	var raw_facilities: Variant = snapshot.get("facilities", [])
 	if not raw_facilities is Array:
 		return {"success": false, "reason": &"invalid_facility_snapshot", "state_revision": _state_revision}
+	if (raw_facilities as Array).size() != _facilities_by_id.size():
+		return {"success": false, "reason": &"incomplete_facility_snapshot", "state_revision": _state_revision}
 	var seen_ids: Dictionary = {}
 	var staged: Dictionary = {}
 	for raw_facility in raw_facilities:
 		if not raw_facility is Dictionary:
 			return {"success": false, "reason": &"invalid_facility_snapshot", "state_revision": _state_revision}
 		var data: Dictionary = raw_facility
+		for required_key in ["id", "type", "state", "used_actions", "revision"]:
+			if not data.has(required_key):
+				return {"success": false, "reason": &"missing_facility_field", "field": required_key, "state_revision": _state_revision}
 		var facility_id := String(data.get("id", ""))
 		if facility_id.is_empty() or not _facilities_by_id.has(facility_id):
 			return {"success": false, "reason": &"unknown_facility", "facility_id": facility_id, "state_revision": _state_revision}
 		if seen_ids.has(facility_id):
 			return {"success": false, "reason": &"duplicate_facility", "facility_id": facility_id, "state_revision": _state_revision}
 		seen_ids[facility_id] = true
+		var current: Dictionary = _facilities_by_id[facility_id]
+		if String(data.get("type", "")) != String(current.get("type", "")):
+			return {"success": false, "reason": &"facility_type_mismatch", "facility_id": facility_id, "state_revision": _state_revision}
 		var used_actions := _read_unique_actions(data.get("used_actions", []))
 		if not bool(used_actions.get("valid", false)):
 			return {"success": false, "reason": &"duplicate_facility_action", "facility_id": facility_id, "state_revision": _state_revision}
-		var current: Dictionary = _facilities_by_id[facility_id]
-		if int(data.get("revision", 0)) < int(current.get("revision", 0)):
+		if int(data.get("revision", 0)) < int(current.get("revision", 0)) and not rollback_restore:
 			return {"success": false, "reason": &"stale_facility_revision", "facility_id": facility_id, "state_revision": _state_revision}
 		staged[facility_id] = {
-			"state": String(data.get("state", current.get("state", "neutral"))),
+			"state": String(data.get("state", "")),
 			"used_actions": used_actions.get("actions", []),
-			"revision": int(data.get("revision", current.get("revision", 0))),
+			"revision": int(data.get("revision", 0)),
 		}
+	for facility_id in _facilities_by_id.keys():
+		if not seen_ids.has(facility_id):
+			return {"success": false, "reason": &"incomplete_facility_snapshot", "facility_id": facility_id, "state_revision": _state_revision}
 	for facility_id in staged.keys():
 		var update: Dictionary = staged[facility_id]
 		var facility: Dictionary = _facilities_by_id[facility_id]
 		facility["state"] = update.get("state", facility.get("state", "neutral"))
 		facility["used_actions"] = (update.get("used_actions", []) as Array).duplicate()
 		facility["revision"] = int(update.get("revision", facility.get("revision", 0)))
-	_state_revision += 1
+	_state_revision = incoming_revision if rollback_restore else _state_revision + 1
 	return {"success": true, "restored": true, "state_revision": _state_revision}
 
 func _build_context(actor: Unit, facility: Dictionary) -> Dictionary:

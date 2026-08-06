@@ -98,6 +98,27 @@ func _assert_facility_snapshot_validation() -> void:
 	var stale_restore: Dictionary = service.restore_snapshot(stale)
 	t.check(not bool(stale_restore.get("success", true)) and service.get_snapshot() == before_invalid, "设施恢复拒绝旧版本快照并回滚")
 
+	var empty_facilities: Dictionary = before_invalid.duplicate(true)
+	empty_facilities["facilities"] = []
+	var empty_restore: Dictionary = service.restore_snapshot(empty_facilities)
+	t.check(not bool(empty_restore.get("success", true)) and service.get_snapshot() == before_invalid, "设施恢复拒绝空设施快照并保持原状态")
+
+	var omitted_facility: Dictionary = before_invalid.duplicate(true)
+	var partial_list: Array = (omitted_facility.get("facilities", []) as Array).duplicate(true)
+	partial_list.remove_at(0)
+	omitted_facility["facilities"] = partial_list
+	var omitted_restore: Dictionary = service.restore_snapshot(omitted_facility)
+	t.check(not bool(omitted_restore.get("success", true)) and service.get_snapshot() == before_invalid, "设施恢复拒绝遗漏设施 ID 的部分快照")
+
+	var missing_required: Dictionary = before_invalid.duplicate(true)
+	var incomplete_list: Array = (missing_required.get("facilities", []) as Array).duplicate(true)
+	var incomplete: Dictionary = (incomplete_list[0] as Dictionary).duplicate(true)
+	incomplete.erase("state")
+	incomplete_list[0] = incomplete
+	missing_required["facilities"] = incomplete_list
+	var missing_restore: Dictionary = service.restore_snapshot(missing_required)
+	t.check(not bool(missing_restore.get("success", true)) and service.get_snapshot() == before_invalid, "设施恢复拒绝缺少必填字段的快照")
+
 func _assert_restore_failure_boundary(snapshot: Dictionary) -> void:
 	var adapter := V2CheckpointAdapter.new()
 	var order: Array = []
@@ -114,6 +135,7 @@ func _assert_restore_failure_boundary(snapshot: Dictionary) -> void:
 	})
 	t.check(not bool(result.get("success", true)) and not bool(result.get("enter_battle", true)), "控制器局部恢复失败不会进入战斗")
 	t.check(order == ["map", "units", "encounter", "facilities"], "控制器恢复按 map、Units、encounter、facilities 顺序停止在失败边界")
+	t.check(fresh_player.grid_pos == Vector2i(0, 0) and fresh_player.current_hp == 5, "后续层恢复失败时已恢复 Unit 状态回滚")
 	fresh_player.free()
 	fresh_enemy.free()
 

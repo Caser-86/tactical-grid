@@ -6,6 +6,9 @@ const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
 
 var v2_hazard_controller: RefCounted = null
+var _v2_hazard_turn_state: Dictionary = {}
+var _v2_restore_attempted := false
+var _v2_restore_failure: Dictionary = {}
 
 ## V2 owns its map, roster, onboarding, and enemy turn. The shared controller
 ## remains a rendering/turn-system base so the V1 branch is never changed.
@@ -46,6 +49,46 @@ func _setup_v2_services() -> void:
 	v2_hazard_controller = V2HazardControllerScript.new()
 	v2_hazard_controller.setup(hazard_map.get("hazards", hazard_map.get("environmental_hazards", [])), hazard_map_size)
 
+func _start_battle() -> void:
+	if boss_unit:
+		AudioManager.bgm_boss()
+	else:
+		AudioManager.bgm_battle_layer(alert_state.get_alert_level() if alert_state else AlertState.LEVEL_CALM)
+	current_encounter_id = "zone_a"
+	var diff_params = GameManager.get_difficulty_params()
+	var base_turn_limit := mission_objective_state.max_turns if mission_objective_state else int(level_config.get("max_turns", 20))
+	var turn_limit = base_turn_limit + int(diff_params.get("turn_limit_bonus", 0))
+	turn_limit = max(5, turn_limit)
+	turn_manager.setup(player_units, enemy_units, turn_limit)
+	action_system.set_units(player_units, enemy_units)
+	if tactical_network_state and not map_data.is_empty():
+		var nodes: Array = map_data.get("nodes", [])
+		var connections: Array = map_data.get("connections", [])
+		tactical_network_state.setup(nodes, connections)
+		_render_network_nodes()
+	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
+	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
+	hud.set_battle_controller(self)
+	_configure_v2_playtest_recorder()
+	_v2_restore_attempted = false
+	_v2_restore_failure.clear()
+	turn_manager.start_battle()
+	var restored_v2_checkpoint := _restore_v2_checkpoint()
+	if restored_v2_checkpoint:
+		_reconcile_v2_unit_occupancy()
+	elif _v2_restore_attempted:
+		_handle_v2_checkpoint_restore_failure(_v2_restore_failure)
+		return
+	else:
+		_save_v2_checkpoint(&"cp_start")
+	hud.update_objective(_get_objective_text())
+	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
+	hud.update_alert_display(alert_state)
+	_render_v2_hud()
+	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
+	_begin_context_tutorials()
+	_render_v2_hud()
+
 func _save_v2_checkpoint(checkpoint_id: StringName) -> bool:
 	if not _is_v2_battle() or GameManager.current_save.is_empty():
 		return false
@@ -83,12 +126,16 @@ func _restore_v2_checkpoint() -> bool:
 	var snapshot: Dictionary = GameManager.consume_v2_checkpoint_request()
 	if snapshot.is_empty():
 		return false
+	_v2_restore_attempted = true
+	_v2_restore_failure.clear()
 	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
 	if not bool(validation.get("valid", false)):
 		_log("V2 检查点校验失败，回退任务起点：%s" % "; ".join(validation.get("errors", [])))
+		_v2_restore_failure = {"reason": &"invalid_snapshot", "validation": validation}
 		GameManager.clear_v2_encounter_checkpoint()
 		return false
 	var player_ids: Dictionary = {}
+	var staged_rescue_units: Array[Unit] = []
 	for unit in player_units:
 		if unit:
 			player_ids[unit.entity_id] = true
@@ -103,9 +150,12 @@ func _restore_v2_checkpoint() -> bool:
 		var rescued := _create_v2_rescue_unit(&"scout", entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
 		if rescued == null:
 			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
+			_v2_restore_failure = {"reason": &"missing_player_entity", "entity_id": entity_id}
+			_rollback_staged_v2_rescue_units(staged_rescue_units)
 			GameManager.clear_v2_encounter_checkpoint()
 			return false
 		player_units.append(rescued)
+		staged_rescue_units.append(rescued)
 		player_ids[entity_id] = true
 		if turn_manager:
 			turn_manager.register_player_unit(rescued)
@@ -123,6 +173,8 @@ func _restore_v2_checkpoint() -> bool:
 	var restored: Dictionary = V2CheckpointAdapterScript.restore_v2_layers(snapshot, context)
 	if not bool(restored.get("success", false)):
 		_log("V2 检查点恢复失败，回退任务起点：%s" % String(restored.get("reason", "unknown")))
+		_v2_restore_failure = restored.duplicate(true)
+		_rollback_staged_v2_rescue_units(staged_rescue_units)
 		GameManager.clear_v2_encounter_checkpoint()
 		return false
 	var restored_snapshot: Dictionary = restored.get("snapshot", snapshot)
@@ -146,7 +198,50 @@ func _restore_v2_checkpoint() -> bool:
 	_sync_v2_enemy_sprites_after_restore()
 	_update_visibility()
 	_refresh_v2_runtime_state()
+	_v2_restore_failure.clear()
 	return true
+
+func _rollback_staged_v2_rescue_units(staged_units: Array) -> void:
+	for raw_unit in staged_units:
+		var unit: Unit = raw_unit
+		if unit == null:
+			continue
+		player_units.erase(unit)
+		if is_instance_valid(unit):
+			unit.free()
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service:
+		v2_action_service.refresh_units(player_units, enemy_units)
+
+func _handle_v2_checkpoint_restore_failure(failure: Dictionary) -> void:
+	var reason := String(failure.get("reason", "unknown"))
+	_log("V2 检查点恢复中止：%s" % reason)
+	if turn_manager:
+		turn_manager.battle_over = true
+		turn_manager.current_phase = TurnManager.TurnPhase.BATTLE_OVER
+		turn_manager.input_locked = true
+	var battle_result := {
+		"result": "defeat",
+		"level_id": level_id,
+		"stars": 0,
+		"turns": turn_manager.turn_number if turn_manager else 0,
+		"units_survived": 0,
+		"units_total": player_units.size(),
+		"survivor_count": 0,
+		"rewards": {},
+		"rating": 0,
+		"optional_credit": 0,
+		"optional_resource_collected": false,
+		"defeat_reason": "checkpoint_restore_failed",
+		"restore_error": reason,
+		"has_encounter_checkpoint": false,
+		"encounter_id": "",
+		"mission_id": level_id,
+		"v2_restore_error": true,
+	}
+	_finish_v2_playtest(false, battle_result)
+	GameManager.go_to_mission_result(battle_result)
 
 func _generate_map() -> void:
 	var result: Dictionary = V2RuntimeMapLoader.load_map(StringName(level_id))
@@ -319,6 +414,13 @@ func _begin_tutorials_or_start() -> void:
 	# V2 starts immediately, then uses the non-blocking V2 tutorial state machine.
 	_start_battle()
 
+func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
+	if phase == TurnManager.TurnPhase.PLAYER_ACTION:
+		_advance_v2_hazard_player_turn()
+	elif phase == TurnManager.TurnPhase.ENEMY_ACTION:
+		_consume_v2_hazard_enemy_phase()
+	super._on_phase_changed(phase)
+
 func _run_enemy_turn() -> void:
 	await run_v2_enemy_turn()
 
@@ -333,6 +435,116 @@ func run_v2_enemy_turn() -> void:
 		_reconcile_v2_unit_occupancy()
 		_refresh_v2_runtime_state()
 		turn_manager.end_enemy_turn()
+
+func _advance_v2_hazard_player_turn() -> Dictionary:
+	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("advance_player_turn"):
+		_v2_hazard_turn_state.clear()
+		_render_v2_hazard_overlay()
+		return {}
+	var turn := turn_manager.turn_number if turn_manager else 1
+	_v2_hazard_turn_state = v2_hazard_controller.advance_player_turn(turn)
+	_render_v2_hazard_overlay()
+	_apply_v2_hazard_prompt(_v2_hazard_turn_state)
+	return _v2_hazard_turn_state.duplicate(true)
+
+func _consume_v2_hazard_enemy_phase() -> Array:
+	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("consume_enemy_phase_damage"):
+		return []
+	var turn := turn_manager.turn_number if turn_manager else 1
+	var events: Array = v2_hazard_controller.consume_enemy_phase_damage(turn)
+	if events.is_empty():
+		return []
+	for raw_event in events:
+		if not raw_event is Dictionary:
+			continue
+		var event: Dictionary = raw_event
+		var damage := int(event.get("damage", 0))
+		var cells := _v2_cell_set(event.get("cells", []))
+		for raw_unit in player_units + enemy_units:
+			var unit: Unit = raw_unit
+			if unit == null or not unit.is_alive or not cells.has(unit.grid_pos):
+				continue
+			unit.take_damage(damage)
+			_update_unit_sprite_pos(unit, true)
+			_log("危险区 %s 对 %s 造成 %d 伤害" % [String(event.get("hazard_id", "")), unit.unit_name, damage])
+	_refresh_v2_runtime_state()
+	return events
+
+func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
+	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("commit_close_action"):
+		return {"success": false, "reason": &"hazard_controller_unavailable"}
+	var result: Dictionary = v2_hazard_controller.commit_close_action(action_id)
+	if bool(result.get("success", false)):
+		_advance_v2_hazard_player_turn()
+	return result
+
+func _apply_v2_interaction_result(result: Dictionary) -> void:
+	super._apply_v2_interaction_result(result)
+	var close_result := _commit_v2_hazard_close_action(String(result.get("action_id", "")))
+	if bool(close_result.get("success", false)) and hud:
+		hud.set_context_prompt("危险区已关闭：%s" % ", ".join(close_result.get("closed_now", [])))
+		_render_v2_hud()
+
+func _render_v2_hazard_overlay() -> void:
+	if effect_layer == null:
+		return
+	for child in effect_layer.get_children():
+		if String(child.name).begins_with("V2HazardOverlay_"):
+			child.queue_free()
+	var warning_cells: Array = _v2_hazard_turn_state.get("warning_cells", [])
+	var active_cells: Array = _v2_hazard_turn_state.get("active_cells", [])
+	for raw_cell in warning_cells:
+		var cell := _parse_v2_hazard_cell(raw_cell)
+		if cell.x >= 0:
+			_draw_v2_hazard_cell(cell, Color(1.0, 0.78, 0.12, 0.32), "warning")
+	for raw_cell in active_cells:
+		var cell := _parse_v2_hazard_cell(raw_cell)
+		if cell.x >= 0:
+			_draw_v2_hazard_cell(cell, Color(1.0, 0.14, 0.08, 0.44), "active")
+
+func _draw_v2_hazard_cell(cell: Vector2i, color: Color, kind: String) -> void:
+	var overlay := Polygon2D.new()
+	overlay.name = "V2HazardOverlay_%s_%d_%d" % [kind, cell.x, cell.y]
+	overlay.position = GridSystem.grid_to_world(cell)
+	overlay.polygon = PackedVector2Array([
+		Vector2(6, 6),
+		Vector2(CELL_SIZE - 6, 6),
+		Vector2(CELL_SIZE - 6, CELL_SIZE - 6),
+		Vector2(6, CELL_SIZE - 6),
+	])
+	overlay.color = color
+	overlay.z_index = 5
+	effect_layer.add_child(overlay)
+
+func _apply_v2_hazard_prompt(state: Dictionary) -> void:
+	if hud == null:
+		return
+	var warning_count := (state.get("warning_cells", []) as Array).size()
+	var active_count := (state.get("active_cells", []) as Array).size()
+	if active_count > 0:
+		hud.set_context_prompt("危险区已生效：敌方阶段会结算 %d 个危险格" % active_count)
+	elif warning_count > 0:
+		hud.set_context_prompt("危险区预警：%d 个格子将在下一轮生效" % warning_count)
+
+func _v2_cell_set(raw_cells: Variant) -> Dictionary:
+	var cells: Dictionary = {}
+	if raw_cells is Array:
+		for raw_cell in raw_cells:
+			var cell := _parse_v2_hazard_cell(raw_cell)
+			if cell.x >= 0:
+				cells[cell] = true
+	return cells
+
+func _parse_v2_hazard_cell(raw_cell: Variant) -> Vector2i:
+	if raw_cell is Vector2i:
+		return raw_cell
+	if raw_cell is Vector2:
+		return Vector2i(raw_cell)
+	if raw_cell is Array and raw_cell.size() >= 2:
+		return Vector2i(int(raw_cell[0]), int(raw_cell[1]))
+	if raw_cell is Dictionary:
+		return Vector2i(int(raw_cell.get("x", -1)), int(raw_cell.get("y", -1)))
+	return Vector2i(-1, -1)
 
 func _update_v2_encounters(mission_events: Array) -> Dictionary:
 	if not _is_v2_battle() or v2_encounter_activation == null:
