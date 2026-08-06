@@ -3121,6 +3121,9 @@ func request_move(cell: Vector2i) -> Dictionary:
 func _finalize_v2_move(result: Dictionary) -> void:
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_preview()
+	# Commit updates the selected unit first; repair any stale encounter overlap
+	# before the movement animation can present two units in one cell.
+	_reconcile_v2_unit_occupancy()
 	if selected_unit:
 		_update_unit_sprite_pos(selected_unit, true)
 		_refresh_selected_unit_affordances(selected_unit)
@@ -4521,6 +4524,11 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 		hud.update_unit_info(unit)
 
 func _on_unit_died(unit: Unit) -> void:
+	if _is_v2_battle() and visibility_state and unit != null:
+		# Death is not loss of sight: remove the remembered enemy so the fog
+		# renderer cannot replace the corpse with a last-known ghost.
+		visibility_state.forget_enemy(unit.entity_id)
+		_refresh_last_known_ghosts()
 	if _is_v2_battle() and v2_mission_flow:
 		_apply_v2_mission_event(&"unit_downed", {"unit": unit, "unit_id": unit.entity_id})
 	if _is_v2_battle() and v2_damage_signal_suppressed:
@@ -4630,7 +4638,7 @@ func _update_unit_sprite_pos(unit: Unit, animate: bool = false) -> void:
 	if animate:
 		sprite.play_move_to(target_position)
 	else:
-		sprite.position = target_position
+		sprite.snap_to(target_position)
 
 func _play_unit_state(unit: Unit, state: StringName, direction: Vector2 = Vector2.RIGHT) -> void:
 	var sprite := _get_unit_sprite(unit)

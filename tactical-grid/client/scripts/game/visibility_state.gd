@@ -163,6 +163,17 @@ func is_cell_observed(cell: Vector2i) -> bool:
 func is_enemy_observed(entity_id: String) -> bool:
 	return _observed_enemies.has(entity_id)
 
+## Remove all remembered visibility for an enemy that has been defeated.
+## A dead unit is not an enemy that merely left sight, so it must not render as
+## a last-known ghost after its live sprite is removed.
+func forget_enemy(entity_id: String) -> void:
+	if entity_id == "":
+		return
+	_observed_enemies.erase(entity_id)
+	_previously_observed.erase(entity_id)
+	_newly_revealed.erase(entity_id)
+	_last_known.erase(entity_id)
+
 
 ## Check if an enemy was first revealed this turn.
 func is_newly_revealed(entity_id: String) -> bool:

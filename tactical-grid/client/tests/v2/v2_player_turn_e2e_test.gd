@@ -122,6 +122,7 @@ func _run() -> void:
 		await get_tree().process_frame
 		t.check(target.current_hp < hp_before, "单次左键敌人完成攻击")
 		t.check(target.current_hp == expected_hp_after, "攻击结算严格等于悬停预览的 HP 结果")
+		t.check(not battle._last_known_ghosts.has(target.entity_id), "敌人死亡后不生成最后已知位置幽灵")
 		t.check(not player.v2_turn_state.action_available, "攻击只消耗行动预算")
 		t.check(battle.effect_layer.get_node_or_null("V2AttackFeedback") != null, "攻击在地面显示弹道与命中反馈")
 		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "攻击完成后回到单位选择状态")

@@ -198,6 +198,18 @@ func play_move_to(target_position: Vector2, duration_override: float = -1.0) -> 
 	_state_tween.tween_property(self, "position", target_position, duration)
 	_state_tween.finished.connect(_return_to_idle)
 
+## Snap visual state after an authoritative position correction.
+## Reconciliation must cancel any in-flight movement tween, otherwise the old
+## tween can move a corrected enemy back onto a player unit a few frames later.
+func snap_to(target_position: Vector2) -> void:
+	if _state_tween and _state_tween.is_valid():
+		_state_tween.kill()
+	position = target_position
+	current_state = &"idle"
+	if unit:
+		z_index = 100 + unit.grid_pos.y
+	_reset_art_transform()
+
 func play_death(duration_override: float = -1.0) -> void:
 	_begin_state(&"death")
 	var base_duration := duration_override if duration_override > 0.0 else 0.55
