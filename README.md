@@ -1,17 +1,16 @@
-# Tactical Grid
+# Tactical Grid V2: Infiltration
 
-Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游戏项目。新的“战术网络控制”系统垂直切片和 M1 初版已经进入 `main`；整部第一章和五章战役仍未完成，**不是已发布或内容完整的游戏**。
+这是 Tactical Grid 的 V2 独立开发线，使用 Godot 4.7.1 制作，方向为 2D 小队潜入探索冒险。V1“战术网络控制版”仍由 `main` 独立维护，本工作区不修改、不读取 V1 的运行存档，也不与 V1 共用开发产物。
 
-后续开发、测试、文档和发布只以 `main` 为准。过期分支、服务端实验和旧路线图已经清理。
+V2 的唯一开发入口见 [V2 版本说明](docs/v2/README.md)。V1 文档和旧规格仅作为历史基线，不属于 V2 的执行任务。
 
-## 当前状态
+## V2 当前状态
 
-- Godot 客户端可从 `boot.tscn` 启动，包含主菜单、基地、战斗、设置、暂停、结算和对话流程。
-- 任务单一权威、战术网络、警戒、迷雾状态、敌方意图状态和 M1 分阶段流程已进入主线。
-- 2026-08-02 重新运行 Godot 发布门禁为 2,966/2,966 通过，0 失败；选中队员后即时显示蓝色移动范围与红色攻击范围/目标、移动完成回到直接选择模式、真实鼠标结束回合、中键拖动镜头、右键移动快捷键、直接点击敌人预览命中率/预计伤害并再次点击确认、角色详情面板、对话布局和两个选项的真实鼠标输入均已通过回归契约。Windows 发布包在 200% 系统缩放下已核验为完整 1280×720 内容布局。
-- 敌方意图真实执行、完整迷雾人工表现验收、M1 真人门、干净克隆导出、三难度通关、长时/多硬件 QA、代码签名及 M2-M6 重做仍未完成。
+- V2 已完成独立 worktree、Git 分支、Godot 项目身份和用户数据目录隔离。
+- V2 当前仍继承 V1 的可运行基线；正式总规格已于 2026-08-05 获用户批准，78 个可提交实施任务与三个真人硬门已经写入，玩法代码尚未开始修改。
+- V2 的下一步是执行 F01 独立发布门，然后按 P1 技术骨架、P2 操作与 HUD、P3 M1 灰盒的顺序推进。
 
-完整的已验证状态、限制和下一步请见 [项目状态](tactical-grid/PROJECT_STATUS.md) 与 [接管路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)。
+完整的 V2 状态、边界和下一步请见 [V2 项目状态](tactical-grid/PROJECT_STATUS_V2.md) 与 [V2 文档入口](docs/v2/README.md)。
 
 ## 仓库结构
 
@@ -20,8 +19,8 @@ Tactical Grid 是一个使用 Godot 4.7.1 制作中的单机回合制战术游�
 ├── tactical-grid/          # 可运行项目模块
 │   ├── client/             # Godot 4.7.1 游戏、数据、资源与测试
 │   ├── README.md           # 本地运行、测试和目录说明
-│   └── PROJECT_STATUS.md   # 当前实测状态
-└── docs/                   # 活跃文档、规格与唯一路线图
+│   └── PROJECT_STATUS_V2.md # V2 当前状态
+└── docs/                   # V2 文档与路线图
 ```
 
 ## 快速开始
@@ -36,13 +35,13 @@ godot --path tactical-grid/client
 
 `tactical-grid/start.bat` 是开发启动器，会直接打开 Godot 编辑器。
 
-## 文档入口
+## V2 文档入口
 
 - [项目模块说明](tactical-grid/README.md)：安装、启动、测试和目录结构。
-- [当前状态](tactical-grid/PROJECT_STATUS.md)：当前实测结果与发布阻断项。
-- [接管路线图](docs/PROJECT_TAKEOVER_ROADMAP.md)：唯一的开发任务、优先级与验收记录。
-- [文档索引](docs/README.md)：活跃文档和历史参考的完整导航。
-- [活跃设计范围](docs/design/README.md)：首发版本的边界与玩法原则。
+- [V2 当前状态](tactical-grid/PROJECT_STATUS_V2.md)：V2 当前状态与发布阻断项。
+- [V2 版本说明](docs/v2/README.md)：V2 唯一执行入口、边界与后续规格。
+- [V2 总规格](docs/v2/V2_MASTER_SPEC.md)：产品、玩法、内容、技术、资源、测试与发布的唯一权威要求。
+- [V2 主实施计划](docs/superpowers/plans/2026-08-05-v2-master-implementation.md)：78 个实施任务、依赖、模型分工、提交边界和 H1-H3 验收门。
 
 ## 贡献约定
 

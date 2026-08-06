@@ -1,0 +1,36 @@
+extends SceneTree
+
+const Runner = preload("res://tests/v2/test_runner.gd")
+const Recorder = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
+
+var t := Runner.new()
+
+func _initialize() -> void:
+	var recorder := Recorder.new()
+	var started := recorder.start("P01", "standard")
+	t.check(bool(started.get("success", false)), "匿名试玩记录器启动成功")
+	t.check(String(started.get("participant_id", "")) == "P01", "只保存匿名参与者编号")
+	t.check(String(started.get("mission_id", "")) == "ch1_m1", "记录固定绑定 M1")
+
+	var selected := recorder.record(&"unit_selected", {"unit_id": "player_assault"})
+	var moved := recorder.record(&"move_committed", {"from": [3, 14], "to": [4, 13]})
+	t.check(bool(selected.get("success", false)) and bool(moved.get("success", false)), "允许记录关键试玩事件")
+	var rejected := recorder.record(&"unit_selected", {"player_name": "should-not-enter"})
+	t.check(not bool(rejected.get("success", false)), "拒绝含隐私字段的事件")
+	var unknown := recorder.record(&"unknown_event", {})
+	t.check(not bool(unknown.get("success", false)), "拒绝未定义事件")
+	var session := recorder.finish({"would_continue": true, "completed": false})
+	t.check(String(session.get("participant_id", "")) == "P01", "完成后保留匿名编号")
+	t.check((session.get("events", []) as Array).size() == 4, "事件按发生顺序保存")
+	t.check(int((session.get("events", []) as Array)[0].get("elapsed_ms", -1)) >= 0, "事件保存相对时间")
+	t.check(not session.has("player_name") and not session.has("machine_name"), "记录不含姓名或机器名")
+	t.check(not session.has("account") and not session.has("username") and not session.has("ip_address"), "记录不含账号或网络隐私")
+	t.check(bool(session.get("result", {}).get("would_continue", false)), "完成结果保存继续意愿")
+	t.check((recorder.get_session().get("events", []) as Array).size() == 4, "拒绝事件不会进入记录")
+	var save_result := recorder.get_last_save()
+	t.check(bool(save_result.get("success", false)), "完成试玩后写入本地 JSON")
+	var output_path := String(save_result.get("path", ""))
+	t.check(output_path == "user://playtests/m1/P01.json" and FileAccess.file_exists(output_path), "本地输出路径固定且文件存在")
+	var saved_data: Variant = JSON.parse_string(FileAccess.get_file_as_string(output_path))
+	t.check(saved_data is Dictionary and String((saved_data as Dictionary).get("participant_id", "")) == "P01", "写入文件可重新解析")
+	t.finish(self)

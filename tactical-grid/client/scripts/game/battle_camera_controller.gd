@@ -39,6 +39,8 @@ var _saved_zoom: Vector2 = Vector2.ONE
 var _saved_position: Vector2 = Vector2.ZERO
 ## Home 键目标
 var _home_target: Vector2 = Vector2.ZERO
+## V2 使用 BattleInputRouter 转发镜头输入时，关闭本脚本的旧 _input 路径，避免双倍平移/缩放。
+var _router_input_mode: bool = false
 
 func _ready() -> void:
 	enabled = true
@@ -60,12 +62,14 @@ func _process(delta: float) -> void:
 		_clamp_to_bounds()
 
 func _input(event: InputEvent) -> void:
+	if _router_input_mode:
+		return
 	# 鼠标滚轮缩放
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_zoom_at(event.position, 1.0 / ZOOM_STEP)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_zoom_at(event.position, ZOOM_STEP)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			_zoom_at(event.position, 1.0 / ZOOM_STEP)
 		elif event.button_index == MOUSE_BUTTON_MIDDLE:
 			if event.pressed:
 				begin_drag(event.position)
@@ -98,6 +102,9 @@ func _input(event: InputEvent) -> void:
 ## CODE-P0-01: configure_bounds is the canonical entry point.
 func configure_bounds(map_pixel_rect: Rect2, hud_safe_rect: Rect2, initial_focus: Vector2 = Vector2(INF, INF)) -> void:
 	_setup_internal(map_pixel_rect, hud_safe_rect, initial_focus)
+
+func set_input_router_mode(enabled: bool) -> void:
+	_router_input_mode = enabled
 
 ## Backward-compatible alias; new code should call configure_bounds.
 func setup(map_bounds: Rect2, safe_viewport: Rect2, initial_focus: Vector2 = Vector2(INF, INF)) -> void:
@@ -152,9 +159,24 @@ func drag_to(screen_pos: Vector2) -> void:
 	_last_drag_screen_pos = screen_pos
 	_clamp_to_bounds()
 
+## 由 V2 输入路由器转发的中键拖动增量。
+func pan_by_screen_delta(delta: Vector2) -> void:
+	position -= delta / zoom
+	_clamp_to_bounds()
+
 ## 结束拖拽
 func end_drag() -> void:
 	_dragging = false
+
+## 公开缩放接口：direction > 0 放大，direction < 0 缩小。
+func zoom_at(direction: float, anchor: Vector2) -> void:
+	if is_zero_approx(direction):
+		return
+	_zoom_at(anchor, ZOOM_STEP if direction > 0.0 else 1.0 / ZOOM_STEP)
+
+## 以地图格子为目标聚焦，供 Home 快捷键使用。
+func focus_cell(cell: Vector2i) -> void:
+	focus_home(GridSystem.grid_to_world(cell) + Vector2(32.0, 32.0))
 
 ## 平滑定位到指定格子（世界坐标）
 func focus_position(world_pos: Vector2) -> void:
@@ -223,9 +245,10 @@ func _zoom_at(screen_pos: Vector2, factor: float) -> void:
 	if new_zoom == old_zoom:
 		return
 	# 保持鼠标位置对应的世界坐标不变
-	var world_pos_before = screen_pos / old_zoom + position - get_viewport_rect().size * 0.5 / old_zoom
+	var viewport_size := _get_viewport_size()
+	var world_pos_before = screen_pos / old_zoom + position - viewport_size * 0.5 / old_zoom
 	zoom = new_zoom
-	var world_pos_after = screen_pos / new_zoom + position - get_viewport_rect().size * 0.5 / new_zoom
+	var world_pos_after = screen_pos / new_zoom + position - viewport_size * 0.5 / new_zoom
 	position += world_pos_before - world_pos_after
 	_clamp_to_bounds()
 
@@ -257,9 +280,14 @@ func _clamp_to_bounds() -> void:
 func _get_safe_viewport() -> Rect2:
 	if _safe_viewport.size.x > 0.0 and _safe_viewport.size.y > 0.0:
 		return _safe_viewport
-	return Rect2(Vector2.ZERO, get_viewport_rect().size)
+	return Rect2(Vector2.ZERO, _get_viewport_size())
 
 
 func _get_safe_viewport_offset() -> Vector2:
-	var viewport_center := get_viewport_rect().size * 0.5
+	var viewport_center := _get_viewport_size() * 0.5
 	return (viewport_center - _get_safe_viewport().get_center()) / zoom
+
+func _get_viewport_size() -> Vector2:
+	if is_inside_tree():
+		return get_viewport_rect().size
+	return Vector2(1152.0, 648.0)

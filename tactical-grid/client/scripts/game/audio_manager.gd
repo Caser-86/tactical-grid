@@ -94,6 +94,9 @@ func _restart_bgm() -> void:
 ## 停止 BGM
 func stop_bgm() -> void:
 	bgm_player.stop()
+	# Release the stream as well as playback so temporary battle scenes and
+	# headless verification runs do not retain decoded BGM resources.
+	bgm_player.stream = null
 	current_bgm = ""
 	battle_music_layer = -1
 
@@ -148,6 +151,7 @@ func play_ambient(ambient_id: String) -> void:
 ## 停止环境音
 func stop_ambient() -> void:
 	ambient_player.stop()
+	ambient_player.stream = null
 
 ## 加载音频文件
 func _load_audio(category: String, audio_id: String) -> AudioStream:

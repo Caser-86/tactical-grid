@@ -152,6 +152,70 @@ func create_player_unit(job_id: String, name: String = "") -> Unit:
 
 	return unit
 
+## Create a unit from the V2 character contract without consulting V1 job data.
+## V2 combat uses a single deterministic damage value, represented as a two-item
+## weapon range so the shared Unit and combat presentation code can be reused.
+func create_v2_player_unit(character_data: Dictionary, name_override: String = "") -> Unit:
+	var unit := Unit.new()
+	var character_id := String(character_data.get("id", "assault"))
+	unit.unit_name = name_override if not name_override.is_empty() else String(character_data.get("name", character_id))
+	unit.job = character_id
+	unit.team = "player"
+	unit.max_hp = maxi(1, int(character_data.get("hp", 1)))
+	unit.current_hp = unit.max_hp
+	unit.move_points = maxi(1, int(character_data.get("move", 1)))
+	unit.base_move_points = unit.move_points
+	unit.vision_range = maxi(1, int(character_data.get("vision", 1)))
+	unit.max_ap = 2
+	unit.current_ap = unit.max_ap
+	unit.armor = maxi(0, int(character_data.get("armor", 0)))
+	var raw_range: Variant = character_data.get("attack_range", [1, 1])
+	if raw_range is Array and (raw_range as Array).size() >= 2:
+		unit.weapon_range = [int(raw_range[0]), int(raw_range[1])]
+	else:
+		unit.weapon_range = [1, 1]
+	var damage := maxi(1, int(character_data.get("damage", 1)))
+	unit.weapon_damage = [damage, damage]
+	unit.weapon_optimal_range = int(unit.weapon_range[1])
+	unit.learned_skills = [String(character_data.get("ability_id", ""))].filter(func(value: String): return not value.is_empty())
+	unit.available_items = []
+	unit.base_hit = 100
+	unit.crit_chance = 0.0
+	unit.dodge = 0.0
+	unit.enable_v2_turn_mode()
+	return unit
+
+## Create an enemy from the V2 enemy contract without consulting V1 templates.
+## Inactive encounter members are kept as non-alive data nodes until their
+## stable encounter ID is activated by V2EncounterActivation.
+func create_v2_enemy_unit(enemy_data: Dictionary) -> Unit:
+	var unit := Unit.new()
+	var enemy_id := String(enemy_data.get("id", "sentry"))
+	unit.unit_name = String(enemy_data.get("name", enemy_id))
+	unit.job = enemy_id
+	unit.team = "enemy"
+	unit.max_hp = maxi(1, int(enemy_data.get("hp", 1)))
+	unit.current_hp = unit.max_hp
+	unit.move_points = maxi(0, int(enemy_data.get("move", 1)))
+	unit.base_move_points = unit.move_points
+	unit.vision_range = maxi(1, int(enemy_data.get("vision", 1)))
+	unit.max_ap = 2
+	unit.current_ap = unit.max_ap
+	unit.armor = maxi(0, int(enemy_data.get("armor", 0)))
+	var raw_range: Variant = enemy_data.get("attack_range", [1, 1])
+	if raw_range is Array and (raw_range as Array).size() >= 2:
+		unit.weapon_range = [int(raw_range[0]), int(raw_range[1])]
+	else:
+		unit.weapon_range = [1, 1]
+	var damage := maxi(1, int(enemy_data.get("damage", 1)))
+	unit.weapon_damage = [damage, damage]
+	unit.weapon_optimal_range = int(unit.weapon_range[1])
+	unit.base_hit = 100
+	unit.crit_chance = 0.0
+	unit.dodge = 0.0
+	unit.enable_v2_turn_mode()
+	return unit
+
 ## 创建敌人单位
 func create_enemy_unit(enemy_id: String) -> Unit:
 	var unit = Unit.new()

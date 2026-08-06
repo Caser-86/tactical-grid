@@ -7,6 +7,8 @@ class_name HUD
 @onready var phase_label = $TopBar/PhaseLabel
 @onready var objective_label = $TopBar/ObjectiveLabel
 @onready var unit_info_label = $RightPanel/UnitInfoLabel
+@onready var action_budget_label = $RightPanel/V2ActionBudgetLabel
+@onready var action_hint_label = $RightPanel/V2ActionHintLabel
 @onready var move_button = $BottomBar/ActionBar/MoveButton
 @onready var attack_button = $BottomBar/ActionBar/AttackButton
 @onready var skill_button = $BottomBar/ActionBar/SkillButton
@@ -34,6 +36,12 @@ var _action_picker_callback: Callable = Callable()
 enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
 var _context_state: ContextState = ContextState.NONE
 var _context_prompt: Label = null
+## V2 使用统一名称暴露当前操作提示，避免测试和其他表现层依赖内部节点名。
+var context_label: Label = null
+var _pending_v2_snapshot: Dictionary = {}
+var _v2_hud_active := false
+## V2: 当前攻击预览卡片文本。单独保留，便于输入测试和结果回显使用同一份数据。
+var _attack_preview_text: String = ""
 ## CODE-P2-02: 警报显示标签和网络覆盖层
 var _alert_label: Label = null
 var _network_overlay: Control = null
@@ -63,6 +71,7 @@ func _ready() -> void:
 	_context_prompt.offset_bottom = -60.0
 	_context_prompt.visible = false
 	add_child(_context_prompt)
+	context_label = _context_prompt
 	set_context_state(ContextState.NONE)
 	# CODE-P2-02: Alert display label (top bar second row)
 	_alert_label = Label.new()
@@ -104,6 +113,8 @@ func _ready() -> void:
 	_threat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_threat_label.visible = false
 	$RightPanel.add_child(_threat_label)
+	if not _pending_v2_snapshot.is_empty():
+		render_v2_snapshot(_pending_v2_snapshot)
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -172,6 +183,8 @@ func update_turn_display(turn: int, phase: int) -> void:
 			phase_label.text = "..."
 
 func update_unit_info(unit: Node) -> void:
+	if unit_info_label == null:
+		return
 	if not unit or not unit.is_alive:
 		unit_info_label.text = ""
 		set_action_buttons_visible(false)
@@ -244,7 +257,7 @@ func set_context_state(state: ContextState) -> void:
 		ContextState.ATTACK_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击敌人查看攻击结果，再次点击确认，右键取消"
+				_context_prompt.text = "悬停敌人查看伤害，点击一次攻击，右键取消"
 		ContextState.FACILITY_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
@@ -255,6 +268,142 @@ func set_context_prompt(text: String) -> void:
 	if _context_prompt:
 		_context_prompt.text = text
 		_context_prompt.visible = true
+
+## V2: 以一个快照驱动整块战斗 HUD，保证目标、预算和下一步后果不会互相覆盖。
+## 该入口只改变 V2 显示状态，V1 仍使用原有的 update_* 方法。
+func render_v2_snapshot(snapshot: Dictionary) -> void:
+	if not is_node_ready() or context_label == null:
+		_pending_v2_snapshot = snapshot.duplicate(true)
+		return
+	_v2_hud_active = true
+	_pending_v2_snapshot.clear()
+
+	var objective := String(snapshot.get("primary_objective", ""))
+	if objective != "":
+		objective_label.text = objective
+
+	var phase := String(snapshot.get("phase", "玩家回合"))
+	var state := String(snapshot.get("state", "free_select"))
+	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if state != "" else phase
+	phase_label.modulate = Color.CYAN if phase.contains("玩家") else Color.RED if phase.contains("敌人") else Color.GOLD
+
+	var alert := String(snapshot.get("alert", ""))
+	var next_consequence := String(snapshot.get("next_consequence", ""))
+	var visibility_summary: Dictionary = snapshot.get("visibility_summary", {})
+	if _alert_label:
+		var alert_text := "警戒：%s" % alert if alert != "" else ""
+		if next_consequence != "":
+			alert_text += " | 下一步：%s" % next_consequence
+		var newly_observed_cells := int(visibility_summary.get("newly_observed_cells", 0))
+		var newly_revealed_enemies := int(visibility_summary.get("newly_revealed_enemies", 0))
+		if newly_observed_cells > 0:
+			alert_text += " | 视野 +%d格" % newly_observed_cells
+		if newly_revealed_enemies > 0:
+			alert_text += " | 发现敌人 %d" % newly_revealed_enemies
+		_alert_label.text = alert_text
+		_alert_label.visible = alert_text != ""
+
+	var selected: Node = snapshot.get("selected", null) as Node
+	var selected_valid := selected != null and is_instance_valid(selected) and bool(selected.get("is_alive"))
+	$RightPanel.visible = selected_valid
+	if selected_valid:
+		update_unit_info(selected)
+	else:
+		unit_info_label.text = ""
+
+	# V2 直接地图交互不显示常驻移动/攻击/技能按钮，玩家从地图高亮和提示中行动。
+	set_action_buttons_visible(false)
+	var budget: Dictionary = snapshot.get("action_budget", {})
+	if action_budget_label:
+		action_budget_label.visible = selected_valid
+		if selected_valid:
+			action_budget_label.text = "行动预算\n移动 %s   行动 %s" % [
+				"可用" if bool(budget.get("move", false)) else "已用",
+				"可用" if bool(budget.get("action", false)) else "已用",
+			]
+	var ability := String(snapshot.get("ability", ""))
+	var interaction := String(snapshot.get("interaction", ""))
+	var side_hint := ability if ability != "" else interaction
+	if side_hint == "":
+		side_hint = "蓝格移动 · 红色敌人攻击\n右键取消 · 中键拖动地图"
+	if action_hint_label:
+		action_hint_label.text = side_hint
+		action_hint_label.visible = selected_valid
+
+	var prompt := String(snapshot.get("context_prompt", ""))
+	var attack_preview: Variant = snapshot.get("attack_preview", "")
+	if prompt == "" and attack_preview is String:
+		prompt = String(attack_preview)
+	context_label.text = prompt if prompt != "" else "选择一个单位开始行动"
+	context_label.visible = true
+
+func _v2_state_label(state: String) -> String:
+	match state:
+		"free_select":
+			return "选择单位"
+		"unit_selected":
+			return "已选中"
+		"attack_locked":
+			return "攻击已锁定"
+		"ability_targeting":
+			return "选择技能目标"
+		"interaction_menu":
+			return "选择设施操作"
+		"enemy_turn":
+			return "敌人行动"
+		"paused":
+			return "已暂停"
+		_:
+			return state
+
+## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
+func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:
+	if target == null:
+		return
+	var hp_before := int(preview.get("hp_before", target.current_hp))
+	var hp_after := int(preview.get("hp_after", target.current_hp))
+	var shield_before := int(preview.get("shield_before", target.current_shield))
+	var shield_after := int(preview.get("shield_after", target.current_shield))
+	var damage := int(preview.get("hp_damage", maxi(0, hp_before - hp_after)))
+	var mode := "已锁定" if locked else "悬停预览"
+	var text := "%s %s：伤害 %d · HP %d → %d" % [mode, target.unit_name, damage, hp_before, hp_after]
+	if shield_before != shield_after:
+		text += " · 护盾 %d → %d" % [shield_before, shield_after]
+	text += " · %s" % ("再次点击确认" if locked else "点击攻击")
+	_attack_preview_text = text
+	set_context_prompt(text)
+
+func get_attack_preview_text() -> String:
+	return _attack_preview_text
+
+func clear_attack_preview() -> void:
+	_attack_preview_text = ""
+
+## V2: 将服务层错误转换为玩家可理解的操作反馈。
+func show_action_reason(reason: Variant) -> void:
+	var text := "无法执行该操作"
+	match String(reason):
+		"action_unavailable":
+			text = "本单位本回合已经攻击过"
+		"out_of_range":
+			text = "目标超出攻击范围"
+		"no_line_of_sight":
+			text = "目标被墙体或掩体遮挡"
+		"full_cover":
+			text = "目标处于完全掩体后，无法从当前位置攻击"
+		"stale_preview":
+			text = "目标状态已变化，请重新选择目标"
+		"same_team":
+			text = "不能攻击友方单位"
+		"target_dead":
+			text = "目标已经失去战斗能力"
+		"move_unavailable":
+			text = "本单位本回合已经移动过"
+		"blocked":
+			text = "目标格不可通行"
+		"move_too_far":
+			text = "目标格超出移动范围"
+	set_context_prompt(text)
 
 func get_context_prompt_text() -> String:
 	return _context_prompt.text if _context_prompt else ""
@@ -353,6 +502,22 @@ func show_action_picker(title: String, items: Array, on_selected: Callable) -> v
 	if is_instance_valid(popup):
 		var vp_size = get_viewport().get_visible_rect().size
 		popup.position = Vector2i(int((vp_size.x - popup.size.x) * 0.5), int(vp_size.y - popup.size.y - 90))
+
+## V2: 设施交互复用同一张选择卡，但把结果、持续时间和警戒影响写进描述。
+func show_interaction_actions(facility_name: String, actions: Array, on_selected: Callable) -> void:
+	var items: Array = []
+	for action in actions:
+		var duration := int(action.get("duration_turns", -1))
+		var duration_text := "持续%d回合" % duration if duration > 0 else "持续到任务结束"
+		var alert_text := "会提高警戒" if bool(action.get("raises_alert", false)) else "不提高警戒"
+		items.append({
+			"id": String(action.get("id", "")),
+			"name": "%s（1行动）" % String(action.get("label", "操作")),
+			"description": "结果：%s · %s · %s" % [String(action.get("consequence", "")), duration_text, alert_text],
+			"disabled": not bool(action.get("enabled", false)),
+			"disabled_reason": String(action.get("reason", "不可用")),
+		})
+	show_action_picker("交互：%s" % facility_name, items, on_selected)
 
 ## 隐藏行动选择面板
 func hide_action_picker() -> void:

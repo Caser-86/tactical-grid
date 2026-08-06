@@ -4,6 +4,8 @@ extends Node
 
 const ProgressionManagerScript = preload("res://scripts/game/progression_manager.gd")
 const DialogueScene = preload("res://scenes/dialogue.tscn")
+const V2CampaignProgressScript = preload("res://scripts/v2/mission/v2_campaign_progress.gd")
+const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 
 signal save_loaded(slot: int)
 signal save_created(slot: int)
@@ -26,9 +28,14 @@ var current_slot: int = 0
 var current_level_id: String = ""
 var current_map_data: Dictionary = {}
 
+## V2 启动状态。V2 数据失败时只阻止 V2 入口，不回退读取 V1 数据。
+var v2_data_ready: bool = false
+var v2_boot_errors: Array[String] = []
+
 ## 流程状态：仅用于记录，不持有战斗单位
 var battle_result: Dictionary = {}
 var pending_level_id: String = ""
+var pending_v2_checkpoint: Dictionary = {}
 
 ## 待展示的成就通知队列（场景切换间保留）
 var pending_achievement_notifications: Array[Dictionary] = []
@@ -36,10 +43,28 @@ var pending_achievement_notifications: Array[Dictionary] = []
 ## 进度管理器实例
 var progression = null
 
+## The V2 executable is a distinct product line. Route only its own entry
+## scenes here; V1 keeps its original routes on the V1 branch.
+func is_v2_runtime() -> bool:
+	return String(ProjectSettings.get_setting("tactical_grid/product_line", "")) == "v2_infiltration"
+
 func _ready() -> void:
 	current_save = SaveManager.create_default_save()
 	progression = ProgressionManagerScript.new()
 	add_child(progression)
+	_initialize_v2_boot()
+
+func _initialize_v2_boot() -> void:
+	var repository: Node = get_parent().get_node_or_null("V2Data") if get_parent() != null else null
+	if repository == null:
+		v2_boot_errors = ["V2Data autoload is missing"]
+		push_error("V2 data bootstrap failed: V2Data autoload is missing")
+		return
+	var result: Dictionary = repository.call("reload_all")
+	v2_data_ready = bool(result.get("success", false))
+	v2_boot_errors = result.get("errors", []).duplicate()
+	if not v2_data_ready:
+		push_error("V2 data bootstrap failed: %s" % "; ".join(v2_boot_errors))
 
 ## 开始新游戏（槽位 0 为自动存档）
 func new_game(slot: int = 0) -> void:
@@ -63,6 +88,103 @@ func begin_new_game_for_test(slot: int) -> Dictionary:
 	current_state = GameState.BASE
 	SaveManager.save_game(current_save, current_slot)
 	return current_save
+
+## V2 新游戏入口。V2 使用独立身份和存档目录，不复用 V1 队伍结构。
+func new_v2_game(slot: int = 0) -> bool:
+	current_slot = slot
+	current_save = SaveManager.create_v2_save()
+	pending_v2_checkpoint.clear()
+	current_state = GameState.BASE
+	var saved: bool = SaveManager.save_game_v2(current_save, current_slot)
+	if saved:
+		save_created.emit(current_slot)
+	return saved
+
+## V2 测试入口：初始化存档但不切换到尚未完成的 V2 场景。
+func begin_v2_new_game_for_test(slot: int = 0) -> Dictionary:
+	if not new_v2_game(slot):
+		return {}
+	return current_save.duplicate(true)
+
+func continue_v2_game() -> bool:
+	for slot in range(SaveManager.V2_MAX_LOCAL_SAVES):
+		var data: Dictionary = SaveManager.load_game_v2(slot)
+		if not data.is_empty():
+			current_slot = slot
+			current_save = data
+			current_state = GameState.BASE
+			save_loaded.emit(current_slot)
+			return true
+	return false
+
+func load_v2_slot(slot: int) -> bool:
+	var data: Dictionary = SaveManager.load_game_v2(slot)
+	if data.is_empty():
+		return false
+	current_slot = slot
+	current_save = data
+	current_state = GameState.BASE
+	save_loaded.emit(current_slot)
+	return true
+
+func save_current_v2() -> bool:
+	if current_save.is_empty():
+		return false
+	return SaveManager.save_game_v2(current_save, current_slot)
+
+func complete_v2_mission(result: Dictionary) -> bool:
+	if current_save.is_empty():
+		return false
+	var mission_id := StringName(String(result.get("mission_id", result.get("level_id", ""))))
+	if mission_id == StringName(""):
+		return false
+	current_save = V2CampaignProgressScript.complete_mission(current_save, mission_id, result)
+	SaveManager.clear_encounter_checkpoint(current_save)
+	return save_current_v2()
+
+## V2 失败只写 V2 statistics，绝不调用 V1 campaign_progress 或 V1 存档目录。
+func fail_v2_mission(result: Dictionary) -> bool:
+	if current_save.is_empty() or String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	var statistics: Dictionary = current_save.get("statistics", {}).duplicate(true)
+	statistics["missions_failed"] = int(statistics.get("missions_failed", 0)) + 1
+	var failure_counts: Dictionary = statistics.get("failure_counts", {}).duplicate(true)
+	var mission_id := String(result.get("mission_id", result.get("level_id", current_level_id)))
+	failure_counts[mission_id] = int(failure_counts.get(mission_id, 0)) + 1
+	statistics["failure_counts"] = failure_counts
+	statistics["last_failed_mission"] = mission_id
+	current_save["statistics"] = statistics
+	return save_current_v2()
+
+## V2 checkpoint API. Snapshot validation happens before it can enter the save.
+func set_v2_encounter_checkpoint(snapshot: Dictionary) -> bool:
+	if current_save.is_empty() or String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		return false
+	SaveManager.set_encounter_checkpoint(current_save, snapshot)
+	return save_current_v2()
+
+func get_v2_encounter_checkpoint() -> Dictionary:
+	if String(current_save.get("game_line", "")) != "v2_infiltration":
+		return {}
+	return SaveManager.get_encounter_checkpoint(current_save)
+
+func clear_v2_encounter_checkpoint() -> bool:
+	if String(current_save.get("game_line", "")) != "v2_infiltration":
+		return false
+	SaveManager.clear_encounter_checkpoint(current_save)
+	pending_v2_checkpoint.clear()
+	return save_current_v2()
+
+func get_v2_retry_actions() -> Array[StringName]:
+	return V2CheckpointAdapterScript.get_retry_actions(not get_v2_encounter_checkpoint().is_empty())
+
+func consume_v2_checkpoint_request() -> Dictionary:
+	var requested := pending_v2_checkpoint.duplicate(true)
+	pending_v2_checkpoint.clear()
+	return requested
 
 ## 继续游戏（读取最新有效存档）
 func continue_game() -> bool:
@@ -454,7 +576,10 @@ func get_settings() -> Dictionary:
 func update_settings(settings: Dictionary) -> void:
 	InputBindings.apply_settings(settings)
 	current_save["settings"] = settings
-	SaveManager.save_game(current_save, current_slot)
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		SaveManager.save_game_v2(current_save, current_slot)
+	else:
+		SaveManager.save_game(current_save, current_slot)
 
 ## 获取当前难度参数
 ## 故事难度：敌人弱化、奖励加成；标准难度：原值；困难难度：敌人强化、奖励削减
@@ -487,7 +612,8 @@ func get_difficulty_params() -> Dictionary:
 ## 场景切换
 func go_to_main_menu() -> void:
 	current_state = GameState.MAIN_MENU
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	var menu_scene := "res://scenes/v2_main_menu.tscn" if is_v2_runtime() else "res://scenes/main_menu.tscn"
+	get_tree().change_scene_to_file(menu_scene)
 
 func go_to_base() -> void:
 	current_state = GameState.BASE
@@ -497,10 +623,20 @@ func go_to_battle(level_id: String) -> void:
 	current_state = GameState.BATTLE
 	pending_level_id = level_id
 	current_level_id = level_id
-	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+	var battle_scene := "res://scenes/v2_battle.tscn" if is_v2_runtime() and String(current_save.get("game_line", "")) == "v2_infiltration" else "res://scenes/battle.tscn"
+	get_tree().change_scene_to_file(battle_scene)
 
 ## CH1-080: 从遭遇检查点重试战斗（当前实现为重开关卡，完整状态恢复见 CH1-020）
 func go_to_battle_from_encounter(level_id: String) -> void:
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		pending_v2_checkpoint = get_v2_encounter_checkpoint()
+	go_to_battle(level_id)
+
+## V2 从任务起点重新开始，清除旧检查点但不修改战役进度。
+func restart_v2_mission(level_id: String) -> void:
+	if String(current_save.get("game_line", "")) == "v2_infiltration":
+		clear_v2_encounter_checkpoint()
+	pending_v2_checkpoint.clear()
 	go_to_battle(level_id)
 
 func go_to_settings(caller: String = "main_menu") -> void:

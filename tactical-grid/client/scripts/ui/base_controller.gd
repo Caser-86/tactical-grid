@@ -13,6 +13,7 @@ class_name BaseController
 @onready var threat_label = $Center/SituationPanel/Content/ThreatLabel
 @onready var threat_bar = $Center/SituationPanel/Content/ThreatBar
 @onready var intel_hint = $Center/SituationPanel/Content/IntelHint
+@onready var v2_squad_panel = $Center/SituationPanel/Content/V2SquadPanel
 @onready var barracks_btn = $BottomBar/HBox/BarracksBtn
 @onready var armory_btn = $BottomBar/HBox/ArmoryBtn
 @onready var shop_btn = $BottomBar/HBox/ShopBtn
@@ -21,6 +22,7 @@ class_name BaseController
 const CharacterPanelScene = preload("res://scenes/character_panel.tscn")
 const ShopPanelScene = preload("res://scenes/shop_panel.tscn")
 const ErrorDialogScene = preload("res://scenes/error_dialog.tscn")
+const V2SquadSelectionScript = preload("res://scripts/v2/mission/v2_squad_selection.gd")
 const COLOR_CYAN := Color("#37d7ff")
 const COLOR_AMBER := Color("#f3a44a")
 const COLOR_MUTED := Color("#8aa2a7")
@@ -36,8 +38,13 @@ func _ready() -> void:
 	shop_btn.pressed.connect(_on_shop)
 	back_btn.pressed.connect(_on_back)
 
-	_load_campaign()
-	_update_top_bar()
+	if _is_v2_base():
+		_configure_v2_base()
+		_load_v2_campaign()
+		_update_v2_top_bar()
+	else:
+		_load_campaign()
+		_update_top_bar()
 
 	# 监听成就解锁通知
 	if not GameManager.achievement_unlocked.is_connected(_on_achievement_unlocked):
@@ -46,6 +53,142 @@ func _ready() -> void:
 	# 处理场景切换前已解锁但尚未展示的成就
 	# 使用 call_deferred 确保 Base 场景完全进入树后再弹窗，避免与场景切换冲突
 	call_deferred("_drain_pending_achievements")
+
+func _is_v2_base() -> bool:
+	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
+
+func _configure_v2_base() -> void:
+	chapter_label.text = "第一章 // 渗透行动"
+	chapter_label.tooltip_text = "V2 Infiltration · M1 纵向切片"
+	credit_label.visible = false
+	armory_btn.visible = false
+	shop_btn.visible = false
+	barracks_btn.text = "队员 / SQUAD"
+	back_btn.text = "返回 / MENU"
+	operation_title.text = "渗透行动 // 编队准备"
+	intel_hint.text = "选择任务后进入战术地图"
+	v2_squad_panel.visible = true
+
+func _load_v2_campaign() -> void:
+	for child in mission_list.get_children():
+		child.queue_free()
+	var mission_id := String(GameManager.current_save.get("current_mission", "ch1_m1"))
+	var repository: Node = get_node_or_null("/root/V2Data")
+	var mission: Dictionary = repository.get_mission(StringName(mission_id)) if repository else {}
+	if mission.is_empty():
+		_show_error("V2 数据错误", "任务数据不存在：%s" % mission_id)
+		return
+	var button := Button.new()
+	button.text = "%s  ·  %s" % [mission_id.to_upper(), String(mission.get("name", mission_id))]
+	button.icon = ArtCatalog.get_texture(&"objective", &"evac")
+	button.add_theme_constant_override("icon_max_width", 34)
+	button.add_theme_font_size_override("font_size", 17)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.custom_minimum_size = Vector2(320, 58)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.tooltip_text = "主目标：%s" % String(mission.get("primary", ""))
+	button.pressed.connect(_on_v2_mission_selected.bind(mission_id))
+	mission_list.add_child(button)
+	_show_v2_mission_brief(mission)
+
+func _show_v2_mission_brief(mission: Dictionary) -> void:
+	var save: Dictionary = GameManager.current_save
+	var available: Array[String] = V2SquadSelectionScript.get_available_characters(save)
+	var selected: Array[String] = _get_v2_selected_squad(mission, save)
+	situation_title.text = "%s  //  V2" % String(mission.get("name", "任务"))
+	status_tag.text = "● 可部署 · %d 名队员已解锁" % available.size()
+	status_tag.modulate = COLOR_CYAN
+	threat_label.text = "敌人实体 %d  /  同时活跃上限 %d" % [int(mission.get("enemy_total", 0)), int(mission.get("active_cap", 0))]
+	threat_bar.value = clampi(int(mission.get("active_cap", 0)) * 20, 0, 100)
+	var names: Array[String] = []
+	for character_id in selected:
+		var data: Dictionary = _get_v2_character(character_id)
+		names.append(String(data.get("name", character_id)))
+	situation_body.text = (
+		"主目标\n%s\n\n"
+		+ "可选目标\n%s\n\n"
+		+ "当前编队\n%s\n\n"
+		+ "流程\n选择队员 → 进入地图 → 营救 → 撤离"
+	) % [
+		String(mission.get("primary", "")),
+		String(mission.get("optional", "无")),
+		"、".join(names) if not names.is_empty() else "尚未选择",
+	]
+	intel_hint.text = "队员面板可查看身份、能力和模块；V2 不使用商店、技能树或六属性加点。"
+	_render_v2_squad_picker(mission, available, selected)
+
+func _get_v2_selected_squad(mission: Dictionary, save: Dictionary) -> Array[String]:
+	var saved: Array = save.get("selected_squad", [])
+	var validation := V2SquadSelectionScript.validate_squad_for_save(mission, saved, save)
+	if bool(validation.get("valid", false)):
+		return saved.duplicate()
+	return V2SquadSelectionScript.get_default_squad(mission, save)
+
+func _render_v2_squad_picker(mission: Dictionary, available: Array[String], selected: Array[String]) -> void:
+	for child in v2_squad_panel.get_children():
+		child.queue_free()
+	var header := Label.new()
+	header.text = "部署编队  ·  选择 %d/%d" % [selected.size(), int(mission.get("deployment_limit", 1))]
+	header.modulate = COLOR_AMBER
+	v2_squad_panel.add_child(header)
+	for character_id in available:
+		if not character_id in mission.get("starting_roster", []):
+			continue
+		var data := _get_v2_character(character_id)
+		var button := Button.new()
+		button.text = ("✓ " if character_id in selected else "○ ") + String(data.get("name", character_id))
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.toggle_mode = true
+		button.button_pressed = character_id in selected
+		button.custom_minimum_size = Vector2(0, 30)
+		button.toggled.connect(_on_v2_squad_toggled.bind(character_id, mission))
+		v2_squad_panel.add_child(button)
+
+func _on_v2_squad_toggled(pressed: bool, character_id: String, mission: Dictionary) -> void:
+	var selected := _get_v2_selected_squad(mission, GameManager.current_save)
+	if pressed and not character_id in selected:
+		selected.append(character_id)
+	elif not pressed:
+		selected.erase(character_id)
+	var validation := V2SquadSelectionScript.validate_squad_for_save(mission, selected, GameManager.current_save)
+	if not bool(validation.get("valid", false)):
+		_show_error("编队不可用", "至少选择一名队员，且不能超过本任务编制。")
+		_show_v2_mission_brief(mission)
+		return
+	GameManager.current_save["selected_squad"] = selected
+	GameManager.save_current_v2()
+	_show_v2_mission_brief(mission)
+
+func _get_v2_character(character_id: String) -> Dictionary:
+	var repository: Node = get_node_or_null("/root/V2Data")
+	if repository and repository.has_method("get_character"):
+		return repository.get_character(StringName(character_id))
+	return {}
+
+func _on_v2_mission_selected(mission_id: String) -> void:
+	var mission: Dictionary = {}
+	var repository: Node = get_node_or_null("/root/V2Data")
+	if repository:
+		mission = repository.get_mission(StringName(mission_id))
+	var selected := _get_v2_selected_squad(mission, GameManager.current_save)
+	var validation := V2SquadSelectionScript.validate_squad_for_save(mission, selected, GameManager.current_save)
+	if not bool(validation.get("valid", false)):
+		_show_error("编队不可用", "请在队员面板确认可用角色后再部署。")
+		return
+	GameManager.current_save["selected_squad"] = selected
+	GameManager.save_current_v2()
+	if mission_id == "ch1_m1":
+		var v2_repository: Node = get_node_or_null("/root/V2Data")
+		if v2_repository and not v2_repository.get_dialogue(&"ch1_m1_brief").is_empty():
+			GameManager.play_dialogue(
+				"ch1_m1_brief",
+				Callable(self, "_start_v2_mission_after_brief").bind(mission_id)
+			)
+			return
+	GameManager.go_to_battle(mission_id)
+
+func _start_v2_mission_after_brief(mission_id: String) -> void:
+	GameManager.go_to_battle(mission_id)
 
 func _load_campaign() -> void:
 	var progress = GameManager.current_save.get("campaign_progress", {})
@@ -180,8 +323,17 @@ func _update_top_bar() -> void:
 	var intel = resources.get("intel", 0)
 	credit_label.text = "信用点 %d | 情报 %d" % [credit, intel]
 
+func _update_v2_top_bar() -> void:
+	chapter_label.text = "第一章 // 渗透行动"
+	var available: Array[String] = V2SquadSelectionScript.get_available_characters(GameManager.current_save)
+	credit_label.visible = false
+	status_tag.text = "● %d 名队员可用" % available.size()
+
 ## 选择任务后弹出确认对话框
 func _on_mission_selected(level_id: String) -> void:
+	if _is_v2_base():
+		_on_v2_mission_selected(level_id)
+		return
 	var level = CampaignRepository.get_level(level_id)
 	if level.is_empty():
 		_show_error("错误", "关卡数据不存在: " + level_id)
@@ -257,7 +409,10 @@ func _open_character_panel(char_index: int) -> void:
 	panel.open_panel(char_index)
 
 func _on_back() -> void:
-	GameManager.save_current()
+	if _is_v2_base():
+		GameManager.save_current_v2()
+	else:
+		GameManager.save_current()
 	GameManager.go_to_main_menu()
 
 func _show_error(title: String, message: String) -> void:

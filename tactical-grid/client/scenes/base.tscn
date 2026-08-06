@@ -53,6 +53,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+metadata/_v2_shared_shell = true
 
 [node name="Background" type="TextureRect" parent="."]
 layout_mode = 1
@@ -292,6 +293,11 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.54, 0.635, 0.655, 1)
 theme_override_font_sizes/font_size = 11
 text = "悬停行动节点可刷新简报"
+
+[node name="V2SquadPanel" type="VBoxContainer" parent="Center/SituationPanel/Content"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="BottomBar" type="Panel" parent="."]
 layout_mode = 1
