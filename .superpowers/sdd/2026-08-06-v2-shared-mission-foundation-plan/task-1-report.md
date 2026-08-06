@@ -178,3 +178,62 @@ Output: no whitespace errors; Git reported only the repository's existing LF-to-
   hazard controller file, encounter queue/snapshot APIs, and schema-4
   migration API have not been implemented yet. The checkpoint fixture itself
   is now validated successfully.
+
+## A-1 Fix Round 2
+
+### Status
+
+Corrected only the encounter queue snapshot-restoration assertion. No
+production code or V1 files changed.
+
+### Changed Files
+
+- `tactical-grid/client/tests/v2/v2_encounter_queue_test.gd`
+
+### Commit Hashes
+
+- `59c63df test(v2): preserve encounter snapshot sets`
+
+### Commands And Outputs
+
+Command:
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_encounter_queue_test.gd
+```
+
+Output:
+
+```text
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [FAIL] 遭遇激活器公开击败和等待队列契约
+  [FAIL] 遭遇激活器公开快照恢复契约
+Passed: 0
+Failed: 2
+```
+
+Exit code: `1`.
+
+Command:
+
+```powershell
+git diff --check
+```
+
+Output: no whitespace errors. Git emitted only the repository's existing
+LF-to-CRLF checkout warnings.
+
+### Self-Review Notes
+
+- The test captures active and waiting enemy IDs before creating the snapshot.
+- Restoration compares the captured active, waiting, and defeated enemy sets
+  against the restored state using order-independent comparisons.
+- The restored waiting assertion no longer depends on `enemy_four`; it checks
+  the exact pre-snapshot waiting set.
+
+### Concerns
+
+- The affected test remains red because the current production activation
+  class does not yet expose the queue and snapshot APIs required by this
+  contract. The update was limited to making the restoration assertion honest.
