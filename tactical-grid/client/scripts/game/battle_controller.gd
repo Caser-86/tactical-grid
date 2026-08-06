@@ -3155,6 +3155,10 @@ func _finalize_v2_move(result: Dictionary) -> void:
 func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	if not _is_v2_battle():
 		return
+	# A facility picker owns the pointer until it is cancelled or an option is
+	# chosen. Do not let a map click leak through and move the selected unit.
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
+		return
 	# Heal any legacy/checkpoint overlap before resolving the clicked occupant.
 	# Otherwise _get_unit_at can select the wrong object and preserve the bad state.
 	_reconcile_v2_unit_occupancy()
@@ -3196,6 +3200,9 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 
 func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	if not _is_v2_battle() or selected_unit == null or v2_affordance_presenter == null:
+		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
+		v2_affordance_presenter.clear_preview()
 		return
 	var hovered_unit: Unit = _get_unit_at(cell)
 	if hovered_unit != null and hovered_unit.team != "player":
@@ -3472,6 +3479,25 @@ func _open_v2_interaction_menu(entity_id: String) -> void:
 		if hud:
 			hud.set_context_prompt("这里没有可用的设施操作")
 		return
+	var has_enabled_action := false
+	for raw_action in actions:
+		if raw_action is Dictionary and bool(raw_action.get("enabled", false)):
+			has_enabled_action = true
+			break
+	if not has_enabled_action:
+		var reason := String(actions[0].get("reason", "interaction_unavailable")) if actions[0] is Dictionary else "interaction_unavailable"
+		var facility_name := String(facility.get("name", facility.get("type", "设施")))
+		if reason == "out_of_range":
+			if selected_unit.can_move():
+				hud.set_context_prompt("%s需要相邻操作；先点击蓝色格移动到设施旁，再点击设施。" % facility_name)
+			else:
+				hud.set_context_prompt("%s不在操作范围内，且本回合移动已用；按 Space 结束回合，下回合再靠近。" % facility_name)
+		elif reason == "action_unavailable":
+			hud.set_context_prompt("本回合行动已用；按 Space 结束回合，下回合再操作%s。" % facility_name)
+		else:
+			hud.set_context_prompt("%s当前没有可用操作：%s" % [facility_name, reason])
+		_render_v2_hud()
+		return
 	v2_pending_interaction_facility_id = entity_id
 	_clear_v2_hover_preview()
 	_cancel_v2_preview(v2_locked_attack_preview)
@@ -3560,6 +3586,9 @@ func _highlight_color(role: String, fallback: Color) -> Color:
 
 func _show_move_range(unit: Unit) -> void:
 	_clear_layer(move_highlight)
+	if _is_v2_battle() and unit.team == "player" and not unit.can_move():
+		reachable_cells.clear()
+		return
 	reachable_cells = Pathfinding.get_reachable_cells(
 		unit.grid_pos, unit.move_points,
 		map_width, map_height,
@@ -3596,9 +3625,16 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	attack_targets.clear()
 	if unit.team != "player":
 		return
-	if unit.current_ap <= 0:
+	var can_attack := unit.can_act() if _is_v2_battle() else unit.current_ap > 0
+	if not can_attack:
 		if hud:
-			hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+			if _is_v2_battle():
+				if unit.can_move():
+					hud.set_context_prompt("行动已用；蓝色格仍可移动。本回合不能再次攻击，按 Tab 选择其他队员，或按 Space 结束回合。")
+				else:
+					hud.set_context_prompt("移动和行动都已用；按 Tab 选择其他队员，或按 Space 结束回合。")
+			else:
+				hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
 		_render_v2_hud()
 		return
 	_show_attack_range(unit)
@@ -3610,16 +3646,17 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
+	var move_note := "移动已用；" if _is_v2_battle() and not unit.can_move() else ""
 	if attack_targets.is_empty():
 		if hud:
 			hud.set_context_prompt(
-				"蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % range_text
+				"%s蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % [move_note, range_text]
 			)
 	else:
 		if hud:
 			hud.set_context_prompt(
-			"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % range_text
-		)
+			"%s蓝色格 = 可移动；红色敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % [move_note, range_text]
+			)
 	_render_v2_hud()
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径

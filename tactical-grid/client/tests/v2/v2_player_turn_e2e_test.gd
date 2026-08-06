@@ -127,6 +127,12 @@ func _run() -> void:
 		t.check(battle.effect_layer.get_node_or_null("V2AttackFeedback") != null, "攻击在地面显示弹道与命中反馈")
 		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "攻击完成后回到单位选择状态")
 		t.check(battle.hud.phase_label.text.contains("已选中"), "攻击完成后 HUD 状态同步回已选中")
+		battle.call("_refresh_selected_unit_affordances", player)
+		t.check(battle.reachable_cells.is_empty(), "移动预算已用后不再显示可移动格")
+		t.check(_group_count(battle.v2_affordance_presenter, "v2_path_line") == 0, "移动预算已用后清除旧路径线")
+		battle.call("_open_v2_interaction_menu", "facility_camera_console_south")
+		t.check(battle.v2_pending_interaction_facility_id.is_empty(), "行动预算已用后不打开不可用摄像头菜单")
+		t.check(not battle.hud.get_context_prompt_text().contains("设施菜单：选择一个操作"), "不可用摄像头操作给出明确下一步提示")
 		await get_tree().create_timer(0.75).timeout
 		t.check(battle._get_unit_sprite(target) == null, "敌人倒地动画结束后移除精灵，空格可供移动")
 		target.grid_pos = player.grid_pos
@@ -163,6 +169,7 @@ func _run() -> void:
 	t.check(_has_unique_live_positions(battle), "V2 敌方行动后不存在任何单位重合")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "下一玩家回合自动恢复单位选择状态")
 	t.check(battle.hud.context_label.visible and battle.hud.phase_label.text.contains("玩家回合"), "下一玩家回合 HUD 恢复可操作提示")
+	t.check(player.is_alive and player.can_move() and player.can_act(), "下一玩家回合恢复 V2 移动与行动预算")
 	get_window().size = Vector2i(1920, 1080)
 	await get_tree().process_frame
 	await get_tree().process_frame
