@@ -237,19 +237,26 @@ func _apply_encounter_delta(delta: Dictionary) -> void:
 	var changed := false
 	var defeated_ids: Array = v2_encounter_activation.get_defeated_enemy_ids()
 	var departed_ids: Array = v2_encounter_activation.get_departed_enemy_ids()
-	for raw_id in delta.get("deactivated_ids", []):
+	# The encounter state is authoritative for both active and waiting departures.
+	# Waiting IDs are not present in deactivated_ids, but their stable Units still
+	# need the same lifecycle/occupancy cleanup as active IDs.
+	for raw_id in departed_ids:
 		var entity_id := String(raw_id)
-		if not departed_ids.has(entity_id):
-			continue
 		var departed_unit := _get_v2_enemy_unit(entity_id)
-		if departed_unit == null or not departed_unit.is_alive:
-			if departed_unit != null:
-				_remove_v2_enemy_sprite(_get_unit_sprite(departed_unit))
+		if departed_unit == null:
 			continue
-		departed_unit.is_alive = false
-		departed_unit.is_downed = false
-		_remove_v2_enemy_sprite(_get_unit_sprite(departed_unit))
-		changed = true
+		if departed_unit.is_alive:
+			departed_unit.is_alive = false
+			changed = true
+		# V2ActionService treats non-downed inactive enemies as reserved spawn
+		# cells. Departed is a terminal, occupancy-free lifecycle state.
+		if not departed_unit.is_downed:
+			departed_unit.is_downed = true
+			changed = true
+		var departed_sprite := _get_unit_sprite(departed_unit)
+		if departed_sprite != null:
+			_remove_v2_enemy_sprite(departed_sprite)
+			changed = true
 	for raw_id in defeated_ids:
 		var defeated_id := String(raw_id)
 		var defeated_unit := _get_v2_enemy_unit(defeated_id)
