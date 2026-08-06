@@ -1021,6 +1021,7 @@ func _render_v2_hud(context_override: String = "") -> void:
 		"phase": phase_text,
 		"state": v2_input_router.get_state_name() if v2_input_router else "free_select",
 		"primary_objective": _get_objective_text(),
+		"mission_guide": v2_mission_flow.get_guide_text() if v2_mission_flow else "",
 		"alert": alert_name,
 		"next_consequence": next_text,
 		"selected": selected_unit,

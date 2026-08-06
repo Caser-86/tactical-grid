@@ -146,6 +146,21 @@ func get_primary_text() -> String:
 			return "小队已失能"
 	return "找到失联侦察兵"
 
+## Persistent M1 guide shown in the V2 bottom rail. This is intentionally
+## shorter than the tutorial dialogue so the next required action remains
+## visible after the player skips or completes the tutorial.
+func get_guide_text() -> String:
+	match state:
+		State.SEARCH_SCOUT:
+			return "流程 1/2：选中突击兵，点蓝格移动；靠近侦察标记后点标记营救。"
+		State.ESCORT_TO_EVAC:
+			return "流程 2/2：选中两名队员分别移动到绿色撤离区；两人都到达后自动完成。"
+		State.COMPLETE:
+			return "任务完成：两名队员已进入撤离区，系统正在打开结算。"
+		State.FAILED:
+			return "任务失败：重新开始后先营救侦察兵，再让两名队员进入绿色撤离区。"
+	return "流程 1/2：先找到并营救侦察兵。"
+
 func is_victory() -> bool:
 	return state == State.COMPLETE
 

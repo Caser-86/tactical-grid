@@ -20,6 +20,7 @@ func _initialize() -> void:
 		"phase": "玩家回合",
 		"state": "unit_selected",
 		"primary_objective": "找到侦察兵并撤离",
+		"mission_guide": "流程 1/2：先营救侦察兵。",
 		"alert": "潜伏",
 		"next_consequence": "被摄像头识别后进入搜索",
 		"selected": selected,
@@ -37,6 +38,7 @@ func _initialize() -> void:
 	t.check(not hud.move_button.visible and not hud.attack_button.visible, "V2 不显示常驻移动攻击按钮")
 	t.check(hud.phase_label.text.contains("已选中"), "回合栏显示当前输入状态")
 	t.check(hud.get_node("TopBar/AlertLabel").visible and hud.get_node("TopBar/AlertLabel").text.contains("下一步"), "顶部显示警戒和下一步后果")
+	t.check(hud.get_node("BottomBar/ShortcutHint").text.contains("流程 1/2") and hud.get_node("BottomBar/ShortcutHint").text.contains("Space结束回合"), "底栏持续显示任务流程和结束回合方式")
 	t.check(hud.get_node("RightPanel").visible, "选中单位时显示右侧信息")
 
 	presenter.render({
@@ -103,6 +105,9 @@ func _make_hud() -> HUD:
 	bottom_bar.name = "BottomBar"
 	var action_bar := HBoxContainer.new()
 	action_bar.name = "ActionBar"
+	var shortcut_hint := Label.new()
+	shortcut_hint.name = "ShortcutHint"
+	bottom_bar.add_child(shortcut_hint)
 	for button_name in ["MoveButton", "AttackButton", "SkillButton", "ItemButton", "OverwatchButton", "EndTurnButton"]:
 		var button := Button.new()
 		button.name = button_name

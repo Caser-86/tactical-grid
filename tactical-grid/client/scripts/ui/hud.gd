@@ -337,6 +337,17 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 	context_label.text = prompt if prompt != "" else "选择一个单位开始行动"
 	context_label.visible = true
 
+	# Keep the mission's next required step visible even when a contextual
+	# action prompt changes. V2 supplies a short guide; V1 keeps its original
+	# control summary untouched.
+	var mission_guide := String(snapshot.get("mission_guide", ""))
+	var shortcut_hint := get_node_or_null("BottomBar/ShortcutHint") as Label
+	if shortcut_hint != null and mission_guide != "":
+		shortcut_hint.text = "%s\nSpace结束回合 · 右键取消 · 中键拖动地图" % mission_guide
+	var v2_control_guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+	if v2_control_guide != null and mission_guide != "":
+		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图\nSpace结束回合" % mission_guide
+
 func _v2_state_label(state: String) -> String:
 	match state:
 		"free_select":

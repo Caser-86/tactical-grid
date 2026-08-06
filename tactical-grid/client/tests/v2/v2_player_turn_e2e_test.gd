@@ -61,7 +61,7 @@ func _run() -> void:
 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
-	t.check(v2_guide != null and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键"), "V2 底栏固定显示直接操作指南")
+	t.check(v2_guide != null and v2_guide.text.contains("流程 1/2") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键") and v2_guide.text.contains("Space结束回合"), "V2 底栏固定显示任务流程和直接操作指南")
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
