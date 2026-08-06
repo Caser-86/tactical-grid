@@ -160,6 +160,7 @@ func create_v2_player_unit(character_data: Dictionary, name_override: String = "
 	var character_id := String(character_data.get("id", "assault"))
 	unit.unit_name = name_override if not name_override.is_empty() else String(character_data.get("name", character_id))
 	unit.job = character_id
+	unit.v2_art_key = StringName("v2_" + character_id)
 	unit.team = "player"
 	unit.max_hp = maxi(1, int(character_data.get("hp", 1)))
 	unit.current_hp = unit.max_hp
@@ -193,6 +194,7 @@ func create_v2_enemy_unit(enemy_data: Dictionary) -> Unit:
 	var enemy_id := String(enemy_data.get("id", "sentry"))
 	unit.unit_name = String(enemy_data.get("name", enemy_id))
 	unit.job = enemy_id
+	unit.v2_art_key = StringName("v2_" + enemy_id)
 	unit.team = "enemy"
 	unit.max_hp = maxi(1, int(enemy_data.get("hp", 1)))
 	unit.current_hp = unit.max_hp

@@ -52,7 +52,7 @@ func _run() -> void:
 	t.check(player != null and player.max_hp == 10 and player.current_hp == 10, "V2 M1 突击兵使用 V2 角色数值")
 	var player_sprite: UnitSprite = battle.call("_get_unit_sprite", player)
 	var player_texture_path := String(player_sprite.art_sprite.texture.resource_path) if player_sprite != null and player_sprite.art_sprite != null and player_sprite.art_sprite.texture != null else ""
-	t.check(player_sprite != null and player_sprite.unit == player and player_texture_path.ends_with("units/assault_96.png"), "V2 玩家绑定蓝色突击兵贴图而非敌人贴图")
+	t.check(player_sprite != null and player_sprite.unit == player and player_texture_path.ends_with("assets/v2/units/v2_assault_128.png"), "V2 玩家绑定专属突击兵贴图而非 V1 或敌人贴图")
 	t.check(player != null and player.v2_turn_mode_enabled, "V2 实战单位启用移动/行动双预算")
 	t.check(battle._active_tutorial_hint == null, "V2 开场不显示 V1 模态教学")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")

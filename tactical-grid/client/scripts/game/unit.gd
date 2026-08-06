@@ -18,6 +18,8 @@ signal shield_changed(unit, current_shield: int, max_shield: int)
 @export var team: String = "player"  # player / enemy
 @export var job: String = "assault"
 var boss_art_key: StringName = &""
+## V2-only visual identity. Empty for V1 units so the original catalog mapping remains unchanged.
+var v2_art_key: StringName = &""
 
 ## CODE-P1-02: 稳定实体 ID，地图加载时分配，不依赖数组索引
 var entity_id: String = ""

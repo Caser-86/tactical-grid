@@ -6,6 +6,7 @@
     "res://tests/v2/v2_m1_config_test.gd",
     "res://tests/v2/v2_m1_map_test.gd",
     "res://tests/v2/v2_m1_expansion_test.gd",
+    "res://tests/v2/v2_unit_art_distinction_test.gd",
     "res://tests/v2/v2_m1_flow_test.gd",
     "res://tests/v2/v2_m1_interaction_test.gd",
     "res://tests/v2/v2_m1_enemy_activation_test.gd",

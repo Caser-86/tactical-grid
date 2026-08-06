@@ -3,6 +3,7 @@
 extends Node
 
 const ROOT := "res://assets/generated/chapter1/runtime/"
+const V2_UNIT_ROOT := "res://assets/v2/units/"
 const ENVIRONMENT_ROOT := ROOT + "environment/"
 const ENVIRONMENT_COMPONENTS := {
 	&"echo_yard": {
@@ -172,6 +173,14 @@ const PATHS := {
 		&"toxic": ROOT + "tiles/toxic_64.png",
 	},
 	&"unit": {
+		&"v2_assault": V2_UNIT_ROOT + "v2_assault_128.png",
+		&"v2_scout": V2_UNIT_ROOT + "v2_scout_128.png",
+		&"v2_sniper": V2_UNIT_ROOT + "v2_sniper_128.png",
+		&"v2_heavy": V2_UNIT_ROOT + "v2_heavy_128.png",
+		&"v2_sentry": V2_UNIT_ROOT + "v2_sentry_128.png",
+		&"v2_drone": V2_UNIT_ROOT + "v2_drone_128.png",
+		&"v2_shield_guard": V2_UNIT_ROOT + "v2_shield_guard_128.png",
+		&"v2_sniper_sentry": V2_UNIT_ROOT + "v2_sniper_sentry_128.png",
 		&"assault": ROOT + "units/assault_96.png",
 		&"sniper": ROOT + "units/sniper_96.png",
 		&"heavy": ROOT + "units/heavy_96.png",

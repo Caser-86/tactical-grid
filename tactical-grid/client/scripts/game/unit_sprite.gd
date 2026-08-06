@@ -111,7 +111,9 @@ func _refresh_art_texture() -> void:
 	if not unit:
 		art_sprite.texture = null
 		return
-	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else StringName(unit.job)
+	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else unit.v2_art_key if not unit.v2_art_key.is_empty() else StringName(unit.job)
+	if not ArtCatalog.has_texture(&"unit", key):
+		key = StringName(unit.job)
 	if not ArtCatalog.has_texture(&"unit", key):
 		key = &"cyber_guard" if unit.team == "enemy" else &"assault"
 	art_sprite.texture = ArtCatalog.get_texture(&"unit", key)
