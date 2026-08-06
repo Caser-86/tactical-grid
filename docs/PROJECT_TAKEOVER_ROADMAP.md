@@ -264,7 +264,7 @@ func commit_action(preview: Dictionary) -> Dictionary
   - `tests/visibility_renderer_test.gd`
   - `tests/visibility_renderer_test.tscn`
 - 行为：
-  - 未探索为实黑遮挡；已记录区域显示降饱和地形；正在观察区域显示实时单位与设施。
+  - V1 未探索为实黑遮挡；V2 未探索保留暗色地图剪影，已记录区域显示降饱和地形，正在观察区域显示实时单位与设施。
   - 离开视野的敌人只保留最后已知位置、回合戳和不确定标记，不泄露实时移动、生命或意图。
   - 摄像头接管扩展观察区；摄像头失效后回到已记录状态。
   - 所有目标和交互校验使用真实可见性状态，而非遮罩颜色。

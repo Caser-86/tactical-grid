@@ -56,6 +56,7 @@ func _run() -> void:
 	t.check(player != null and player.v2_turn_mode_enabled, "V2 实战单位启用移动/行动双预算")
 	t.check(battle._active_tutorial_hint == null, "V2 开场不显示 V1 模态教学")
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")
+	t.check(battle.visibility_renderer != null and battle.visibility_renderer.show_hidden_silhouette, "V2 使用可读暗色地图剪影迷雾")
 	t.check(not battle.hud.move_button.visible and not battle.hud.attack_button.visible and not battle.hud.skill_button.visible and not battle.hud.item_button.visible and not battle.hud.overwatch_button.visible, "V2 HUD 不暴露旧动作按钮")
 	t.check(battle.hud.end_turn_button.visible and not battle.hud.end_turn_button.disabled, "V2 HUD 保留可用结束回合入口")
 	var evac_marker := battle.get_node_or_null("MapLayer/V2EvacMarker")

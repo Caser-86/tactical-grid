@@ -1,14 +1,18 @@
 ## CH1-040: 战争迷雾运行时渲染层
 ## 根据 VisibilityState 的每格状态绘制三态遮挡：
-##   - 未探索 (RENDER_HIDDEN):  实黑遮挡，玩家完全看不到地形与单位
+##   - 未探索 (RENDER_HIDDEN):  V1 使用实黑遮挡；V2 使用暗色地图剪影，但仍隐藏单位与设施
 ##   - 已记录 (RENDER_DIMMED):  半透明深色叠加，地形降饱和显示，不显示实时单位
 ##   - 正在观察 (RENDER_VISIBLE): 无叠加，地形、单位与设施全部实时显示
 ## 渲染器只负责视觉遮挡；目标和交互校验使用 VisibilityState 的真实状态，不读遮罩颜色。
 extends Node2D
 class_name VisibilityRenderer
 
-## 未探索格的实黑叠加色
+## V1 未探索格的实黑叠加色
 const COLOR_HIDDEN := Color(0.015, 0.022, 0.030, 1.0)
+## V2 未探索格的暗色剪影叠加色：保留地图轮廓，避免开局只剩一块黑屏。
+const COLOR_HIDDEN_SILHOUETTE := Color(0.015, 0.022, 0.030, 0.78)
+## V2 未探索格的微弱网格线，不携带地形、单位或设施信息。
+const COLOR_HIDDEN_GRID := Color(0.10, 0.16, 0.20, 0.22)
 ## 已记录格的降饱和叠加色（保留地形可见但明显变暗）
 const COLOR_DIMMED := Color(0.04, 0.06, 0.10, 0.55)
 ## 摄像头区域微调色相，让玩家能识别"由摄像头维持的观察区"
@@ -18,15 +22,18 @@ var _visibility_state: VisibilityState
 var _cell_size: float = 64.0
 var _map_width: int = 0
 var _map_height: int = 0
+## V2 专属表现开关。默认关闭以保持 V1 的实黑迷雾行为不变。
+var show_hidden_silhouette: bool = false
 ## CH1-040: 摄像头区域格子集合（用于视觉提示），由 battle_controller 同步
 var _camera_cells: Dictionary = {}
 
 ## 绑定 VisibilityState 和地图尺寸。cell_size 必须与 BattleController.CELL_SIZE 一致。
-func setup(state: VisibilityState, map_width: int, map_height: int, cell_size: float) -> void:
+func setup(state: VisibilityState, map_width: int, map_height: int, cell_size: float, v2_hidden_silhouette: bool = false) -> void:
 	_visibility_state = state
 	_map_width = map_width
 	_map_height = map_height
 	_cell_size = cell_size
+	show_hidden_silhouette = v2_hidden_silhouette
 	_camera_cells.clear()
 	queue_redraw()
 
@@ -60,7 +67,10 @@ func _draw() -> void:
 			)
 			match render_state:
 				VisibilityState.RENDER_HIDDEN:
-					draw_rect(rect, COLOR_HIDDEN, true)
+					var hidden_color := COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN
+					draw_rect(rect, hidden_color, true)
+					if show_hidden_silhouette:
+						draw_rect(rect, COLOR_HIDDEN_GRID, false, 1.0)
 				VisibilityState.RENDER_DIMMED:
 					draw_rect(rect, COLOR_DIMMED, true)
 					# 已记录格在边缘画一条暗线，帮助玩家区分"去过但看不到"与"正在看见"
@@ -70,7 +80,7 @@ func _draw() -> void:
 					if _camera_cells.has(cell):
 						draw_rect(rect, COLOR_CAMERA_TINT, true)
 				_:
-					draw_rect(rect, COLOR_HIDDEN, true)
+					draw_rect(rect, COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN, true)
 
 
 ## CH1-040: 获取某格的渲染状态字符串（供测试断言）

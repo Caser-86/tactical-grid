@@ -5,6 +5,17 @@
   "seed": 1001,
   "size": {"width": 22, "height": 16},
   "theme": "echo_yard",
+  "environment": {
+    "kit": "echo_yard",
+    "decorations": [
+        {"component_type":"landmark", "variant":0, "x":10, "y":1, "z":1},
+        {"component_type":"landmark", "variant":1, "x":18, "y":5, "z":1},
+        {"component_type":"landmark", "variant":2, "x":2, "y":8, "z":1},
+      {"component_type":"decal", "variant":0, "x":5, "y":12, "z":1},
+      {"component_type":"decal", "variant":1, "x":12, "y":10, "z":1},
+      {"component_type":"decal", "variant":2, "x":17, "y":8, "z":1}
+    ]
+  },
   "mission_type": "rescue_extract",
   "primary_objective_id": "rescue_scout",
   "layers": {

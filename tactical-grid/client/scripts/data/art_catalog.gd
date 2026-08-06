@@ -216,6 +216,7 @@ const PATHS := {
 		&"terminal": ROOT + "objectives/terminal_64.png",
 		&"evac": ROOT + "objectives/evac_64.png",
 		&"reactor_target": ROOT + "objectives/reactor_target_64.png",
+		&"rescue_beacon": ROOT + "objectives/rescue_beacon_128.png",
 	},
 	&"network_node": {
 		&"camera": ROOT + "network_icons/camera_64.png",

@@ -92,12 +92,15 @@ func _render_map() -> void:
 	var layers: Dictionary = map_data.get("layers", {})
 	var base_terrain: Array = layers.get("base_terrain", [])
 	var blockers: Array = layers.get("blocker", [])
+	var environment: Dictionary = map_data.get("environment", {})
+	var environment_kit := String(environment.get("kit", map_data.get("theme", "")))
 	for y in range(map_height):
 		for x in range(map_width):
 			var terrain := int(base_terrain[y][x]) if y < base_terrain.size() and x < base_terrain[y].size() else 0
 			var blocker := int(blockers[y][x]) if y < blockers.size() and x < blockers[y].size() else 0
 			var cell := Vector2i(x, y)
-			_draw_tactical_tile(cell, terrain, blocker, "", "", _get_environment_variant(cell, "floor", 8), _get_terrain_edge_variants(cell, terrain), _get_blocker_variant(cell, blocker))
+			_draw_tactical_tile(cell, terrain, blocker, "", environment_kit, _get_environment_variant(cell, "floor", 8), _get_terrain_edge_variants(cell, terrain), _get_blocker_variant(cell, blocker))
+	_render_environment_decorations(environment_kit, environment.get("decorations", []))
 	_render_v2_map_entities()
 	_render_evac_zone()
 
@@ -115,6 +118,12 @@ func _render_v2_map_entities() -> void:
 			marker.name = "V2EvacMarker"
 			marker.position = _get_cell_center(position)
 			marker.z_index = 3
+			var icon := Sprite2D.new()
+			icon.name = "V2EvacIcon"
+			icon.texture = ArtCatalog.get_texture(&"objective", &"evac")
+			icon.scale = Vector2(0.75, 0.75)
+			icon.z_index = 1
+			marker.add_child(icon)
 			var ring := Polygon2D.new()
 			ring.name = "V2EvacRing"
 			ring.polygon = PackedVector2Array([Vector2(0, -28), Vector2(28, 0), Vector2(0, 28), Vector2(-28, 0)])
@@ -136,16 +145,24 @@ func _render_v2_map_entities() -> void:
 			marker.add_child(label)
 			map_layer.add_child(marker)
 		elif kind == "facility_marker":
-			var facility := Label.new()
-			facility.name = "V2Facility_%s" % String(entity.get("id", "facility"))
-			facility.text = "终端" if String(entity.get("facility_type", "")) == "record" else "摄像头"
-			facility.position = GridSystem.grid_to_world(position) + Vector2(6, 6)
-			facility.size = Vector2(CELL_SIZE - 12, CELL_SIZE - 12)
-			facility.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			facility.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			facility.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			facility.add_theme_color_override("font_color", Color(0.98, 0.72, 0.24, 0.95))
-			map_layer.add_child(facility)
+			var facility_node := Node2D.new()
+			facility_node.name = "V2Facility_%s" % String(entity.get("id", "facility"))
+			facility_node.position = _get_cell_center(position)
+			facility_node.z_index = 4
+			var facility_icon := Sprite2D.new()
+			facility_icon.texture = ArtCatalog.get_texture(&"network_node", &"camera") if String(entity.get("facility_type", "")) == "camera" else ArtCatalog.get_texture(&"objective", &"terminal")
+			facility_icon.scale = Vector2(0.78, 0.78)
+			facility_node.add_child(facility_icon)
+			var facility_label := Label.new()
+			facility_label.text = "摄像头" if String(entity.get("facility_type", "")) == "camera" else "终端"
+			facility_label.position = Vector2(-48, 22)
+			facility_label.size = Vector2(96, 22)
+			facility_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			facility_label.add_theme_font_size_override("font_size", 12)
+			facility_label.add_theme_color_override("font_color", Color(0.98, 0.82, 0.34, 0.98))
+			facility_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			facility_node.add_child(facility_label)
+			map_layer.add_child(facility_node)
 
 func _render_evac_zone() -> void:
 	_clear_layer(evac_zone_layer)

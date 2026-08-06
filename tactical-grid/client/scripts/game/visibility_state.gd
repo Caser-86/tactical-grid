@@ -11,7 +11,7 @@ const STATE_RECORDED := &"recorded"
 const STATE_OBSERVED := &"observed"
 
 ## CH1-040: Render state constants consumed by VisibilityRenderer.
-## RENDER_HIDDEN  -> unexplored: solid black overlay.
+## RENDER_HIDDEN  -> unexplored: V1 solid black overlay; V2 dark silhouette overlay.
 ## RENDER_DIMMED  -> recorded: desaturated/dimmed terrain overlay.
 ## RENDER_VISIBLE -> observed: no overlay, real-time units and facilities shown.
 const RENDER_HIDDEN := &"hidden"

@@ -313,7 +313,9 @@ func _setup_visibility_renderer() -> void:
 	# 插入到 MoveHighlightLayer 当前位置，使雾层位于 EvacZoneLayer 与 MoveHighlightLayer 之间。
 	if move_highlight:
 		move_child(visibility_renderer, move_highlight.get_index())
-	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE))
+	# V2 keeps the fog rules but uses a readable dark silhouette for unexplored
+	# terrain. V1 keeps the original opaque fog presentation.
+	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE), _is_v2_battle())
 
 
 ## CH1-050: 创建并挂载 EnemyIntentRenderer，位于单位层之上，绘制观察到的敌人意图
@@ -1732,7 +1734,13 @@ func _render_v2_rescue_marker() -> void:
 	v2_rescue_marker = Node2D.new()
 	v2_rescue_marker.name = "V2RescueMarker"
 	v2_rescue_marker.position = _get_cell_center(rescue_pos)
-	v2_rescue_marker.z_index = 1
+	v2_rescue_marker.z_index = 4
+	var rescue_icon := Sprite2D.new()
+	rescue_icon.name = "RescueBeaconIcon"
+	rescue_icon.texture = ArtCatalog.get_texture(&"objective", &"rescue_beacon")
+	rescue_icon.scale = Vector2(0.36, 0.36)
+	rescue_icon.z_index = 1
+	v2_rescue_marker.add_child(rescue_icon)
 	var diamond := Polygon2D.new()
 	diamond.polygon = PackedVector2Array([
 		Vector2(0, -18), Vector2(18, 0), Vector2(0, 18), Vector2(-18, 0),
