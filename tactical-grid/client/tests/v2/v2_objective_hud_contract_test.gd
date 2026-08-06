@@ -8,9 +8,11 @@ const FlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
 var t := Runner.new()
 
 func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
 	print("=== V2 objective HUD contract ===")
 	var hud: HUD = _make_hud()
-	await process_frame
 	var presenter := PresenterScript.new()
 	presenter.setup(hud)
 	var snapshot := {
@@ -134,7 +136,6 @@ func _assert_m1_player_facing_progress() -> void:
 
 func _assert_v1_isolation() -> void:
 	var hud: HUD = _make_hud()
-	await process_frame
 	hud.update_objective("V1 原作目标")
 	hud.update_turn_display(7, TurnManager.TurnPhase.PLAYER_ACTION)
 	t.check(hud.objective_label.text == "V1 原作目标", "V1 HUD 调用仍保留原目标布局")
