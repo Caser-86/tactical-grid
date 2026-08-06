@@ -539,6 +539,123 @@ func _apply_v2_hazard_prompt(state: Dictionary) -> void:
 	elif warning_count > 0:
 		hud.set_context_prompt("危险区预警：%d 个格子将在下一轮生效" % warning_count)
 
+## V2 owns the mission-facing HUD contract. V1 and the shared controller keep
+## their original presentation paths; this override is only reached by the V2
+## battle scene.
+func _render_v2_hud(context_override: String = "") -> void:
+	if not _is_v2_battle() or v2_hud_presenter == null or hud == null:
+		return
+	v2_hud_presenter.render(_build_v2_hud_snapshot(context_override))
+
+func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
+	var mission_snapshot: Dictionary = v2_mission_flow.get_snapshot() if v2_mission_flow != null and v2_mission_flow.has_method("get_snapshot") else {}
+	var objective_text: String = String(v2_mission_flow.get_primary_text()) if v2_mission_flow != null and v2_mission_flow.has_method("get_primary_text") else String(_get_objective_text())
+	var guide_text: String = String(v2_mission_flow.get_current_guide_text()) if v2_mission_flow != null and v2_mission_flow.has_method("get_current_guide_text") else ""
+	var step_id := String(v2_mission_flow.get_current_step_id()) if v2_mission_flow != null and v2_mission_flow.has_method("get_current_step_id") else ""
+	var step_index := int(v2_mission_flow.get_objective_step_index()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_index") else 0
+	var step_count := int(v2_mission_flow.get_objective_step_count()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count") else 0
+	var route_hint := _get_v2_route_hint(mission_snapshot, step_index)
+	var hazard_warning := _get_v2_hazard_warning()
+	var checkpoint_id := v2_last_checkpoint_id
+	if checkpoint_id.is_empty():
+		checkpoint_id = String(v2_last_checkpoint.get("checkpoint_id", ""))
+	var phase_text := _get_v2_phase_text()
+	var ordinary_controls := context_override
+	if ordinary_controls.is_empty() and hud != null:
+		ordinary_controls = hud.get_context_prompt_text()
+	if ordinary_controls.is_empty():
+		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消 · Space结束回合"
+
+	var status := ""
+	var outcome_text := ""
+	if v2_mission_flow != null:
+		if v2_mission_flow.has_method("is_defeat") and v2_mission_flow.is_defeat():
+			status = "failure"
+			outcome_text = "任务失败"
+		elif v2_mission_flow.has_method("is_victory") and v2_mission_flow.is_victory():
+			status = "victory"
+			outcome_text = "任务完成"
+
+	var alert_name := "平静"
+	var next_text := ""
+	if alert_state:
+		alert_name = alert_state.get_front_state_label()
+		var next_consequence: Dictionary = alert_state.get_next_consequence()
+		next_text = String(next_consequence.get("description", ""))
+		var turns_until := int(next_consequence.get("turns_until", 0))
+		if turns_until > 0:
+			next_text += "（%d回合后）" % turns_until
+
+	var budget := {"move": false, "action": false}
+	if selected_unit and is_instance_valid(selected_unit) and selected_unit.team == "player":
+		budget["move"] = selected_unit.can_move()
+		budget["action"] = selected_unit.can_act()
+	return {
+		"mission_id": level_id,
+		"step_id": step_id,
+		"step_index": step_index,
+		"step_count": step_count,
+		"objective_text": objective_text,
+		"guide_text": guide_text,
+		"route_hint": route_hint,
+		"hazard_warning": hazard_warning,
+		"checkpoint_id": checkpoint_id,
+		"turn": turn_manager.turn_number if turn_manager else 0,
+		"phase": phase_text,
+		"current_turn": turn_manager.turn_number if turn_manager else 0,
+		"current_phase": phase_text,
+		"status": status,
+		"outcome_text": outcome_text,
+		"state": v2_input_router.get_state_name() if v2_input_router else "free_select",
+		"primary_objective": objective_text,
+		"mission_guide": guide_text,
+		"ordinary_controls": ordinary_controls,
+		"alert": alert_name,
+		"next_consequence": next_text,
+		"selected": selected_unit,
+		"context_prompt": context_override,
+		"action_budget": budget,
+		"ability": "",
+		"interaction": "设施菜单：选择一个操作" if not v2_pending_interaction_facility_id.is_empty() else "",
+		"attack_preview": hud.get_attack_preview_text() if hud else "",
+		"visibility_summary": v2_visibility_summary.duplicate(true),
+	}
+
+func _get_v2_phase_text() -> String:
+	if turn_manager == null:
+		return ""
+	match turn_manager.current_phase:
+		TurnManager.TurnPhase.ENEMY_ACTION:
+			return "敌人回合"
+		TurnManager.TurnPhase.BATTLE_OVER:
+			return "战斗结束"
+		_:
+			return "玩家回合"
+
+func _get_v2_route_hint(mission_snapshot: Dictionary, step_index: int) -> String:
+	var route_hint := String(mission_snapshot.get("route_hint", ""))
+	if not route_hint.is_empty():
+		return route_hint
+	if v2_mission_flow != null:
+		var mission_data: Dictionary = v2_mission_flow.mission
+		var steps: Variant = mission_data.get("objective_steps", [])
+		if steps is Array and step_index >= 0 and step_index < steps.size() and steps[step_index] is Dictionary:
+			route_hint = String((steps[step_index] as Dictionary).get("route_hint", ""))
+		if route_hint.is_empty():
+			route_hint = String(mission_data.get("route_hint", ""))
+	if route_hint.is_empty():
+		route_hint = String(map_data.get("route_hint", ""))
+	return route_hint
+
+func _get_v2_hazard_warning() -> String:
+	var active_cells: Array = _v2_hazard_turn_state.get("active_cells", [])
+	var warning_cells: Array = _v2_hazard_turn_state.get("warning_cells", [])
+	if not active_cells.is_empty():
+		return "危险区已生效：敌方阶段结算 %d 个危险格" % active_cells.size()
+	if not warning_cells.is_empty():
+		return "危险区预警：%d 个格子将在下一轮生效" % warning_cells.size()
+	return ""
+
 func _v2_cell_set(raw_cells: Variant) -> Dictionary:
 	var cells: Dictionary = {}
 	if raw_cells is Array:

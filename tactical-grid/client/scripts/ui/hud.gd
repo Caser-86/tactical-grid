@@ -277,6 +277,9 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 		return
 	_v2_hud_active = true
 	_pending_v2_snapshot.clear()
+	if _is_canonical_v2_snapshot(snapshot):
+		_render_canonical_v2_snapshot(snapshot)
+		return
 
 	var objective := String(snapshot.get("primary_objective", ""))
 	if objective != "":
@@ -347,6 +350,145 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 	var v2_control_guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
 	if v2_control_guide != null and mission_guide != "":
 		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图\nSpace结束回合" % mission_guide
+
+func _is_canonical_v2_snapshot(snapshot: Dictionary) -> bool:
+	return snapshot.has("mission_id") or snapshot.has("objective_text") or snapshot.has("step_id") or snapshot.has("guide_text") or snapshot.has("route_hint") or snapshot.has("hazard_warning") or snapshot.has("checkpoint_id") or snapshot.has("status") or snapshot.has("outcome_text") or snapshot.has("ordinary_controls")
+
+func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
+	var objective := String(snapshot.get("objective_text", "")).strip_edges()
+	var guide := String(snapshot.get("guide_text", "")).strip_edges()
+	var route_hint := String(snapshot.get("route_hint", "")).strip_edges()
+	var hazard_warning := String(snapshot.get("hazard_warning", "")).strip_edges()
+	var checkpoint_id := String(snapshot.get("checkpoint_id", "")).strip_edges()
+	var ordinary_controls := String(snapshot.get("ordinary_controls", "")).strip_edges()
+	if ordinary_controls.is_empty():
+		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消 · Space结束回合"
+
+	var step_count := maxi(0, int(snapshot.get("step_count", 0)))
+	var step_index := maxi(0, int(snapshot.get("step_index", 0)))
+	var progress := "%d/%d" % [mini(step_index + 1, step_count), step_count] if step_count > 0 else ""
+	var status := String(snapshot.get("status", "")).to_lower()
+	var outcome := String(snapshot.get("outcome_text", "")).strip_edges()
+	if status == "failure" and outcome.is_empty():
+		outcome = "任务失败"
+	elif status == "victory" and outcome.is_empty():
+		outcome = "任务完成"
+
+	if not outcome.is_empty() and status in ["failure", "victory"]:
+		objective_label.text = outcome
+	else:
+		objective_label.text = _join_v2_parts([progress, objective], " · ")
+		if objective_label.text.is_empty():
+			objective_label.text = "等待任务状态"
+	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_label.clip_text = true
+	objective_label.max_lines_visible = 2
+	objective_label.add_theme_font_size_override("font_size", _v2_font_size_for(objective_label.text, 18))
+
+	var turn_value := int(snapshot.get("turn", snapshot.get("current_turn", 0)))
+	if turn_value > 0:
+		turn_label.text = "回合 %d" % turn_value
+	var phase := String(snapshot.get("phase", snapshot.get("current_phase", ""))).strip_edges()
+	var state := String(snapshot.get("state", "")).strip_edges()
+	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if not phase.is_empty() and not state.is_empty() else phase
+	phase_label.modulate = Color.CYAN if phase.contains("玩家") else Color.RED if phase.contains("敌人") else Color.GOLD if phase.contains("结束") else Color.WHITE
+
+	# The alert line is a non-modal priority channel. Lower-priority details
+	# remain visible in the bounded bottom guidance label below.
+	var priority_text := ""
+	if not outcome.is_empty() and status in ["failure", "victory"]:
+		priority_text = outcome
+	elif not objective.is_empty():
+		priority_text = objective
+	elif not hazard_warning.is_empty():
+		priority_text = hazard_warning
+	elif not route_hint.is_empty():
+		priority_text = route_hint
+	else:
+		priority_text = ordinary_controls
+	if _alert_label:
+		_alert_label.text = priority_text
+		_alert_label.visible = not priority_text.is_empty()
+		_alert_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_alert_label.clip_text = true
+		_alert_label.max_lines_visible = 2
+		_alert_label.add_theme_font_size_override("font_size", _v2_font_size_for(priority_text, 12))
+
+	var selected: Node = snapshot.get("selected", null) as Node
+	var selected_valid := selected != null and is_instance_valid(selected) and bool(selected.get("is_alive"))
+	$RightPanel.visible = selected_valid
+	if selected_valid:
+		update_unit_info(selected)
+	else:
+		unit_info_label.text = ""
+	set_action_buttons_visible(false)
+	var budget: Dictionary = snapshot.get("action_budget", {})
+	if action_budget_label:
+		action_budget_label.visible = selected_valid
+		if selected_valid:
+			action_budget_label.text = "行动预算\n移动 %s   行动 %s" % [
+				"可用" if bool(budget.get("move", false)) else "已用",
+				"可用" if bool(budget.get("action", false)) else "已用",
+			]
+	var prompt := String(snapshot.get("context_prompt", "")).strip_edges()
+	if prompt.is_empty():
+		prompt = ordinary_controls
+	context_label.text = prompt
+	context_label.visible = not prompt.is_empty()
+	context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	context_label.clip_text = true
+	context_label.max_lines_visible = 2
+	context_label.position = Vector2(-260, -104)
+	context_label.size = Vector2(520, 42)
+	context_label.add_theme_font_size_override("font_size", _v2_font_size_for(prompt, 14))
+
+	var guidance_lines: Array[String] = []
+	if not guide.is_empty():
+		guidance_lines.append("行动：%s" % guide)
+	if not route_hint.is_empty():
+		guidance_lines.append("路线：%s" % route_hint)
+	if not hazard_warning.is_empty():
+		guidance_lines.append("危险：%s" % hazard_warning)
+	if not checkpoint_id.is_empty():
+		guidance_lines.append("检查点：%s" % checkpoint_id)
+	guidance_lines.append("操作：%s" % ordinary_controls)
+	var v2_control_guide := _ensure_v2_control_guide()
+	if v2_control_guide:
+		v2_control_guide.text = "\n".join(guidance_lines)
+		v2_control_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v2_control_guide.clip_text = true
+		v2_control_guide.max_lines_visible = 4
+		v2_control_guide.add_theme_font_size_override("font_size", _v2_font_size_for(v2_control_guide.text, 12))
+
+func _ensure_v2_control_guide() -> Label:
+	var guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+	if guide != null:
+		return guide
+	var bottom_bar := get_node_or_null("BottomBar") as Control
+	if bottom_bar == null:
+		return null
+	guide = Label.new()
+	guide.name = "V2DirectControlGuide"
+	guide.position = Vector2(14, 6)
+	guide.size = Vector2(510, 54)
+	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_bar.add_child(guide)
+	return guide
+
+func _join_v2_parts(parts: Array, separator: String) -> String:
+	var non_empty: Array[String] = []
+	for raw_part in parts:
+		var part := String(raw_part).strip_edges()
+		if not part.is_empty():
+			non_empty.append(part)
+	return separator.join(non_empty)
+
+func _v2_font_size_for(text: String, default_size: int) -> int:
+	if text.length() > 100:
+		return maxi(10, default_size - 4)
+	if text.length() > 52:
+		return maxi(11, default_size - 2)
+	return default_size
 
 func _v2_state_label(state: String) -> String:
 	match state:
