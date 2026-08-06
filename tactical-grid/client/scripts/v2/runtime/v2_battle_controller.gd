@@ -197,6 +197,7 @@ func _restore_v2_checkpoint() -> bool:
 	v2_last_checkpoint_id = String(restored_snapshot.get("checkpoint_id", ""))
 	_sync_v2_enemy_sprites_after_restore()
 	_update_visibility()
+	_advance_v2_hazard_player_turn()
 	_refresh_v2_runtime_state()
 	_v2_restore_failure.clear()
 	return true
@@ -241,7 +242,19 @@ func _handle_v2_checkpoint_restore_failure(failure: Dictionary) -> void:
 		"v2_restore_error": true,
 	}
 	_finish_v2_playtest(false, battle_result)
+	_clear_v2_failed_restore_runtime_state()
 	GameManager.go_to_mission_result(battle_result)
+
+func _clear_v2_failed_restore_runtime_state() -> void:
+	if unit_layer:
+		for child in unit_layer.get_children():
+			child.queue_free()
+	_cleanup_units()
+	v2_action_service = null
+	v2_interaction_service = null
+	v2_hazard_controller = null
+	_v2_hazard_turn_state.clear()
+	_render_v2_hazard_overlay()
 
 func _generate_map() -> void:
 	var result: Dictionary = V2RuntimeMapLoader.load_map(StringName(level_id))
@@ -490,7 +503,7 @@ func _render_v2_hazard_overlay() -> void:
 		return
 	for child in effect_layer.get_children():
 		if String(child.name).begins_with("V2HazardOverlay_"):
-			child.queue_free()
+			child.free()
 	var warning_cells: Array = _v2_hazard_turn_state.get("warning_cells", [])
 	var active_cells: Array = _v2_hazard_turn_state.get("active_cells", [])
 	for raw_cell in warning_cells:
