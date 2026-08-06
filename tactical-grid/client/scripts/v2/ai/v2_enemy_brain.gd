@@ -2,7 +2,7 @@ extends RefCounted
 class_name V2EnemyBrain
 
 const DEFAULT_PROFILES := {
-	"sentry": {"attack_range": [1, 5], "damage": 2},
+	"sentry": {"attack_range": [1, 5], "damage": 1},
 	"drone": {"attack_range": [1, 3], "damage": 1, "scan_radius": 3},
 	"sniper_sentry": {"attack_range": [3, 8], "damage": 3},
 	"shield_guard": {"attack_range": [1, 3], "damage": 2},

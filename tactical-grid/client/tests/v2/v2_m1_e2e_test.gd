@@ -81,8 +81,10 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 		t.check(bool(attack_result.get("success", false)), route_id + " 正式攻击事务成功")
 		t.check(int(attack_result.get("hp_after", target.current_hp)) == target.current_hp, route_id + " 攻击结果与单位生命同步")
 
+	assault.current_hp = 6
 	var rescue_result := await _rescue_through_formal_service(battle, assault)
 	t.check(bool(rescue_result.get("success", false)), route_id + " 通过正式营救事务救出侦察兵")
+	t.check(int(rescue_result.get("recovered_hp", 0)) == 4 and assault.current_hp == 10, route_id + " 营救后获得一次 4 HP 恢复")
 	var scout: Unit = rescue_result.get("new_unit", null)
 	t.check(scout != null and battle.player_units.has(scout), route_id + " 侦察兵加入正式玩家队伍")
 	t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC", route_id + " 营救后进入护送撤离状态")

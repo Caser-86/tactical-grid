@@ -6,7 +6,7 @@
     "move": 4,
     "vision": 5,
     "attack_range": [1, 5],
-    "damage": 2,
+    "damage": 1,
     "role": "巡逻、守点、直线射击",
     "art_key": "sentry"
   },

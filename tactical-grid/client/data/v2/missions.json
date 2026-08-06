@@ -5,6 +5,7 @@
     "name": "回声失联",
     "starting_roster": ["assault"],
     "rescue_character": "scout",
+    "rescue_recovery_hp": 4,
     "deployment_limit": 2,
     "primary": "找到失联侦察兵并一起撤离",
     "optional": "上传事故记录",

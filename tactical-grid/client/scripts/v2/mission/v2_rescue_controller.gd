@@ -106,6 +106,13 @@ func commit_rescue(preview: Dictionary) -> Dictionary:
 	if not actor.spend_v2_action():
 		new_unit.free()
 		return {"success": false, "reason": &"action_unavailable", "preview_id": preview_id}
+	var hp_before := actor.current_hp
+	var recovery_amount := 0
+	if _mission_flow != null and is_instance_valid(_mission_flow):
+		recovery_amount = maxi(0, int(_mission_flow.mission.get("rescue_recovery_hp", 0)))
+	if recovery_amount > 0:
+		actor.heal(recovery_amount)
+	var recovered_hp := actor.current_hp - hp_before
 	if new_unit.entity_id.is_empty():
 		new_unit.entity_id = "player_%s" % character_id
 	new_unit.grid_pos = target
@@ -138,6 +145,8 @@ func commit_rescue(preview: Dictionary) -> Dictionary:
 		"action": &"rescue",
 		"rescue_id": rescue_id,
 		"character_id": character_id,
+		"actor_id": actor.entity_id,
+		"recovered_hp": recovered_hp,
 		"new_unit": new_unit,
 		"position": target,
 		"checkpoint_id": &"cp_rescue",

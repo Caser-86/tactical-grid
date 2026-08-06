@@ -20,6 +20,7 @@ func _initialize() -> void:
 	t.check(starting_roster == ["assault"], "M1 单人突击开场")
 	t.check(String(mission.get("rescue_character", "")) == "scout", "M1 营救侦察兵")
 	t.check(int(mission.get("deployment_limit", 0)) == 2, "M1 最多部署两名角色")
+	t.check(int(mission.get("rescue_recovery_hp", 0)) == 4, "M1 营救时提供一次 4 HP 医疗恢复")
 	t.check(String(mission.get("primary", "")) == "找到失联侦察兵并一起撤离", "主目标文案固定")
 	t.check(String(mission.get("optional", "")) == "上传事故记录", "事故记录为可选目标")
 	t.check(int(mission.get("enemy_total", 0)) == 6 and int(mission.get("active_cap", 0)) == 3, "六敌且同时最多三敌")

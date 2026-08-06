@@ -21,7 +21,7 @@ func _initialize() -> void:
 			"blocker": _layer(22, 16, 0),
 		},
 	}
-	var mission := {"id": "ch1_m1", "rescue_character": "scout"}
+	var mission := {"id": "ch1_m1", "rescue_character": "scout", "rescue_recovery_hp": 4}
 	var assault := _unit("spawn_assault", "assault", Vector2i(12, 7))
 	var enemy := _unit("enemy_sentry_south", "sentry", Vector2i(8, 12), "enemy")
 	var players: Array = [assault]
@@ -50,6 +50,7 @@ func _initialize() -> void:
 	var captive_attack := action_service.query_action({"action": &"attack", "unit": assault, "target": captive})
 	t.check(not bool(captive_attack.get("valid", false)) and captive_attack.get("reason") == &"invalid_unit", "营救前中立对象不能被攻击")
 
+	assault.current_hp = 6
 	var result: Dictionary = rescue.commit_rescue(preview)
 	var scout: Unit = result.get("new_unit", null)
 	t.check(bool(result.get("success", false)), "相邻营救提交成功")
@@ -57,6 +58,7 @@ func _initialize() -> void:
 	t.check(scout != null and scout.entity_id == "player_scout", "侦察兵使用稳定实体 ID")
 	t.check(scout != null and scout.job == "scout" and scout.team == "player", "侦察兵以玩家单位加入")
 	t.check(scout != null and scout.v2_turn_state.can_move() and scout.v2_turn_state.can_act(), "同关加入时获得完整移动和行动预算")
+	t.check(int(result.get("recovered_hp", 0)) == 4 and assault.current_hp == 10, "营救成功提供一次明确的 4 HP 恢复")
 	t.check(players.size() == 2 and players.has(scout) and _registered.has(scout), "侦察兵注册到队伍和运行时注册回调")
 	t.check(flow.get_state_name() == &"ESCORT_TO_EVAC", "营救成功切换到护送撤离状态")
 	t.check(String(rescue.get_rescue_state(&"rescue_scout")) == "rescued", "营救对象状态变为已营救")
@@ -121,8 +123,8 @@ func _unit(entity_id: String, role: String, position: Vector2i, team: String = "
 	unit.team = team
 	unit.job = role
 	unit.grid_pos = position
-	unit.max_hp = 7
-	unit.current_hp = 7
+	unit.max_hp = 10
+	unit.current_hp = 10
 	unit.weapon_range = [1, 4]
 	unit.weapon_damage = [2, 2]
 	unit.enable_v2_turn_mode()

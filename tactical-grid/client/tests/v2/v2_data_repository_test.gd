@@ -15,8 +15,9 @@ func _initialize() -> void:
 			all_roles_present = false
 	t.check(bool(result.get("success", false)), "六份 V2 数据通过模式校验")
 	t.check(all_roles_present, "四名角色齐全")
-	t.check(int(repo.get_character(&"assault").get("hp", 0)) == 7, "突击兵 HP 基线为 7")
-	t.check(int(repo.get_enemy(&"sentry").get("damage", 0)) == 2, "哨兵伤害基线为 2")
+	t.check(int(repo.get_character(&"assault").get("hp", 0)) == 10, "突击兵 HP 基线为 10")
+	t.check(int(repo.get_character(&"scout").get("hp", 0)) == 7, "侦察兵 HP 基线为 7")
+	t.check(int(repo.get_enemy(&"sentry").get("damage", 0)) == 1, "哨兵伤害基线为 1")
 	t.check(repo.get_mission(&"ch1_m6").get("boss_id", "") == "data_sentinel", "M6 引用数据哨兵")
 	repo.free()
 	t.finish(self)

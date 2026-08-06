@@ -49,7 +49,7 @@ func _run() -> void:
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
 	var player: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	t.check(player != null and player.team == "player", "V2 M1 实战只部署一名玩家角色")
-	t.check(player != null and player.max_hp == 7 and player.current_hp == 7, "V2 M1 突击兵使用 V2 角色数值")
+	t.check(player != null and player.max_hp == 10 and player.current_hp == 10, "V2 M1 突击兵使用 V2 角色数值")
 	var player_sprite: UnitSprite = battle.call("_get_unit_sprite", player)
 	var player_texture_path := String(player_sprite.art_sprite.texture.resource_path) if player_sprite != null and player_sprite.art_sprite != null and player_sprite.art_sprite.texture != null else ""
 	t.check(player_sprite != null and player_sprite.unit == player and player_texture_path.ends_with("units/assault_96.png"), "V2 玩家绑定蓝色突击兵贴图而非敌人贴图")
