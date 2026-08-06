@@ -385,9 +385,10 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 	objective_label.max_lines_visible = 2
 	objective_label.add_theme_font_size_override("font_size", _v2_font_size_for(objective_label.text, 18))
 
+	var has_turn := snapshot.has("turn") or snapshot.has("current_turn")
 	var turn_value := int(snapshot.get("turn", snapshot.get("current_turn", 0)))
-	if turn_value > 0:
-		turn_label.text = "回合 %d" % turn_value
+	# Never retain a restored turn when a later canonical snapshot omits it.
+	turn_label.text = "回合 %d" % turn_value if has_turn and turn_value > 0 else "回合 -"
 	var phase := String(snapshot.get("phase", snapshot.get("current_phase", ""))).strip_edges()
 	var state := String(snapshot.get("state", "")).strip_edges()
 	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if not phase.is_empty() and not state.is_empty() else phase

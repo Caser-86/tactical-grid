@@ -4,6 +4,7 @@
     "res://tests/v2/gate_manifest_test.gd",
     "res://tests/v2/v2_data_repository_test.gd",
     "res://tests/v2/v2_mission_flow_contract_test.gd",
+    "res://tests/v2/v2_objective_hud_contract_test.gd",
     "res://tests/v2/v2_encounter_queue_test.gd",
     "res://tests/v2/v2_hazard_controller_test.gd",
     "res://tests/v2/v2_checkpoint_migration_test.gd",
@@ -57,7 +58,8 @@
     "res://tests/v2/v2_base_progression_scene_test.tscn",
     "res://tests/v2/v2_m1_visual_snapshot.tscn",
     "res://tests/v2/v2_encounter_controller_regression_test.tscn",
-    "res://tests/v2/v2_hazard_runtime_scene_test.tscn"
+    "res://tests/v2/v2_hazard_runtime_scene_test.tscn",
+    "res://tests/v2/v2_objective_hud_runtime_scene_test.tscn"
   ],
   "powershell_tests": [
     "tests/v2/run_m1_visual_matrix.ps1"

@@ -78,5 +78,6 @@
   "main_routes": [
     {"id":"fixture_route", "name":"Fixture Route", "required_ids":["spawn_assault","fixture_primary","fixture_evac"], "cells":[[1,1],[2,2],[4,4],[7,7]]}
   ],
+  "route_hint": "沿测试路线前进",
   "activation_schedule": []
 }

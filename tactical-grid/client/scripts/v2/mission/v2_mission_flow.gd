@@ -160,6 +160,28 @@ func get_objective_step_index() -> int:
 func get_objective_step_count() -> int:
 	return _objective_steps.size()
 
+## Player-facing progress excludes data-only bookkeeping steps while the raw
+## objective APIs above remain stable for saves, restores, and tests.
+func get_display_objective_step_index() -> int:
+	var display_count := get_display_objective_step_count()
+	if _objective_steps.is_empty():
+		return 0
+	var visible_steps_before_current := 0
+	for index in range(mini(_objective_step_index, _objective_steps.size())):
+		if _is_player_facing_step(_objective_steps[index]):
+			visible_steps_before_current += 1
+	var current_is_visible := _objective_step_index < _objective_steps.size() and _is_player_facing_step(_current_objective_step())
+	if current_is_visible:
+		visible_steps_before_current += 1
+	return clampi(visible_steps_before_current - 1, 0, display_count - 1)
+
+func get_display_objective_step_count() -> int:
+	var visible_count := 0
+	for step in _objective_steps:
+		if _is_player_facing_step(step):
+			visible_count += 1
+	return maxi(1, visible_count)
+
 func get_primary_text() -> String:
 	if state == State.COMPLETE:
 		return "侦察兵已撤离" if _rescue_character_id == "scout" else "任务已完成"
@@ -175,20 +197,18 @@ func get_current_guide_text() -> String:
 	var guide := String(_current_objective_step().get("guide_text", ""))
 	if guide.is_empty() or guide.contains("流程"):
 		return guide
-	var display_total := _get_display_step_count()
-	var display_index := mini(_objective_step_index + 1, display_total)
+	var display_total := get_display_objective_step_count()
+	var display_index := get_display_objective_step_index() + 1
 	return "流程 %d/%d：%s" % [display_index, display_total, guide]
 
 func get_guide_text() -> String:
 	return get_current_guide_text()
 
 func _get_display_step_count() -> int:
-	var count := _objective_steps.size()
-	if count > 1:
-		var last_step: Dictionary = _objective_steps[count - 1]
-		if String(last_step.get("complete_event", "")) == "mission_completed":
-			count -= 1
-	return maxi(1, count)
+	return get_display_objective_step_count()
+
+func _is_player_facing_step(step: Dictionary) -> bool:
+	return bool(step.get("player_facing", true))
 
 func is_victory() -> bool:
 	return state == State.COMPLETE

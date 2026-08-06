@@ -1,0 +1,123 @@
+extends Node
+
+const BattleScene = preload("res://scenes/v2_battle.tscn")
+const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
+const Runner = preload("res://tests/v2/test_runner.gd")
+
+var t := Runner.new()
+
+func _ready() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
+	print("=== V2 objective HUD runtime scene regression ===")
+	var manager: Node = get_node_or_null("/root/GameManager")
+	t.check(manager != null, "HUD 场景测试找到正式 GameManager")
+	if manager == null:
+		t.finish(get_tree())
+		return
+
+	await _assert_controller_mapping(manager)
+	await _assert_m1_rescue_and_pre_evac(manager)
+	await _stop_test_audio()
+	t.finish(get_tree())
+
+func _assert_controller_mapping(manager: Node) -> void:
+	manager.call("begin_v2_new_game_for_test", 0)
+	manager.set("current_level_id", "v2_hazard_runtime_fixture")
+	manager.set("current_save", _with_known_tutorials(manager.get("current_save")))
+	var battle := BattleScene.instantiate()
+	t.check(battle != null and battle.get_script() == BattleControllerScript, "映射测试实例化正式 V2 battle scene")
+	if battle == null:
+		return
+	add_child(battle)
+	var ready := await _wait_for_player_phase(battle)
+	t.check(ready, "映射测试进入真实 V2 fixture 玩家回合")
+	if not ready:
+		await _cleanup_battle(battle)
+		return
+	var snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
+	t.check(String(snapshot.get("mission_id", "")) == "v2_hazard_runtime_fixture", "控制器快照填充 mission_id")
+	t.check(not String(snapshot.get("objective_text", "")).is_empty() or not String(snapshot.get("guide_text", "")).is_empty(), "控制器快照填充 objective/guide")
+	t.check(String(snapshot.get("route_hint", "")) == "沿测试路线前进", "控制器快照填充 route_hint")
+	t.check(String(snapshot.get("hazard_warning", "")).contains("危险区"), "控制器快照填充 hazard_warning")
+	t.check(String(snapshot.get("checkpoint_id", "")) == "cp_start", "控制器快照填充 checkpoint_id")
+	t.check(int(snapshot.get("turn", 0)) == 1 and int(snapshot.get("current_turn", 0)) == 1, "控制器快照填充 turn/current_turn")
+	var guide := battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+	t.check(battle.hud.objective_label.text != "" and battle.hud.turn_label.text == "回合 1", "真实 HUD 控件显示任务与回合")
+	t.check(guide != null and guide.text.contains("路线：沿测试路线前进") and guide.text.contains("检查点：cp_start"), "真实 HUD 控件显示路线与检查点")
+	t.check(guide != null and guide.text.contains("危险："), "真实 HUD 控件显示危险提示")
+	await _cleanup_battle(battle)
+
+func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
+	manager.call("begin_v2_new_game_for_test", 0)
+	manager.set("current_level_id", "ch1_m1")
+	manager.set("current_save", _with_known_tutorials(manager.get("current_save")))
+	var battle := BattleScene.instantiate()
+	t.check(battle != null and battle.get_script() == BattleControllerScript, "M1 HUD 测试实例化正式 V2 battle scene")
+	if battle == null:
+		return
+	add_child(battle)
+	var ready := await _wait_for_player_phase(battle)
+	t.check(ready, "M1 HUD 测试进入真实玩家回合")
+	if not ready:
+		await _cleanup_battle(battle)
+		return
+	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
+	t.check(String(initial.get("step_id", "")) == "search_scout" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 2, "M1 营救前真实 HUD 快照为 1/2")
+	t.check(battle.hud.objective_label.text.contains("1/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/2"), "M1 营救前真实 HUD 控件显示 1/2")
+	var assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
+	if assault != null and battle.v2_rescue_controller != null:
+		var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
+		assault.grid_pos = rescue_pos + Vector2i.LEFT
+		battle.call("_update_visibility")
+		var preview: Dictionary = battle.v2_rescue_controller.query_rescue(assault, &"rescue_scout")
+		var rescue: Dictionary = battle.v2_rescue_controller.commit_rescue(preview) if bool(preview.get("valid", false)) else preview
+		await get_tree().process_frame
+		t.check(bool(rescue.get("success", false)), "M1 真实营救事务成功")
+		var rescued_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
+		t.check(String(rescued_snapshot.get("step_id", "")) == "escort_scout" and int(rescued_snapshot.get("step_index", -1)) == 1 and int(rescued_snapshot.get("step_count", -1)) == 2, "M1 营救后 pre-evac 真实 HUD 快照为 2/2")
+		var pre_evac_trigger := Vector2i(16, 5)
+		assault.grid_pos = pre_evac_trigger + Vector2i.LEFT
+		battle.call("_update_unit_sprite_pos", assault, false)
+		battle.call("_update_visibility")
+		battle.selected_unit = assault
+		var evac_move: Dictionary = battle.request_move(pre_evac_trigger)
+		await get_tree().process_frame
+		t.check(bool(evac_move.get("success", false)) and bool(evac_move.get("committed", false)), "M1 真实首名队员进入撤离区")
+		var pre_evac_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
+		t.check(String(pre_evac_snapshot.get("checkpoint_id", "")) == "cp_pre_evac" and String(pre_evac_snapshot.get("step_id", "")) == "escort_scout", "M1 pre-evac 真实 HUD 快照保留护送阶段和检查点")
+		t.check(battle.hud.objective_label.text.contains("2/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 2/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("检查点：cp_pre_evac"), "M1 pre-evac 真实 HUD 控件显示 2/2 与检查点")
+	await _cleanup_battle(battle)
+
+func _with_known_tutorials(save: Dictionary) -> Dictionary:
+	var next := save.duplicate(true)
+	var progress: Dictionary = next.get("campaign_progress", {})
+	var flags: Dictionary = progress.get("story_flags", {})
+	for flag in ["teach_selection", "teach_movement", "teach_attack", "teach_observe", "teach_network_takeover", "teach_end_turn"]:
+		flags["tutorial_" + flag] = true
+	progress["story_flags"] = flags
+	next["campaign_progress"] = progress
+	return next
+
+func _wait_for_player_phase(battle: Node) -> bool:
+	for _i in range(180):
+		if battle != null and battle.turn_manager != null and battle.turn_manager.current_phase == TurnManager.TurnPhase.PLAYER_ACTION:
+			return true
+		await get_tree().process_frame
+	return false
+
+func _cleanup_battle(battle: Node) -> void:
+	if battle != null and is_instance_valid(battle):
+		battle.queue_free()
+		await get_tree().process_frame
+
+func _stop_test_audio() -> void:
+	AudioManager.stop_bgm()
+	AudioManager.stop_ambient()
+	for child in AudioManager.get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+			child.stream = null
+	AudioManager.audio_cache.clear()
+	await get_tree().process_frame

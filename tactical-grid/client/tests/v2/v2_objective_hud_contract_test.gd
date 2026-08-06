@@ -3,6 +3,7 @@ extends SceneTree
 const Runner = preload("res://tests/v2/test_runner.gd")
 const HUDScript = preload("res://scripts/ui/hud.gd")
 const PresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
+const FlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
 
 var t := Runner.new()
 
@@ -41,6 +42,7 @@ func _initialize() -> void:
 	_assert_priority(hud, presenter)
 	_assert_long_text_layout(hud, presenter)
 	_assert_missing_optional_fields(hud, presenter)
+	_assert_m1_player_facing_progress()
 	_assert_v1_isolation()
 
 	presenter = null
@@ -95,7 +97,40 @@ func _assert_missing_optional_fields(hud: HUD, presenter: RefCounted) -> void:
 	presenter.render({"mission_id": "ch1_m1", "objective_text": "找到侦察兵"})
 	t.check(hud.objective_label.text.contains("找到侦察兵"), "缺少可选字段时仍显示目标")
 	t.check(hud.get_node("TopBar/AlertLabel").text != "", "缺少可选字段时保留安全提示默认值")
+	t.check(hud.turn_label.text == "回合 -", "后续快照缺少回合字段时清除旧回合标签")
 	t.check(_no_popup_descendant(hud), "缺少可选字段时不创建模态")
+
+func _assert_m1_player_facing_progress() -> void:
+	var mission_file := FileAccess.open("res://data/v2/missions.json", FileAccess.READ)
+	if mission_file == null:
+		t.check(false, "加载 shipped M1 任务数据")
+		return
+	var missions: Variant = JSON.parse_string(mission_file.get_as_text())
+	mission_file.close()
+	var mission: Dictionary = missions.get("ch1_m1", {}) if missions is Dictionary else {}
+	var flow := FlowScript.new()
+	flow.setup(mission, {}, [], [])
+	t.check(int(flow.call("get_objective_step_count")) == 3, "M1 保留三个原始目标步骤供存档和测试")
+	var supports_display_progress := flow.has_method("get_display_objective_step_index") \
+		and flow.has_method("get_display_objective_step_count")
+	t.check(supports_display_progress, "任务流公开玩家可见目标进度读取契约")
+	if not supports_display_progress:
+		return
+	t.check(
+		int(flow.call("get_display_objective_step_index")) == 0
+		and int(flow.call("get_display_objective_step_count")) == 2
+		and flow.get_current_guide_text().contains("流程 1/2"),
+		"M1 营救前 HUD 进度与玩家指南均为 1/2"
+	)
+	var rescue := flow.apply_event(&"character_rescued", {"character_id": "scout"})
+	t.check(bool(rescue.get("success", false)), "M1 进度断言可推进真实营救事件")
+	t.check(
+		int(flow.call("get_objective_step_index")) == 1
+		and int(flow.call("get_display_objective_step_index")) == 1
+		and int(flow.call("get_display_objective_step_count")) == 2
+		and flow.get_current_guide_text().contains("流程 2/2"),
+		"M1 营救后 pre-evac HUD 进度与玩家指南均为 2/2"
+	)
 
 func _assert_v1_isolation() -> void:
 	var hud: HUD = _make_hud()

@@ -552,9 +552,10 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 	var objective_text: String = String(v2_mission_flow.get_primary_text()) if v2_mission_flow != null and v2_mission_flow.has_method("get_primary_text") else String(_get_objective_text())
 	var guide_text: String = String(v2_mission_flow.get_current_guide_text()) if v2_mission_flow != null and v2_mission_flow.has_method("get_current_guide_text") else ""
 	var step_id := String(v2_mission_flow.get_current_step_id()) if v2_mission_flow != null and v2_mission_flow.has_method("get_current_step_id") else ""
-	var step_index := int(v2_mission_flow.get_objective_step_index()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_index") else 0
-	var step_count := int(v2_mission_flow.get_objective_step_count()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count") else 0
-	var route_hint := _get_v2_route_hint(mission_snapshot, step_index)
+	var raw_step_index := int(v2_mission_flow.get_objective_step_index()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_index") else 0
+	var step_index := int(v2_mission_flow.get_display_objective_step_index()) if v2_mission_flow != null and v2_mission_flow.has_method("get_display_objective_step_index") else raw_step_index
+	var step_count := int(v2_mission_flow.get_display_objective_step_count()) if v2_mission_flow != null and v2_mission_flow.has_method("get_display_objective_step_count") else (int(v2_mission_flow.get_objective_step_count()) if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count") else 0)
+	var route_hint := _get_v2_route_hint(mission_snapshot, raw_step_index)
 	var hazard_warning := _get_v2_hazard_warning()
 	var checkpoint_id := v2_last_checkpoint_id
 	if checkpoint_id.is_empty():
@@ -679,6 +680,8 @@ func _parse_v2_hazard_cell(raw_cell: Variant) -> Vector2i:
 func _update_v2_encounters(mission_events: Array) -> Dictionary:
 	if not _is_v2_battle() or v2_encounter_activation == null:
 		return {"success": false, "reason": &"encounter_activation_unavailable"}
+	for position in _get_v2_player_positions():
+		_check_encounter_zone(position)
 	var result: Dictionary = v2_encounter_activation.update(
 		_get_v2_player_positions(),
 		mission_events,
