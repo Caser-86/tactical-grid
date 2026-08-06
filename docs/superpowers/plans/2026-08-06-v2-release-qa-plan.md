@@ -213,4 +213,3 @@ git commit -m "release(v2): close M1 and M2 Windows release gate"
 git add tactical-grid/client/docs/v2_m1_m2_release_report.md tactical-grid/client/docs/v2/README.md
 git commit -m "docs(v2): publish M1 and M2 release acceptance report"
 ```
-

@@ -269,4 +269,3 @@ Expected: existing V2 gate and new shared foundation tests all pass.
 git add tactical-grid/client/tests/v2/gate_manifest.json tactical-grid/client/tests/v2/README.md
 git commit -m "test(v2): close shared mission foundation gate"
 ```
-

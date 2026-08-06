@@ -187,4 +187,3 @@ git commit -m "feat(v2): add mission state audio feedback"
 git add tactical-grid/client/tests/v2/v2_art_import_contract_test.gd tactical-grid/client/data/v2/resource_manifest.md tactical-grid/client/assets/v2/README.md
 git commit -m "test(v2): validate mission art import and provenance"
 ```
-
