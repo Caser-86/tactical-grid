@@ -24,26 +24,36 @@ func _initialize() -> void:
 	activation.call("mark_enemy_defeated", &"enemy_one")
 	activation.update([], [&"encounter_two"])
 
-	var snapshot: Dictionary = activation.call("get_snapshot")
-	var defeated: Array = snapshot.get("defeated_enemy_ids", [])
-	t.check(activation.get_active_enemy_ids().has("enemy_two"), "第二遭遇触发后旧存活敌人保持激活")
+	var active_enemy_ids: Array = activation.get_active_enemy_ids()
 	var waiting_enemy_ids: Array = activation.call("get_waiting_enemy_ids")
+	var snapshot: Dictionary = activation.call("get_snapshot")
+	var defeated_enemy_ids: Array = snapshot.get("defeated_enemy_ids", [])
+	t.check(active_enemy_ids.has("enemy_two"), "第二遭遇触发后旧存活敌人保持激活")
 	t.check(
 		waiting_enemy_ids.has("enemy_four") or waiting_enemy_ids.has("enemy_five"),
 		"活跃上限填满后至少一名新请求敌人进入等待队列"
 	)
-	t.check(defeated.has("enemy_one"), "击败敌人进入击败状态")
+	t.check(defeated_enemy_ids.has("enemy_one"), "击败敌人进入击败状态")
 
 	var restored := Activation.new()
 	restored.setup(_map())
 	var restore_result: Dictionary = restored.call("restore_snapshot", snapshot)
+	var restored_snapshot: Dictionary = restored.call("get_snapshot")
 	t.check(
 		bool(restore_result.get("success", false))
-		and restored.get_active_enemy_ids().has("enemy_two")
-		and restored.call("get_waiting_enemy_ids").has("enemy_four"),
-		"遭遇队列快照恢复保留活跃和等待敌人"
+		and _same_ids(restored.get_active_enemy_ids(), active_enemy_ids)
+		and _same_ids(restored.call("get_waiting_enemy_ids"), waiting_enemy_ids)
+		and _same_ids(restored_snapshot.get("defeated_enemy_ids", []), defeated_enemy_ids),
+		"遭遇队列快照恢复保留活跃、等待和击败敌人集合"
 	)
 	t.finish(self)
+
+func _same_ids(left: Array, right: Array) -> bool:
+	var sorted_left: Array = left.duplicate()
+	var sorted_right: Array = right.duplicate()
+	sorted_left.sort()
+	sorted_right.sort()
+	return sorted_left == sorted_right
 
 func _map() -> Dictionary:
 	return {
