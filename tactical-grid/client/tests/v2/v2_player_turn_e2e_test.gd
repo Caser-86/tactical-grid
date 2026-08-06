@@ -58,6 +58,9 @@ func _run() -> void:
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "玩家回合自动选中单位")
 	t.check(not battle.hud.move_button.visible and not battle.hud.attack_button.visible and not battle.hud.skill_button.visible and not battle.hud.item_button.visible and not battle.hud.overwatch_button.visible, "V2 HUD 不暴露旧动作按钮")
 	t.check(battle.hud.end_turn_button.visible and not battle.hud.end_turn_button.disabled, "V2 HUD 保留可用结束回合入口")
+	var evac_marker := battle.get_node_or_null("MapLayer/V2EvacMarker")
+	var evac_label: Label = evac_marker.get_node_or_null("V2EvacLabel") if evac_marker != null else null
+	t.check(evac_label != null and evac_label.text.contains("撤离点") and evac_label.text.contains("营救后前往"), "V2 地图持续标出营救后的结束地点")
 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")

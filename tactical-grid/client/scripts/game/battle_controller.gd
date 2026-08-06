@@ -834,12 +834,14 @@ func _register_v2_rescued_unit(unit: Unit) -> void:
 func _on_v2_rescue_committed(result: Dictionary) -> void:
 	_record_v2_playtest_event(&"scout_rescued", {"character_id": String(result.get("character_id", "scout"))})
 	_update_v2_encounters([&"scout_rescued"])
+	if has_method("_update_v2_evac_marker"):
+		call("_update_v2_evac_marker")
 	if hud:
 		var recovered_hp := int(result.get("recovered_hp", 0))
 		if recovered_hp > 0:
-			hud.set_context_prompt("营救成功：侦察兵已加入小队；医疗包恢复 %d HP，可继续撤离。" % recovered_hp)
+			hud.set_context_prompt("营救成功：侦察兵已加入小队，恢复 %d HP。下一步：去地图右上方绿色撤离点，两人进入后自动完成。" % recovered_hp)
 		else:
-			hud.set_context_prompt("营救成功：侦察兵已加入小队，可立即选择行动")
+			hud.set_context_prompt("营救成功：侦察兵已加入小队。下一步：去地图右上方绿色撤离点，两人进入后自动完成。")
 		hud.update_objective(_get_objective_text())
 	_advance_context_hint("interact")
 	_render_v2_rescue_marker()

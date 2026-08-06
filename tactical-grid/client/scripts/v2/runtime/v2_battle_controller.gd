@@ -114,16 +114,24 @@ func _render_v2_map_entities() -> void:
 			var marker := Node2D.new()
 			marker.name = "V2EvacMarker"
 			marker.position = _get_cell_center(position)
-			marker.z_index = 2
+			marker.z_index = 3
 			var ring := Polygon2D.new()
-			ring.polygon = PackedVector2Array([Vector2(0, -22), Vector2(22, 0), Vector2(0, 22), Vector2(-22, 0)])
-			ring.color = Color(0.12, 0.95, 0.72, 0.66)
+			ring.name = "V2EvacRing"
+			ring.polygon = PackedVector2Array([Vector2(0, -28), Vector2(28, 0), Vector2(0, 28), Vector2(-28, 0)])
+			ring.color = Color(0.12, 0.95, 0.72, 0.78)
 			marker.add_child(ring)
 			var label := Label.new()
-			label.text = "撤离"
-			label.position = Vector2(-34, -42)
-			label.size = Vector2(68, 24)
+			label.name = "V2EvacLabel"
+			label.text = "撤离点\n营救后前往"
+			label.position = Vector2(-72, -66)
+			label.size = Vector2(144, 48)
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			label.add_theme_font_size_override("font_size", 15)
+			label.add_theme_color_override("font_color", Color(0.70, 1.0, 0.88, 1.0))
+			label.add_theme_color_override("font_shadow_color", Color(0.02, 0.10, 0.08, 1.0))
+			label.add_theme_constant_override("shadow_offset_x", 2)
+			label.add_theme_constant_override("shadow_offset_y", 2)
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			marker.add_child(label)
 			map_layer.add_child(marker)
@@ -143,6 +151,18 @@ func _render_evac_zone() -> void:
 	_clear_layer(evac_zone_layer)
 	for cell in evac_cells:
 		_highlight_cell(evac_zone_layer, cell, Color(0.0, 0.88, 0.72, 0.18))
+
+func _update_v2_evac_marker() -> void:
+	var marker := map_layer.get_node_or_null("V2EvacMarker") as Node2D
+	if marker == null:
+		return
+	var label := marker.get_node_or_null("V2EvacLabel") as Label
+	var ring := marker.get_node_or_null("V2EvacRing") as Polygon2D
+	var unlocked := v2_mission_flow != null and String(v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC"
+	if label != null:
+		label.text = "撤离点\n进入后自动完成" if unlocked else "撤离点\n营救后前往"
+	if ring != null:
+		ring.color = Color(0.12, 0.95, 0.72, 0.92) if unlocked else Color(0.42, 0.72, 0.62, 0.78)
 
 func _play_intro_then_start() -> void:
 	# The V2 base already plays its dedicated briefing. Never queue V1 dialogue

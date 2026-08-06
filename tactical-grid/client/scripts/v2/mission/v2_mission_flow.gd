@@ -152,9 +152,9 @@ func get_primary_text() -> String:
 func get_guide_text() -> String:
 	match state:
 		State.SEARCH_SCOUT:
-			return "流程 1/2：选中突击兵，点蓝格移动；靠近侦察标记后点标记营救。"
+			return "流程 1/2：前往青色侦察标记并点击营救；终点是地图右上方绿色菱形撤离点。"
 		State.ESCORT_TO_EVAC:
-			return "流程 2/2：选中两名队员分别移动到绿色撤离区；两人都到达后自动完成。"
+			return "流程 2/2：前往地图右上方绿色菱形撤离点；两名队员进入后自动完成。"
 		State.COMPLETE:
 			return "任务完成：两名队员已进入撤离区，系统正在打开结算。"
 		State.FAILED:
