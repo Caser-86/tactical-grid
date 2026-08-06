@@ -8,6 +8,7 @@ const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
 var _registered: Array = []
+var _rejected_created: Unit = null
 
 func _initialize() -> void:
 	var map := {
@@ -89,11 +90,27 @@ func _initialize() -> void:
 	var no_target := empty_rescue.query_rescue(second_assault, &"rescue_scout")
 	t.check(not bool(no_target.get("valid", false)) and no_target.get("reason") == &"rescue_unavailable", "没有营救对象时返回明确失败")
 
+	var rejected_map := map.duplicate(true)
+	var rejected_mission := mission.duplicate(true)
+	rejected_mission["objective_steps"] = [{"id": "secure_access", "complete_event": "access_secured", "required_flags": []}]
+	var rejected_flow := Flow.new()
+	var rejected_assault := _unit("rejected_assault", "assault", Vector2i(12, 7))
+	var rejected_players: Array = [rejected_assault]
+	rejected_flow.setup(rejected_mission, rejected_map, rejected_players, enemies)
+	var rejected_action_service := ActionService.new()
+	rejected_action_service.setup(rejected_map, rejected_players, enemies)
+	var rejected_rescue := Rescue.new()
+	rejected_rescue.setup(rejected_map, rejected_players, enemies, rejected_action_service, rejected_flow, Callable(self, "_create_rejected_scout"), Callable(self, "_register_unit"))
+	var rejected_preview := rejected_rescue.query_rescue(rejected_assault, &"rescue_scout")
+	var rejected_result := rejected_rescue.commit_rescue(rejected_preview)
+	t.check(not bool(rejected_result.get("success", true)) and not rejected_players.has(_rejected_created) and not rejected_flow.player_units.has(_rejected_created) and not rejected_action_service._players.has(_rejected_created) and not _registered.has(_rejected_created) and not is_instance_valid(_rejected_created), "任务流拒绝营救时不会注册或保留新单位")
+
 	assault.free()
 	enemy.free()
 	scout.free()
 	far_assault.free()
 	second_assault.free()
+	rejected_assault.free()
 	t.finish(self)
 
 func _create_scout(character_id: StringName, entity_id: String, position: Vector2i) -> Unit:
@@ -115,6 +132,10 @@ func _create_scout(character_id: StringName, entity_id: String, position: Vector
 
 func _register_unit(unit: Unit) -> void:
 	_registered.append(unit)
+
+func _create_rejected_scout(character_id: StringName, entity_id: String, position: Vector2i) -> Unit:
+	_rejected_created = _create_scout(character_id, entity_id, position)
+	return _rejected_created
 
 func _unit(entity_id: String, role: String, position: Vector2i, team: String = "player") -> Unit:
 	var unit := UnitScript.new()

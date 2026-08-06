@@ -70,6 +70,8 @@ func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, ene
 func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
 	var normalized_event := _normalize_event(event_name)
 	var result := {"success": true, "event": event_name, "changed": false}
+	if _event_already_completed(normalized_event):
+		return _finish_event(event_name, _fail(&"event_already_completed"))
 	if state in [State.COMPLETE, State.FAILED] and event_name not in [&"mission_started", &"evac_checked"]:
 		return _finish_event(event_name, _fail(&"mission_finished"))
 
@@ -90,14 +92,8 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			_register_rescued_unit(payload)
 			result["character_id"] = character_id
 		if event_name == &"evac_checked":
-			# M1's configured final marker is descriptive; reaching evacuation ends it.
-			if get_current_step_id() == "evacuate":
-				state = State.COMPLETE
-			result["victory"] = state == State.COMPLETE
+			result["victory"] = false
 		return _finish_event(event_name, _complete_result(result))
-
-	if _event_already_completed(normalized_event):
-		return _finish_event(event_name, _fail(&"event_already_completed"))
 
 	match event_name:
 		&"mission_started":

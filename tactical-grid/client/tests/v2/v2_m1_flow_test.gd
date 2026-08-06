@@ -57,6 +57,24 @@ func _initialize() -> void:
 	var irreversible_result := irreversible.apply_event(&"primary_irreversible_failure")
 	t.check(bool(irreversible_result.get("defeat", false)), "不可逆主线失败判负")
 	t.check(not irreversible.apply_event(&"unknown_event").get("success", false), "未知事件返回明确错误")
+
+	var configured_flow := Flow.new()
+	var configured_mission := mission.duplicate(true)
+	configured_mission["objective_steps"] = [
+		{"id": "search_scout", "complete_event": "character_rescued", "required_flags": []},
+		{"id": "escort_scout", "complete_event": "evac_checked", "required_flags": ["scout_rescued"]},
+		{"id": "evacuate", "complete_event": "mission_completed", "required_flags": ["scout_rescued"]},
+	]
+	var configured_assault := _unit("configured_assault", Vector2i(19, 2))
+	var configured_scout := _unit("configured_scout", Vector2i(19, 2))
+	configured_flow.setup(configured_mission, map, [configured_assault], enemies)
+	configured_flow.apply_event(&"character_rescued", {"character_id": "scout", "unit": configured_scout})
+	var evac_advanced := configured_flow.apply_event(&"evac_checked")
+	t.check(bool(evac_advanced.get("success", false)) and not bool(evac_advanced.get("victory", true)) and configured_flow.get_current_step_id() == "evacuate", "配置化 M1 撤离检查只推进到最终目标")
+	var completed := configured_flow.apply_event(&"mission_completed")
+	t.check(bool(completed.get("success", false)) and bool(completed.get("victory", false)) and configured_flow.is_victory(), "配置化 M1 仅由最终完成事件胜利")
+	var duplicate_completion := configured_flow.apply_event(&"mission_completed")
+	t.check(not bool(duplicate_completion.get("success", true)) and duplicate_completion.get("reason") == &"event_already_completed", "配置化 M1 重复最终完成事件被幂等拒绝")
 	t.finish(self)
 
 func _unit(entity_id: String, position: Vector2i, alive: bool = true) -> Dictionary:

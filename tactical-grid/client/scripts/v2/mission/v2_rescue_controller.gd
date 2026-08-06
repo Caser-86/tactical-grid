@@ -20,7 +20,15 @@ var _rescued: Dictionary = {}
 var _state_revision := 0
 var _next_preview_id := 1
 
-func setup(map_data: Dictionary, players: Array, enemies: Array, action_service: RefCounted = null, mission_flow: RefCounted = null, create_unit: Callable = Callable(), register_unit: Callable = Callable()) -> void:
+func setup(
+	map_data: Dictionary,
+	players: Array,
+	enemies: Array,
+	action_service: RefCounted = null,
+	mission_flow: RefCounted = null,
+	create_unit: Callable = Callable(),
+	register_unit: Callable = Callable(),
+) -> void:
 	_map_data = map_data.duplicate(true)
 	# Keep the owning BattleController arrays live so joining the squad is visible
 	# to rendering, turn flow and save capture in the same frame.
@@ -77,12 +85,14 @@ func commit_rescue(preview: Dictionary) -> Dictionary:
 	var new_unit: Unit = _create_unit.call(StringName(character_id), "player_%s" % character_id, target)
 	if new_unit == null or not is_instance_valid(new_unit):
 		return {"success": false, "reason": &"unit_creation_failed", "preview_id": preview_id}
-	var action_available_before := actor.v2_turn_state.action_available
+	var action_available_before: bool = actor.v2_turn_state.action_available
 	var hp_before := actor.current_hp
 	if not actor.spend_v2_action():
 		new_unit.free()
 		return {"success": false, "reason": &"action_unavailable", "preview_id": preview_id}
-	var recovery_amount := maxi(0, int(_mission_flow.mission.get("rescue_recovery_hp", 0))) if _mission_flow != null and is_instance_valid(_mission_flow) else 0
+	var recovery_amount := 0
+	if _mission_flow != null and is_instance_valid(_mission_flow):
+		recovery_amount = maxi(0, int(_mission_flow.mission.get("rescue_recovery_hp", 0)))
 	if recovery_amount > 0:
 		actor.heal(recovery_amount)
 	if new_unit.entity_id.is_empty():
@@ -90,27 +100,43 @@ func commit_rescue(preview: Dictionary) -> Dictionary:
 	new_unit.grid_pos = target
 	new_unit.team = "player"
 	new_unit.enable_v2_turn_mode()
+	var flow_result := {"success": true}
+	if _mission_flow != null and is_instance_valid(_mission_flow):
+		flow_result = _mission_flow.apply_event(&"character_rescued", {"character_id": character_id, "new_unit": new_unit, "unit_id": new_unit.entity_id, "position": new_unit.grid_pos})
+	if not bool(flow_result.get("success", false)):
+		actor.v2_turn_state.action_available = action_available_before
+		actor.current_hp = hp_before
+		new_unit.free()
+		return {"success": false, "reason": flow_result.get("reason", &"mission_flow_rejected"), "preview_id": preview_id}
+	# Register only after the mission flow accepts the event. This keeps rejected
+	# rescues out of TurnManager, sprites, and every BattleController registry.
 	if not _players.has(new_unit):
 		_players.append(new_unit)
 	if _register_unit.is_valid():
 		_register_unit.call(new_unit)
 	var entity := _get_rescue_entity(rescue_id)
-	var entity_before := entity.duplicate(true)
 	entity["state"] = "rescued"
 	entity["rescued_by"] = actor.entity_id
 	_rescued[rescue_id] = true
-	var flow_result := {"success": true}
-	if _mission_flow != null and is_instance_valid(_mission_flow):
-		flow_result = _mission_flow.apply_event(&"character_rescued", {"character_id": character_id, "new_unit": new_unit, "unit_id": new_unit.entity_id, "position": new_unit.grid_pos})
-	if not bool(flow_result.get("success", false)):
-		_rollback_rescue(actor, action_available_before, hp_before, new_unit, rescue_id, entity_before)
-		return {"success": false, "reason": flow_result.get("reason", &"mission_flow_rejected"), "preview_id": preview_id}
 	_state_revision += 1
 	_previews.erase(preview_id)
 	if _action_service != null and _action_service.has_method("refresh_units"):
 		_action_service.refresh_units(_players, _enemies)
 	var checkpoint_id := StringName(flow_result.get("checkpoint_id", &"cp_rescue"))
-	var result := {"success": true, "action": &"rescue", "rescue_id": rescue_id, "character_id": character_id, "actor_id": actor.entity_id, "recovered_hp": actor.current_hp - hp_before, "new_unit": new_unit, "position": target, "checkpoint_id": checkpoint_id, "flow": flow_result, "preview_id": preview_id, "state_revision": _state_revision}
+	var result := {
+		"success": true,
+		"action": &"rescue",
+		"rescue_id": rescue_id,
+		"character_id": character_id,
+		"actor_id": actor.entity_id,
+		"recovered_hp": actor.current_hp - hp_before,
+		"new_unit": new_unit,
+		"position": target,
+		"checkpoint_id": checkpoint_id,
+		"flow": flow_result,
+		"preview_id": preview_id,
+		"state_revision": _state_revision,
+	}
 	rescue_committed.emit(result)
 	checkpoint_requested.emit(checkpoint_id, result)
 	return result
@@ -155,20 +181,6 @@ func restore_rescued_state(rescue_id: StringName) -> bool:
 	_rescued[id] = true
 	_state_revision += 1
 	return true
-
-func _rollback_rescue(actor: Unit, action_available_before: bool, hp_before: int, new_unit: Unit, rescue_id: String, entity_before: Dictionary) -> void:
-	actor.v2_turn_state.action_available = action_available_before
-	actor.current_hp = hp_before
-	_players.erase(new_unit)
-	if new_unit != null and is_instance_valid(new_unit):
-		new_unit.free()
-	var entity := _get_rescue_entity(rescue_id)
-	entity.clear()
-	for key in entity_before:
-		entity[key] = entity_before[key]
-	_rescued.erase(rescue_id)
-	if _action_service != null and _action_service.has_method("refresh_units"):
-		_action_service.refresh_units(_players, _enemies)
 
 func _validate_preview(stored: Dictionary, submitted: Dictionary) -> Dictionary:
 	if int(submitted.get("state_revision", -1)) != int(stored.get("state_revision", -1)) or int(stored.get("state_revision", -1)) != _state_revision:
