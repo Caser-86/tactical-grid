@@ -82,7 +82,7 @@ func _start_battle() -> void:
 	else:
 		_save_v2_checkpoint(&"cp_start")
 	hud.update_objective(_get_objective_text())
-	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
+	hud.update_turn_display(turn_manager.turn_number, TurnManager.TurnPhase.PLAYER_ACTION)
 	hud.update_alert_display(alert_state)
 	_render_v2_hud()
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])

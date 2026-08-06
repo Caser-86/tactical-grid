@@ -86,6 +86,7 @@ func _assert_restore_recomputes_hazard_overlay(manager: Node) -> void:
 	_test_tree.root.add_child(restored)
 	await _wait_for_player_phase(restored)
 	t.check(restored.turn_manager.turn_number == 3, "恢复入口安装检查点保存的回合数")
+	t.check(restored.hud.turn_label.text == "回合 3", "恢复后 HUD 可见回合计数与保存回合一致")
 	t.check(not _has_hazard_overlay(restored, "warning", Vector2i(1, 1)), "恢复后没有保留恢复前 turn 1 的 stale 预警覆盖层")
 	t.check(_has_hazard_overlay(restored, "warning", Vector2i(2, 1)), "恢复后按保存回合重新渲染危险区预警覆盖层")
 	var hazard_snapshot: Dictionary = restored.v2_hazard_controller.get_snapshot()
