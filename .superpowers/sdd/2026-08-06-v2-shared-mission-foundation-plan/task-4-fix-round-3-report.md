@@ -10,20 +10,24 @@
 
 ## Focused Verification
 
-All commands were attempted from `tactical-grid/client` in this worktree.
+All commands were run from the worktree root with Godot 4.7.1 at
+`D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe`.
 
 | Command | Exact result |
 | --- | --- |
-| `godot --headless --path . res://tests/v2/v2_hazard_runtime_scene_test.tscn` | **BLOCKED**: PowerShell error `The term 'godot' is not recognized as a name of a cmdlet, function, script file, or operable program.` |
-| `godot --headless --path . --script res://tests/v2/v2_hazard_controller_test.gd` | **BLOCKED**: same missing `godot` executable error |
-| `godot --headless --path . --script res://tests/v2/v2_checkpoint_migration_test.gd` | **BLOCKED**: same missing `godot` executable error |
-| `godot --headless --path . --script res://tests/v2/v2_checkpoint_test.gd` | **BLOCKED**: same missing `godot` executable error |
-| `godot --headless --path . res://tests/battle_smoke_test.tscn` | **BLOCKED**: same missing `godot` executable error |
+| `D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe --headless --path tactical-grid/client --scene res://tests/v2/v2_hazard_runtime_scene_test.tscn` | PASS: 31 passed, 0 failed, exit code 0. Includes the restored HUD assertion `回合 3`. |
+| `D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe --headless --path tactical-grid/client --script res://tests/v2/v2_hazard_controller_test.gd` | PASS: 16 passed, 0 failed, exit code 0. |
+| `D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe --headless --path tactical-grid/client --script res://tests/v2/v2_checkpoint_migration_test.gd` | PASS: 22 passed, 0 failed, exit code 0. |
+| `D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe --headless --path tactical-grid/client --script res://tests/v2/v2_checkpoint_test.gd` | PASS: 14 passed, 0 failed, exit code 0. |
+| `D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe --headless --path tactical-grid/client --scene res://tests/battle_smoke_test.tscn` | PASS: 1816 passed, 0 failed, exit code 0. |
 | `git diff --check` | PASS: no whitespace errors |
 
-## Test Limitation
+**Focused total:** 1899 passed, 0 failed across the five Godot commands.
 
-The red-green runtime execution could not be completed because Godot 4.7.1 is not installed or available on `PATH` in this environment. The new assertion was added before the production change, but the pre-fix and post-fix scene runs both remain unverified for this reason. No historical test result is reported as a round-3 result.
+## Warnings
+
+- The hazard runtime scene emitted the existing teardown warnings: 2 leaked `ObjectDB` instances and 1 resource still in use.
+- V1 smoke emitted the expected save-corruption recovery warnings for `save_0` and `save_1` backup cases.
 
 ## Worktree Review
 
