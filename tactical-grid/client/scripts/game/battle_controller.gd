@@ -783,6 +783,10 @@ func _set_v2_enemy_active(entity_id: String, active: bool) -> void:
 		if unit == null or unit.entity_id != entity_id:
 			continue
 		if active:
+			# A defeated enemy remains in the stable roster for saves and mission
+			# telemetry, but an encounter transition must never resurrect it.
+			if not unit.is_alive and unit.is_downed:
+				return
 			if not unit.is_alive:
 				unit.is_alive = true
 				unit.is_downed = false
@@ -790,11 +794,14 @@ func _set_v2_enemy_active(entity_id: String, active: bool) -> void:
 			if _v2_units_rendered and _get_unit_sprite(unit) == null:
 				_create_unit_sprite(unit)
 		else:
-			unit.is_alive = false
-			unit.is_downed = false
+			# Inactive-but-never-engaged enemies use is_downed=false. Preserve the
+			# downed marker when an already defeated enemy leaves an encounter.
+			if unit.is_alive:
+				unit.is_alive = false
+				unit.is_downed = false
 			var sprite := _get_unit_sprite(unit)
 			if sprite:
-				sprite.queue_free()
+				_remove_v2_enemy_sprite(sprite)
 		return
 
 ## Create rescued characters from the V2 data contract, never from V1 job data.
@@ -1820,6 +1827,12 @@ func _render_units() -> void:
 	_v2_units_rendered = true
 
 func _create_unit_sprite(unit: Unit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	# Dead V2 enemies stay in the roster, but never in the scene tree. This
+	# guard covers encounter refresh, reinforcement, and restore paths alike.
+	if _is_v2_battle() and unit.team == "enemy" and not unit.is_alive:
+		return
 	var sprite := UnitSprite.new()
 	sprite.name = "Unit_%s_%s" % [unit.team, unit.unit_name]
 	sprite.update_unit(unit)
@@ -3354,7 +3367,7 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 	_clear_v2_locked_attack()
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_all()
-	if target and is_instance_valid(target):
+	if target and is_instance_valid(target) and target.is_alive:
 		_update_unit_sprite_pos(target, true)
 	if selected_unit and is_instance_valid(selected_unit):
 		_refresh_selected_unit_affordances(selected_unit)
@@ -3425,11 +3438,31 @@ func _schedule_v2_dead_sprite_cleanup(unit: Unit) -> void:
 	var sprite := _get_unit_sprite(unit)
 	if sprite == null:
 		return
+	# Do not leave a defeated enemy visible while its death feedback is running.
+	# Keep the node briefly for the presenter, but remove it from the scene's
+	# visible unit roster immediately and finalize by stable entity ID.
+	sprite.visible = false
+	sprite.set_process(false)
 	var duration := 0.22 if GameManager.get_settings().get("reduce_motion", false) else 0.62
-	get_tree().create_timer(duration).timeout.connect(func() -> void:
-		if is_instance_valid(sprite) and not unit.is_alive:
+	get_tree().create_timer(duration).timeout.connect(_finish_v2_dead_sprite_cleanup.bind(unit.entity_id))
+
+func _finish_v2_dead_sprite_cleanup(entity_id: String) -> void:
+	if unit_layer == null:
+		return
+	for child in unit_layer.get_children():
+		if not child is UnitSprite:
+			continue
+		var sprite := child as UnitSprite
+		var sprite_unit: Unit = sprite.unit
+		if sprite_unit != null and sprite_unit.entity_id == entity_id and not sprite_unit.is_alive:
 			sprite.queue_free()
-	)
+
+func _remove_v2_enemy_sprite(sprite: UnitSprite) -> void:
+	if sprite == null or not is_instance_valid(sprite):
+		return
+	sprite.visible = false
+	sprite.set_process(false)
+	sprite.queue_free()
 
 func _clear_v2_hover_preview() -> void:
 	_cancel_v2_preview(v2_hover_attack_preview)
@@ -4809,6 +4842,9 @@ func _refresh_enemy_sprite_visibility() -> void:
 		if not sprite or not sprite.unit:
 			continue
 		if sprite.unit.team != "enemy":
+			continue
+		if _is_v2_battle() and not sprite.unit.is_alive:
+			_remove_v2_enemy_sprite(sprite)
 			continue
 		var observed = visibility_state.is_enemy_observed(sprite.unit.entity_id)
 		sprite.visible = observed

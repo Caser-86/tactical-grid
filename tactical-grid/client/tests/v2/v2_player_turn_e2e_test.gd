@@ -127,6 +127,8 @@ func _run() -> void:
 		await get_tree().process_frame
 		t.check(target.current_hp < hp_before, "单次左键敌人完成攻击")
 		t.check(target.current_hp == expected_hp_after, "攻击结算严格等于悬停预览的 HP 结果")
+		var defeated_sprite: UnitSprite = battle._get_unit_sprite(target)
+		t.check(defeated_sprite == null or not defeated_sprite.visible, "击杀后敌人精灵立即从战场隐藏")
 		t.check(not battle._last_known_ghosts.has(target.entity_id), "敌人死亡后不生成最后已知位置幽灵")
 		t.check(not player.v2_turn_state.action_available, "攻击只消耗行动预算")
 		t.check(battle.effect_layer.get_node_or_null("V2AttackFeedback") != null, "攻击在地面显示弹道与命中反馈")
@@ -140,6 +142,11 @@ func _run() -> void:
 		t.check(not battle.hud.get_context_prompt_text().contains("设施菜单：选择一个操作"), "不可用摄像头操作给出明确下一步提示")
 		await get_tree().create_timer(0.75).timeout
 		t.check(battle._get_unit_sprite(target) == null, "敌人倒地动画结束后移除精灵，空格可供移动")
+		t.check(not target.is_alive and target.is_downed, "击杀后敌人保留倒地状态而非变成可复活的停用状态")
+		battle.call("_set_v2_enemy_active", target.entity_id, false)
+		battle.call("_set_v2_enemy_active", target.entity_id, true)
+		t.check(not target.is_alive and target.is_downed, "遭遇刷新不会复活已击倒敌人")
+		t.check(battle._get_unit_sprite(target) == null, "遭遇刷新后不会重新生成已击倒敌人精灵")
 		target.grid_pos = player.grid_pos
 		battle.call("_update_unit_sprite_pos", target, false)
 		battle.call("_on_v2_cell_left_clicked", player.grid_pos)
