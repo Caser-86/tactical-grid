@@ -1,7 +1,7 @@
 extends RefCounted
 class_name V2CheckpointAdapter
 
-const SCHEMA_VERSION := 3
+const SCHEMA_VERSION := 4
 const GAME_LINE := "v2_infiltration"
 const V2UnitTurnStateScript = preload("res://scripts/v2/combat/v2_unit_turn_state.gd")
 const CHECKPOINT_IDS := [&"cp_start", &"cp_rescue", &"cp_pre_evac"]
@@ -40,6 +40,9 @@ static func capture(context: Dictionary) -> Dictionary:
 		"alert_state": (context.get("alert_state", {}) as Dictionary).duplicate(true),
 		"visibility_state": (context.get("visibility_state", {}) as Dictionary).duplicate(true),
 		"facilities": (context.get("facilities", []) as Array).duplicate(true),
+		"encounter_state": (context.get("encounter_state", {}) as Dictionary).duplicate(true),
+		"hazard_state": (context.get("hazard_state", {}) as Dictionary).duplicate(true),
+		"facility_state": _default_facility_state(context),
 		"mission_flow": (context.get("mission_flow", {}) as Dictionary).duplicate(true),
 		"enemy_intents": (context.get("enemy_intents", {}) as Dictionary).duplicate(true),
 		"turn_state": (context.get("turn_state", {}) as Dictionary).duplicate(true),
@@ -50,54 +53,121 @@ static func capture(context: Dictionary) -> Dictionary:
 	return snapshot
 
 static func validate(snapshot: Dictionary) -> Dictionary:
+	var normalized := snapshot
+	if int(snapshot.get("schema_version", 0)) == 3:
+		normalized = migrate_schema_3_to_4(snapshot)
+		if normalized.has("_migration_error"):
+			return {"valid": false, "errors": [String(normalized.get("_migration_error", "migration_failed"))]}
 	var errors: Array[String] = []
-	if int(snapshot.get("schema_version", 0)) != SCHEMA_VERSION:
-		errors.append("schema_version must be 3")
-	if String(snapshot.get("game_line", "")) != GAME_LINE:
+	if int(normalized.get("schema_version", 0)) != SCHEMA_VERSION:
+		errors.append("schema_version must be 4")
+	if String(normalized.get("game_line", "")) != GAME_LINE:
 		errors.append("game_line must be %s" % GAME_LINE)
-	for key in ["level_id", "encounter_id", "player_units", "enemy_units", "alert_state", "visibility_state", "facilities", "mission_flow", "enemy_intents", "turn_state", "extra", "hash"]:
-		if not snapshot.has(key):
+	for key in ["level_id", "encounter_id", "player_units", "enemy_units", "alert_state", "visibility_state", "facilities", "encounter_state", "hazard_state", "facility_state", "mission_flow", "enemy_intents", "turn_state", "extra", "hash"]:
+		if not normalized.has(key):
 			errors.append("missing field: %s" % key)
-	if String(snapshot.get("level_id", "")).is_empty():
+	if String(normalized.get("level_id", "")).is_empty():
 		errors.append("level_id is required")
-	if String(snapshot.get("encounter_id", "")).is_empty():
+	if String(normalized.get("encounter_id", "")).is_empty():
 		errors.append("encounter_id is required")
-	var checkpoint_id := String(snapshot.get("checkpoint_id", ""))
+	var checkpoint_id := String(normalized.get("checkpoint_id", ""))
 	if not checkpoint_id.is_empty() and not is_valid_checkpoint_id(StringName(checkpoint_id)):
 		errors.append("unknown checkpoint_id: %s" % checkpoint_id)
-	if not snapshot.get("player_units", []) is Array:
+	if not normalized.get("player_units", []) is Array:
 		errors.append("player_units must be an array")
-	if not snapshot.get("enemy_units", []) is Array:
+	if not normalized.get("enemy_units", []) is Array:
 		errors.append("enemy_units must be an array")
-	_validate_unit_ids(snapshot.get("player_units", []), snapshot.get("enemy_units", []), errors)
-	if errors.is_empty() and String(snapshot.get("hash", "")) != _compute_hash(snapshot):
+	_validate_unit_ids(normalized.get("player_units", []), normalized.get("enemy_units", []), errors)
+	if errors.is_empty() and String(normalized.get("hash", "")) != _compute_hash(normalized):
 		errors.append("snapshot hash mismatch")
 	return {"valid": errors.is_empty(), "errors": errors}
 
 static func restore(snapshot: Dictionary, context: Dictionary) -> Dictionary:
-	var validation: Dictionary = validate(snapshot)
+	var working := snapshot
+	if int(snapshot.get("schema_version", 0)) == 3:
+		working = migrate_schema_3_to_4(snapshot)
+	var validation: Dictionary = validate(working)
 	if not bool(validation.get("valid", false)):
 		return {"success": false, "reason": &"invalid_snapshot", "validation": validation}
-	var player_check: Dictionary = _check_context_units(snapshot.player_units, context.get("player_units", []))
+	var player_check: Dictionary = _check_context_units(working.player_units, context.get("player_units", []))
 	if not bool(player_check.get("valid", false)):
 		return {"success": false, "reason": &"missing_player_entity", "entity_id": player_check.get("entity_id", "")}
-	var enemy_check: Dictionary = _check_context_units(snapshot.enemy_units, context.get("enemy_units", []))
+	var enemy_check: Dictionary = _check_context_units(working.enemy_units, context.get("enemy_units", []))
 	if not bool(enemy_check.get("valid", false)):
 		return {"success": false, "reason": &"missing_enemy_entity", "entity_id": enemy_check.get("entity_id", "")}
-	_restore_units(snapshot.player_units, context.get("player_units", []))
-	_restore_units(snapshot.enemy_units, context.get("enemy_units", []))
+	_restore_units(working.player_units, context.get("player_units", []))
+	_restore_units(working.enemy_units, context.get("enemy_units", []))
 	context["game_line"] = GAME_LINE
-	context["level_id"] = snapshot.level_id
-	context["encounter_id"] = snapshot.encounter_id
-	context["turn"] = int(snapshot.turn)
-	context["alert_state"] = snapshot.alert_state.duplicate(true)
-	context["visibility_state"] = snapshot.visibility_state.duplicate(true)
-	context["facilities"] = snapshot.facilities.duplicate(true)
-	context["mission_flow"] = snapshot.mission_flow.duplicate(true)
-	context["enemy_intents"] = snapshot.enemy_intents.duplicate(true)
-	context["turn_state"] = snapshot.turn_state.duplicate(true)
-	context["extra"] = snapshot.extra.duplicate(true)
-	return {"success": true, "hash": snapshot.hash}
+	context["level_id"] = working.level_id
+	context["encounter_id"] = working.encounter_id
+	context["turn"] = int(working.turn)
+	context["alert_state"] = working.alert_state.duplicate(true)
+	context["visibility_state"] = working.visibility_state.duplicate(true)
+	context["facilities"] = working.facilities.duplicate(true)
+	context["encounter_state"] = working.encounter_state.duplicate(true)
+	context["hazard_state"] = working.hazard_state.duplicate(true)
+	context["facility_state"] = working.facility_state.duplicate(true)
+	context["mission_flow"] = working.mission_flow.duplicate(true)
+	context["enemy_intents"] = working.enemy_intents.duplicate(true)
+	context["turn_state"] = working.turn_state.duplicate(true)
+	context["extra"] = working.extra.duplicate(true)
+	return {"success": true, "hash": working.hash, "snapshot": working}
+
+static func migrate_schema_3_to_4(snapshot: Dictionary) -> Dictionary:
+	if int(snapshot.get("schema_version", 0)) != 3:
+		var not_v3 := snapshot.duplicate(true)
+		not_v3["_migration_error"] = "schema_version_not_3"
+		return not_v3
+	if String(snapshot.get("game_line", "")) != GAME_LINE:
+		var wrong_line := snapshot.duplicate(true)
+		wrong_line["_migration_error"] = "game_line must be %s" % GAME_LINE
+		return wrong_line
+	if String(snapshot.get("hash", "")) != _compute_hash(snapshot):
+		var bad_hash := snapshot.duplicate(true)
+		bad_hash["_migration_error"] = "snapshot hash mismatch"
+		return bad_hash
+	var migrated := snapshot.duplicate(true)
+	var checkpoint_id := String(migrated.get("checkpoint_id", migrated.get("encounter_id", "")))
+	migrated["schema_version"] = SCHEMA_VERSION
+	migrated["encounter_id"] = _stable_encounter_id(String(migrated.get("encounter_id", checkpoint_id)), checkpoint_id)
+	migrated["checkpoint_id"] = checkpoint_id
+	migrated["encounter_state"] = (snapshot.get("encounter_state", _default_encounter_state(migrated["encounter_id"])) as Dictionary).duplicate(true)
+	migrated["hazard_state"] = (snapshot.get("hazard_state", _default_hazard_state()) as Dictionary).duplicate(true)
+	migrated["facility_state"] = (snapshot.get("facility_state", _legacy_facility_state(snapshot.get("facilities", []))) as Dictionary).duplicate(true)
+	migrated["mission_flow"] = _migrate_mission_flow((snapshot.get("mission_flow", {}) as Dictionary).duplicate(true))
+	migrated["hash"] = _compute_hash(migrated)
+	return migrated
+
+static func restore_v2_layers(snapshot: Dictionary, context: Dictionary) -> Dictionary:
+	var working := snapshot
+	if int(snapshot.get("schema_version", 0)) == 3:
+		working = migrate_schema_3_to_4(snapshot)
+	var order: Array = context.get("restore_order", [])
+	order.append("map")
+	context["level_id"] = String(working.get("level_id", context.get("level_id", "")))
+	context["encounter_id"] = String(working.get("encounter_id", context.get("encounter_id", "")))
+	order.append("units")
+	var unit_restore := restore(working, context)
+	if not bool(unit_restore.get("success", false)):
+		unit_restore["enter_battle"] = false
+		return unit_restore
+	var stages := [
+		{"name": "encounter", "service": context.get("encounter_service", null), "snapshot": working.get("encounter_state", {})},
+		{"name": "facilities", "service": context.get("facility_service", null), "snapshot": working.get("facility_state", {})},
+		{"name": "hazards", "service": context.get("hazard_service", null), "snapshot": working.get("hazard_state", {})},
+		{"name": "mission", "service": context.get("mission_flow", null), "snapshot": working.get("mission_flow", {})},
+	]
+	for stage in stages:
+		var service: Variant = stage.get("service", null)
+		if service == null:
+			continue
+		if not service.has_method("restore_snapshot"):
+			return {"success": false, "reason": StringName("%s_restore_unavailable" % String(stage.get("name", ""))), "enter_battle": false}
+		var result: Dictionary = service.restore_snapshot(stage.get("snapshot", {}))
+		if not bool(result.get("success", false)):
+			result["enter_battle"] = false
+			return result
+	return {"success": true, "enter_battle": true, "hash": working.get("hash", ""), "snapshot": working}
 
 static func _serialize_units(units: Variant) -> Array:
 	var result: Array = []
@@ -214,3 +284,70 @@ static func _compute_hash(snapshot: Dictionary) -> String:
 	hashing.start(HashingContext.HASH_SHA256)
 	hashing.update(JSON.stringify(body).to_utf8_buffer())
 	return hashing.finish().hex_encode()
+
+static func _default_facility_state(context: Dictionary) -> Dictionary:
+	var raw_state: Variant = context.get("facility_state", null)
+	if raw_state is Dictionary:
+		return (raw_state as Dictionary).duplicate(true)
+	return _legacy_facility_state(context.get("facilities", []))
+
+static func _legacy_facility_state(raw_facilities: Variant) -> Dictionary:
+	var facilities: Array = []
+	if raw_facilities is Array:
+		for raw_facility in raw_facilities:
+			if not raw_facility is Dictionary:
+				continue
+			var facility: Dictionary = raw_facility
+			facilities.append({
+				"id": String(facility.get("id", "")),
+				"type": String(facility.get("type", "")),
+				"state": String(facility.get("state", "neutral")),
+				"used_actions": (facility.get("used_actions", []) as Array).duplicate() if facility.get("used_actions", []) is Array else [],
+				"revision": int(facility.get("revision", 0)),
+			})
+	return {"state_revision": 0, "facilities": facilities}
+
+static func _default_hazard_state() -> Dictionary:
+	return {"schema_version": 1, "closed_ids": {}, "resolved_damage_keys": {}, "last_turn": 0}
+
+static func _default_encounter_state(encounter_id: String) -> Dictionary:
+	return {
+		"active_ids": [],
+		"waiting_ids": [],
+		"defeated_ids": [],
+		"departed_ids": [],
+		"triggered_ids": [encounter_id] if not encounter_id.is_empty() else [],
+		"active_cap": 3,
+		"started": true,
+	}
+
+static func _stable_encounter_id(raw_encounter_id: String, checkpoint_id: String) -> String:
+	var candidate := raw_encounter_id
+	if candidate.is_empty():
+		candidate = checkpoint_id
+	match candidate:
+		"cp_start":
+			return "encounter_south"
+		"cp_rescue":
+			return "encounter_rescue"
+		"cp_pre_evac":
+			return "encounter_evac"
+	return candidate
+
+static func _migrate_mission_flow(flow: Dictionary) -> Dictionary:
+	var phase := String(flow.get("phase", flow.get("state", ""))).to_lower()
+	if String(flow.get("step_id", "")).is_empty():
+		if phase in ["escort_to_evac", "escort_scout"]:
+			flow["step_id"] = "escort_scout"
+			flow["step_index"] = int(flow.get("step_index", 1))
+		elif phase in ["complete", "evacuate"]:
+			flow["step_id"] = "evacuate"
+			flow["step_index"] = int(flow.get("step_index", 2))
+		else:
+			flow["step_id"] = "search_scout"
+			flow["step_index"] = int(flow.get("step_index", 0))
+	if not flow.has("step_count"):
+		flow["step_count"] = 3
+	if not flow.has("completed_step_ids"):
+		flow["completed_step_ids"] = {}
+	return flow

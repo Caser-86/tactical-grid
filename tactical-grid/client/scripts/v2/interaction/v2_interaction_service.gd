@@ -130,6 +130,65 @@ func get_facility_at(cell: Vector2i) -> Dictionary:
 func get_state_revision() -> int:
 	return _state_revision
 
+func get_snapshot() -> Dictionary:
+	var facilities: Array[Dictionary] = []
+	var ids: Array = _facilities_by_id.keys()
+	ids.sort()
+	for raw_id in ids:
+		var facility: Dictionary = _facilities_by_id[raw_id]
+		facilities.append({
+			"id": String(facility.get("id", raw_id)),
+			"type": String(facility.get("type", "")),
+			"state": String(facility.get("state", "neutral")),
+			"used_actions": (facility.get("used_actions", []) as Array).duplicate(),
+			"revision": int(facility.get("revision", 0)),
+		})
+	return {
+		"state_revision": _state_revision,
+		"facilities": facilities,
+	}
+
+func restore_snapshot(snapshot: Dictionary) -> Dictionary:
+	if snapshot.is_empty():
+		return {"success": true, "restored": true, "state_revision": _state_revision}
+	var incoming_revision := int(snapshot.get("state_revision", 0))
+	if incoming_revision < _state_revision:
+		return {"success": false, "reason": &"stale_facility_snapshot", "state_revision": _state_revision}
+	var raw_facilities: Variant = snapshot.get("facilities", [])
+	if not raw_facilities is Array:
+		return {"success": false, "reason": &"invalid_facility_snapshot", "state_revision": _state_revision}
+	var seen_ids: Dictionary = {}
+	var staged: Dictionary = {}
+	for raw_facility in raw_facilities:
+		if not raw_facility is Dictionary:
+			return {"success": false, "reason": &"invalid_facility_snapshot", "state_revision": _state_revision}
+		var data: Dictionary = raw_facility
+		var facility_id := String(data.get("id", ""))
+		if facility_id.is_empty() or not _facilities_by_id.has(facility_id):
+			return {"success": false, "reason": &"unknown_facility", "facility_id": facility_id, "state_revision": _state_revision}
+		if seen_ids.has(facility_id):
+			return {"success": false, "reason": &"duplicate_facility", "facility_id": facility_id, "state_revision": _state_revision}
+		seen_ids[facility_id] = true
+		var used_actions := _read_unique_actions(data.get("used_actions", []))
+		if not bool(used_actions.get("valid", false)):
+			return {"success": false, "reason": &"duplicate_facility_action", "facility_id": facility_id, "state_revision": _state_revision}
+		var current: Dictionary = _facilities_by_id[facility_id]
+		if int(data.get("revision", 0)) < int(current.get("revision", 0)):
+			return {"success": false, "reason": &"stale_facility_revision", "facility_id": facility_id, "state_revision": _state_revision}
+		staged[facility_id] = {
+			"state": String(data.get("state", current.get("state", "neutral"))),
+			"used_actions": used_actions.get("actions", []),
+			"revision": int(data.get("revision", current.get("revision", 0))),
+		}
+	for facility_id in staged.keys():
+		var update: Dictionary = staged[facility_id]
+		var facility: Dictionary = _facilities_by_id[facility_id]
+		facility["state"] = update.get("state", facility.get("state", "neutral"))
+		facility["used_actions"] = (update.get("used_actions", []) as Array).duplicate()
+		facility["revision"] = int(update.get("revision", facility.get("revision", 0)))
+	_state_revision += 1
+	return {"success": true, "restored": true, "state_revision": _state_revision}
+
 func _build_context(actor: Unit, facility: Dictionary) -> Dictionary:
 	var context := {"can_operate": false, "reason": ""}
 	context["mission_flow"] = _mission_flow
@@ -203,3 +262,16 @@ func _normalize_type(raw_type: String) -> String:
 		"terminal":
 			return "boss_terminal"
 	return raw_type
+
+func _read_unique_actions(raw_actions: Variant) -> Dictionary:
+	if not raw_actions is Array:
+		return {"valid": false, "actions": []}
+	var seen: Dictionary = {}
+	var actions: Array = []
+	for raw_action in raw_actions:
+		var action_id := String(raw_action)
+		if seen.has(action_id):
+			return {"valid": false, "actions": []}
+		seen[action_id] = true
+		actions.append(action_id)
+	return {"valid": true, "actions": actions}

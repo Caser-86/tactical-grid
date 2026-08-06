@@ -3,6 +3,9 @@ extends "res://scripts/game/battle_controller.gd"
 const V2EnemyBrainScript = preload("res://scripts/v2/ai/v2_enemy_brain.gd")
 const V2IntentExecutorScript = preload("res://scripts/v2/ai/v2_intent_executor.gd")
 const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
+const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
+
+var v2_hazard_controller: RefCounted = null
 
 ## V2 owns its map, roster, onboarding, and enemy turn. The shared controller
 ## remains a rendering/turn-system base so the V1 branch is never changed.
@@ -32,6 +35,118 @@ func _install_v2_control_guide() -> void:
 	guide.add_theme_color_override("font_color", Color(0.64, 0.86, 0.93, 0.96))
 	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom_bar.add_child(guide)
+
+func _setup_v2_services() -> void:
+	super._setup_v2_services()
+	if not _is_v2_battle():
+		return
+	var hazard_map: Dictionary = v2_mission_flow.map_data if v2_mission_flow != null else map_data
+	var size_data: Dictionary = hazard_map.get("size", {})
+	var hazard_map_size := Vector2i(int(size_data.get("width", map_width)), int(size_data.get("height", map_height)))
+	v2_hazard_controller = V2HazardControllerScript.new()
+	v2_hazard_controller.setup(hazard_map.get("hazards", hazard_map.get("environmental_hazards", [])), hazard_map_size)
+
+func _save_v2_checkpoint(checkpoint_id: StringName) -> bool:
+	if not _is_v2_battle() or GameManager.current_save.is_empty():
+		return false
+	var snapshot := V2CheckpointAdapterScript.capture({
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(checkpoint_id),
+		"checkpoint_id": String(checkpoint_id),
+		"turn": turn_manager.turn_number if turn_manager else 0,
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+		"alert_state": alert_state.serialize() if alert_state else {},
+		"visibility_state": visibility_state.serialize() if visibility_state else {},
+		"facilities": v2_mission_flow.map_data.get("facilities", []) if v2_mission_flow else [],
+		"encounter_state": v2_encounter_activation.get_snapshot() if v2_encounter_activation and v2_encounter_activation.has_method("get_snapshot") else {},
+		"hazard_state": v2_hazard_controller.get_snapshot() if v2_hazard_controller and v2_hazard_controller.has_method("get_snapshot") else {},
+		"facility_state": v2_interaction_service.get_snapshot() if v2_interaction_service and v2_interaction_service.has_method("get_snapshot") else {},
+		"mission_flow": v2_mission_flow.get_snapshot() if v2_mission_flow else {},
+		"enemy_intents": {},
+		"turn_state": {"phase": turn_manager.current_phase if turn_manager else 0},
+		"extra": {"checkpoint_id": String(checkpoint_id)},
+	})
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点无效：%s" % "; ".join(validation.get("errors", [])))
+		return false
+	if not GameManager.set_v2_encounter_checkpoint(snapshot):
+		_log("V2 检查点写入失败：%s" % checkpoint_id)
+		return false
+	v2_last_checkpoint = snapshot
+	v2_last_checkpoint_id = String(checkpoint_id)
+	return true
+
+func _restore_v2_checkpoint() -> bool:
+	var snapshot: Dictionary = GameManager.consume_v2_checkpoint_request()
+	if snapshot.is_empty():
+		return false
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点校验失败，回退任务起点：%s" % "; ".join(validation.get("errors", [])))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	var player_ids: Dictionary = {}
+	for unit in player_units:
+		if unit:
+			player_ids[unit.entity_id] = true
+	for raw_unit in snapshot.get("player_units", []):
+		if not raw_unit is Dictionary:
+			continue
+		var data: Dictionary = raw_unit
+		var entity_id := String(data.get("entity_id", ""))
+		if entity_id.is_empty() or player_ids.has(entity_id):
+			continue
+		var position_data: Dictionary = data.get("grid_pos", {})
+		var rescued := _create_v2_rescue_unit(&"scout", entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
+		if rescued == null:
+			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
+			GameManager.clear_v2_encounter_checkpoint()
+			return false
+		player_units.append(rescued)
+		player_ids[entity_id] = true
+		if turn_manager:
+			turn_manager.register_player_unit(rescued)
+	var context := {
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(snapshot.get("encounter_id", "")),
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+		"encounter_service": v2_encounter_activation,
+		"facility_service": v2_interaction_service,
+		"hazard_service": v2_hazard_controller,
+		"mission_flow": v2_mission_flow,
+	}
+	var restored: Dictionary = V2CheckpointAdapterScript.restore_v2_layers(snapshot, context)
+	if not bool(restored.get("success", false)):
+		_log("V2 检查点恢复失败，回退任务起点：%s" % String(restored.get("reason", "unknown")))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	var restored_snapshot: Dictionary = restored.get("snapshot", snapshot)
+	if v2_rescue_controller and v2_mission_flow and bool(v2_mission_flow.rescued_characters.get("scout", false)):
+		v2_rescue_controller.restore_rescued_state(&"rescue_scout")
+	if alert_state:
+		alert_state.deserialize(restored_snapshot.get("alert_state", {}))
+	if visibility_state and restored_snapshot.get("visibility_state", {}) is Dictionary:
+		visibility_state.deserialize(restored_snapshot.get("visibility_state", {}))
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service:
+		v2_action_service.refresh_units(player_units, enemy_units)
+	if turn_manager:
+		turn_manager.turn_number = maxi(1, int(restored_snapshot.get("turn", 1)))
+		turn_manager.current_phase = TurnManager.TurnPhase.PLAYER_ACTION
+		turn_manager.battle_over = false
+	current_encounter_id = String(restored_snapshot.get("encounter_id", "zone_a"))
+	v2_last_checkpoint = restored_snapshot.duplicate(true)
+	v2_last_checkpoint_id = String(restored_snapshot.get("checkpoint_id", ""))
+	_sync_v2_enemy_sprites_after_restore()
+	_update_visibility()
+	_refresh_v2_runtime_state()
+	return true
 
 func _generate_map() -> void:
 	var result: Dictionary = V2RuntimeMapLoader.load_map(StringName(level_id))
