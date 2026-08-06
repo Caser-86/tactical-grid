@@ -73,3 +73,108 @@ Output: no whitespace errors.
   migration method are also production work expected from later tasks. Their
   contract scripts are registered but were not independently executed because
   those production contracts do not yet exist.
+
+## A-1 Fix Round 1
+
+### Status
+
+Corrected only the three reviewed A-1 V2 contract scripts. No production code
+or V1 files changed.
+
+### Changed Files
+
+- `tactical-grid/client/tests/v2/v2_hazard_controller_test.gd`
+- `tactical-grid/client/tests/v2/v2_encounter_queue_test.gd`
+- `tactical-grid/client/tests/v2/v2_checkpoint_migration_test.gd`
+
+### Commit Hashes
+
+- `08e0227 test(v2): correct shared mission contracts`
+
+### Commands And Outputs
+
+Command:
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_hazard_controller_test.gd
+```
+
+Output:
+
+```text
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+SCRIPT ERROR: Parse Error: Preload file "res://scripts/v2/mission/v2_hazard_controller.gd" does not exist.
+   at: GDScript::reload (res://tests/v2/v2_hazard_controller_test.gd:4)
+ERROR: Failed to load script "res://tests/v2/v2_hazard_controller_test.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+```
+
+Exit code: `1`.
+
+Command:
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_encounter_queue_test.gd
+```
+
+Output:
+
+```text
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [FAIL] 遭遇激活器公开击败和等待队列契约
+  [FAIL] 遭遇激活器公开快照恢复契约
+Passed: 0
+Failed: 2
+```
+
+Exit code: `1`.
+
+Command:
+
+```powershell
+& 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_checkpoint_migration_test.gd
+```
+
+Output:
+
+```text
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] schema 3 检查点夹具通过现有校验并含有效哈希
+  [FAIL] 检查点适配器公开 schema 3 到 4 的迁移契约
+Passed: 1
+Failed: 1
+```
+
+Exit code: `1`.
+
+Command:
+
+```powershell
+git diff --check
+```
+
+Output: no whitespace errors; Git reported only the repository's existing LF-to-CRLF checkout warnings.
+
+### Self-Review Notes
+
+- The hazard test now calls `setup(hazard_data, map_size)` and
+  `advance_player_turn(turn)`, asserts `warning_cells`, `active_cells`,
+  `closed`, and `cycle`, and does not create player Units or inspect HP.
+- The encounter test keeps a live first-encounter enemy active while requesting
+  two new enemies under `active_cap = 3`, making at least one new enemy wait.
+  It also gates all dynamic snapshot calls behind explicit method-contract
+  checks.
+- The migration fixture uses `V2CheckpointAdapter.capture()` with valid V2
+  identity, level, encounter, unit, state, and legacy mission-phase data. Its
+  `validate()` assertion confirms the generated schema-3 hash before testing
+  migration preservation.
+
+### Concerns
+
+- The three scripts remain red against the current branch because the planned
+  hazard controller file, encounter queue/snapshot APIs, and schema-4
+  migration API have not been implemented yet. The checkpoint fixture itself
+  is now validated successfully.
