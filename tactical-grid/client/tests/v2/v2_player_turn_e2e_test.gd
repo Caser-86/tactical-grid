@@ -43,7 +43,7 @@ func _run() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
-	t.check(battle.hud.objective_label.text.contains("找到失联侦察兵") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示营救主目标而非旧上传目标")
+	t.check(battle.hud.objective_label.text.contains("路线分叉") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示路线分叉主目标而非旧上传目标")
 	t.check(battle.map_layer.get_node_or_null("V2EvacMarker") != null, "V2 地图按 entities 数据渲染撤离标记")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
@@ -65,7 +65,7 @@ func _run() -> void:
 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
-	t.check(v2_guide != null and v2_guide.text.contains("流程 1/2") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键") and v2_guide.text.contains("Space结束回合"), "V2 底栏固定显示任务流程和直接操作指南")
+	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键") and v2_guide.text.contains("Space结束回合"), "V2 底栏固定显示任务流程和直接操作指南")
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())

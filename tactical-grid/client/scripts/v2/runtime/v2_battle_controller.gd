@@ -49,6 +49,67 @@ func _setup_v2_services() -> void:
 	v2_hazard_controller = V2HazardControllerScript.new()
 	v2_hazard_controller.setup(hazard_map.get("hazards", hazard_map.get("environmental_hazards", [])), hazard_map_size)
 
+func _finalize_v2_move(result: Dictionary) -> void:
+	super._finalize_v2_move(result)
+	if not _is_v2_battle() or level_id != "ch1_m1" or v2_mission_flow == null:
+		return
+	if v2_mission_flow.get_current_step_id() != "search_route_split" or selected_unit == null:
+		return
+	if not _v2_cell_in_list(selected_unit.grid_pos, map_data.get("route_split_cells", [])):
+		return
+	var entered := _apply_v2_mission_event(&"entered_route_split", {"position": selected_unit.grid_pos})
+	if bool(entered.get("success", false)):
+		_show_v2_route_choice()
+
+func _show_v2_route_choice() -> void:
+	if hud == null or v2_interaction_service == null:
+		return
+	var actions := [
+		{
+			"id": "camera_maintenance",
+			"name": "维修摄像头路线",
+			"description": "提前揭示救援区，但会提高警戒。",
+			"disabled": false,
+		},
+		{
+			"id": "cargo_breakthrough",
+			"name": "货柜突破路线",
+			"description": "不提供救援区预览，但路径更短且不额外提高警戒。",
+			"disabled": false,
+		},
+	]
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.INTERACTION_MENU)
+	hud.show_action_picker("路线分叉：选择一条推进路线", actions, Callable(self, "_on_v2_route_selected"))
+	hud.set_context_prompt("两条路线都能到达吊机；选择后本关不再更换。")
+	_render_v2_hud()
+
+func _on_v2_route_selected(route_id: String) -> void:
+	if v2_interaction_service == null or v2_mission_flow == null:
+		return
+	var route_result: Dictionary = v2_interaction_service.select_route(route_id)
+	if not bool(route_result.get("success", false)):
+		if hud:
+			hud.show_action_reason(route_result.get("reason", "route_unavailable"))
+		return
+	var mission_result := _apply_v2_mission_event(&"route_selected", {"route_id": route_id})
+	if not bool(mission_result.get("success", false)):
+		if hud:
+			hud.show_action_reason(mission_result.get("reason", "route_unavailable"))
+		return
+	if bool(route_result.get("raises_alert", false)) and alert_state:
+		alert_state.apply_event("camera_identified_player")
+	_update_v2_encounters([{"event": "route_selected", "route_id": route_id}])
+	if hud:
+		hud.hide_action_picker()
+		hud.set_context_prompt("已选择%s。下一步：前往地图中上方吊机控制台并放下吊桥。" % String(route_result.get("route_name", route_id)))
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if _is_v2_battle() and level_id == "ch1_m1":
+		GameManager.play_dialogue("ch1_m1_route")
+	_record_v2_playtest_event(&"route_selected", {"route_id": route_id})
+	_render_v2_hud()
+
 func _start_battle() -> void:
 	if boss_unit:
 		AudioManager.bgm_boss()
@@ -493,12 +554,79 @@ func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
 
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	super._apply_v2_interaction_result(result)
+	var action_id := String(result.get("action_id", ""))
+	if action_id == "lower_gantry":
+		_apply_v2_map_changes(result.get("map_changes", []), "open")
+		var gantry_event := _apply_v2_mission_event(&"gantry_lowered", {
+			"route_id": String(result.get("route_id", "gantry_bridge")),
+			"map_changes": result.get("map_changes", []),
+			"enemy_intent_changes": result.get("enemy_intent_changes", {}),
+		})
+		if bool(gantry_event.get("success", false)) and hud:
+			hud.set_context_prompt("通路已放下。下一步：沿吊桥通路前往中部青色侦察标记并营救侦察兵。")
+		if _is_v2_battle() and level_id == "ch1_m1":
+			GameManager.play_dialogue("ch1_m1_gantry")
+		_record_v2_playtest_event(&"gantry_lowered", {"route_id": String(result.get("route_id", "gantry_bridge"))})
 	var close_result := _commit_v2_hazard_close_action(String(result.get("action_id", "")))
 	if bool(close_result.get("success", false)) and hud:
 		hud.set_context_prompt("危险区已关闭：%s" % ", ".join(close_result.get("closed_now", [])))
 		_render_v2_hud()
 	elif _is_v2_battle():
 		_render_v2_hud()
+
+func _on_v2_rescue_committed(result: Dictionary) -> void:
+	super._on_v2_rescue_committed(result)
+	if not _is_v2_battle() or level_id != "ch1_m1":
+		return
+	var route_changes: Dictionary = map_data.get("route_changes", {})
+	var lockdown: Array = []
+	for raw_cell in route_changes.get("rescue_lockdown", []):
+		lockdown.append({"cell": raw_cell, "state": "closed"})
+	_apply_v2_map_changes(lockdown, "closed")
+	var intercept := _apply_v2_mission_event(&"evac_intercept_started", {"enemy_ids": ["m1_sniper_evac_a", "m1_sniper_evac_b"]})
+	_update_v2_encounters([{"event": "pre_evac"}])
+	if hud and bool(intercept.get("success", false)):
+		hud.set_context_prompt("营救触发撤离拦截：东北直通线已封锁。沿吊桥通路前往右上方绿色撤离标记。")
+		GameManager.play_dialogue("ch1_m1_intercept")
+	_render_v2_hud()
+
+func _apply_v2_map_changes(raw_changes: Variant, default_state: String) -> void:
+	if not raw_changes is Array:
+		return
+	var changes: Array = []
+	for raw_change in raw_changes:
+		var cell := _parse_v2_hazard_cell(raw_change.get("cell", raw_change) if raw_change is Dictionary else raw_change)
+		if cell.x < 0:
+			continue
+		var state := String(raw_change.get("state", default_state)) if raw_change is Dictionary else default_state
+		changes.append({"cell": [cell.x, cell.y], "state": state})
+		var layers: Dictionary = map_data.get("layers", {})
+		var blockers: Variant = layers.get("blocker", [])
+		if blockers is Array and cell.y < (blockers as Array).size() and (blockers as Array)[cell.y] is Array:
+			var row: Array = (blockers as Array)[cell.y]
+			if cell.x < row.size():
+				row[cell.x] = 0 if state == "open" else 5
+		if v2_mission_flow != null:
+			var flow_layers: Dictionary = v2_mission_flow.map_data.get("layers", {})
+			var flow_blockers: Variant = flow_layers.get("blocker", [])
+			if flow_blockers is Array and cell.y < (flow_blockers as Array).size() and (flow_blockers as Array)[cell.y] is Array:
+				var flow_row: Array = (flow_blockers as Array)[cell.y]
+				if cell.x < flow_row.size():
+					flow_row[cell.x] = 0 if state == "open" else 5
+	if v2_action_service and v2_action_service.has_method("apply_map_changes"):
+		v2_action_service.apply_map_changes(changes)
+	if not changes.is_empty():
+		_render_map()
+		_render_v2_rescue_marker()
+		_update_visibility()
+
+func _v2_cell_in_list(cell: Vector2i, raw_cells: Variant) -> bool:
+	if not raw_cells is Array:
+		return false
+	for raw_cell in raw_cells:
+		if _parse_v2_hazard_cell(raw_cell) == cell:
+			return true
+	return false
 
 func _render_v2_hazard_overlay() -> void:
 	if effect_layer == null:
@@ -759,6 +887,10 @@ func _apply_encounter_delta(delta: Dictionary) -> void:
 	_refresh_enemy_sprite_visibility()
 	_update_visibility()
 	_refresh_enemy_intent_display()
+	if v2_interaction_service != null and v2_encounter_activation != null:
+		var defeated: Array = v2_encounter_activation.get_defeated_enemy_ids()
+		if "m1_sentry_record" in defeated and "m1_engineer_record" in defeated:
+			v2_interaction_service.mark_encounter_cleared("m1_e03_record")
 
 func _on_unit_died(unit: Unit) -> void:
 	super._on_unit_died(unit)

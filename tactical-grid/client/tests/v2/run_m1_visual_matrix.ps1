@@ -9,7 +9,7 @@ $outputRoot = Join-Path $projectRoot '..\artifacts\v2\verification\m1-graybox\sc
 $null = New-Item -ItemType Directory -Force -Path $outputRoot
 $sizes = @('1280x720', '1920x1080')
 $modes = @('normal', 'grayscale', 'deuteranopia_assist')
-$stages = @('start', 'selected', 'attack_preview', 'rescue', 'evac', 'dialogue', 'result')
+$stages = @('start', 'route_split', 'record_room', 'gantry_open', 'rescue', 'evac_intercept', 'result')
 
 if (-not (Test-Path -LiteralPath $GodotExe)) {
     throw "Godot executable not found: $GodotExe"

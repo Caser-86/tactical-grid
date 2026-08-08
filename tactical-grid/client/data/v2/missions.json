@@ -1,7 +1,8 @@
 {
   "ch1_m1": {
     "id": "ch1_m1",
-    "map_id": "ch1_m1_echo_yard_v3",
+    "map_id": "ch1_m1_echo_yard_v4",
+    "flow_mode": "expanded_m1",
     "name": "回声失联",
     "starting_roster": ["assault"],
     "rescue_character": "scout",
@@ -9,15 +10,22 @@
     "deployment_limit": 2,
     "primary": "找到失联侦察兵并一起撤离",
     "optional": "上传事故记录",
-    "enemy_total": 9,
+    "enemy_total": 12,
     "active_cap": 3,
-    "duration_minutes": [12, 18],
+    "duration_minutes": [20, 25],
     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],
-    "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_rescue", "ch1_m1_record", "ch1_m1_outro"],
+    "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_route", "ch1_m1_gantry", "ch1_m1_rescue", "ch1_m1_intercept", "ch1_m1_record", "ch1_m1_outro"],
     "objective_steps": [
       {"id": "search_scout", "objective_text": "找到失联侦察兵", "guide_text": "前往青色侦察标记并营救侦察兵。", "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "required_flags": []},
       {"id": "escort_scout", "objective_text": "带侦察兵抵达撤离点", "guide_text": "带领小队前往地图右上方绿色菱形撤离点。", "complete_event": "evac_checked", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued"]},
       {"id": "evacuate", "objective_text": "完成撤离", "guide_text": "确认小队已全部进入撤离区。", "complete_event": "mission_completed", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued"], "player_facing": false}
+    ],
+    "expanded_objective_steps": [
+      {"id": "search_route_split", "objective_text": "抵达路线分叉", "guide_text": "前往南侧货运坪上方的黄色分叉标记；到达后选择一条推进路线。", "complete_event": "entered_route_split", "checkpoint_id": "cp_start", "required_flags": []},
+      {"id": "select_route", "objective_text": "选择推进路线", "guide_text": "在路线分叉处选择维修摄像头路线或货柜突破路线。两条路线都能到达吊机。", "complete_event": "route_selected", "checkpoint_id": "cp_start", "required_flags": []},
+      {"id": "operate_gantry", "objective_text": "放下吊桥", "guide_text": "前往地图中上方的吊机控制台，点击后选择“放下吊桥”。", "complete_event": "gantry_lowered", "checkpoint_id": "cp_start", "required_flags": ["route_selected"]},
+      {"id": "rescue_scout", "objective_text": "营救失联侦察兵", "guide_text": "沿已打开的通路前往中部青色侦察标记，靠近后点击营救。", "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "required_flags": ["route_selected", "gantry_lowered"]},
+      {"id": "evacuate_squad", "objective_text": "带小队撤离", "guide_text": "撤离路线已改变；避开东北封锁，沿吊桥通路前往右上方绿色撤离标记，两名存活队员进入后完成。", "complete_event": "evac_checked", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued", "gantry_lowered"]}
     ]
   },
   "ch1_m2": {

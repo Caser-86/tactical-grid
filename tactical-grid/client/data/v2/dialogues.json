@@ -28,6 +28,28 @@
       {"speaker": "alpha", "text": "我会沿掩体推进。侦察兵的信标在中区。", "emotion": "serious"}
     ]
   },
+  "ch1_m1_route": {
+    "id": "ch1_m1_route",
+    "trigger": "route_selected",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "路线已定。别在分叉口久留，吊机是下一步。", "emotion": "serious"},
+      {"speaker": "alpha", "text": "收到。沿标记推进，先打开中部通路。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m1_gantry": {
+    "id": "ch1_m1_gantry",
+    "trigger": "gantry_lowered",
+    "characters": [
+      {"id": "commander", "position": "right"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "吊桥落下了。现在去中部侦察标记，靠近后执行营救。", "emotion": "serious"}
+    ]
+  },
   "ch1_m1_rescue": {
     "id": "ch1_m1_rescue",
     "trigger": "scout_rescued",
@@ -38,6 +60,18 @@
     "lines": [
       {"speaker": "alpha", "text": "找到你了。还能行动吗？", "emotion": "serious"},
       {"speaker": "commander", "text": "侦察兵归队。现在两人一起去东北撤离点。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m1_intercept": {
+    "id": "ch1_m1_intercept",
+    "trigger": "evac_intercept_started",
+    "characters": [
+      {"id": "commander", "position": "right"},
+      {"id": "alpha", "position": "left"}
+    ],
+    "lines": [
+      {"speaker": "commander", "text": "撤离线被封锁，拦截哨兵已经出现。沿吊桥回撤，不要走东北直线。", "emotion": "serious"},
+      {"speaker": "alpha", "text": "明白。两人保持在撤离标记内。", "emotion": "serious"}
     ]
   },
   "ch1_m1_record": {

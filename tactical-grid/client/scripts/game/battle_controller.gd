@@ -672,6 +672,11 @@ func _setup_v2_services() -> void:
 		var loaded_mission: Dictionary = v2_data.get_mission(StringName(level_id))
 		if not loaded_mission.is_empty():
 			v2_mission = loaded_mission
+	# The V2 M1 expansion is opt-in at runtime. Legacy mission-flow fixtures and
+	# V1 never receive this flag, so their stable two/three-step contracts remain
+	# unchanged while the shipped V2 mission uses its five-stage flow.
+	if _is_v2_battle() and String(v2_mission.get("flow_mode", "")) == "expanded_m1":
+		v2_mission["expanded_flow"] = true
 	if _is_v2_battle() and String(v2_mission.get("id", level_id)) == "ch1_m1":
 		_configure_v2_m1_alert()
 		v2_tutorial_flow = V2TutorialFlowScript.new()

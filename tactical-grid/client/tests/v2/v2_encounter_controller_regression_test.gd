@@ -15,8 +15,9 @@ func _run() -> void:
 	if manager == null:
 		t.finish(get_tree())
 		return
-	manager.call("begin_v2_new_game_for_test", 0)
+	var save: Dictionary = manager.call("begin_v2_new_game_for_test", 0)
 	manager.set("current_level_id", "ch1_m1")
+	manager.set("current_save", _with_known_tutorials(save))
 	var battle := BattleScene.instantiate()
 	t.check(battle != null and battle.get_script() == BattleControllerScript, "实例化正式 V2 battle.tscn 控制器")
 	if battle == null:
@@ -31,11 +32,11 @@ func _run() -> void:
 		t.finish(get_tree())
 		return
 
-	var old_live_id := "enemy_sentry_south"
+	var old_live_id := "m1_sentry_south"
 	var old_live := _find_enemy(battle, old_live_id)
 	t.check(old_live != null and old_live.is_alive and battle.call("_get_unit_sprite", old_live) != null, "第一遭遇的旧存活 Unit 和精灵已进入运行时")
 
-	var second_delta: Dictionary = battle.call("_update_v2_encounters", [{"event": "enter_rescue_radius"}])
+	var second_delta: Dictionary = battle.call("_update_v2_encounters", [{"event": "route_selected"}])
 	var second_active: Array = battle.v2_encounter_activation.get_active_enemy_ids()
 	var second_waiting: Array = battle.v2_encounter_activation.get_waiting_enemy_ids()
 	t.check(second_delta.get("success", false), "第二遭遇通过真实控制器 delta 事务触发")
@@ -164,6 +165,16 @@ func _dismiss_intro(manager: Node) -> void:
 			dialogue.call("_end_dialogue")
 			await get_tree().process_frame
 			return
+
+func _with_known_tutorials(save: Dictionary) -> Dictionary:
+	var next := save.duplicate(true)
+	var progress: Dictionary = next.get("campaign_progress", {})
+	var flags: Dictionary = progress.get("story_flags", {})
+	for flag in ["teach_selection", "teach_movement", "teach_attack", "teach_observe", "teach_network_takeover", "teach_end_turn"]:
+		flags["tutorial_" + flag] = true
+	progress["story_flags"] = flags
+	next["campaign_progress"] = progress
+	return next
 
 func _wait_for_player_phase(battle: Node) -> bool:
 	for _i in range(180):

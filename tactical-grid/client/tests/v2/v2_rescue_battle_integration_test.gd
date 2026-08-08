@@ -1,7 +1,7 @@
 extends Node
 
-const BattleScene = preload("res://scenes/battle.tscn")
-const BattleControllerScript = preload("res://scripts/game/battle_controller.gd")
+const BattleScene = preload("res://scenes/v2_battle.tscn")
+const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
 const Runner = preload("res://tests/v2/test_runner.gd")
 const Checkpoint = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 
@@ -16,8 +16,9 @@ func _run() -> void:
 	if manager == null:
 		t.finish(get_tree())
 		return
-	manager.call("begin_v2_new_game_for_test", 0)
+	var save: Dictionary = manager.call("begin_v2_new_game_for_test", 0)
 	manager.set("current_level_id", "ch1_m1")
+	manager.set("current_save", _with_known_tutorials(save))
 	var battle := BattleScene.instantiate() as BattleController
 	t.check(battle != null and battle.get_script() == BattleControllerScript, "M104 实例化正式 battle.tscn")
 	if battle == null:
@@ -38,6 +39,25 @@ func _run() -> void:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
 		return
+
+	# M1 rescue is intentionally gated behind the authored route and gantry
+	# stages; exercise those public transactions instead of bypassing the flow.
+	assault.grid_pos = Vector2i(8, 14)
+	battle.call("_update_unit_sprite_pos", assault, false)
+	battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": assault.grid_pos})
+	battle.call("_on_v2_route_selected", "cargo_breakthrough")
+	assault.grid_pos = Vector2i(12, 5)
+	battle.call("_update_unit_sprite_pos", assault, false)
+	battle.call("refresh_visibility_transaction", &"rescue_gantry_setup")
+	var gantry_actions: Array = battle.v2_interaction_service.query_actions(assault, "facility_gantry")
+	t.check(not gantry_actions.is_empty(), "正式战斗中吊机提供营救前置操作")
+	if not gantry_actions.is_empty():
+		var gantry_action_id := String(gantry_actions[0].get("id", ""))
+		var gantry_result: Dictionary = battle.v2_interaction_service.commit_action(assault, "facility_gantry", gantry_action_id, battle.v2_interaction_service.get_state_revision())
+		if bool(gantry_result.get("success", false)):
+			battle.call("_apply_v2_interaction_result", gantry_result)
+			t.check(battle.v2_mission_flow.get_current_step_id() == "rescue_scout", "正式战斗中吊机后目标切换为营救")
+	assault.begin_v2_turn()
 
 	var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
 	assault.grid_pos = rescue_pos + Vector2i.LEFT
@@ -71,6 +91,16 @@ func _dismiss_intro(manager: Node) -> void:
 			dialogue.call("_end_dialogue")
 			await get_tree().process_frame
 			return
+
+func _with_known_tutorials(save: Dictionary) -> Dictionary:
+	var next := save.duplicate(true)
+	var progress: Dictionary = next.get("campaign_progress", {})
+	var flags: Dictionary = progress.get("story_flags", {})
+	for flag in ["teach_selection", "teach_movement", "teach_attack", "teach_observe", "teach_network_takeover", "teach_end_turn"]:
+		flags["tutorial_" + flag] = true
+	progress["story_flags"] = flags
+	next["campaign_progress"] = progress
+	return next
 
 func _wait_for_player_phase(battle: BattleController) -> bool:
 	for _i in range(180):

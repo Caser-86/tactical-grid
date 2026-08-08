@@ -64,10 +64,26 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		await _cleanup_battle(battle)
 		return
 	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
-	t.check(String(initial.get("step_id", "")) == "search_scout" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 2, "M1 营救前真实 HUD 快照为 1/2")
-	t.check(battle.hud.objective_label.text.contains("1/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/2"), "M1 营救前真实 HUD 控件显示 1/2")
+	t.check(String(initial.get("step_id", "")) == "search_route_split" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 5, "M1 路线分叉前真实 HUD 快照为 1/5")
+	t.check(battle.hud.objective_label.text.contains("1/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/5"), "M1 路线分叉前真实 HUD 控件显示 1/5")
 	var assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	if assault != null and battle.v2_rescue_controller != null:
+		assault.grid_pos = Vector2i(8, 14)
+		battle.call("_update_unit_sprite_pos", assault, false)
+		battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": assault.grid_pos})
+		battle.call("_on_v2_route_selected", "cargo_breakthrough")
+		assault.grid_pos = Vector2i(12, 5)
+		battle.call("_update_unit_sprite_pos", assault, false)
+		battle.call("refresh_visibility_transaction", &"m1_hud_gantry")
+		var gantry_actions: Array = battle.v2_interaction_service.query_actions(assault, "facility_gantry")
+		var gantry_result: Dictionary = {}
+		if not gantry_actions.is_empty():
+			var gantry_action_id := String(gantry_actions[0].get("id", ""))
+			gantry_result = battle.v2_interaction_service.commit_action(assault, "facility_gantry", gantry_action_id, battle.v2_interaction_service.get_state_revision())
+			if bool(gantry_result.get("success", false)):
+				battle.call("_apply_v2_interaction_result", gantry_result)
+		t.check(bool(gantry_result.get("success", false)), "M1 HUD 测试通过正式事务打开吊桥")
+		assault.begin_v2_turn()
 		var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
 		assault.grid_pos = rescue_pos + Vector2i.LEFT
 		battle.call("_update_visibility")
@@ -76,18 +92,18 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		await get_tree().process_frame
 		t.check(bool(rescue.get("success", false)), "M1 真实营救事务成功")
 		var rescued_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
-		t.check(String(rescued_snapshot.get("step_id", "")) == "escort_scout" and int(rescued_snapshot.get("step_index", -1)) == 1 and int(rescued_snapshot.get("step_count", -1)) == 2, "M1 营救后 pre-evac 真实 HUD 快照为 2/2")
-		var pre_evac_trigger := Vector2i(16, 5)
-		assault.grid_pos = pre_evac_trigger + Vector2i.LEFT
+		t.check(String(rescued_snapshot.get("step_id", "")) == "evacuate_squad" and int(rescued_snapshot.get("step_index", -1)) == 4 and int(rescued_snapshot.get("step_count", -1)) == 5, "M1 营救后撤离真实 HUD 快照为 5/5")
+		var evac_center: Vector2i = battle.v2_mission_flow.get_snapshot().get("evac_center", Vector2i(-1, -1))
+		assault.grid_pos = evac_center + Vector2i.LEFT
 		battle.call("_update_unit_sprite_pos", assault, false)
 		battle.call("_update_visibility")
 		battle.selected_unit = assault
-		var evac_move: Dictionary = battle.request_move(pre_evac_trigger)
+		var evac_move: Dictionary = battle.request_move(evac_center)
 		await get_tree().process_frame
 		t.check(bool(evac_move.get("success", false)) and bool(evac_move.get("committed", false)), "M1 真实首名队员进入撤离区")
 		var pre_evac_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
-		t.check(String(pre_evac_snapshot.get("checkpoint_id", "")) == "cp_pre_evac" and String(pre_evac_snapshot.get("step_id", "")) == "escort_scout", "M1 pre-evac 真实 HUD 快照保留护送阶段和检查点")
-		t.check(battle.hud.objective_label.text.contains("2/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 2/2") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("检查点：cp_pre_evac"), "M1 pre-evac 真实 HUD 控件显示 2/2 与检查点")
+		t.check(String(pre_evac_snapshot.get("checkpoint_id", "")) == "cp_rescue" and String(pre_evac_snapshot.get("step_id", "")) == "evacuate_squad", "M1 pre-evac 真实 HUD 快照保留撤离阶段和检查点")
+		t.check(battle.hud.objective_label.text.contains("5/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 5/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("检查点：cp_rescue"), "M1 pre-evac 真实 HUD 控件显示 5/5 与检查点")
 	await _cleanup_battle(battle)
 
 func _with_known_tutorials(save: Dictionary) -> Dictionary:

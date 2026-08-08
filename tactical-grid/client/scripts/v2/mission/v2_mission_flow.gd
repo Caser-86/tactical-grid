@@ -60,7 +60,10 @@ func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, ene
 	_evac_center = Vector2i(-1, -1)
 	_evac_radius = 1
 	_rescue_character_id = String(mission.get("rescue_character", "scout"))
-	_objective_steps = _read_objective_steps(mission.get("objective_steps", []))
+	var configured_steps: Variant = mission.get("objective_steps", [])
+	if bool(mission.get("expanded_flow", false)) and mission.get("expanded_objective_steps", []) is Array:
+		configured_steps = mission.get("expanded_objective_steps", [])
+	_objective_steps = _read_objective_steps(configured_steps)
 	if _objective_steps.is_empty():
 		_objective_steps = _legacy_m1_steps()
 	_find_mission_entities()
@@ -91,6 +94,10 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			rescued_characters[character_id] = true
 			_register_rescued_unit(payload)
 			result["character_id"] = character_id
+		if normalized_event in [&"route_selected", &"gantry_lowered"]:
+			for key in ["route_id", "map_changes", "enemy_intent_changes"]:
+				if payload.has(key):
+					result[key] = payload[key]
 		if event_name == &"evac_checked":
 			result["victory"] = false
 		return _finish_event(event_name, _complete_result(result))
@@ -118,6 +125,11 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 				_mission_flags["evac_route_opened"] = true
 				result["changed"] = true
 				result["evac_route_opened"] = true
+		&"evac_intercept_started":
+			_mission_flags["evac_intercept_started"] = true
+			result["changed"] = true
+			result["evac_intercept_started"] = true
+			result["enemy_ids"] = payload.get("enemy_ids", [])
 		&"unit_moved":
 			_remember_moved_payload(payload)
 			result["changed"] = true
@@ -315,6 +327,11 @@ func _advance_current_step(event_name: StringName, payload: Dictionary, result: 
 	if not _required_flags_satisfied(step):
 		return _fail(&"required_flags_unsatisfied")
 	_record_payload_flags(payload)
+	if event_name == &"route_selected":
+		_mission_flags["route_selected"] = true
+		_mission_flags["route_%s" % String(payload.get("route_id", ""))] = true
+	if event_name == &"gantry_lowered":
+		_mission_flags["gantry_lowered"] = true
 	var completed_step_id := String(step.get("id", ""))
 	_completed_step_ids[completed_step_id] = true
 	_mission_flags[completed_step_id] = true

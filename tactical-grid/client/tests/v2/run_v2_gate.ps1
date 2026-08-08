@@ -66,7 +66,13 @@ function Invoke-GodotItem {
     param([string]$ScriptPath)
 
     Write-Host "[V2] Godot script: $ScriptPath"
+    # Godot writes non-fatal leak diagnostics to stderr. Capture them as
+    # ordinary output so they are reported by Register-Result instead of
+    # aborting this PowerShell gate under ErrorActionPreference=Stop.
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $output = @(& $GodotExe --headless --path $projectRoot --script $ScriptPath 2>&1 | ForEach-Object { [string]$_ })
+    $ErrorActionPreference = $previousErrorAction
     $exitCode = $LASTEXITCODE
     $output | ForEach-Object { Write-Host $_ }
     Register-Result -Kind 'Godot script' -Path $ScriptPath -ExitCode $exitCode -Output $output
@@ -76,7 +82,10 @@ function Invoke-SceneItem {
     param([string]$ScenePath)
 
     Write-Host "[V2] Godot scene: $ScenePath"
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $output = @(& $GodotExe --headless --path $projectRoot $ScenePath 2>&1 | ForEach-Object { [string]$_ })
+    $ErrorActionPreference = $previousErrorAction
     $exitCode = $LASTEXITCODE
     $output | ForEach-Object { Write-Host $_ }
     Register-Result -Kind 'Godot scene' -Path $ScenePath -ExitCode $exitCode -Output $output
@@ -93,11 +102,14 @@ function Invoke-PowerShellItem {
     }
 
     Write-Host "[V2] PowerShell test: $RelativePath"
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     if ($RelativePath -eq 'tests/run_release_gate.ps1' -or $RelativePath -eq 'tests/v2/run_m1_visual_matrix.ps1') {
         $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -GodotExe $GodotExe 2>&1 | ForEach-Object { [string]$_ })
     } else {
         $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1 | ForEach-Object { [string]$_ })
     }
+    $ErrorActionPreference = $previousErrorAction
     $exitCode = $LASTEXITCODE
     $output | ForEach-Object { Write-Host $_ }
     Register-Result -Kind 'PowerShell test' -Path $RelativePath -ExitCode $exitCode -Output $output

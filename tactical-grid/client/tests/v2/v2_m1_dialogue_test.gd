@@ -12,7 +12,10 @@ func _initialize() -> void:
 	var required_ids := [
 		&"ch1_m1_brief",
 		&"ch1_m1_intro",
+		&"ch1_m1_route",
+		&"ch1_m1_gantry",
 		&"ch1_m1_rescue",
+		&"ch1_m1_intercept",
 		&"ch1_m1_record",
 		&"ch1_m1_outro",
 	]
@@ -21,7 +24,10 @@ func _initialize() -> void:
 	t.check(mission.get("dialogue_ids", []) == [
 		"ch1_m1_brief",
 		"ch1_m1_intro",
+		"ch1_m1_route",
+		"ch1_m1_gantry",
 		"ch1_m1_rescue",
+		"ch1_m1_intercept",
 		"ch1_m1_record",
 		"ch1_m1_outro",
 	], "M1 对话 ID 覆盖战前、战中节点和战后")
@@ -41,6 +47,9 @@ func _initialize() -> void:
 	t.check(_choice_count(brief) == 2, "战前选项数量固定为两个")
 	t.check(repo.get_dialogue(&"ch1_m1_record").get("full_text", "").length() <= 120, "事故记录正文不超过 120 字")
 	t.check(String(repo.get_dialogue(&"ch1_m1_rescue").get("trigger", "")) == "scout_rescued", "营救对话绑定营救事件")
+	t.check(String(repo.get_dialogue(&"ch1_m1_route").get("trigger", "")) == "route_selected", "路线对话绑定路线事件")
+	t.check(String(repo.get_dialogue(&"ch1_m1_gantry").get("trigger", "")) == "gantry_lowered", "吊机对话绑定吊机事件")
+	t.check(String(repo.get_dialogue(&"ch1_m1_intercept").get("trigger", "")) == "evac_intercept_started", "撤离反制对话绑定反制事件")
 	t.check(String(repo.get_dialogue(&"ch1_m1_record").get("trigger", "")) == "optional_record_uploaded", "记录对话绑定可选记录事件")
 
 	repo.free()

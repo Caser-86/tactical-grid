@@ -1,6 +1,6 @@
 extends Node
 
-const BattleScene = preload("res://scenes/battle.tscn")
+const BattleScene = preload("res://scenes/v2_battle.tscn")
 const MissionResultScene = preload("res://scenes/mission_result.tscn")
 const VisualMode = preload("res://scripts/v2/presentation/v2_visual_mode.gd")
 const Runner = preload("res://tests/v2/test_runner.gd")
@@ -106,18 +106,30 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 	match stage:
 		"start":
 			battle.call("_deselect_unit")
-		"selected":
-			battle.call("_select_unit", actor)
-		"attack_preview":
-			battle.call("_select_unit", actor)
-			var target := _prepare_attack_target(battle, actor)
-			if target != null:
-				battle.call("request_attack_preview", target)
+		"route_split":
+			actor.grid_pos = Vector2i(8, 14)
+			battle.call("_update_unit_sprite_pos", actor, false)
+			battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": actor.grid_pos})
+			battle.call("_show_v2_route_choice")
+		"record_room":
+			actor.grid_pos = Vector2i(4, 5)
+			battle.call("_update_unit_sprite_pos", actor, false)
+			battle.v2_interaction_service.mark_encounter_cleared("m1_e03_record")
+			var record_result := _commit_facility_action(battle, actor, "facility_record")
+			t.check(bool(record_result.get("success", false)), "M112 record_room 展示事故记录室奖励状态")
+		"gantry_open":
+			await _prepare_route_and_gantry(battle, actor)
 		"rescue":
+			await _prepare_route_and_gantry(battle, actor)
 			var rescue_result := await _rescue_actor(battle, actor)
-			t.check(bool(rescue_result.get("success", false)), "M112 rescue 阶段展示已营救状态")
+			var rescue_ok := bool(rescue_result.get("success", false))
+			var rescue_label := "M112 rescue 阶段展示已营救状态"
+			if not rescue_ok:
+				rescue_label += ": %s" % String(rescue_result.get("reason", "unknown"))
+			t.check(rescue_ok, rescue_label)
 			await _dismiss_dialogue(manager, 24)
 		"evac":
+			await _prepare_route_and_gantry(battle, actor)
 			var rescue_result := await _rescue_actor(battle, actor)
 			t.check(bool(rescue_result.get("success", false)), "M112 evac 阶段先完成营救状态")
 			await _dismiss_dialogue(manager, 24)
@@ -130,6 +142,11 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 				battle.call("_update_unit_sprite_pos", scout, false)
 				battle.call("refresh_visibility_transaction", &"m112_visual_evac")
 				battle.call("_render_v2_hud")
+		"evac_intercept":
+			await _prepare_route_and_gantry(battle, actor)
+			var rescue_result := await _rescue_actor(battle, actor)
+			t.check(bool(rescue_result.get("success", false)), "M112 evac_intercept 阶段完成营救转折")
+			await _dismiss_dialogue(manager, 24)
 		"dialogue":
 			GameManager.play_dialogue("ch1_m1_rescue")
 			await _wait_for_dialogue(manager)
@@ -189,17 +206,46 @@ func _prepare_attack_target(battle: BattleController, actor: Unit) -> Unit:
 				return enemy
 	return null
 
+func _prepare_route_and_gantry(battle: BattleController, actor: Unit) -> void:
+	actor.grid_pos = Vector2i(8, 14)
+	battle.call("_update_unit_sprite_pos", actor, false)
+	battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": actor.grid_pos})
+	battle.call("_on_v2_route_selected", "cargo_breakthrough")
+	actor.grid_pos = Vector2i(12, 5)
+	battle.call("_update_unit_sprite_pos", actor, false)
+	battle.call("refresh_visibility_transaction", &"m112_visual_gantry")
+	var gantry_result := _commit_facility_action(battle, actor, "facility_gantry")
+	t.check(bool(gantry_result.get("success", false)), "M112 visual flow 正式打开吊桥")
+	# Each visual stage is an isolated still frame; refresh the actor budget so
+	# the next staged interaction can be shown without simulating enemy turns.
+	actor.begin_v2_turn()
+
+func _commit_facility_action(battle: BattleController, actor: Unit, facility_id: String) -> Dictionary:
+	var actions: Array = battle.v2_interaction_service.query_actions(actor, facility_id)
+	if actions.is_empty():
+		return {"success": false, "reason": "no_actions"}
+	var action_id := String(actions[0].get("id", ""))
+	var result: Dictionary = battle.v2_interaction_service.commit_action(actor, facility_id, action_id, battle.v2_interaction_service.get_state_revision())
+	if bool(result.get("success", false)):
+		battle.call("_apply_v2_interaction_result", result)
+	return result
+
 func _validate_stage(manager: Node, battle: BattleController) -> void:
 	if stage == "result":
 		return
 	t.check(battle.hud.objective_label.text != "", "M112 %s HUD 目标文本存在" % stage)
-	if stage == "selected":
-		t.check(battle.v2_affordance_presenter.get_child_count() > 0, "M112 selected 阶段显示移动/攻击范围")
-	if stage == "attack_preview":
-		t.check(not battle.v2_locked_attack_preview.is_empty(), "M112 attack_preview 阶段锁定攻击预览")
-		t.check(battle.hud.get_attack_preview_text() != "", "M112 attack_preview 阶段显示伤害预览")
+	if stage == "route_split":
+		t.check(battle.v2_mission_flow.get_current_step_id() == "select_route", "M112 route_split 阶段显示路线选择状态")
+	if stage == "record_room":
+		t.check(bool(battle.v2_mission_flow.get_snapshot().get("optional_complete", false)), "M112 record_room 阶段记录奖励已登记")
+	if stage == "gantry_open":
+		var blockers: Array = battle.map_data.get("layers", {}).get("blocker", [])
+		t.check(blockers.size() > 5 and (blockers[5] as Array).size() > 14 and int((blockers[5] as Array)[14]) == 0, "M112 gantry_open 阶段吊桥格已打开")
 	if stage == "rescue":
 		t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC", "M112 rescue 阶段目标切换为护送撤离")
+	if stage == "evac_intercept":
+		var mission_flags: Dictionary = battle.v2_mission_flow.get_snapshot().get("mission_flags", {})
+		t.check(bool(mission_flags.get("evac_intercept_started", false)), "M112 evac_intercept 阶段记录撤离反制")
 	if stage == "evac":
 		t.check(battle.v2_mission_flow.get_snapshot().get("evac_center", Vector2i(-1, -1)).x >= 0, "M112 evac 阶段显示撤离点")
 	if stage == "dialogue":
@@ -221,7 +267,7 @@ func _parse_user_args() -> void:
 			_explicit_output = true
 	if not visual_mode in ["normal", "grayscale", "deuteranopia_assist"]:
 		visual_mode = "normal"
-	if not stage in ["start", "selected", "attack_preview", "rescue", "evac", "dialogue", "result"]:
+	if not stage in ["start", "route_split", "record_room", "gantry_open", "rescue", "evac_intercept", "evac", "dialogue", "result"]:
 		stage = "start"
 
 func _with_known_tutorials(save: Dictionary) -> Dictionary:

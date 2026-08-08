@@ -29,6 +29,26 @@ func refresh_units(players: Array, enemies: Array) -> void:
 	_previews.clear()
 	_state_revision += 1
 
+func apply_map_changes(map_changes: Array) -> Dictionary:
+	var layers: Dictionary = _map_data.get("layers", {})
+	var blockers: Variant = layers.get("blocker", [])
+	if not blockers is Array:
+		return {"success": false, "reason": "blocker_layer_unavailable"}
+	var changed: Array = []
+	for raw_change in map_changes:
+		var cell := _parse_cell(raw_change.get("cell", raw_change) if raw_change is Dictionary else raw_change)
+		if cell.x < 0 or cell.y < 0 or cell.y >= (blockers as Array).size():
+			continue
+		var row: Variant = (blockers as Array)[cell.y]
+		if not row is Array or cell.x >= (row as Array).size():
+			continue
+		var state := String(raw_change.get("state", "open")) if raw_change is Dictionary else "open"
+		(row as Array)[cell.x] = 0 if state == "open" else 5
+		changed.append([cell.x, cell.y, state])
+	_state_revision += 1
+	_previews.clear()
+	return {"success": true, "changed": changed, "state_revision": _state_revision}
+
 func query_action(request: Dictionary) -> Dictionary:
 	var action := StringName(String(request.get("action", "")))
 	match action:
@@ -292,6 +312,15 @@ func _layer_value(layer: Variant, cell: Vector2i) -> Variant:
 	if cell.x < 0 or cell.x >= row.size():
 		return null
 	return row[cell.x]
+
+func _parse_cell(raw_cell: Variant) -> Vector2i:
+	if raw_cell is Vector2i:
+		return raw_cell
+	if raw_cell is Array and raw_cell.size() >= 2:
+		return Vector2i(int(raw_cell[0]), int(raw_cell[1]))
+	if raw_cell is Dictionary:
+		return Vector2i(int(raw_cell.get("x", -1)), int(raw_cell.get("y", -1)))
+	return Vector2i(-1, -1)
 
 func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
 	for raw_unit in _players + _enemies:

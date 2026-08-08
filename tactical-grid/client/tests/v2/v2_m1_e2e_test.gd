@@ -1,7 +1,7 @@
 extends Node
 
-const BattleScene = preload("res://scenes/battle.tscn")
-const BattleControllerScript = preload("res://scripts/game/battle_controller.gd")
+const BattleScene = preload("res://scenes/v2_battle.tscn")
+const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
 const Checkpoint = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const Runner = preload("res://tests/v2/test_runner.gd")
 
@@ -31,7 +31,7 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 	manager.set("current_level_id", "ch1_m1")
 	manager.set("current_save", _with_known_tutorials(manager.get("current_save")))
 	var battle := BattleScene.instantiate() as BattleController
-	t.check(battle != null and battle.get_script() == BattleControllerScript, route_id + " 实例化正式 battle.tscn")
+	t.check(battle != null and battle.get_script() == BattleControllerScript, route_id + " 实例化正式 V2 battle 场景")
 	if battle == null:
 		return
 	add_child(battle)
@@ -55,15 +55,27 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 		if fixture_enemy != null:
 			fixture_enemy.weapon_damage = [0, 0]
 	battle.call("_select_unit", assault)
-	# The south console is an optional observation action. Start its route from
-	# the interaction radius, then let the real turn boundary restore the action
-	# budget before the combat leg.
-	assault.grid_pos = Vector2i(7, 10)
+	# Enter the real V2 route split and commit one of the two one-time choices.
+	assault.grid_pos = Vector2i(8, 14)
+	battle.call("_update_unit_sprite_pos", assault, false)
+	var entered_split: Dictionary = battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": assault.grid_pos})
+	t.check(bool(entered_split.get("success", false)) and battle.v2_mission_flow.get_current_step_id() == "select_route", route_id + " 进入路线分叉阶段")
+	var selected_route := "camera_maintenance" if route_id == "main_direct" else "cargo_breakthrough"
+	battle.call("_on_v2_route_selected", selected_route)
+	t.check(battle.v2_interaction_service.get_selected_route_id() == selected_route, route_id + " 通过正式路线服务选择正式路线")
+	if selected_route == "camera_maintenance":
+		t.check(battle.alert_state.get_front_state() == &"searching", route_id + " 维修路线进入搜索警戒")
+	else:
+		t.check(battle.alert_state.get_front_state() == &"hidden", route_id + " 货柜路线不额外提高警戒")
+
+	# The south console is now an optional observation action at the expanded
+	# map's authored location.
+	assault.grid_pos = Vector2i(7, 13)
 	battle.call("_update_unit_sprite_pos", assault, false)
 	battle.call("refresh_visibility_transaction", &"m112_camera_setup")
 	var camera_result := _commit_facility_action(battle, assault, "facility_camera_console_south")
 	t.check(bool(camera_result.get("success", false)), route_id + " 通过正式设施事务观察摄像头")
-	t.check(battle.alert_state.get_front_state() == &"searching", route_id + " 观察摄像头后进入搜索警戒")
+	t.check(camera_result.get("action_id", "") == "view_rescue_zone", route_id + " 摄像头动作使用正式 ID")
 	await _end_turn_and_wait(battle)
 
 	var safe_move := _find_safe_move_target(battle, assault)
@@ -81,6 +93,14 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 		t.check(bool(attack_result.get("success", false)), route_id + " 正式攻击事务成功")
 		t.check(int(attack_result.get("hp_after", target.current_hp)) == target.current_hp, route_id + " 攻击结果与单位生命同步")
 
+	await _end_turn_and_wait(battle)
+	assault.grid_pos = Vector2i(12, 5)
+	battle.call("_update_unit_sprite_pos", assault, false)
+	battle.call("refresh_visibility_transaction", &"m112_gantry_setup")
+	var gantry_result := _commit_facility_action(battle, assault, "facility_gantry")
+	t.check(bool(gantry_result.get("success", false)), route_id + " 通过正式吊机事务打开通路")
+	t.check(battle.v2_mission_flow.get_current_step_id() == "rescue_scout", route_id + " 吊机后目标切换为营救")
+
 	assault.current_hp = 6
 	var rescue_result := await _rescue_through_formal_service(battle, assault)
 	t.check(bool(rescue_result.get("success", false)), route_id + " 通过正式营救事务救出侦察兵")
@@ -95,7 +115,8 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 			record_actor.grid_pos = Vector2i(4, 5)
 			battle.call("_update_unit_sprite_pos", record_actor, false)
 			battle.call("refresh_visibility_transaction", &"m112_record_setup")
-		var record_result := _commit_facility_action(battle, record_actor, "facility_optional_record")
+		battle.v2_interaction_service.mark_encounter_cleared("m1_e03_record")
+		var record_result := _commit_facility_action(battle, record_actor, "facility_record")
 		t.check(bool(record_result.get("success", false)), route_id + " 通过正式设施事务上传事故记录")
 		t.check(bool(battle.v2_mission_flow.get_snapshot().get("optional_complete", false)), route_id + " 可选事故记录被正式记录")
 
@@ -220,7 +241,10 @@ func _with_known_tutorials(save: Dictionary) -> Dictionary:
 func _dismiss_dialogue(manager: Node) -> void:
 	for _i in range(60):
 		await get_tree().process_frame
-		var dialogue: Node = manager.get("_active_dialogue")
+		# The dialogue manager can clear this reference in the same frame that
+		# the test observes it; keep the lookup untyped so a freed instance is
+		# handled by is_instance_valid instead of a typed assignment error.
+		var dialogue: Variant = manager.get("_active_dialogue")
 		if dialogue != null and is_instance_valid(dialogue):
 			dialogue.call("_end_dialogue")
 			await get_tree().process_frame
