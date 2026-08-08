@@ -3159,7 +3159,8 @@
       "x": 4,
       "action_id": "upload_incident_record",
       "type": "record",
-      "id": "facility_record"
+    "id": "facility_record",
+    "requires_encounter_clear": "m1_e03_record"
     },
     {
       "name": "吊机控制台",
@@ -3169,7 +3170,9 @@
       "route_id": "gantry_bridge",
       "type": "door",
       "y": 5,
-      "action_id": "lower_gantry"
+    "action_id": "lower_gantry",
+    "map_changes": [[14, 5], [15, 5]],
+    "enemy_intent_changes": {"m1_sniper_evac_a": "intercept", "m1_sniper_evac_b": "intercept"}
     }
   ],
   "main_routes": [

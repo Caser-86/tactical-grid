@@ -8,6 +8,7 @@ const RailHandler = preload("res://scripts/v2/interaction/handlers/rail_handler.
 const BeaconHandler = preload("res://scripts/v2/interaction/handlers/beacon_handler.gd")
 const BossTerminalHandler = preload("res://scripts/v2/interaction/handlers/boss_terminal_handler.gd")
 const RecordHandler = preload("res://scripts/v2/interaction/handlers/record_handler.gd")
+const GantryCraneHandler = preload("res://scripts/v2/interaction/handlers/gantry_crane_handler.gd")
 
 var _map_data: Dictionary = {}
 var _facilities_by_id: Dictionary = {}
@@ -15,6 +16,8 @@ var _handlers: Dictionary = {}
 var _visibility_state: Node = null
 var _mission_flow: RefCounted = null
 var _state_revision: int = 0
+var _selected_route_id := ""
+var _cleared_encounters: Dictionary = {}
 
 func setup(
 	map_data: Dictionary,
@@ -35,8 +38,11 @@ func setup(
 		"beacon": BeaconHandler.new(),
 		"boss_terminal": BossTerminalHandler.new(),
 		"record": RecordHandler.new(),
+		"gantry": GantryCraneHandler.new(),
 	}
 	_state_revision = 0
+	_selected_route_id = ""
+	_cleared_encounters.clear()
 	var raw_facilities: Variant = _map_data.get("facilities", [])
 	if not raw_facilities is Array or (raw_facilities as Array).is_empty():
 		raw_facilities = _map_data.get("network_nodes", _map_data.get("nodes", []))
@@ -49,6 +55,8 @@ func setup(
 			continue
 		var facility_type := String(facility.get("type", facility.get("action", "")))
 		facility_type = _normalize_type(facility_type)
+		if facility_type == "door" and String(facility.get("action_id", "")) == "lower_gantry":
+			facility_type = "gantry"
 		if not _handlers.has(facility_type):
 			continue
 		facility["type"] = facility_type
@@ -130,6 +138,41 @@ func get_facility_at(cell: Vector2i) -> Dictionary:
 func get_state_revision() -> int:
 	return _state_revision
 
+func select_route(route_id: String) -> Dictionary:
+	if not _selected_route_id.is_empty():
+		return {"success": false, "reason": "route_already_selected", "route_id": _selected_route_id}
+	var selected: Dictionary = {}
+	for raw_option in _map_data.get("route_options", []):
+		if raw_option is Dictionary and String(raw_option.get("id", "")) == route_id:
+			selected = raw_option
+			break
+	if selected.is_empty():
+		return {"success": false, "reason": "unknown_route", "route_id": route_id}
+	_selected_route_id = route_id
+	_state_revision += 1
+	var consequence := String(selected.get("consequence", ""))
+	return {
+		"success": true,
+		"event": "route_selected",
+		"route_selected": true,
+		"route_id": route_id,
+		"route_name": String(selected.get("name", route_id)),
+		"route_preview": consequence == "reveal_rescue_zone",
+		"shorter_path": consequence == "shorter_path",
+		"raises_alert": route_id == "camera_maintenance",
+		"consequence": "已选择%s" % String(selected.get("name", route_id)),
+		"state_revision": _state_revision,
+	}
+
+func get_selected_route_id() -> String:
+	return _selected_route_id
+
+func mark_encounter_cleared(encounter_id: String) -> Dictionary:
+	if encounter_id.is_empty():
+		return {"success": false, "reason": "invalid_encounter_id"}
+	_cleared_encounters[encounter_id] = true
+	return {"success": true, "encounter_id": encounter_id, "cleared": true}
+
 func get_snapshot() -> Dictionary:
 	var facilities: Array[Dictionary] = []
 	var ids: Array = _facilities_by_id.keys()
@@ -145,6 +188,8 @@ func get_snapshot() -> Dictionary:
 		})
 	return {
 		"state_revision": _state_revision,
+		"selected_route_id": _selected_route_id,
+		"cleared_encounters": _cleared_encounters.duplicate(true),
 		"facilities": facilities,
 	}
 
@@ -199,6 +244,10 @@ func restore_snapshot(snapshot: Dictionary) -> Dictionary:
 		facility["state"] = update.get("state", facility.get("state", "neutral"))
 		facility["used_actions"] = (update.get("used_actions", []) as Array).duplicate()
 		facility["revision"] = int(update.get("revision", facility.get("revision", 0)))
+	_selected_route_id = String(snapshot.get("selected_route_id", _selected_route_id))
+	var restored_cleared: Variant = snapshot.get("cleared_encounters", _cleared_encounters)
+	if restored_cleared is Dictionary:
+		_cleared_encounters = (restored_cleared as Dictionary).duplicate(true)
 	_state_revision = incoming_revision if rollback_restore else _state_revision + 1
 	return {"success": true, "restored": true, "state_revision": _state_revision}
 
@@ -206,6 +255,9 @@ func _build_context(actor: Unit, facility: Dictionary) -> Dictionary:
 	var context := {"can_operate": false, "reason": ""}
 	context["mission_flow"] = _mission_flow
 	context["optional_complete"] = bool(_mission_flow.optional_complete) if _mission_flow != null else false
+	context["selected_route_id"] = _selected_route_id
+	context["cleared_encounters"] = _cleared_encounters.duplicate(true)
+	context["map_data"] = _map_data
 	if actor == null or not is_instance_valid(actor):
 		context["reason"] = "invalid_unit"
 		return context

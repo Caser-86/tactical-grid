@@ -32,11 +32,11 @@
 - Copy the current V2 `ch1_m1.json` content into `ch1_m1_echo_yard_v3.json` before changing the canonical alias; `load_map("ch1_m1_echo_yard_v3")` must continue loading the 22×16 fixture only when explicitly requested by migration tests.
 - Map stable ID for the runtime map is `ch1_m1_echo_yard_v4`; the legacy fixture keeps its original `ch1_m1_echo_yard_v3` map ID.
 
-- [ ] **Step 1: 写地图合同测试**
+- [x] **Step 1: 写地图合同测试**
 
 断言尺寸 26×18、12 名敌人、五个遭遇、至少两个 `main_routes`、一个可选 `record` 设施、三个检查点、主目标和撤离点存在；五个遭遇的 `active_count` 都不超过 3。
 
-- [ ] **Step 2: 写地图数据**
+- [x] **Step 2: 写地图数据**
 
 使用以下固定地标和路线坐标：
 
@@ -54,7 +54,7 @@
 
 所有五层图层均为 26×18；阻挡层只封闭货柜、墙和营救后东北直通线，不能切断两条主路线。
 
-- [ ] **Step 3: 写 12 个稳定敌人和五个遭遇**
+- [x] **Step 3: 写 12 个稳定敌人和五个遭遇**
 
 敌人 ID 与职责固定为：
 
@@ -68,7 +68,7 @@
 
 `m1_e02_route` 根据 `route_camera_selected` 或 `route_cargo_selected` 激活不同出生点；记录室遭遇只在进入记录区域后触发。
 
-- [ ] **Step 4: 接入地图加载别名并运行校验**
+- [x] **Step 4: 接入地图加载别名并运行校验**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m1_expansion_map_test.gd
@@ -76,7 +76,7 @@
 
 Expected: PASS; explicit v3 fixture remains unchanged and v4 becomes the `ch1_m1` runtime map.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json tactical-grid/client/scripts/v2/content/v2_map_loader.gd tactical-grid/client/tests/v2/v2_m1_map_test.gd tactical-grid/client/tests/v2/v2_m1_expansion_map_test.gd
@@ -98,30 +98,30 @@ git commit -m "feat(v2): author expanded Echo Yard M1 map contract"
 - Crane result includes `route_id="gantry_bridge"`, `map_changes=[{"cell":[x,y],"state":"open"}]` and `enemy_intent_changes`; it does not create an extra checkpoint beyond `cp_m1_start`, `cp_m1_rescue` and `cp_m1_pre_evac`.
 - Route selection event is `route_selected` with payload `route_id="camera_maintenance"` or `route_id="cargo_breakthrough"`.
 
-- [ ] **Step 1: 写路线结果测试**
+- [x] **Step 1: 写路线结果测试**
 
 断言摄像头路线能获得营救区预览但提高警戒，货柜路线不获得预览但保留较短的可通行路径；两者都能操作吊机并到达营救区。
 
-- [ ] **Step 2: 实现路线选择状态**
+- [x] **Step 2: 实现路线选择状态**
 
 第一次进入路线分叉区域时只显示两句结果摘要；提交路线后写入 `route_id`，重复提交返回 `route_already_selected`，不会打开复杂菜单。
 
-- [ ] **Step 3: 实现吊机设施**
+- [x] **Step 3: 实现吊机设施**
 
 吊机操作消耗一次行动，打开一组预先封闭格并把一组撤离敌人意图从 `hold` 改为 `intercept`。地图、HUD 和音效同时显示“通路已放下”。
 
-- [ ] **Step 4: 实现记录室奖励**
+- [x] **Step 4: 实现记录室奖励**
 
 记录终端只在事故记录室敌人被处理后可用；操作后写入 `optional_record_uploaded`、`scout_b`，并保持可跳过不阻断营救与撤离。
 
-- [ ] **Step 5: 运行路线测试**
+- [x] **Step 5: 运行路线测试**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m1_route_consequence_test.gd
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m1_interaction_test.gd
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json tactical-grid/client/scripts/v2/interaction/handlers/camera_handler.gd tactical-grid/client/scripts/v2/interaction/handlers/record_handler.gd tactical-grid/client/scripts/v2/interaction/handlers/gantry_crane_handler.gd tactical-grid/client/scripts/v2/interaction/v2_interaction_service.gd tactical-grid/client/tests/v2/v2_m1_route_consequence_test.gd
@@ -129,6 +129,8 @@ git commit -m "feat(v2): add M1 route and gantry consequences"
 ```
 
 ### Task 3: M1 营救、撤离反制和目标流程
+
+状态：下一步执行。路线选择与设施状态已具备服务层契约，下一步接入任务流程和运行时 UI。
 
 **Files:**
 - Modify: `tactical-grid/client/data/v2/missions.json`

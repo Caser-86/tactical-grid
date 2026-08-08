@@ -1,9 +1,13 @@
 extends RefCounted
 class_name V2RecordHandler
 
-func query(_actor: Unit, _facility: Dictionary, context: Dictionary) -> Array:
+func query(_actor: Unit, facility: Dictionary, context: Dictionary) -> Array:
 	var enabled := bool(context.get("can_operate", false))
 	var reason := String(context.get("reason", ""))
+	var required_encounter := String(facility.get("requires_encounter_clear", ""))
+	if not required_encounter.is_empty() and not bool((context.get("cleared_encounters", {}) as Dictionary).get(required_encounter, false)):
+		enabled = false
+		reason = "先清理记录室敌人"
 	if bool(context.get("optional_complete", false)):
 		enabled = false
 		reason = "事故记录已经上传"
