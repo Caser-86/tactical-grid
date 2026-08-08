@@ -497,6 +497,8 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 	if bool(close_result.get("success", false)) and hud:
 		hud.set_context_prompt("危险区已关闭：%s" % ", ".join(close_result.get("closed_now", [])))
 		_render_v2_hud()
+	elif _is_v2_battle():
+		_render_v2_hud()
 
 func _render_v2_hazard_overlay() -> void:
 	if effect_layer == null:
@@ -561,11 +563,10 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 	if checkpoint_id.is_empty():
 		checkpoint_id = String(v2_last_checkpoint.get("checkpoint_id", ""))
 	var phase_text := _get_v2_phase_text()
-	var ordinary_controls := context_override
-	if ordinary_controls.is_empty() and hud != null:
-		ordinary_controls = hud.get_context_prompt_text()
-	if ordinary_controls.is_empty():
-		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消 · Space结束回合"
+	var ordinary_controls := "左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图 · Space结束回合"
+	var context_prompt := context_override
+	if context_prompt.is_empty() and hud != null:
+		context_prompt = hud.get_context_prompt_text()
 
 	var status := ""
 	var outcome_text := ""
@@ -614,7 +615,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		"alert": alert_name,
 		"next_consequence": next_text,
 		"selected": selected_unit,
-		"context_prompt": context_override,
+		"context_prompt": context_prompt,
 		"action_budget": budget,
 		"ability": "",
 		"interaction": "设施菜单：选择一个操作" if not v2_pending_interaction_facility_id.is_empty() else "",

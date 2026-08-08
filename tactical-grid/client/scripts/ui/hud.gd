@@ -369,6 +369,7 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 	var progress := "%d/%d" % [mini(step_index + 1, step_count), step_count] if step_count > 0 else ""
 	var status := String(snapshot.get("status", "")).to_lower()
 	var outcome := String(snapshot.get("outcome_text", "")).strip_edges()
+	var alert_name := String(snapshot.get("alert", "")).strip_edges()
 	if status == "failure" and outcome.is_empty():
 		outcome = "任务失败"
 	elif status == "victory" and outcome.is_empty():
@@ -399,6 +400,8 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 	var priority_text := ""
 	if not outcome.is_empty() and status in ["failure", "victory"]:
 		priority_text = outcome
+	elif not alert_name.is_empty() and alert_name not in ["平静", "潜伏"]:
+		priority_text = "警戒：%s · %s" % [alert_name, objective] if not objective.is_empty() else "警戒：%s" % alert_name
 	elif not objective.is_empty():
 		priority_text = objective
 	elif not hazard_warning.is_empty():

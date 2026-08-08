@@ -43,7 +43,7 @@ func _run() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
-	t.check(battle.hud.objective_label.text == "找到失联侦察兵", "V2 HUD 显示营救主目标而非旧上传目标")
+	t.check(battle.hud.objective_label.text.contains("找到失联侦察兵") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示营救主目标而非旧上传目标")
 	t.check(battle.map_layer.get_node_or_null("V2EvacMarker") != null, "V2 地图按 entities 数据渲染撤离标记")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
