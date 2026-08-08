@@ -7,6 +7,8 @@ const MAP_FILES := {
 	"ch1_m1": "ch1_m1_echo_yard_v4.json",
 	"ch1_m1_echo_yard_v4": "ch1_m1_echo_yard_v4.json",
 	"ch1_m1_echo_yard_v3": "ch1_m1_echo_yard_v3.json",
+	"ch1_m2": "ch1_m2_cooling_works_v1.json",
+	"ch1_m2_cooling_works_v1": "ch1_m2_cooling_works_v1.json",
 }
 
 static func load_map(map_id: StringName) -> Dictionary:

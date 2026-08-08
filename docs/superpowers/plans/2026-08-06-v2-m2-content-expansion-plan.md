@@ -20,6 +20,8 @@
 
 ### Task 1: 建立 M2 锁定地图和数据合同
 
+状态：已完成。Cooling Works 28×20 锁定地图、13 名稳定敌人、五个遭遇、四个检查点和正式任务配置已通过 25/25 地图合同与 13/13 配置测试；运行时流程和对话仍留给后续任务。
+
 **Files:**
 - Create: `tactical-grid/client/data/v2/locked_maps/ch1_m2_cooling_works_v1.json`
 - Modify: `tactical-grid/client/scripts/v2/content/v2_map_loader.gd`
@@ -32,11 +34,11 @@
 - Map stable ID is `ch1_m2_cooling_works_v1`.
 - Mission record includes `objective_steps`, `hazards`, `route_options`, `rescue_character="sniper"`, `enemy_total=13`, `active_cap=3`, `duration_minutes=[25,30]`.
 
-- [ ] **Step 1: 写 M2 地图合同测试**
+- [x] **Step 1: 写 M2 地图合同测试**
 
 断言尺寸 28×20、13 个 `spawn_enemy`、五个遭遇、四个检查点、至少两个主路线、一个 `cooling_control` 可选设施、`rescue_sniper` 和北侧撤离区存在；所有图层尺寸准确。
 
-- [ ] **Step 2: 写固定地标和路线**
+- [x] **Step 2: 写固定地标和路线**
 
 使用以下坐标：
 
@@ -55,7 +57,7 @@
 
 西侧路线上放置固定喷口危险格；东侧路线放置两条可见狙击预告射线。两条路线均可到达中央涡轮。
 
-- [ ] **Step 3: 写 13 个稳定敌人和五个遭遇**
+- [x] **Step 3: 写 13 个稳定敌人和五个遭遇**
 
 敌人职责分配：5 名 `sentry`、3 名 `drone`、3 名 `sniper_sentry`、2 名 `protocol_engineer`。遭遇 ID 和预算固定为：
 
@@ -69,18 +71,18 @@
 
 同一时间最多激活 3 名；未激活敌人保留在等待队列，不从地图无反馈消失。
 
-- [ ] **Step 4: 写 M2 任务数据和加载别名**
+- [x] **Step 4: 写 M2 任务数据和加载别名**
 
 目标阶段为 `disable_lockdown`、`rescue_sniper`、`show_sniper_ability`、`evacuate_squad`；任一封锁解除路线都推进到下一阶段。
 
-- [ ] **Step 5: 运行 M2 地图和配置测试**
+- [x] **Step 5: 运行 M2 地图和配置测试**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m2_map_test.gd
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m2_config_test.gd
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add tactical-grid/client/data/v2/locked_maps/ch1_m2_cooling_works_v1.json tactical-grid/client/scripts/v2/content/v2_map_loader.gd tactical-grid/client/data/v2/missions.json tactical-grid/client/tests/v2/v2_m2_map_test.gd tactical-grid/client/tests/v2/v2_m2_config_test.gd
