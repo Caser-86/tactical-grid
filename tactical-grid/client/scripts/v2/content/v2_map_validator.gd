@@ -2,7 +2,7 @@ extends RefCounted
 class_name V2MapValidator
 
 const REQUIRED_LAYERS := ["base_terrain", "blocker", "vision", "height", "cover"]
-const ALLOWED_FACILITY_TYPES := ["camera", "door", "power", "rail", "beacon", "boss_terminal", "record"]
+const ALLOWED_FACILITY_TYPES := ["camera", "door", "power", "rail", "beacon", "boss_terminal", "record", "cooling_control"]
 const BLOCKED_TERRAIN_VALUES := [5]
 
 static func validate(map_data: Dictionary) -> Dictionary:

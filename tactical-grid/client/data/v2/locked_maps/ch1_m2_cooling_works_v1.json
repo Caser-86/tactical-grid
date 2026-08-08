@@ -3394,12 +3394,12 @@
     }
   ],
   "facilities": [
-    {
-      "id": "facility_power_west",
+  {
+    "id": "facility_power_west",
       "name": "西侧电力控制台",
       "entity_id": "cooling_power_west",
-      "type": "power",
-      "action_id": "disable_lockdown",
+    "type": "power",
+      "action_id": "cut_power_grid",
       "x": 7,
       "y": 13,
       "route_id": "west_maintenance",
@@ -3426,7 +3426,7 @@
       "name": "东侧安全门旁路",
       "entity_id": "security_bypass_east",
       "type": "door",
-      "action_id": "disable_lockdown",
+      "action_id": "bypass_security_door",
       "x": 20,
       "y": 12,
       "route_id": "east_overpass",
@@ -3444,16 +3444,16 @@
         "m2_sniper_route": "telegraph"
       }
     },
-    {
-      "id": "facility_cooling_control",
+  {
+    "id": "facility_cooling_control",
       "name": "冷却控制室",
       "entity_id": "cooling_control_console",
-      "type": "power",
-      "action_id": "stabilize_cooling",
+    "type": "cooling_control",
+      "action_id": "shutdown_cooling_nozzles",
       "x": 6,
       "y": 5,
       "optional": true,
-      "requires_encounter_clear": "m2_e04_isolation",
+      "requires_encounter_clear": "m2_e03_turbine",
       "reward": "assault_b"
     },
     {

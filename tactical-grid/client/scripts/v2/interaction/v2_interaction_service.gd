@@ -9,6 +9,7 @@ const BeaconHandler = preload("res://scripts/v2/interaction/handlers/beacon_hand
 const BossTerminalHandler = preload("res://scripts/v2/interaction/handlers/boss_terminal_handler.gd")
 const RecordHandler = preload("res://scripts/v2/interaction/handlers/record_handler.gd")
 const GantryCraneHandler = preload("res://scripts/v2/interaction/handlers/gantry_crane_handler.gd")
+const CoolingControlHandler = preload("res://scripts/v2/interaction/handlers/cooling_control_handler.gd")
 
 var _map_data: Dictionary = {}
 var _facilities_by_id: Dictionary = {}
@@ -39,6 +40,7 @@ func setup(
 		"boss_terminal": BossTerminalHandler.new(),
 		"record": RecordHandler.new(),
 		"gantry": GantryCraneHandler.new(),
+		"cooling_control": CoolingControlHandler.new(),
 	}
 	_state_revision = 0
 	_selected_route_id = ""
@@ -77,7 +79,7 @@ func query_actions(actor: Unit, entity_id: String) -> Array:
 	var actions: Array = handler.query(actor, facility, context)
 	for action in actions:
 		var action_id := String(action.get("id", ""))
-		if action_id in facility.get("used_actions", []) and bool(action.get("enabled", false)):
+		if action_id in facility.get("used_actions", []):
 			action["enabled"] = false
 			action["reason"] = "该操作已经完成"
 		if String(facility.get("state", "")) in ["damaged", "destroyed"]:

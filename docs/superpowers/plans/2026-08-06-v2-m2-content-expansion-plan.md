@@ -91,6 +91,8 @@ git commit -m "feat(v2): author Cooling Works M2 map and mission data"
 
 ### Task 2: 双路线封锁解除和冷却控制室
 
+状态：已完成。西侧断电、东侧安全门旁路和冷却控制室三种设施事务已接入，重复提交会返回明确的“该操作已经完成”；M1 既有路线交互回归保持通过。
+
 **Files:**
 - Create: `tactical-grid/client/scripts/v2/interaction/handlers/cooling_control_handler.gd`
 - Modify: `tactical-grid/client/scripts/v2/interaction/handlers/power_handler.gd`
@@ -103,25 +105,25 @@ git commit -m "feat(v2): author Cooling Works M2 map and mission data"
 - East action `bypass_security_door` returns `door_state="open"`, `sniper_lines_visible=true`, `power_state="online"`.
 - Optional action `shutdown_cooling_nozzles` returns `hazard_closed=true`, `unlocked_modules=["assault_b"]`.
 
-- [ ] **Step 1: 写路线结果测试**
+- [x] **Step 1: 写路线结果测试**
 
 分别提交西侧和东侧动作，断言两者都产生 `lockdown_cleared`，但只有西侧降低观察范围、只有东侧保留电力并显示狙击线；重复提交返回明确拒绝。
 
-- [ ] **Step 2: 实现路线动作**
+- [x] **Step 2: 实现路线动作**
 
 两种动作都消耗一次行动并写入 `route_id`；玩家可以继续探索另一侧，但不会重复获得封锁解除奖励。
 
-- [ ] **Step 3: 实现冷却控制室**
+- [x] **Step 3: 实现冷却控制室**
 
 进入控制室后先触发独立两名敌人局面，清理后才允许关闭喷口；关闭状态写入危险区快照，并解锁 `assault_b`，跳过房间只失去奖励。
 
-- [ ] **Step 4: 运行交互测试**
+- [x] **Step 4: 运行交互测试**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m2_route_consequence_test.gd
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/interaction/handlers/cooling_control_handler.gd tactical-grid/client/scripts/v2/interaction/handlers/power_handler.gd tactical-grid/client/scripts/v2/interaction/handlers/door_handler.gd tactical-grid/client/scripts/v2/interaction/v2_interaction_service.gd tactical-grid/client/tests/v2/v2_m2_route_consequence_test.gd
