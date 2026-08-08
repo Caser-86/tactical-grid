@@ -4,8 +4,9 @@ class_name V2MapLoader
 const V2MapValidator = preload("res://scripts/v2/content/v2_map_validator.gd")
 const ROOT := "res://data/v2/locked_maps/"
 const MAP_FILES := {
-	"ch1_m1": "ch1_m1.json",
-	"ch1_m1_echo_yard_v3": "ch1_m1.json",
+	"ch1_m1": "ch1_m1_echo_yard_v4.json",
+	"ch1_m1_echo_yard_v4": "ch1_m1_echo_yard_v4.json",
+	"ch1_m1_echo_yard_v3": "ch1_m1_echo_yard_v3.json",
 }
 
 static func load_map(map_id: StringName) -> Dictionary:

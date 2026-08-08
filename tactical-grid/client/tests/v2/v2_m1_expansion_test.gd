@@ -40,8 +40,8 @@ func _initialize() -> void:
 	for entity in map.get("entities", []):
 		if entity is Dictionary and String(entity.get("type", "")) == "spawn_enemy":
 			enemy_ids[String(entity.get("id", ""))] = true
-	t.check(enemy_ids.size() == 9, "M1 敌人总实体扩展为九名")
-	for id in [&"enemy_shield_rescue", &"enemy_engineer_record", &"enemy_sniper_evac"]:
+	t.check(enemy_ids.size() == 12, "M1 敌人总实体扩展为十二名")
+	for id in [&"m1_shield_rescue", &"m1_engineer_record", &"m1_sniper_evac_a"]:
 		t.check(enemy_ids.has(id), "M1 存在新增敌人实体：%s" % id)
 
 	var caps_valid := true
