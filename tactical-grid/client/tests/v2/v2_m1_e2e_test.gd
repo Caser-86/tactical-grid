@@ -4,6 +4,13 @@ const BattleScene = preload("res://scenes/v2_battle.tscn")
 const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
 const Checkpoint = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const Runner = preload("res://tests/v2/test_runner.gd")
+const ROUTE_ARGUMENT_PREFIX := "--v2-m1-e2e-route="
+const ROUTE_IDS := ["main_direct", "optional_record", "checkpoint_retry"]
+const ROUTE_CONFIGS := {
+	"main_direct": {"include_optional": false, "should_retry": false},
+	"optional_record": {"include_optional": true, "should_retry": false},
+	"checkpoint_retry": {"include_optional": false, "should_retry": true}
+}
 
 var t := Runner.new()
 
@@ -18,11 +25,26 @@ func _run() -> void:
 		t.finish(get_tree())
 		return
 
-	await _run_route(manager, "main_direct", false, false)
-	await _run_route(manager, "optional_record", true, false)
-	await _run_route(manager, "checkpoint_retry", false, true)
+	var requested_route := _get_requested_route()
+	if requested_route.is_empty():
+		# Direct scene runs retain the aggregate regression route. The gate passes
+		# one route argument so each route owns a separate Godot process lifetime.
+		for route_id in ROUTE_IDS:
+			var config: Dictionary = ROUTE_CONFIGS[route_id]
+			await _run_route(manager, route_id, bool(config["include_optional"]), bool(config["should_retry"]))
+	elif not ROUTE_CONFIGS.has(requested_route):
+		t.check(false, "M112 路线参数有效: " + requested_route)
+	else:
+		var config: Dictionary = ROUTE_CONFIGS[requested_route]
+		await _run_route(manager, requested_route, bool(config["include_optional"]), bool(config["should_retry"]))
 	await _stop_test_audio()
 	t.finish(get_tree())
+
+func _get_requested_route() -> String:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with(ROUTE_ARGUMENT_PREFIX):
+			return argument.trim_prefix(ROUTE_ARGUMENT_PREFIX)
+	return ""
 
 func _run_route(manager: Node, route_id: String, include_optional: bool, should_retry: bool) -> void:
 	print("--- M112 route: ", route_id, " ---")

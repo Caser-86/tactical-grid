@@ -63,7 +63,6 @@
     "res://tests/v2/v2_player_turn_e2e_test.tscn",
     "res://tests/v2/v2_rescue_battle_integration_test.tscn",
     "res://tests/v2/v2_m1_evacuation_bridge_test.tscn",
-    "res://tests/v2/v2_m1_e2e_test.tscn",
     "res://tests/v2/v2_m1_retry_scene_test.tscn",
     "res://tests/v2/v2_m1_m2_checkpoint_scene_test.tscn",
     "res://tests/v2/v2_m1_dialogue_scene_test.tscn",
@@ -77,6 +76,7 @@
     "res://tests/v2/v2_objective_hud_runtime_scene_test.tscn"
   ],
   "powershell_tests": [
+    "tests/v2/run_m1_e2e_process_matrix.ps1",
     "tests/v2/run_m1_visual_matrix.ps1",
     "tests/v2/run_m2_visual_matrix.ps1"
   ]

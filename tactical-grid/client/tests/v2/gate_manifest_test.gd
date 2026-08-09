@@ -18,4 +18,6 @@ func _initialize() -> void:
 		var powershell_tests: Array = manifest.get("powershell_tests", [])
 		t.check(not scene_tests.has("res://tests/v2/v2_main_menu_contract.tscn"), "V2 门禁不执行旧 V1 主菜单兼容测试")
 		t.check(not powershell_tests.has("tests/run_release_gate.ps1"), "V2 门禁不调用 V1 发布门禁")
+		t.check(not scene_tests.has("res://tests/v2/v2_m1_e2e_test.tscn"), "M112 不在单进程场景列表累计运行路线")
+		t.check(powershell_tests.has("tests/v2/run_m1_e2e_process_matrix.ps1"), "M112 使用独立进程路线矩阵")
 	t.finish(self)

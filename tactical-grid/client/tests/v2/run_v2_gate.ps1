@@ -123,7 +123,7 @@ function Invoke-PowerShellItem {
     Write-Host "[V2] PowerShell test: $RelativePath"
     $previousErrorAction = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    if ($RelativePath -eq 'tests/run_release_gate.ps1' -or $RelativePath -eq 'tests/v2/run_m1_visual_matrix.ps1') {
+    if ($RelativePath -eq 'tests/run_release_gate.ps1' -or $RelativePath -eq 'tests/v2/run_m1_visual_matrix.ps1' -or $RelativePath -eq 'tests/v2/run_m1_e2e_process_matrix.ps1') {
         $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -GodotExe $GodotExe 2>&1 | ForEach-Object { [string]$_ })
     } else {
         $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1 | ForEach-Object { [string]$_ })
