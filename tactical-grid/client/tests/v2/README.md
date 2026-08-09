@@ -36,6 +36,8 @@ V1/V2 隔离证据包括专用 `TacticalGrid_V2_Infiltration` 用户目录、`v2
 
 ## Exact Gate Command
 
+完整门禁会写入 V2 检查点存档，因此运行前必须关闭 `TacticalGrid_V2_Infiltration.exe`，且同一时间只能启动一份门禁。脚本会用跨进程互斥体拒绝重复运行，并在检测到活动 V2 客户端时提前退出；出现这两类提示时不要重试并发运行。
+
 从 `tactical-grid/client` 运行唯一的完整门禁命令：
 
 ```powershell

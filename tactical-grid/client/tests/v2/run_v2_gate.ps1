@@ -10,6 +10,25 @@ $gateResults = New-Object System.Collections.Generic.List[object]
 $gateWarnings = New-Object System.Collections.Generic.List[string]
 $gateWarningCounts = @{}
 
+# The V2 tests write encounter checkpoints. A gate run must own that shared
+# user-data directory for its whole lifetime, otherwise parallel runs can race
+# on save_0.tmp and produce misleading failures. A named mutex is required here:
+# file-share locks are not reliable across all PowerShell child-process paths.
+$gateMutex = [System.Threading.Mutex]::new($false, 'Global\TacticalGrid_V2_Infiltration_Gate')
+if (-not $gateMutex.WaitOne(0)) {
+    $gateMutex.Dispose()
+    throw "Another V2 gate is already running. Wait for it to finish before starting a new gate."
+}
+
+$activeV2Client = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -eq 'TacticalGrid_V2_Infiltration.exe' -and $_.CommandLine -like "*$projectRoot*"
+})
+if ($activeV2Client.Count -gt 0) {
+    $gateMutex.ReleaseMutex()
+    $gateMutex.Dispose()
+    throw "A V2 game client is running (PID $($activeV2Client[0].ProcessId)). Close it before running the gate so test saves cannot conflict with player data."
+}
+
 if (-not (Test-Path -LiteralPath $GodotExe)) {
     throw "Godot executable not found: $GodotExe"
 }
