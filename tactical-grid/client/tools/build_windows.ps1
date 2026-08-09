@@ -11,6 +11,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
+$projectConfig = Get-Content (Join-Path $projectRoot 'project.godot') -Raw
+if ($projectConfig -notmatch 'run/main_scene="res://scenes/v2_boot\.tscn"' -or
+	$projectConfig -notmatch 'config/custom_user_dir_name="TacticalGrid_V2_Infiltration"') {
+	throw 'This build script only builds the isolated V2 product line.'
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     $godotCommand = Get-Command godot -ErrorAction SilentlyContinue
     if ($godotCommand) {
@@ -28,7 +34,7 @@ if ([string]::IsNullOrWhiteSpace($GodotPath) -or -not (Test-Path -LiteralPath $G
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $projectRoot 'build\TacticalGrid.exe'
+	$OutputPath = Join-Path $projectRoot 'build\TacticalGrid_V2_Infiltration\TacticalGrid_V2_Infiltration.exe'
 }
 
 $outputDirectory = Split-Path -Parent $OutputPath

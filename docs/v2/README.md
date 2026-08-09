@@ -26,6 +26,24 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 - H1 三名首次玩家门：待项目负责人组织真实玩家执行，AI 不代替该验收。
 - V2 发布资格：未评估。
 
+## Windows 发布包
+
+V2 发布包必须由客户端目录下的 `tools/build_windows.ps1` 生成到：
+
+```text
+tactical-grid/client/build/TacticalGrid_V2_Infiltration/
+```
+
+包入口由 `project.godot` 固定为 `res://scenes/v2_boot.tscn`，可执行文件和资源包名称均为 `TacticalGrid_V2_Infiltration`。构建后依次运行：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build_windows.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File tests/verify_windows_package.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test.ps1
+```
+
+在真实 H1/H2 玩家试玩和 Windows 包启动链路完成前，V2 仍不得标记为可发布。
+
 ## 执行顺序
 
 1. 从 [V2 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md) 的 F01 建立独立发布门。

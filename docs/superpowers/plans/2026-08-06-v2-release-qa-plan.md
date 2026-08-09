@@ -154,37 +154,39 @@ git commit -m "docs(v2): record first-time M1 and M2 playtest gate"
 - Modify: `tactical-grid/client/tests/verify_windows_package.ps1`
 - Modify: `tactical-grid/client/tests/v2/run_v2_gate.ps1`
 - Create: `tactical-grid/client/tests/v2/v2_release_isolation_test.ps1`
-- Modify: `tactical-grid/client/README.md`
+- Modify: `docs/v2/README.md`
 
-- [ ] **Step 1: 构建 V2 包**
+- [x] **Step 1: 构建 V2 包**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build_windows.ps1
 ```
 
-输出包必须以 `TacticalGrid_V2_Infiltration` 为用户目录，入口为 `scenes/v2_boot.tscn`，不把 V1 发布包复制到 V2 目录。
+已将导出预设和构建脚本固定为 `build/TacticalGrid_V2_Infiltration/TacticalGrid_V2_Infiltration.exe`；实际导出、包元数据检查和冷启动已通过。输出包必须以 `TacticalGrid_V2_Infiltration` 为用户目录，入口为 `scenes/v2_boot.tscn`，不把 V1 发布包复制到 V2 目录。
 
-- [ ] **Step 2: 检查发布包隔离**
+- [x] **Step 2: 检查发布包隔离**
 
-扫描包内脚本和资源路径，拒绝 V2 运行时通过相对路径读取 V1 worktree；确认 V2 存档 game line、配置名和窗口标题均为 V2。
+已通过 `tests/v2/v2_release_isolation_test.ps1` 检查 V2 入口、用户目录、产品线、包文件名、旧版残留和冷启动；V2 存档身份与配置名由总闸门继续覆盖。
 
 - [ ] **Step 3: 从包启动并完成最短 M1/M2**
 
 不打开 Godot 编辑器，验证启动、基地、任务选择、游戏、失败重试、胜利结算、返回基地和退出。
 
-- [ ] **Step 4: 运行完整 V2 门禁**
+- [x] **Step 4: 运行完整 V2 门禁**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test.ps1
 ```
 
-- [ ] **Step 5: 更新发布文档并提交**
+已通过完整 V2 总闸门（71/71 项、1592/1592 断言）和 Windows 包隔离冷启动检查；Task 5 Step 3 的包内完整 M1/M2 流程仍待真人执行。
 
-在 `client/README.md` 记录 V2 构建命令、运行入口、测试命令、已验收关卡和 V1/V2 分离规则。
+- [x] **Step 5: 更新发布文档并提交**
+
+已在 `docs/v2/README.md` 记录 V2 构建命令、运行入口、测试命令、已验收关卡和 V1/V2 分离规则。
 
 ```powershell
-git add tactical-grid/client/tools/build_windows.ps1 tactical-grid/client/tests/verify_windows_package.ps1 tactical-grid/client/tests/v2/run_v2_gate.ps1 tactical-grid/client/tests/v2/v2_release_isolation_test.ps1 tactical-grid/client/README.md
+git add tactical-grid/client/export_presets.cfg tactical-grid/client/tools/build_windows.ps1 tactical-grid/client/tests/verify_windows_package.ps1 tactical-grid/client/tests/v2/v2_release_isolation_test.ps1 docs/v2/README.md
 git commit -m "release(v2): close M1 and M2 Windows release gate"
 ```
 
