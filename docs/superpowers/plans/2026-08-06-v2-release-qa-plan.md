@@ -30,19 +30,19 @@
 - Tests may call public `V2MapLoader`, `V2MissionFlow`, `V2RescueController.query_rescue/commit_rescue`, `V2InteractionService.query_actions/commit_action`, public battle input actions and `end_turn`.
 - Tests may not assign `Unit.grid_pos`, `enemy.weapon_damage`, `mission_flow.state` or call `mission_complete` directly.
 
-- [ ] **Step 1: 写 M1 两路线流程测试**
+- [x] **Step 1: 写 M1 两路线流程测试**
 
 分别通过 camera maintenance 和 cargo breakthrough 完成 M1；每个动作通过公开预览/提交接口，断言总时长数据、遭遇数、设施结果和胜利结果。
 
-- [ ] **Step 2: 写 M2 两路线流程测试**
+- [x] **Step 2: 写 M2 两路线流程测试**
 
 分别通过 west maintenance 和 east catwalk 完成 M2，覆盖喷口预告、狙击预告、路线互斥结果、狙击手营救和撤离反制。
 
-- [ ] **Step 3: 写稳定性回归测试**
+- [x] **Step 3: 写稳定性回归测试**
 
 连续启动、结束回合、保存、恢复和失败重试 20 次；每次检查 active/waiting/defeated 集合、单位坐标唯一性、任务阶段和 HUD snapshot 非空。
 
-- [ ] **Step 4: 运行测试确认无作弊路径**
+- [x] **Step 4: 运行测试确认无作弊路径**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m1_public_flow_test.gd
@@ -50,7 +50,7 @@
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m1_m2_stability_test.gd
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add tactical-grid/client/tests/v2/v2_m1_public_flow_test.gd tactical-grid/client/tests/v2/v2_m2_public_flow_test.gd tactical-grid/client/tests/v2/v2_m1_m2_stability_test.gd tactical-grid/client/tests/v2/gate_manifest.json
