@@ -124,9 +124,9 @@ git commit -m "test(v2): verify M1 and M2 checkpoint retry flows"
 - Create: `tactical-grid/client/docs/v2_first_time_playtest_results.md`
 - Modify: `tactical-grid/client/docs/v2_visual_acceptance_matrix.md`
 
-- [ ] **Step 1: 准备试玩版本**
+- [x] **Step 1: 准备试玩版本**
 
-使用 Windows 导出包或直接运行 V2 独立入口；关闭 Godot 编辑器提示、调试快捷键和开发者日志，不向试玩者解释操作。
+已准备 V2 首次试玩记录模板和未执行结果模板；真实试玩仍必须使用 Windows 导出包或 V2 独立入口，关闭 Godot 编辑器提示、调试快捷键和开发者日志，不向试玩者解释操作。
 
 - [ ] **Step 2: 让三名未参与实现的玩家首次完成 M1**
 

@@ -27,6 +27,11 @@ Automated PNG generation is not a substitute for visual review. Mark each item
 only after inspecting the generated screenshots at both resolutions and all
 three modes.
 
+Current evidence status: automated matrix passed `96/96`; representative M1/M2
+normal result screens were manually inspected after the V2 result-layer and
+layout fix. The complete 96-image, screenshot-by-screenshot review is still
+`PENDING_HUMAN_REVIEW` and must not be treated as complete.
+
 - [ ] Player and enemy silhouettes remain distinct at normal gameplay scale.
 - [ ] M1 route, gantry, rescue, evacuation interception, and result states are readable.
 - [ ] M2 route consequences, hazard warning, cooling control, sniper rescue, countermeasure, and result states are readable.
