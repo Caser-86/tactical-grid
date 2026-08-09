@@ -7,12 +7,12 @@
 ## 构建与版本
 
 - 分支：`codex/ch1-infiltration-v2`
-- 源码自动化验证基线：`bb8eacd feat(v2): finalize M1 M2 release interactions`
+- 源码自动化验证基线：`a1efb3c test(v2): prevent headless audio resource leaks`
 - Godot：4.7.1-stable
 - V2 入口：`res://scenes/v2_boot.tscn`
 - V2 用户目录：`TacticalGrid_V2_Infiltration`
 - Windows 包目录：`build/TacticalGrid_V2_Infiltration/`
-- 最近一次已记录包校验：2026-08-09；该记录未绑定当前源码提交，必须在 NX-030 重建后才可作为本基线发布证据。
+- 当前候选包：2026-08-10 基于 `a1efb3c` 重建；EXE `109080576` bytes，PCK `19519700` bytes。SHA-256 记录于未纳入 Git 的 `artifacts/v2/verification/h1/BUILD_ID.txt`。
 
 ## 已通过证据
 
@@ -22,9 +22,9 @@
 | M1 视觉矩阵 | `tests/v2/run_m1_visual_matrix.ps1` | 42/42 PNG 通过 |
 | M2 视觉矩阵 | `tests/v2/run_m2_visual_matrix.ps1` | 54/54 PNG 通过 |
 | 结算页可见性 | M1/M2 两分辨率结果阶段断言 | 结算层可见、覆盖当前视口、奖励文本不与按钮重叠 |
-| Windows 构建 | `tools/build_windows.ps1` | 最近一次记录于 2026-08-09；当前 `bb8eacd` 包重建待 NX-030 |
-| Windows 包校验 | `tests/verify_windows_package.ps1` | 最近一次记录通过；当前 `bb8eacd` 包内验证待 NX-030 |
-| V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前源码隔离通过；当前 `bb8eacd` 包内冷启动待 NX-030 |
+| Windows 构建 | `tools/build_windows.ps1` | 2026-08-10 基于 `a1efb3c` 重新导出成功 |
+| Windows 包校验 | `tests/verify_windows_package.ps1` | 当前候选包的 EXE、PCK、版本元数据和冷启动通过 |
+| V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前候选包的 V2 入口、用户目录、旧版文件残留和冷启动通过 |
 | 首次试玩材料 | `docs/v2_first_time_playtest_form.json` | JSON 可解析，模板已准备 |
 | 基地 fresh save | `v2_base_progression_scene_test.tscn` | M1 默认预览、主目标和 20-25 分钟预计时长可读 |
 | V2 难度入口 | `v2_settings_contract_test.gd`、`v2_settings_scene_test.tscn` | 故事/标准两档可见、可保存，困难档不对 V2 开放 |
@@ -41,7 +41,7 @@
 1. 三名未参与实现的玩家首次完成 M1 和 M2，并记录真实时长、目标理解、卡点和可选内容使用率。
 2. M1 中位时长达到 20–25 分钟，M2 中位时长达到 25–30 分钟，且无人 5 分钟内通关。
 3. 96 张视觉截图完成逐张人工审查。目前已完成自动矩阵，并人工复核路线、范围层、危险预警和 M1/M2 结算代表画面。
-4. 基于 `bb8eacd` 重建 Windows 包，且不打开 Godot 编辑器，从包内完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
+4. 不打开 Godot 编辑器，从基于 `a1efb3c` 的 Windows 包完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
 5. 剩余 70 条测试场景退出警告完成风险评估或修复，并把结论补回本报告。
 
 ## 本轮收口结果
@@ -59,6 +59,6 @@
 ## 下一条执行任务
 
 1. 执行 NX-020/NX-025，补齐 M1/M2 主目标、可选目标和撤离状态的地图断言。
-2. 执行 NX-030，按 `bb8eacd` 重建并验证独立 Windows 包。
+2. 对当前候选包完成启动、基地、进入 M1、退出的人工技术烟雾检查，然后冻结为 H1 试玩包。
 3. 使用 `v2_first_time_playtest_form.json` 组织 P01/P02/P03 的无指导 M1/M2 试玩，并将原始记录保存在未纳入 Git 的 `artifacts/v2/verification/h1/`。
 4. 根据真实卡点调整提示、路线后果和遭遇节奏，不用堆血量凑时长。
