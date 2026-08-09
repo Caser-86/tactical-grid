@@ -26,6 +26,7 @@ const V2SquadSelectionScript = preload("res://scripts/v2/mission/v2_squad_select
 const COLOR_CYAN := Color("#37d7ff")
 const COLOR_AMBER := Color("#f3a44a")
 const COLOR_MUTED := Color("#8aa2a7")
+const V2_VISIBLE_MISSIONS := ["ch1_m1", "ch1_m2"]
 
 ## 是否正在显示成就弹窗（避免多个弹窗叠加）
 var _showing_achievement_popup: bool = false
@@ -72,24 +73,41 @@ func _configure_v2_base() -> void:
 func _load_v2_campaign() -> void:
 	for child in mission_list.get_children():
 		child.queue_free()
-	var mission_id := String(GameManager.current_save.get("current_mission", "ch1_m1"))
 	var repository: Node = get_node_or_null("/root/V2Data")
-	var mission: Dictionary = repository.get_mission(StringName(mission_id)) if repository else {}
-	if mission.is_empty():
-		_show_error("V2 数据错误", "任务数据不存在：%s" % mission_id)
+	if repository == null:
+		_show_error("V2 数据错误", "任务数据服务不可用")
 		return
-	var button := Button.new()
-	button.text = "%s  ·  %s" % [mission_id.to_upper(), String(mission.get("name", mission_id))]
-	button.icon = ArtCatalog.get_texture(&"objective", &"evac")
-	button.add_theme_constant_override("icon_max_width", 34)
-	button.add_theme_font_size_override("font_size", 17)
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size = Vector2(320, 58)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.tooltip_text = "主目标：%s" % String(mission.get("primary", ""))
-	button.pressed.connect(_on_v2_mission_selected.bind(mission_id))
-	mission_list.add_child(button)
-	_show_v2_mission_brief(mission)
+
+	var current_mission := String(GameManager.current_save.get("current_mission", "ch1_m1"))
+	var preview_mission_id := current_mission if current_mission in V2_VISIBLE_MISSIONS else V2_VISIBLE_MISSIONS[0]
+	var completed: Array = GameManager.current_save.get("completed_missions", [])
+	var preview_set := false
+	for mission_id in V2_VISIBLE_MISSIONS:
+		var mission: Dictionary = repository.get_mission(StringName(mission_id))
+		if mission.is_empty():
+			_show_error("V2 数据错误", "任务数据不存在：%s" % mission_id)
+			continue
+
+		var is_completed: bool = mission_id in completed
+		var is_unlocked: bool = mission_id == "ch1_m1" or is_completed or mission_id == current_mission
+		var status := "已完成 · 可重玩" if is_completed else ("可部署" if is_unlocked else "完成上一关解锁")
+		var button := Button.new()
+		button.text = "%s  ·  %s   [%s]" % [mission_id.to_upper(), String(mission.get("name", mission_id)), status]
+		button.icon = ArtCatalog.get_texture(&"objective", &"evac")
+		button.add_theme_constant_override("icon_max_width", 34)
+		button.add_theme_font_size_override("font_size", 17)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size = Vector2(320, 58)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.tooltip_text = "主目标：%s" % String(mission.get("primary", "")) if is_unlocked else "完成上一关后解锁此任务"
+		button.disabled = not is_unlocked
+		if is_unlocked:
+			button.pressed.connect(_on_v2_mission_selected.bind(mission_id))
+		mission_list.add_child(button)
+
+		if not preview_set and mission_id == preview_mission_id:
+			_show_v2_mission_brief(mission)
+			preview_set = true
 
 func _show_v2_mission_brief(mission: Dictionary) -> void:
 	var save: Dictionary = GameManager.current_save

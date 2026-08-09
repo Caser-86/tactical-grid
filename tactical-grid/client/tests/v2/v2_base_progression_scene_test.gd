@@ -29,7 +29,12 @@ func _run() -> void:
 	t.check(bool(base.get_node("BottomBar/HBox/BarracksBtn").visible), "V2 基地保留队员入口")
 	t.check(base.get_node("BottomBar/HBox/BarracksBtn").text == "队员 / SQUAD", "V2 队员入口使用明确名称")
 	t.check(base.get_node("Center/OperationTitle").text == "渗透行动 // 编队准备", "V2 基地使用编队准备标题")
-	t.check(base.get_node("Center/ScrollContainer/MissionList").get_child_count() == 1, "V2 基地只显示当前任务")
+	var mission_buttons := base.get_node("Center/ScrollContainer/MissionList").get_children()
+	t.check(mission_buttons.size() == 2, "V2 基地显示已制作的 M1/M2 任务链")
+	if mission_buttons.size() == 2:
+		t.check(not bool(mission_buttons[0].disabled), "V2 M1 已完成后可重玩")
+		t.check(not bool(mission_buttons[1].disabled), "V2 M2 完成 M1 后已解锁")
+		t.check("熄灯协议" in String(mission_buttons[1].text), "V2 基地显示第二关名称")
 	t.check("熄灯协议" in base.get_node("Center/SituationPanel/Content/SituationTitle").text, "V2 基地显示下一任务")
 	t.check(bool(base.get_node("Center/SituationPanel/Content/V2SquadPanel").visible), "V2 基地显示编队选择区")
 	t.check(base.get_node("Center/SituationPanel/Content/V2SquadPanel").get_child_count() >= 3, "V2 编队区显示两名角色选项")
