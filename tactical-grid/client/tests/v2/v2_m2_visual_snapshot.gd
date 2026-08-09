@@ -11,6 +11,7 @@ var visual_mode := "normal"
 var stage := "start"
 var output_path := ""
 var _explicit_output := false
+var _result_layer: CanvasLayer
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -47,7 +48,12 @@ func _run() -> void:
 		t.finish(get_tree())
 		return
 	if stage == "result":
-		await _prepare_result(manager)
+		battle.hide()
+		battle.hud.hide()
+		_result_layer = CanvasLayer.new()
+		_result_layer.layer = 200
+		add_child(_result_layer)
+		await _prepare_result(manager, _result_layer)
 	else:
 		await _prepare_stage(manager, battle)
 		battle.camera.toggle_overview()
@@ -76,9 +82,8 @@ func _run() -> void:
 	t.check(image.save_png(absolute_path) == OK and FileAccess.file_exists(absolute_path), "M2 %s 保存 PNG" % stage)
 	print("M2 visual snapshot: %s (%dx%d, mode=%s, stage=%s)" % [absolute_path, image.get_width(), image.get_height(), visual_mode, stage])
 	await _cleanup_battle(battle)
-	var result_screen := get_node_or_null("M2VisualResult")
-	if result_screen != null and is_instance_valid(result_screen):
-		result_screen.queue_free()
+	if _result_layer != null and is_instance_valid(_result_layer):
+		_result_layer.queue_free()
 	await _stop_test_audio()
 	t.finish(get_tree())
 
@@ -152,7 +157,7 @@ func _rescue_sniper(manager: Node, battle: BattleController, actor: Unit) -> voi
 		await get_tree().process_frame
 		await _dismiss_dialogue(manager)
 
-func _prepare_result(manager: Node) -> void:
+func _prepare_result(manager: Node, result_layer: CanvasLayer) -> void:
 	manager.set("battle_result", {
 		"result": "victory",
 		"level_id": "ch1_m2",
@@ -169,8 +174,14 @@ func _prepare_result(manager: Node) -> void:
 	})
 	var result_screen := MissionResultScene.instantiate()
 	result_screen.name = "M2VisualResult"
-	add_child(result_screen)
+	result_layer.add_child(result_screen)
 	await get_tree().process_frame
+	t.check(result_screen.visible, "M2 result 结算层可见")
+	t.check(result_screen.size == result_screen.get_viewport_rect().size, "M2 result 结算层覆盖当前视口")
+	t.check(result_screen.get_node("Panel").visible, "M2 result 结算面板可见")
+	var loot_container := result_screen.get_node("Panel/LootContainer") as Control
+	var buttons := result_screen.get_node("Panel/Buttons") as Control
+	t.check(buttons.position.y >= loot_container.position.y + loot_container.get_combined_minimum_size().y, "M2 result 奖励文本不与按钮重叠")
 	t.check(result_screen.get_node("Panel/TitleLabel").text == "任务完成", "M2 result 显示任务完成")
 
 func _validate_stage(battle: BattleController) -> void:

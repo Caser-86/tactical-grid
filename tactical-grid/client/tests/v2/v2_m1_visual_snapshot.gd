@@ -11,6 +11,7 @@ var visual_mode := "normal"
 var stage := "start"
 var output_path := ""
 var _explicit_output := false
+var _result_layer: CanvasLayer
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -52,7 +53,12 @@ func _run() -> void:
 	_dismiss_tutorial_hint(battle)
 
 	if stage == "result":
-		await _prepare_result(manager, battle)
+		battle.hide()
+		battle.hud.hide()
+		_result_layer = CanvasLayer.new()
+		_result_layer.layer = 200
+		add_child(_result_layer)
+		await _prepare_result(manager, _result_layer)
 	else:
 		await _prepare_battle_stage(manager, battle)
 	_dismiss_tutorial_hint(battle)
@@ -93,9 +99,8 @@ func _run() -> void:
 	t.check(error == OK and FileAccess.file_exists(absolute_path), "M112 %s 保存 PNG 到矩阵目录" % stage)
 	print("M112 visual snapshot: %s (%dx%d, mode=%s, stage=%s)" % [absolute_path, image.get_width(), image.get_height(), visual_mode, stage])
 	await _cleanup_battle(battle)
-	var result_screen := get_node_or_null("V2VisualResult")
-	if result_screen != null and is_instance_valid(result_screen):
-		result_screen.queue_free()
+	if _result_layer != null and is_instance_valid(_result_layer):
+		_result_layer.queue_free()
 	await _stop_test_audio()
 	t.finish(get_tree())
 
@@ -153,9 +158,7 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 		_:
 			t.check(false, "M112 不识别视觉阶段 %s" % stage)
 
-func _prepare_result(manager: Node, battle: BattleController) -> void:
-	# Keep the battle viewport alive under the result overlay. Capturing a
-	# viewport after freeing its Camera2D is driver-dependent on Windows.
+func _prepare_result(manager: Node, result_layer: CanvasLayer) -> void:
 	manager.set("battle_result", {
 		"result": "victory",
 		"level_id": "ch1_m1",
@@ -170,8 +173,15 @@ func _prepare_result(manager: Node, battle: BattleController) -> void:
 	})
 	var result_screen := MissionResultScene.instantiate()
 	result_screen.name = "V2VisualResult"
-	add_child(result_screen)
+	result_layer.add_child(result_screen)
 	await get_tree().process_frame
+	t.check(result_screen.visible, "M112 result 阶段结算层可见")
+	var result_viewport_size: Vector2 = result_screen.get_viewport_rect().size
+	t.check(result_screen.size == result_viewport_size, "M112 result 阶段结算层覆盖当前视口")
+	t.check(result_screen.get_node("Panel").visible, "M112 result 阶段结算面板可见")
+	var loot_container := result_screen.get_node("Panel/LootContainer") as Control
+	var buttons := result_screen.get_node("Panel/Buttons") as Control
+	t.check(buttons.position.y >= loot_container.position.y + loot_container.get_combined_minimum_size().y, "M112 result 阶段奖励文本不与按钮重叠")
 	t.check(result_screen.get_node("Panel/TitleLabel").text == "任务完成", "M112 result 阶段显示任务完成")
 
 func _rescue_actor(battle: BattleController, actor: Unit) -> Dictionary:

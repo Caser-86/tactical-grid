@@ -116,6 +116,15 @@ func show_result(data: Dictionary) -> void:
 		base_button.text = "返回基地"
 
 func _show_v2_summary(data: Dictionary) -> void:
+	# V2 adds rescue and module feedback; reserve a dedicated lower band so
+	# those lines never collide with the result actions at small resolutions.
+	var panel: Control = $Panel
+	panel.offset_top = -340.0
+	panel.offset_bottom = 340.0
+	$Panel/LootContainer.offset_top = 350.0
+	$Panel/LootContainer.offset_bottom = 540.0
+	$Panel/Buttons.offset_top = 560.0
+	$Panel/Buttons.offset_bottom = 620.0
 	stars_container.visible = false
 	var header := Label.new()
 	header.text = "行动回顾"
