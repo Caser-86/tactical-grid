@@ -63,6 +63,7 @@
     "res://tests/v2/v2_m1_evacuation_bridge_test.tscn",
     "res://tests/v2/v2_m1_e2e_test.tscn",
     "res://tests/v2/v2_m1_retry_scene_test.tscn",
+    "res://tests/v2/v2_m1_m2_checkpoint_scene_test.tscn",
     "res://tests/v2/v2_m1_dialogue_scene_test.tscn",
     "res://tests/v2/v2_base_progression_scene_test.tscn",
     "res://tests/v2/v2_m1_visual_snapshot.tscn",

@@ -91,30 +91,29 @@ git commit -m "test(v2): add M1 and M2 visual acceptance matrix"
 - Create: `tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.tscn`
 - Create: `tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.gd`
 - Modify: `tactical-grid/client/tests/v2/v2_checkpoint_migration_test.gd`
-- Modify: `tactical-grid/client/scripts/v2/mission/v2_campaign_progress.gd`
 
-- [ ] **Step 1: 测试 M1 三个检查点**
+- [x] **Step 1: 测试 M1 三个检查点**
 
 分别在开场、营救完成、撤离反制后保存；恢复后检查任务目标、单位坐标、敌人击倒状态、设施状态和撤离路线。
 
-- [ ] **Step 2: 测试 M2 四个检查点**
+- [x] **Step 2: 测试 M2 三个稳定检查点和阶段内反制状态**
 
-分别在开场、封锁解除、狙击手营救、撤离反制后保存；恢复后喷口周期、狙击预告、工程师反制和角色加入状态一致。
+分别在开场、封锁解除后的推进阶段、狙击手营救、撤离反制后保存；恢复后喷口周期、狙击预告、工程师反制和角色加入状态一致。M2 的“封锁解除”与开场共用 `cp_start`，不人为增加一个不存在的检查点 ID。
 
-- [ ] **Step 3: 测试失败重试**
+- [x] **Step 3: 测试失败重试**
 
 全队失能后分别选择检查点重试、重新开始任务和返回基地；三个按钮都可用，返回基地不污染当前任务或 V1 存档。
 
-- [ ] **Step 4: 运行场景测试**
+- [x] **Step 4: 运行场景测试**
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . res://tests/v2/v2_m1_m2_checkpoint_scene_test.tscn
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
-git add tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.tscn tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.gd tactical-grid/client/tests/v2/v2_checkpoint_migration_test.gd tactical-grid/client/scripts/v2/mission/v2_campaign_progress.gd
+git add tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.tscn tactical-grid/client/tests/v2/v2_m1_m2_checkpoint_scene_test.gd tactical-grid/client/tests/v2/v2_checkpoint_migration_test.gd
 git commit -m "test(v2): verify M1 and M2 checkpoint retry flows"
 ```
 

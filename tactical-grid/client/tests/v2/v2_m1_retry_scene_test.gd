@@ -3,7 +3,8 @@ extends Node
 const Runner = preload("res://tests/v2/test_runner.gd")
 const Checkpoint = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const MissionResultScene = preload("res://scenes/mission_result.tscn")
-const BattleScene = preload("res://scenes/battle.tscn")
+const BattleScene = preload("res://scenes/v2_battle.tscn")
+const BattleControllerScript = preload("res://scripts/v2/runtime/v2_battle_controller.gd")
 
 var t := Runner.new()
 
@@ -60,6 +61,7 @@ func _run() -> void:
 	result_screen.queue_free()
 	await get_tree().process_frame
 	var battle := BattleScene.instantiate()
+	t.check(battle != null and battle.get_script() == BattleControllerScript, "重试场景只实例化正式 V2 battle")
 	add_child(battle)
 	await _dismiss_intro(manager)
 	var battle_ready := await _wait_for_player_phase(battle)

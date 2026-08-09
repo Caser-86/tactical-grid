@@ -55,6 +55,9 @@ func _initialize() -> void:
 	wrong_line.game_line = "v1_legacy"
 	wrong_line = _with_hash(wrong_line)
 	t.check(not bool(V2CheckpointAdapter.validate(wrong_line).get("valid", true)), "V1 game_line 检查点继续被 V2 拒绝")
+	t.check(V2CheckpointAdapter.get_retry_actions(true) == [&"retry_checkpoint", &"restart_mission", &"return_base"], "有检查点时三种失败出口契约稳定")
+	var no_checkpoint_actions: Array[StringName] = V2CheckpointAdapter.get_retry_actions(false)
+	t.check(no_checkpoint_actions == [&"restart_mission", &"return_base"], "没有检查点时保留重开和返回基地出口")
 
 	_assert_facility_snapshot_validation()
 	_assert_restore_failure_boundary(migrated)
