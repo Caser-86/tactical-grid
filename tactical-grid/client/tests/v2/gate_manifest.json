@@ -13,6 +13,7 @@
     "res://tests/v2/v2_m1_map_test.gd",
     "res://tests/v2/v2_m2_map_test.gd",
     "res://tests/v2/v2_m2_expanded_flow_test.gd",
+    "res://tests/v2/v2_m2_progression_test.gd",
     "res://tests/v2/v2_m1_expansion_test.gd",
     "res://tests/v2/v2_m1_art_baseline_test.gd",
     "res://tests/v2/v2_unit_art_distinction_test.gd",
@@ -62,11 +63,13 @@
     "res://tests/v2/v2_m1_dialogue_scene_test.tscn",
     "res://tests/v2/v2_base_progression_scene_test.tscn",
     "res://tests/v2/v2_m1_visual_snapshot.tscn",
+    "res://tests/v2/v2_m2_visual_snapshot.tscn",
     "res://tests/v2/v2_encounter_controller_regression_test.tscn",
     "res://tests/v2/v2_hazard_runtime_scene_test.tscn",
     "res://tests/v2/v2_objective_hud_runtime_scene_test.tscn"
   ],
   "powershell_tests": [
-    "tests/v2/run_m1_visual_matrix.ps1"
+    "tests/v2/run_m1_visual_matrix.ps1",
+    "tests/v2/run_m2_visual_matrix.ps1"
   ]
 }

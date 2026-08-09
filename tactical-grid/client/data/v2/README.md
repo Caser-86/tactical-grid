@@ -9,3 +9,11 @@ M1 关键地点：南侧货运坪（出生与初战）、路线分叉（8,14）�
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m1_visual_matrix.ps1
 ```
+
+M2 当前内容基线：28×20 冷却工坊，13 个固定敌人、5 个分阶段遭遇、同时活跃敌人不超过 3 名。开场为突击兵与侦察兵，玩家先从西侧维护管廊或东侧高架桥选择一条解除封锁，再营救被困狙击手；中央涡轮提供一次清晰的远程火力教学。冷却控制室是可选目标，关闭两组喷口后停止危险周期并解锁突击模块 B。营救后工程师启动撤离反制，北侧直线关闭，玩家沿改变后的路线进入撤离门。
+
+M2 关键地点：西侧电力控制台（7,13）、东侧安全门（20,12）、中央涡轮（14,9）、冷却控制室（6,5）、狙击手营救点（19,5）、北侧撤离门（24,2）。危险喷口在固定玩家回合提前预警、敌方阶段结算一次伤害，关闭后永久停止。视觉矩阵覆盖 `start`、`route_west`、`route_east`、`turbine`、`hazard_warning`、`cooling_room`、`sniper_rescue`、`exit_countermeasure`、`result` 九个阶段，验证命令：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m2_visual_matrix.ps1
+```

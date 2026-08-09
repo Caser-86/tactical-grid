@@ -30,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 - `V2InteractionService.get_snapshot()`、`restore_snapshot()`；`V2CheckpointAdapter.capture()` 负责保存共享任务状态。
 - `V2HudPresenter.render(snapshot)` 是唯一的 V2 HUD 入口，`HUD.render_v2_snapshot(snapshot)` 负责非模态显示目标进度、行动、路线、危险区和检查点。
 
-manifest 覆盖任务流、遭遇队列/占位/控制器、危险区控制器和运行时、schema 3 迁移与 schema 4 检查点恢复、目标 HUD 合同和真实 HUD 场景、M1 路线/对话/重试/legacy evacuation、救援、V2 主菜单与运行时隔离，以及 V2 battle runtime 和玩家回合输入场景。当前仓库没有独立的 M2 运行时测试文件；M1 完成后进入 M2 的存档身份由 `v2_save_identity_test.gd` 覆盖，新增 M2 测试必须显式加入 manifest。
+manifest 覆盖任务流、遭遇队列/占位/控制器、危险区控制器和运行时、schema 3 迁移与 schema 4 检查点恢复、目标 HUD 合同和真实 HUD 场景、M1 路线/对话/重试/legacy evacuation、M2 路线/危险/营救/进度和视觉矩阵、救援、V2 主菜单与运行时隔离，以及 V2 battle runtime 和玩家回合输入场景。M1 与 M2 的测试、截图目录和数据身份均独立，新增任务测试必须显式加入 manifest。
 
 V1/V2 隔离证据包括专用 `TacticalGrid_V2_Infiltration` 用户目录、`v2_infiltration` 存档身份、V2 专用启动/主菜单、V1 存档拒绝和不调用 V1 release gate。V1 smoke 仍单独运行，不能把 V1 结果当作 V2 通过证据。
 

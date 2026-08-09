@@ -181,6 +181,8 @@ git commit -m "feat(v2): complete M2 hazard rescue and countermeasure flow"
 
 ### Task 4: M2 视觉关卡和基地解锁
 
+**Status:** Implemented and verified. M2 progression and the 54-image Windows Compatibility visual matrix are now isolated from the M1 matrix.
+
 **Files:**
 - Modify: `tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd`
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_campaign_progress.gd`
@@ -188,19 +190,19 @@ git commit -m "feat(v2): complete M2 hazard rescue and countermeasure flow"
 - Create: `tactical-grid/client/tests/v2/v2_m2_visual_snapshot.gd`
 - Create: `tactical-grid/client/tests/v2/run_m2_visual_matrix.ps1`
 
-- [ ] **Step 1: 接入环境构图**
+- [x] **Step 1: 接入环境构图**
 
 使用 `ArtCatalog` 的 Cooling Works 地面、边界、管线、涡轮和冷却塔组件，确保中央涡轮在初始或首次展开镜头可见；状态层不覆盖角色和网格点击区域。
 
-- [ ] **Step 2: 接入 M2 结算奖励**
+- [x] **Step 2: 接入 M2 结算奖励**
 
 完成 M2 后只写一次 `rescued_characters += sniper`、`unlocked_modules += sniper_a` 和 `current_mission = ch1_m3`；可选控制室额外写 `assault_b`，不影响主线解锁。
 
-- [ ] **Step 3: 写视觉快照场景**
+- [x] **Step 3: 写视觉快照场景**
 
 阶段固定为 `start`、`route_west`、`route_east`、`turbine`、`hazard_warning`、`cooling_room`、`sniper_rescue`、`exit_countermeasure`、`result`。
 
-- [ ] **Step 4: 运行 M2 视觉矩阵**
+- [x] **Step 4: 运行 M2 视觉矩阵**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m2_visual_matrix.ps1
@@ -208,7 +210,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m2_visual_matrix.ps1
 
 矩阵覆盖 1280×720、1920×1080、normal、grayscale、deuteranopia_assist，并验证危险区同时有形状和颜色编码。
 
-- [ ] **Step 5: 运行进度测试并提交**
+- [x] **Step 5: 运行进度测试并提交**
+
+验证证据：`v2_m2_progression_test.gd` 通过 14/14；M2 无头视觉阶段 9/9；Windows Compatibility 视觉矩阵通过 54/54。
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m2_progression_test.gd
@@ -218,21 +222,23 @@ git commit -m "feat(v2): connect M2 presentation and campaign progression"
 
 ### Task 5: M2 子计划门禁
 
+**Status:** Complete. M2 checks are registered in the V2 manifest and the full gate passes with both M1 and M2 visual matrices.
+
 **Files:**
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 - Modify: `tactical-grid/client/data/v2/README.md`
 
-- [ ] **Step 1: 将 M2 脚本和场景加入门禁**
+- [x] **Step 1: 将 M2 脚本和场景加入门禁**
 
 加入地图、配置、路线、流程、进度和视觉脚本；场景测试使用独立 `v2_m2_visual_snapshot.tscn`，不调用 V1 场景。
 
-- [ ] **Step 2: 运行 M2 门禁**
+- [x] **Step 2: 运行 M2 门禁**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 ```
 
-- [ ] **Step 3: 更新 M2 数据说明并提交**
+- [x] **Step 3: 更新 M2 数据说明并提交**
 
 记录 28×20、13 敌人、五遭遇、两路线、危险周期、奖励和验证命令。
 
@@ -240,3 +246,5 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 git add tactical-grid/client/tests/v2/gate_manifest.json tactical-grid/client/data/v2/README.md
 git commit -m "test(v2): close expanded M2 content gate"
 ```
+
+最终验证证据：V2 门禁 `67/67` 项、`1211/1211` 断言；M1 视觉矩阵 `42/42`；M2 视觉矩阵 `54/54`。Godot teardown 资源泄漏仍按门禁规则记录为非致命警告，未产生失败项。
