@@ -65,11 +65,11 @@ git commit -m "test(v2): cover M1 and M2 public interaction flows"
 - Modify: `tactical-grid/client/tests/v2/v2_m2_visual_snapshot.gd`
 - Create: `tactical-grid/client/docs/v2_visual_acceptance_matrix.md`
 
-- [ ] **Step 1: 统一矩阵参数**
+- [x] **Step 1: 统一矩阵参数**
 
 覆盖 `1280x720`、`1920x1080`、`normal`、`grayscale`、`deuteranopia_assist`；M1 阶段为 start/route/record/gantry/rescue/evac/result，M2 阶段为 start/west/east/turbine/hazard/control/rescue/countermeasure/result。
 
-- [ ] **Step 2: 运行快照脚本**
+- [x] **Step 2: 运行快照脚本**
 
 每张图必须检查文件存在、非空、宽高匹配；Godot headless 只能执行合同检查，Windows Compatibility renderer 必须生成真实 PNG。
 
@@ -77,7 +77,7 @@ git commit -m "test(v2): cover M1 and M2 public interaction flows"
 
 逐张检查单位区分度、目标和撤离标记、危险预告、路线状态、设施文字、迷雾边界、底栏说明、攻击/移动范围和结算页面。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_m1_m2_visual_matrix.ps1
