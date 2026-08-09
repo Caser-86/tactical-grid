@@ -196,9 +196,9 @@ git commit -m "release(v2): close M1 and M2 Windows release gate"
 - Create: `tactical-grid/client/docs/v2_m1_m2_release_report.md`
 - Modify: `tactical-grid/client/docs/v2/README.md`
 
-- [ ] **Step 1: 汇总自动化证据**
+- [x] **Step 1: 汇总自动化证据**
 
-记录每条命令、提交哈希、通过数量、失败数量和生成的视觉矩阵目录；没有实际执行的项目写明未执行，不能用计划替代结果。
+已记录每条已执行命令、提交哈希、通过数量、失败数量和生成的视觉矩阵目录；未执行的真人和人工审查项目明确写为未执行。
 
 - [ ] **Step 2: 汇总真人证据**
 

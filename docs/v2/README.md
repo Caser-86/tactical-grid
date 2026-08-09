@@ -24,7 +24,8 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 - M1 灰盒：可从 V2 新档完整游玩，包含移动、攻击、敌方回合、迷雾、营救、撤离、失败重试和进度保存。
 - M1 当前质量状态：自动化 E2E 与视觉矩阵已通过；单位占位、攻击范围、移动路径和死亡幽灵修正已验证。
 - H1 三名首次玩家门：待项目负责人组织真实玩家执行，AI 不代替该验收。
-- V2 发布资格：未评估。
+- V2 自动化发布门：已通过（71/71 项，1592/1592 断言）。
+- V2 发布资格：`NOT_READY`；真人首次试玩、完整逐图人工审查和包内完整 M1/M2 流程仍待执行。
 
 ## Windows 发布包
 
@@ -60,6 +61,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test
 - [P4-P6 美术与共享内容](../superpowers/plans/2026-08-05-v2-p4-p6-art-shared-content.md)：IMAGE2、资源处理、四方向图、环境、VFX 和音频。
 - [P7-P9 M2-M6](../superpowers/plans/2026-08-05-v2-p7-p9-missions.md)：后五关、角色救援、猎手、Boss、结局和平衡。
 - [P10 发布验收](../superpowers/plans/2026-08-05-v2-p10-release-acceptance.md)：无障碍、存档、视觉、音频、性能、长时和 Windows 发布。
+- [当前验收报告](../../tactical-grid/client/docs/v2_m1_m2_release_report.md)：自动化证据、发布包证据和剩余硬门。
 
 ## 禁止事项
 
