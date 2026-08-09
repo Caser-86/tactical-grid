@@ -7,7 +7,8 @@ extends Control
 
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.MAIN_MENU
-	AudioManager.bgm_menu()
+	if DisplayServer.get_name() != "headless":
+		AudioManager.bgm_menu()
 	continue_v2_button.pressed.connect(_on_continue_v2)
 	new_v2_game_button.pressed.connect(_on_new_v2_game)
 	settings_button.pressed.connect(_on_settings)

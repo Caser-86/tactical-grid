@@ -10,6 +10,8 @@ const V2_SAVE_DIR = "user://saves_v2/"
 const V2_MAX_LOCAL_SAVES = 3
 const V2_SAVE_VERSION = "2.0.0"
 const V2_GAME_LINE = "v2_infiltration"
+const V2_SETTINGS_PATH = V2_SAVE_DIR + "settings.json"
+const V2_SETTINGS_TEMP_PATH = V2_SAVE_DIR + "settings.tmp"
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -188,6 +190,31 @@ func create_v2_save() -> Dictionary:
 	data["playtime_seconds"] = 0
 	data["save_time"] = 0
 	return data
+
+func load_v2_settings() -> Dictionary:
+	var text := _read_file(V2_SETTINGS_PATH)
+	if text.is_empty():
+		return {}
+	var parser := JSON.new()
+	if parser.parse(text) != OK or not parser.data is Dictionary:
+		return {}
+	return (parser.data as Dictionary).duplicate(true)
+
+func save_v2_settings(settings: Dictionary) -> bool:
+	_ensure_v2_save_dir()
+	var file := FileAccess.open(V2_SETTINGS_TEMP_PATH, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(settings, "  "))
+	file.close()
+	var verify_text := _read_file(V2_SETTINGS_TEMP_PATH)
+	var verify := JSON.new()
+	if verify_text.is_empty() or verify.parse(verify_text) != OK or not verify.data is Dictionary:
+		DirAccess.remove_absolute(V2_SETTINGS_TEMP_PATH)
+		return false
+	if FileAccess.file_exists(V2_SETTINGS_PATH):
+		DirAccess.remove_absolute(V2_SETTINGS_PATH)
+	return DirAccess.rename_absolute(V2_SETTINGS_TEMP_PATH, V2_SETTINGS_PATH) == OK
 
 func save_game_v2(save_data: Dictionary, slot: int = 0) -> bool:
 	if slot < 0 or slot >= V2_MAX_LOCAL_SAVES:

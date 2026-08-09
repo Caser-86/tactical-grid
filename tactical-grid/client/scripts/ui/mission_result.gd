@@ -3,6 +3,8 @@
 extends Control
 class_name MissionResult
 
+const V2ResultPresentationScript = preload("res://scripts/v2/presentation/v2_result_presentation.gd")
+
 @onready var title_label = $Panel/TitleLabel
 @onready var stars_container = $Panel/StarsContainer
 @onready var turns_label = $Panel/StatsLabel/TurnsValue
@@ -63,6 +65,8 @@ func show_result(data: Dictionary) -> void:
 
 	# 显示奖励
 	var rewards = data.get("rewards", {})
+	credit_label.visible = not is_v2
+	exp_label.visible = not is_v2
 	credit_label.text = "信用点  +%s" % str(rewards.get("credit", 0))
 	exp_label.text = "经验值  +%s" % str(rewards.get("exp", 0))
 	intel_label.text = "情报  +%s" % str(rewards.get("intel", 0))
@@ -76,7 +80,7 @@ func show_result(data: Dictionary) -> void:
 
 	# 显示掉落物品
 	# Task 3: optional resource reward
-	if int(data.get("optional_credit", 0)) > 0:
+	if not is_v2 and int(data.get("optional_credit", 0)) > 0:
 		var opt_label = Label.new()
 		opt_label.text = "optional resource  +%d credit" % int(data.get("optional_credit", 0))
 		opt_label.modulate = Color.GOLD
@@ -89,7 +93,7 @@ func show_result(data: Dictionary) -> void:
 		loot_container.add_child(loot_label)
 
 	# 首通新机制与职业解锁必须在结算页明确反馈给玩家。
-	var new_unlocks: Array = data.get("new_unlocks", [])
+	var new_unlocks: Array = [] if is_v2 else data.get("new_unlocks", [])
 	if not new_unlocks.is_empty():
 		var unlock_header := Label.new()
 		unlock_header.text = "新解锁"
@@ -135,24 +139,25 @@ func _show_v2_summary(data: Dictionary) -> void:
 	primary.text = "主目标：%s" % ("已完成" if data.get("result", "defeat") == "victory" else "未完成")
 	primary.modulate = Color("7ee68a") if data.get("result", "defeat") == "victory" else Color("f4b45a")
 	loot_container.add_child(primary)
+	var repository: Node = get_node_or_null("/root/V2Data")
+	var summary: Dictionary = V2ResultPresentationScript.build_summary(data, repository)
 	var completion_guide := Label.new()
-	completion_guide.text = "通关方式：救出侦察兵后，让两名存活队员进入绿色撤离区；进入后自动完成。"
+	completion_guide.text = "通关回顾：%s" % String(summary.get("completion_guide", ""))
 	completion_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	completion_guide.modulate = Color("b8d7dc")
 	loot_container.add_child(completion_guide)
 	var optional := Label.new()
-	optional.text = "可选记录：%s" % ("已上传" if bool(data.get("optional_record", false)) else "未上传")
+	optional.text = String(summary.get("optional_line", "可选目标：未完成"))
 	optional.modulate = Color("7ee68a") if bool(data.get("optional_record", false)) else Color("9aa9ad")
 	loot_container.add_child(optional)
-	var rescued: Array = data.get("rescued", [])
-	if "scout" in rescued:
+	for rescued_text in summary.get("rescued_lines", []):
 		var rescued_label := Label.new()
-		rescued_label.text = "新队员：侦察兵已加入基地"
+		rescued_label.text = "新队员：%s" % String(rescued_text)
 		rescued_label.modulate = Color("6dd6e5")
 		loot_container.add_child(rescued_label)
-	for module_id in data.get("unlocked_modules", []):
+	for module_name in summary.get("module_lines", []):
 		var module_label := Label.new()
-		module_label.text = "新模块：%s" % String(module_id)
+		module_label.text = "新模块：%s" % String(module_name)
 		module_label.modulate = Color("f4b45a")
 		loot_container.add_child(module_label)
 

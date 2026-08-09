@@ -6,6 +6,7 @@ const ProgressionManagerScript = preload("res://scripts/game/progression_manager
 const DialogueScene = preload("res://scenes/dialogue.tscn")
 const V2CampaignProgressScript = preload("res://scripts/v2/mission/v2_campaign_progress.gd")
 const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
+const V2VisualModeScript = preload("res://scripts/v2/presentation/v2_visual_mode.gd")
 
 signal save_loaded(slot: int)
 signal save_created(slot: int)
@@ -36,6 +37,7 @@ var v2_boot_errors: Array[String] = []
 var battle_result: Dictionary = {}
 var pending_level_id: String = ""
 var pending_v2_checkpoint: Dictionary = {}
+var v2_menu_settings: Dictionary = {}
 
 ## 待展示的成就通知队列（场景切换间保留）
 var pending_achievement_notifications: Array[Dictionary] = []
@@ -50,6 +52,7 @@ func is_v2_runtime() -> bool:
 
 func _ready() -> void:
 	current_save = SaveManager.create_default_save()
+	v2_menu_settings = V2VisualModeScript.normalize(SaveManager.load_v2_settings())
 	progression = ProgressionManagerScript.new()
 	add_child(progression)
 	_initialize_v2_boot()
@@ -93,6 +96,7 @@ func begin_new_game_for_test(slot: int) -> Dictionary:
 func new_v2_game(slot: int = 0) -> bool:
 	current_slot = slot
 	current_save = SaveManager.create_v2_save()
+	current_save["settings"] = V2VisualModeScript.normalize(v2_menu_settings)
 	pending_v2_checkpoint.clear()
 	current_state = GameState.BASE
 	var saved: bool = SaveManager.save_game_v2(current_save, current_slot)
@@ -112,6 +116,7 @@ func continue_v2_game() -> bool:
 		if not data.is_empty():
 			current_slot = slot
 			current_save = data
+			_sync_v2_save_settings()
 			current_state = GameState.BASE
 			save_loaded.emit(current_slot)
 			return true
@@ -123,6 +128,7 @@ func load_v2_slot(slot: int) -> bool:
 		return false
 	current_slot = slot
 	current_save = data
+	_sync_v2_save_settings()
 	current_state = GameState.BASE
 	save_loaded.emit(current_slot)
 	return true
@@ -570,16 +576,54 @@ func create_battle_units_from_roster() -> Array:
 
 ## 获取设置
 func get_settings() -> Dictionary:
+	if is_v2_runtime():
+		if String(current_save.get("game_line", "")) == "v2_infiltration":
+			return V2VisualModeScript.normalize(current_save.get("settings", {}))
+		return V2VisualModeScript.normalize(v2_menu_settings)
 	return current_save.get("settings", SaveManager.create_default_save().settings)
+
+## V2 settings are product-wide, not owned by any individual save slot.
+## The boot scene and settings menu both use this one entry point.
+func apply_v2_runtime_settings() -> Dictionary:
+	v2_menu_settings = V2VisualModeScript.normalize(v2_menu_settings)
+	V2VisualModeScript.apply(v2_menu_settings)
+	InputBindings.apply_settings(v2_menu_settings)
+	AccessibilitySettings.apply_settings(v2_menu_settings)
+	AudioManager.set_bus_volumes(
+		float(v2_menu_settings.get("master_volume", 1.0)),
+		float(v2_menu_settings.get("music_volume", 1.0)),
+		float(v2_menu_settings.get("sfx_volume", 1.0))
+	)
+	if DisplayServer.get_name() != "headless":
+		_apply_v2_window_settings(v2_menu_settings)
+	return v2_menu_settings.duplicate(true)
+
+func _apply_v2_window_settings(settings: Dictionary) -> void:
+	var parts := String(settings.get("resolution", "1280x720")).split("x")
+	if parts.size() == 2:
+		DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
+	DisplayServer.window_set_mode(
+		DisplayServer.WINDOW_MODE_FULLSCREEN if bool(settings.get("fullscreen", false)) else DisplayServer.WINDOW_MODE_WINDOWED
+	)
+
+func _sync_v2_save_settings() -> void:
+	current_save["settings"] = V2VisualModeScript.normalize(v2_menu_settings)
 
 ## 更新设置
 func update_settings(settings: Dictionary) -> void:
+	if is_v2_runtime():
+		var normalized := V2VisualModeScript.normalize(settings)
+		InputBindings.apply_settings(normalized)
+		v2_menu_settings = normalized.duplicate(true)
+		SaveManager.save_v2_settings(v2_menu_settings)
+		if String(current_save.get("game_line", "")) == "v2_infiltration":
+			current_save["settings"] = normalized
+			SaveManager.save_game_v2(current_save, current_slot)
+		apply_v2_runtime_settings()
+		return
 	InputBindings.apply_settings(settings)
 	current_save["settings"] = settings
-	if String(current_save.get("game_line", "")) == "v2_infiltration":
-		SaveManager.save_game_v2(current_save, current_slot)
-	else:
-		SaveManager.save_game(current_save, current_slot)
+	SaveManager.save_game(current_save, current_slot)
 
 ## 获取当前难度参数
 ## 故事难度：敌人弱化、奖励加成；标准难度：原值；困难难度：敌人强化、奖励削减

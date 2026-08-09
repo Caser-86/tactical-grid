@@ -52,6 +52,7 @@
     "res://tests/v2/v2_damage_presentation_test.gd",
     "res://tests/v2/v2_visibility_transaction_test.gd",
     "res://tests/v2/v2_settings_contract_test.gd",
+    "res://tests/v2/v2_result_presentation_test.gd",
     "res://tests/v2/v2_playtest_recorder_test.gd",
     "res://tests/v2/v2_playtest_integration_contract_test.gd"
   ],
@@ -66,6 +67,8 @@
     "res://tests/v2/v2_m1_m2_checkpoint_scene_test.tscn",
     "res://tests/v2/v2_m1_dialogue_scene_test.tscn",
     "res://tests/v2/v2_base_progression_scene_test.tscn",
+    "res://tests/v2/v2_settings_scene_test.tscn",
+    "res://tests/v2/v2_settings_runtime_test.tscn",
     "res://tests/v2/v2_m1_visual_snapshot.tscn",
     "res://tests/v2/v2_m2_visual_snapshot.tscn",
     "res://tests/v2/v2_encounter_controller_regression_test.tscn",

@@ -28,6 +28,7 @@ func _initialize() -> void:
 	t.check(_group_count(presenter, "v2_attack_overlay") >= 4, "选择后同时生成红色攻击范围和目标")
 	t.check(_group_count(presenter, "v2_attack_target_label") == 2, "每个红色目标都有明确攻击标牌")
 	t.check(_group_count(presenter, "v2_danger_overlay") == 0, "普通选择不显示危险路径")
+	t.check(_range_glyph_count(presenter) == 0, "基础移动和攻击范围不在每格重复显示 M/A")
 
 	presenter.show_path([Vector2i(2, 2), Vector2i(2, 3), Vector2i(2, 4)], true)
 	t.check(_group_count(presenter, "v2_path_overlay") == 2, "路径不重复绘制起点")
@@ -50,5 +51,12 @@ func _group_count(node: Node, group_name: StringName) -> int:
 	var count := 0
 	for child in node.get_children():
 		if child.is_in_group(group_name):
+			count += 1
+	return count
+
+func _range_glyph_count(node: Node) -> int:
+	var count := 0
+	for child in node.get_children():
+		if child is Label and String(child.text) in ["M", "A"]:
 			count += 1
 	return count

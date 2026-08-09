@@ -17,6 +17,16 @@ func _run() -> void:
 		t.finish(get_tree())
 		return
 	manager.call("begin_v2_new_game_for_test", 0)
+	var fresh_base := BaseScene.instantiate()
+	add_child(fresh_base)
+	await get_tree().process_frame
+	t.check("回声失联" in fresh_base.get_node("Center/SituationPanel/Content/SituationTitle").text, "V2 fresh save 基地默认预览 M1")
+	var fresh_body := String(fresh_base.get_node("Center/SituationPanel/Content/SituationBody").text)
+	t.check("预计时长" in fresh_body and "20-25 分钟" in fresh_body, "V2 fresh save 基地显示预计任务时长")
+	t.check("找到失联侦察兵并一起撤离" in fresh_body, "V2 fresh save 基地立即显示主目标而非等待数据")
+	fresh_base.queue_free()
+	await get_tree().process_frame
+
 	var completed: Dictionary = Progress.complete_mission(manager.current_save, &"ch1_m1", {"rescued": ["scout"], "optional_record": true, "rating": 3})
 	manager.set("current_save", completed)
 	manager.call("save_current_v2")
@@ -85,7 +95,10 @@ func _run() -> void:
 			result_text += child.text + "\n"
 	t.check("可选记录：已上传" in result_text, "V2 结算显示可选记录结果")
 	t.check("侦察兵已加入基地" in result_text, "V2 结算显示侦察兵加入")
-	t.check("scout_b" in result_text, "V2 结算显示新模块")
+	t.check("扩展扫描" in result_text and "静默扫描" in result_text, "V2 结算使用本地化模块名称")
+	t.check(not "scout_a" in result_text and not "scout_b" in result_text, "V2 结算不泄露内部模块 ID")
+	t.check(not bool(result_screen.get_node("Panel/RewardsLabel/CreditValue").visible), "V2 结算隐藏信用点")
+	t.check(not bool(result_screen.get_node("Panel/RewardsLabel/ExpValue").visible), "V2 结算隐藏经验值")
 	result_screen.queue_free()
 	await get_tree().process_frame
 	if base != null and is_instance_valid(base):

@@ -122,14 +122,18 @@ func _show_v2_mission_brief(mission: Dictionary) -> void:
 	for character_id in selected:
 		var data: Dictionary = _get_v2_character(character_id)
 		names.append(String(data.get("name", character_id)))
+	var duration: Array = mission.get("duration_minutes", [])
+	var duration_text := "%d-%d 分钟" % [int(duration[0]), int(duration[1])] if duration.size() >= 2 else "待评估"
 	situation_body.text = (
 		"主目标\n%s\n\n"
 		+ "可选目标\n%s\n\n"
+		+ "预计时长\n%s\n\n"
 		+ "当前编队\n%s\n\n"
-		+ "流程\n选择队员 → 进入地图 → 营救 → 撤离"
+		+ "行动流程\n选择队员 → 完成阶段目标 → 营救队员 → 全员撤离"
 	) % [
 		String(mission.get("primary", "")),
 		String(mission.get("optional", "无")),
+		duration_text,
 		"、".join(names) if not names.is_empty() else "尚未选择",
 	]
 	intel_hint.text = "队员面板可查看身份、能力和模块；V2 不使用商店、技能树或六属性加点。"

@@ -67,13 +67,13 @@ func _show_v2_route_choice() -> void:
 	var actions := [
 		{
 			"id": "camera_maintenance",
-			"name": "维修摄像头路线",
+			"name": "摄像维护：提前侦察 / 警戒 +1",
 			"description": "提前揭示救援区，但会提高警戒。",
 			"disabled": false,
 		},
 		{
 			"id": "cargo_breakthrough",
-			"name": "货柜突破路线",
+			"name": "货柜突破：路线较短 / 警戒不变",
 			"description": "不提供救援区预览，但路径更短且不额外提高警戒。",
 			"disabled": false,
 		},

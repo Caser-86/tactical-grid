@@ -5,6 +5,7 @@ extends Control
 
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.BOOT
+	GameManager.apply_v2_runtime_settings()
 	status_label.text = "正在启动渗透行动..."
 	progress_bar.value = 0.3
 	await get_tree().process_frame

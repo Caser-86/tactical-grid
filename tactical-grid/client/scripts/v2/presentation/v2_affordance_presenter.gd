@@ -21,14 +21,14 @@ func show_for_unit(unit: Unit, move_query: Dictionary, attack_query: Dictionary)
 		for raw_cell in reachable.keys():
 			var cell := _coerce_cell(raw_cell)
 			if cell != Vector2i(-1, -1):
-				_spawn_cell(cell, MOVE_COLOR, MOVE_BORDER, "v2_move_overlay", "M", false)
+				_spawn_cell(cell, MOVE_COLOR, MOVE_BORDER, "v2_move_overlay", "", false)
 
 	var range_cells: Variant = attack_query.get("range_cells", [])
 	if range_cells is Array:
 		for raw_cell in range_cells:
 			var cell := _coerce_cell(raw_cell)
 			if cell != Vector2i(-1, -1):
-				_spawn_cell(cell, ATTACK_COLOR, ATTACK_BORDER, "v2_attack_overlay", "A", false)
+				_spawn_cell(cell, ATTACK_COLOR, ATTACK_BORDER, "v2_attack_overlay", "", false)
 
 	var targets: Variant = attack_query.get("targets", [])
 	if targets is Array:
@@ -126,7 +126,8 @@ func _spawn_cell(cell: Vector2i, fill: Color, border: Color, group_name: String,
 	fill_rect.set_meta("v2_preview", preview)
 	add_child(fill_rect)
 	_add_border(origin, border, preview)
-	_add_glyph(origin, glyph, border, preview)
+	if not glyph.is_empty():
+		_add_glyph(origin, glyph, border, preview)
 
 func _add_border(origin: Vector2, color: Color, preview: bool) -> void:
 	var width := 2.0

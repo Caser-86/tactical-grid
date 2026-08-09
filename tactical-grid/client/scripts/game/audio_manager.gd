@@ -45,6 +45,22 @@ func _ready() -> void:
 	_load_settings()
 	bgm_player.finished.connect(_restart_bgm)
 
+func _exit_tree() -> void:
+	# Autoload shutdown must release active playback before Godot clears resources.
+	for player in [bgm_player, sfx_player, ambient_player]:
+		_release_player(player)
+	for player in _sfx_pool:
+		_release_player(player)
+	audio_cache.clear()
+	current_bgm = ""
+	battle_music_layer = -1
+
+func _release_player(player: AudioStreamPlayer) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	player.stop()
+	player.stream = null
+
 func _load_settings() -> void:
 	var file = FileAccess.open("user://settings.json", FileAccess.READ)
 	if file:

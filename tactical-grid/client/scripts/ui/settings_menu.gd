@@ -40,6 +40,7 @@ var _pending_binding_action := ""
 var _pending_resolution := ""
 var _previous_resolution := ""
 var _resolution_seconds_remaining := 0
+var _difficulty_ids: Array[String] = []
 
 const BINDING_LABELS := {
 	"pause": "暂停/返回",
@@ -90,14 +91,17 @@ func _setup_ui() -> void:
 
 	# 难度
 	difficulty_option.clear()
-	for d in DIFFICULTIES:
-		difficulty_option.add_item(d)
+	_difficulty_ids.clear()
+	_difficulty_ids.append_array(["story", "standard"] if _is_v2_settings() else DIFFICULTIES)
+	var difficulty_labels := ["故事", "标准"] if _is_v2_settings() else DIFFICULTIES
+	for label in difficulty_labels:
+		difficulty_option.add_item(label)
 	var diff = _settings.get("difficulty", "standard")
-	var diff_index = DIFFICULTIES.find(diff)
+	var diff_index = _difficulty_ids.find(diff)
 	difficulty_option.selected = diff_index if diff_index >= 0 else 1
 	difficulty_option.item_selected.connect(_on_difficulty_changed)
-	difficulty_label.visible = not _is_v2_settings()
-	difficulty_option.visible = not _is_v2_settings()
+	difficulty_label.visible = true
+	difficulty_option.visible = true
 
 	# 可访问性：大字体
 	large_text_check.button_pressed = _settings.get("large_text", false)
@@ -125,7 +129,7 @@ func _setup_ui() -> void:
 	_setup_v2_options()
 
 func _is_v2_settings() -> bool:
-	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
+	return GameManager.is_v2_runtime()
 
 func _setup_v2_options() -> void:
 	var visible := _is_v2_settings()
@@ -154,11 +158,11 @@ func _apply() -> void:
 	if _is_v2_settings():
 		_settings = V2VisualMode.normalize(_settings)
 	GameManager.update_settings(_settings)
+	if _is_v2_settings():
+		return
 	_apply_display()
 	_apply_audio()
 	_apply_accessibility()
-	if _is_v2_settings():
-		V2VisualMode.apply(_settings)
 
 func _apply_display() -> void:
 	var resolution = _settings.get("resolution", "1280x720")
@@ -209,7 +213,9 @@ func _on_sfx_changed(value: float) -> void:
 	_apply()
 
 func _on_difficulty_changed(index: int) -> void:
-	_settings["difficulty"] = DIFFICULTIES[index]
+	if index < 0 or index >= _difficulty_ids.size():
+		return
+	_settings["difficulty"] = _difficulty_ids[index]
 	_apply()
 
 func _on_large_text_changed(enabled: bool) -> void:

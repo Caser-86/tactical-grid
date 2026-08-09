@@ -8,6 +8,7 @@ var t := Runner.new()
 
 func _initialize() -> void:
 	var defaults := VisualModeScript.default_settings()
+	t.check(defaults["difficulty"] == "standard", "V2 默认使用标准难度")
 	t.check(defaults["ui_scale"] == 1.0, "V2 默认文字缩放为 100%")
 	t.check(defaults["visual_mode"] == "normal", "V2 默认视觉模式为普通")
 	t.check(defaults["fullscreen"] == false and defaults["resolution"] == "1280x720", "V2 默认窗口设置明确")
@@ -22,6 +23,12 @@ func _initialize() -> void:
 	})
 	t.check(is_equal_approx(float(normalized["ui_scale"]), 1.5), "V2 非法缩放值归一化到最近档位")
 	t.check(normalized["visual_mode"] == "normal", "V2 非法视觉模式回退为普通")
+	t.check(normalized["difficulty"] == "standard", "V2 缺失难度回退为标准")
+
+	var story_settings := VisualModeScript.normalize({"difficulty": "story"})
+	var unsupported_hard := VisualModeScript.normalize({"difficulty": "hard"})
+	t.check(story_settings["difficulty"] == "story", "V2 保存故事难度")
+	t.check(unsupported_hard["difficulty"] == "standard", "V2 未验证的困难难度回退为标准")
 
 	var migrated_text := VisualModeScript.normalize({"large_text": true})
 	var migrated_color := VisualModeScript.normalize({"colorblind_mode": "deuteranopia"})

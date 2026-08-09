@@ -6,6 +6,7 @@ class_name V2VisualMode
 
 const VISUAL_MODES := [&"normal", &"grayscale", &"deuteranopia_assist"]
 const UI_SCALES := [1.0, 1.25, 1.5]
+const DIFFICULTIES := ["story", "standard"]
 const DEFAULT_RESOLUTION := "1280x720"
 const InputBindingsScript = preload("res://scripts/game/input_bindings.gd")
 
@@ -13,6 +14,7 @@ static var _current_settings: Dictionary = {}
 
 static func default_settings() -> Dictionary:
 	return {
+		"difficulty": "standard",
 		"ui_scale": 1.0,
 		"visual_mode": "normal",
 		"fullscreen": false,
@@ -42,10 +44,13 @@ static func normalize(settings: Dictionary) -> Dictionary:
 	normalized["ui_scale"] = _nearest_scale(scale)
 	var mode := StringName(String(normalized.get("visual_mode", "normal")))
 	normalized["visual_mode"] = String(mode if mode in VISUAL_MODES else &"normal")
+	var difficulty := String(normalized.get("difficulty", "standard"))
+	normalized["difficulty"] = difficulty if difficulty in DIFFICULTIES else "standard"
 	if not normalized["keybindings"] is Dictionary:
 		normalized["keybindings"] = {}
 	var bindings := InputBindingsScript.new()
 	bindings.ensure_settings(normalized)
+	bindings.free()
 	return normalized
 
 static func apply(settings: Dictionary) -> Dictionary:
