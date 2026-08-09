@@ -41,6 +41,7 @@
 - 命令：`Godot_v4.7.1-stable_win64_console.exe --verbose --headless --path . res://tests/v2/v2_rescue_battle_integration_test.tscn`。
 - 结果：场景断言通过，但退出时仍有 10 个 `CanvasItem RID`、24 个 `ObjectDB` 和 `res://scripts/game/unit.gd`、`res://scripts/v2/combat/v2_unit_turn_state.gd` 两项脚本资源仍在使用。
 - 已否定方向：在 `UnitSprite._exit_tree()` 中主动断开单位信号、终止补间并清空单位引用会使同一最小复现从原有 8/20 增至 10/24，因此该改动已撤回。
+- 已修复根因：营救场景测试的 `_cleanup_battle()` 是协程，但三个调用点没有 `await`；清理在第一帧等待时被 `finish()` 越过。测试现在先显式释放脱离场景树的单位数据，再等待战斗根节点销毁，并断言突击兵与侦察兵均已失效。该场景 18/18 断言通过，退出告警回到原有 8 个 `CanvasItem RID`、20 个 `ObjectDB`、2 个脚本资源。
 - 影响结论：这是自动场景退出的未收敛风险，不得当作已修复，也不得阻止已验证 Windows 包的自动构建；完整包内人工流程仍须在 H3 前单独确认。
 
 ## 尚未满足的发布硬门

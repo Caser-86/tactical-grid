@@ -29,14 +29,14 @@ func _run() -> void:
 	var ready := await _wait_for_player_phase(battle)
 	t.check(ready, "M104 等待到玩家行动阶段")
 	if not ready:
-		_cleanup_battle(battle)
+		await _cleanup_battle(battle)
 		t.finish(get_tree())
 		return
 
 	var assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	t.check(assault != null and battle.v2_rescue_controller != null, "正式战斗已注册营救控制器")
 	if assault == null or battle.v2_rescue_controller == null:
-		_cleanup_battle(battle)
+		await _cleanup_battle(battle)
 		t.finish(get_tree())
 		return
 
@@ -79,7 +79,9 @@ func _run() -> void:
 	t.check(bool(Checkpoint.validate(checkpoint).get("valid", false)), "营救检查点可被 V2 schema 验证")
 	t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC", "正式战斗目标切换为护送撤离")
 
-	_cleanup_battle(battle)
+	await _cleanup_battle(battle)
+	t.check(not is_instance_valid(assault), "战斗退出后突击兵数据节点已释放")
+	t.check(not is_instance_valid(scout), "战斗退出后营救侦察兵数据节点已释放")
 	await _stop_test_audio()
 	t.finish(get_tree())
 
@@ -111,8 +113,13 @@ func _wait_for_player_phase(battle: BattleController) -> bool:
 
 func _cleanup_battle(battle: Node) -> void:
 	if battle != null and is_instance_valid(battle):
+		# Unit data nodes are intentionally detached from the battle tree. Release
+		# them before queueing the scene root so test shutdown does not rely on a
+		# deferred lifecycle callback.
+		battle.call("_cleanup_units")
 		battle.queue_free()
 		await get_tree().process_frame
+		t.check(not is_instance_valid(battle), "营救测试退出前已销毁战斗根节点")
 
 func _stop_test_audio() -> void:
 	AudioManager.stop_bgm()
