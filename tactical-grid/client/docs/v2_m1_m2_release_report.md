@@ -36,6 +36,13 @@
 
 总闸门报告了 70 条 Godot 退出清理警告，分布在 12 类消息。无头音频播放引用已通过独立契约测试消除；剩余问题来自部分战斗场景测试的 `ObjectDB`、`CanvasItem RID` 和脚本资源仍在使用。剩余测试清理警告没有造成断言失败，但仍应在 H3 前完成风险评估或收敛。
 
+### NX-020 最小复现记录（2026-08-10）
+
+- 命令：`Godot_v4.7.1-stable_win64_console.exe --verbose --headless --path . res://tests/v2/v2_rescue_battle_integration_test.tscn`。
+- 结果：场景断言通过，但退出时仍有 10 个 `CanvasItem RID`、24 个 `ObjectDB` 和 `res://scripts/game/unit.gd`、`res://scripts/v2/combat/v2_unit_turn_state.gd` 两项脚本资源仍在使用。
+- 已否定方向：在 `UnitSprite._exit_tree()` 中主动断开单位信号、终止补间并清空单位引用会使同一最小复现从原有 8/20 增至 10/24，因此该改动已撤回。
+- 影响结论：这是自动场景退出的未收敛风险，不得当作已修复，也不得阻止已验证 Windows 包的自动构建；完整包内人工流程仍须在 H3 前单独确认。
+
 ## 尚未满足的发布硬门
 
 1. 三名未参与实现的玩家首次完成 M1 和 M2，并记录真实时长、目标理解、卡点和可选内容使用率。
