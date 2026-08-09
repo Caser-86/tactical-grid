@@ -132,6 +132,8 @@ git commit -m "feat(v2): add M2 route consequences and cooling control"
 
 ### Task 3: 冷却危险、狙击手营救和工程师反制
 
+**Status:** Implemented and verified in the V2 runtime branch. The canonical M2 event chain is now `lockdown_cleared` -> `character_rescued` -> `sniper_ability_showcase` -> `evac_checked`; legacy `lockdown_disabled` is not used by shipped M2 data.
+
 **Files:**
 - Modify: `tactical-grid/client/data/v2/locked_maps/ch1_m2_cooling_works_v1.json`
 - Modify: `tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd`
@@ -144,27 +146,29 @@ git commit -m "feat(v2): add M2 route consequences and cooling control"
 - Rescue result uses `character_id="sniper"`, adds `player_sniper`, restores mission-defined HP, and writes `unlocked_modules=["sniper_a"]` once.
 - Engineer countermeasure writes `hazard_warning` and `exit_route_changed` before player control resumes.
 
-- [ ] **Step 1: 写 M2 完整流程测试**
+- [x] **Step 1: 写 M2 完整流程测试**
 
 通过公开移动、设施预览、设施提交、攻击和结束回合完成西侧路线、东侧路线、冷却控制室、狙击手营救和撤离；禁止直接修改位置、伤害或调用任务完成事件。
 
-- [ ] **Step 2: 接入喷口回合节奏**
+- [x] **Step 2: 接入喷口回合节奏**
 
 喷口在每次敌方阶段只处理固定周期；玩家阶段提前显示下一组危险格，控制室关闭后周期固定停止；检查点恢复后预告与周期一致。
 
-- [ ] **Step 3: 接入狙击手即时教学局面**
+- [x] **Step 3: 接入狙击手即时教学局面**
 
 狙击手加入后在其可攻击范围内展示一名公开高威胁意图，底栏只提示“选择狙击手并点击红色目标”；完成或取消都不阻断撤离，但完成后记录 `sniper_ability_showcase`。
 
-- [ ] **Step 4: 接入工程师反制**
+- [x] **Step 4: 接入工程师反制**
 
 进入北侧撤离区域前激活两名工程师/狙击组合，改变一组预警格或撤离门状态；所有变化通过地图覆盖、HUD 和短音效同步显示。
 
-- [ ] **Step 5: 补 M2 对话**
+- [x] **Step 5: 补 M2 对话**
 
 新增路线选择、涡轮大厅、控制室、狙击手加入、工程师反制和撤离结算短句；每段都能在一个玩家回合内跳过。
 
-- [ ] **Step 6: 运行流程测试并提交**
+- [x] **Step 6: 运行流程测试并提交**
+
+验证证据：`v2_m2_expanded_flow_test.gd` 通过 23/23；`v2_m2_route_consequence_test.gd` 通过 18/18；`v2_m1_evacuation_bridge_test.tscn` 通过 28/28；完整 V2 门禁通过 64/64 项、1185/1185 断言。
 
 ```powershell
 & 'D:\Program Files\Godot\Godot_v4.7.1-stable_win64_console.exe' --headless --path . --script res://tests/v2/v2_m2_expanded_flow_test.gd

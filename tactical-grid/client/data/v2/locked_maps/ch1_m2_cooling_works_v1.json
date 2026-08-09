@@ -3394,11 +3394,11 @@
     }
   ],
   "facilities": [
-  {
-    "id": "facility_power_west",
+    {
+      "id": "facility_power_west",
       "name": "西侧电力控制台",
       "entity_id": "cooling_power_west",
-    "type": "power",
+      "type": "power",
       "action_id": "cut_power_grid",
       "x": 7,
       "y": 13,
@@ -3444,11 +3444,11 @@
         "m2_sniper_route": "telegraph"
       }
     },
-  {
-    "id": "facility_cooling_control",
+    {
+      "id": "facility_cooling_control",
       "name": "冷却控制室",
       "entity_id": "cooling_control_console",
-    "type": "cooling_control",
+      "type": "cooling_control",
       "action_id": "shutdown_cooling_nozzles",
       "x": 6,
       "y": 5,
@@ -3663,7 +3663,7 @@
     {
       "id": "cooling_vent_west",
       "name": "西侧冷却喷口",
-      "warning_cells": [
+      "cells": [
         [
           9,
           14
@@ -3678,13 +3678,16 @@
         ]
       ],
       "damage": 1,
-      "warning_turns": 1,
+      "warning_turn": 2,
+      "damage_turn": 3,
+      "cycle_length": 4,
+      "close_action_id": "shutdown_cooling_nozzles",
       "route_id": "west_maintenance"
     },
     {
       "id": "cooling_vent_central",
       "name": "中央涡轮喷口",
-      "warning_cells": [
+      "cells": [
         [
           14,
           11
@@ -3695,7 +3698,10 @@
         ]
       ],
       "damage": 1,
-      "warning_turns": 1,
+      "warning_turn": 4,
+      "damage_turn": 5,
+      "cycle_length": 4,
+      "close_action_id": "shutdown_cooling_nozzles",
       "route_id": "west_maintenance"
     }
   ]

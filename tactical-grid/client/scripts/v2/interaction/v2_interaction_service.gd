@@ -85,6 +85,12 @@ func query_actions(actor: Unit, entity_id: String) -> Array:
 		if String(facility.get("state", "")) in ["damaged", "destroyed"]:
 			action["enabled"] = false
 			action["reason"] = "设施已经失效"
+	# Distance and actor availability are immediate blockers. They must remain
+	# visible even when one of the facility's actions was already consumed.
+	if not bool(context.get("can_operate", false)) and not String(context.get("reason", "")).is_empty():
+		for action in actions:
+			action["enabled"] = false
+			action["reason"] = String(context.get("reason", "interaction_unavailable"))
 	return actions.slice(0, 2)
 
 func commit_action(actor: Unit, entity_id: String, action_id: String, expected_revision: int = -1) -> Dictionary:

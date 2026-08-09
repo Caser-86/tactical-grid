@@ -97,10 +97,77 @@
       {"speaker": "commander", "text": "带回的信号会指向下一处设施。先回基地整备。", "emotion": "serious"}
     ]
   },
-  "ch1_m2_brief": {"id": "ch1_m2_brief", "lines": []},
-  "ch1_m2_intro": {"id": "ch1_m2_intro", "lines": []},
-  "ch1_m2_rescue": {"id": "ch1_m2_rescue", "lines": []},
-  "ch1_m2_outro": {"id": "ch1_m2_outro", "lines": []},
+  "ch1_m2_brief": {
+    "id": "ch1_m2_brief",
+    "trigger": "mission_selected",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "alpha", "position": "left"}],
+    "lines": [
+      {"speaker": "commander", "text": "冷却工坊失控，狙击手被困在东侧维护廊。", "emotion": "serious"},
+      {"speaker": "alpha", "text": "先解除封锁，再接触目标。我们不需要清空整座工坊。", "emotion": "neutral"},
+      {"speaker": "commander", "text": "控制室是可选目标。关闭喷口会让撤离更安全。", "emotion": "serious"}
+    ]
+  },
+  "ch1_m2_intro": {
+    "id": "ch1_m2_intro",
+    "trigger": "mission_start",
+    "characters": [{"id": "commander", "position": "right"}],
+    "lines": [
+      {"speaker": "commander", "text": "两条路都能解除封锁。跟紧目标标记，看到红色意图就先处理威胁。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m2_route": {
+    "id": "ch1_m2_route",
+    "trigger": "lockdown_cleared",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "alpha", "position": "left"}],
+    "lines": [
+      {"speaker": "commander", "text": "封锁解除了。中央涡轮大厅有一条安全信号，先去那里确认目标位置。", "emotion": "serious"},
+      {"speaker": "alpha", "text": "如果喷口开始预警，我们就绕开红色格，不要硬闯。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m2_turbine": {
+    "id": "ch1_m2_turbine",
+    "trigger": "sniper_ability_showcase",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "scout", "position": "left"}],
+    "lines": [
+      {"speaker": "scout", "text": "狙击手已接入瞄准线。选择她，再点击红色目标即可标记威胁。", "emotion": "serious"},
+      {"speaker": "commander", "text": "演示完成。现在只为撤离开路，不要在工坊里逗留。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m2_cooling": {
+    "id": "ch1_m2_cooling",
+    "trigger": "cooling_nozzles_shutdown",
+    "characters": [{"id": "commander", "position": "right"}],
+    "lines": [
+      {"speaker": "commander", "text": "喷口停了。少一个会逼我们停下来的东西，准备向北撤离。", "emotion": "relieved"}
+    ]
+  },
+  "ch1_m2_rescue": {
+    "id": "ch1_m2_rescue",
+    "trigger": "sniper_rescued",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "sniper", "position": "left"}],
+    "lines": [
+      {"speaker": "sniper", "text": "我还能走。给我一个清晰目标，我就能替队伍打开缺口。", "emotion": "serious"},
+      {"speaker": "commander", "text": "归队。接下来只做一件事：活着抵达北侧撤离门。", "emotion": "neutral"}
+    ]
+  },
+  "ch1_m2_countermeasure": {
+    "id": "ch1_m2_countermeasure",
+    "trigger": "engineer_countermeasure_started",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "sniper", "position": "left"}],
+    "lines": [
+      {"speaker": "commander", "text": "工程师启动反制，北侧直线被封锁。改走东侧高架桥。", "emotion": "serious"},
+      {"speaker": "sniper", "text": "收到。我会盯住高架桥尽头，别让他们切断撤离门。", "emotion": "serious"}
+    ]
+  },
+  "ch1_m2_outro": {
+    "id": "ch1_m2_outro",
+    "trigger": "mission_victory",
+    "characters": [{"id": "commander", "position": "right"}, {"id": "sniper", "position": "left"}],
+    "lines": [
+      {"speaker": "sniper", "text": "冷却工坊的信号还在。至少这次，他们没能把我们困在里面。", "emotion": "relieved"},
+      {"speaker": "commander", "text": "回基地整备。下一次行动，狙击手由你选择是否出动。", "emotion": "neutral"}
+    ]
+  },
   "ch1_m3_brief": {"id": "ch1_m3_brief", "lines": []},
   "ch1_m3_intro": {"id": "ch1_m3_intro", "lines": []},
   "ch1_m3_rescue": {"id": "ch1_m3_rescue", "lines": []},

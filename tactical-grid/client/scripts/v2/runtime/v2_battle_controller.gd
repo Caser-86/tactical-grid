@@ -105,8 +105,8 @@ func _on_v2_route_selected(route_id: String) -> void:
 		hud.set_context_prompt("已选择%s。下一步：前往地图中上方吊机控制台并放下吊桥。" % String(route_result.get("route_name", route_id)))
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
-	if _is_v2_battle() and level_id == "ch1_m1":
-		GameManager.play_dialogue("ch1_m1_route")
+	if _is_v2_battle():
+		GameManager.play_dialogue("ch1_m1_route" if level_id == "ch1_m1" else "ch1_m2_route")
 	_record_v2_playtest_event(&"route_selected", {"route_id": route_id})
 	_render_v2_hud()
 
@@ -208,7 +208,8 @@ func _restore_v2_checkpoint() -> bool:
 		if entity_id.is_empty() or player_ids.has(entity_id):
 			continue
 		var position_data: Dictionary = data.get("grid_pos", {})
-		var rescued := _create_v2_rescue_unit(&"scout", entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
+		var character_id := StringName(String(data.get("job", _get_v2_rescue_character_id())))
+		var rescued := _create_v2_rescue_unit(character_id, entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
 		if rescued == null:
 			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
 			_v2_restore_failure = {"reason": &"missing_player_entity", "entity_id": entity_id}
@@ -239,8 +240,10 @@ func _restore_v2_checkpoint() -> bool:
 		GameManager.clear_v2_encounter_checkpoint()
 		return false
 	var restored_snapshot: Dictionary = restored.get("snapshot", snapshot)
-	if v2_rescue_controller and v2_mission_flow and bool(v2_mission_flow.rescued_characters.get("scout", false)):
-		v2_rescue_controller.restore_rescued_state(&"rescue_scout")
+	if v2_rescue_controller and v2_mission_flow:
+		var rescue_character_id := _get_v2_rescue_character_id()
+		if bool(v2_mission_flow.rescued_characters.get(String(rescue_character_id), false)):
+			v2_rescue_controller.restore_rescued_state(_get_v2_rescue_entity_id())
 	if alert_state:
 		alert_state.deserialize(restored_snapshot.get("alert_state", {}))
 	if visibility_state and restored_snapshot.get("visibility_state", {}) is Dictionary:
@@ -555,6 +558,25 @@ func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	super._apply_v2_interaction_result(result)
 	var action_id := String(result.get("action_id", ""))
+	if level_id == "ch1_m2":
+		if action_id in ["cut_power_grid", "bypass_security_door"]:
+			_apply_v2_map_changes(result.get("map_changes", []), "open")
+			var lockdown_result := _apply_v2_mission_event(&"lockdown_cleared", {
+				"route_id": String(result.get("route_id", "")),
+				"map_changes": result.get("map_changes", []),
+				"enemy_intent_changes": result.get("enemy_intent_changes", {}),
+			})
+			_update_v2_encounters([{"event": "route_selected", "route_id": String(result.get("route_id", ""))}])
+			if hud and bool(lockdown_result.get("success", false)):
+				hud.set_context_prompt("封锁已解除：%s。下一步前往中央涡轮大厅。" % String(result.get("consequence", "路线已开放")))
+			GameManager.play_dialogue("ch1_m2_route")
+		elif action_id == "show_sniper_ability":
+			var showcase := _apply_v2_mission_event(&"sniper_ability_showcase", {"sniper_lines_visible": true})
+			if hud and bool(showcase.get("success", false)):
+				hud.set_context_prompt("狙击手已完成远程火力演示。下一步：带小队前往北侧撤离门。")
+			GameManager.play_dialogue("ch1_m2_turbine")
+			_record_v2_playtest_event(&"sniper_ability_showcase", {})
+
 	if action_id == "lower_gantry":
 		_apply_v2_map_changes(result.get("map_changes", []), "open")
 		var gantry_event := _apply_v2_mission_event(&"gantry_lowered", {
@@ -567,7 +589,15 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 		if _is_v2_battle() and level_id == "ch1_m1":
 			GameManager.play_dialogue("ch1_m1_gantry")
 		_record_v2_playtest_event(&"gantry_lowered", {"route_id": String(result.get("route_id", "gantry_bridge"))})
-	var close_result := _commit_v2_hazard_close_action(String(result.get("action_id", "")))
+	var close_result := {}
+	if action_id == "shutdown_cooling_nozzles":
+		close_result = _commit_v2_hazard_close_action(action_id)
+		var cooling_event := _apply_v2_mission_event(&"cooling_nozzles_shutdown", {"hazard_closed": true})
+		if hud and bool(cooling_event.get("success", false)):
+			hud.set_context_prompt("冷却喷口已关闭，危险周期停止；突击模块 B 已解锁。")
+		GameManager.play_dialogue("ch1_m2_cooling")
+	else:
+		close_result = _commit_v2_hazard_close_action(action_id)
 	if bool(close_result.get("success", false)) and hud:
 		hud.set_context_prompt("危险区已关闭：%s" % ", ".join(close_result.get("closed_now", [])))
 		_render_v2_hud()
@@ -577,6 +607,10 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 func _on_v2_rescue_committed(result: Dictionary) -> void:
 	super._on_v2_rescue_committed(result)
 	if not _is_v2_battle() or level_id != "ch1_m1":
+		if level_id == "ch1_m2" and hud:
+			hud.set_context_prompt("狙击手已加入小队。前往中央涡轮大厅，点击涡轮封锁并选择“标记北侧威胁”。")
+			GameManager.play_dialogue("ch1_m2_rescue")
+			_render_v2_hud()
 		return
 	var route_changes: Dictionary = map_data.get("route_changes", {})
 	var lockdown: Array = []
@@ -588,6 +622,26 @@ func _on_v2_rescue_committed(result: Dictionary) -> void:
 	if hud and bool(intercept.get("success", false)):
 		hud.set_context_prompt("营救触发撤离拦截：东北直通线已封锁。沿吊桥通路前往右上方绿色撤离标记。")
 		GameManager.play_dialogue("ch1_m1_intercept")
+	_render_v2_hud()
+
+func _prepare_v2_m2_evac() -> void:
+	if level_id != "ch1_m2" or v2_mission_flow == null:
+		return
+	var flags: Dictionary = v2_mission_flow.get_snapshot().get("mission_flags", {})
+	if bool(flags.get("engineer_countermeasure_started", false)):
+		return
+	var route_changes: Array = []
+	for raw_cell in map_data.get("route_changes", {}).get("rescue_exit_intercept", []):
+		route_changes.append({"cell": raw_cell, "state": "closed"})
+	_apply_v2_map_changes(route_changes, "closed")
+	var countermeasure := _apply_v2_mission_event(&"engineer_countermeasure_started", {
+		"map_changes": route_changes,
+		"enemy_ids": ["m2_sniper_exit", "m2_drone_exit"],
+	})
+	_update_v2_encounters([{"event": "pre_evac"}])
+	if hud and bool(countermeasure.get("success", false)):
+		hud.set_context_prompt("工程师反制启动：北侧直线路径已封锁，沿东侧高架桥进入撤离门。")
+		GameManager.play_dialogue("ch1_m2_countermeasure")
 	_render_v2_hud()
 
 func _apply_v2_map_changes(raw_changes: Variant, default_state: String) -> void:

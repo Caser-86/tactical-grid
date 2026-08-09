@@ -112,13 +112,15 @@ func _run_m2_terminal_regression(mission: Dictionary) -> void:
 	var sniper := _unit("m2_sniper", evac_center + Vector2i(-2, 0))
 	var battle := _build_battle(mission, map, [assault, scout], [assault, scout])
 	var flow: RefCounted = battle.v2_mission_flow
-	var lockdown_result: Dictionary = flow.apply_event(&"lockdown_disabled")
-	t.check(bool(lockdown_result.get("success", false)), "M2 shipped 配置可完成 lockdown_disabled")
+	var lockdown_result: Dictionary = flow.apply_event(&"lockdown_cleared")
+	t.check(bool(lockdown_result.get("success", false)), "M2 shipped 配置可完成 lockdown_cleared")
 	var rescue_result: Dictionary = flow.apply_event(&"character_rescued", {
 		"character_id": "sniper",
 		"unit": sniper,
 	})
 	t.check(bool(rescue_result.get("success", false)), "M2 shipped 配置可完成 sniper 营救")
+	var showcase_result: Dictionary = flow.apply_event(&"sniper_ability_showcase", {"sniper_lines_visible": true})
+	t.check(bool(showcase_result.get("success", false)), "M2 shipped 配置可完成 sniper 火力教学")
 	battle.player_units.append(sniper)
 	battle.turn_manager.register_player_unit(sniper)
 	battle.v2_action_service.refresh_units(battle.player_units, battle.enemy_units)

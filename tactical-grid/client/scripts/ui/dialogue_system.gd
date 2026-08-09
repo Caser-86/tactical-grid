@@ -10,6 +10,8 @@ signal choice_made(flag: String)
 const SPEAKER_NAMES := {
 	"alpha": "阿尔法",
 	"commander": "指挥官",
+	"scout": "侦察兵",
+	"sniper": "狙击手",
 	"lila": "莉拉",
 	"sentinel": "哨兵",
 	"doctor": "博士",

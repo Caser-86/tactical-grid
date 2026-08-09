@@ -850,16 +850,19 @@ func _register_v2_rescued_unit(unit: Unit) -> void:
 	_render_v2_hud()
 
 func _on_v2_rescue_committed(result: Dictionary) -> void:
-	_record_v2_playtest_event(&"scout_rescued", {"character_id": String(result.get("character_id", "scout"))})
-	_update_v2_encounters([&"scout_rescued"])
+	var character_id := String(result.get("character_id", "scout"))
+	var rescue_event := StringName("%s_rescued" % character_id)
+	_record_v2_playtest_event(rescue_event, {"character_id": character_id})
+	_update_v2_encounters([rescue_event])
 	if has_method("_update_v2_evac_marker"):
 		call("_update_v2_evac_marker")
 	if hud:
 		var recovered_hp := int(result.get("recovered_hp", 0))
+		var rescued_name := "狙击手" if character_id == "sniper" else "侦察兵"
 		if recovered_hp > 0:
-			hud.set_context_prompt("营救成功：侦察兵已加入小队，恢复 %d HP。下一步：去地图右上方绿色撤离点，两人进入后自动完成。" % recovered_hp)
+			hud.set_context_prompt("营救成功：%s已加入小队，恢复 %d HP。" % [rescued_name, recovered_hp])
 		else:
-			hud.set_context_prompt("营救成功：侦察兵已加入小队。下一步：去地图右上方绿色撤离点，两人进入后自动完成。")
+			hud.set_context_prompt("营救成功：%s已加入小队。" % rescued_name)
 		hud.update_objective(_get_objective_text())
 	_advance_context_hint("interact")
 	_render_v2_rescue_marker()
@@ -925,7 +928,8 @@ func _restore_v2_checkpoint() -> bool:
 		if entity_id.is_empty() or player_ids.has(entity_id):
 			continue
 		var position_data: Dictionary = data.get("grid_pos", {})
-		var rescued := _create_v2_rescue_unit(&"scout", entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
+		var character_id := StringName(String(data.get("job", _get_v2_rescue_character_id())))
+		var rescued := _create_v2_rescue_unit(character_id, entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
 		if rescued == null:
 			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
 			GameManager.clear_v2_encounter_checkpoint()
@@ -952,8 +956,10 @@ func _restore_v2_checkpoint() -> bool:
 			_log("V2 任务状态恢复失败，回退任务起点")
 			GameManager.clear_v2_encounter_checkpoint()
 			return false
-	if v2_rescue_controller and v2_mission_flow and bool(v2_mission_flow.rescued_characters.get("scout", false)):
-		v2_rescue_controller.restore_rescued_state(&"rescue_scout")
+	if v2_rescue_controller and v2_mission_flow:
+		var rescue_character_id := _get_v2_rescue_character_id()
+		if bool(v2_mission_flow.rescued_characters.get(String(rescue_character_id), false)):
+			v2_rescue_controller.restore_rescued_state(_get_v2_rescue_entity_id())
 	if alert_state:
 		alert_state.deserialize(snapshot.get("alert_state", {}))
 	if visibility_state and snapshot.get("visibility_state", {}) is Dictionary:
@@ -1744,7 +1750,8 @@ func _render_v2_rescue_marker() -> void:
 	v2_rescue_marker = null
 	if not _is_v2_battle() or v2_rescue_controller == null or map_layer == null:
 		return
-	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(&"rescue_scout")
+	var rescue_id := _get_v2_rescue_entity_id()
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
 	if rescue_pos.x < 0:
 		return
 	v2_rescue_marker = Node2D.new()
@@ -1764,7 +1771,7 @@ func _render_v2_rescue_marker() -> void:
 	diamond.color = Color(0.22, 0.92, 0.88, 0.58)
 	v2_rescue_marker.add_child(diamond)
 	var label := Label.new()
-	label.text = "侦察兵\n点击营救"
+	label.text = "%s\n点击营救" % _get_v2_rescue_character_name()
 	label.position = Vector2(-48, -58)
 	label.size = Vector2(96, 42)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1781,9 +1788,34 @@ func _render_v2_rescue_marker() -> void:
 func _update_v2_rescue_marker_visibility() -> void:
 	if not v2_rescue_marker or not is_instance_valid(v2_rescue_marker) or v2_rescue_controller == null:
 		return
-	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(&"rescue_scout")
-	var captive: bool = v2_rescue_controller.get_rescue_state(&"rescue_scout") == "captive"
+	var rescue_id := _get_v2_rescue_entity_id()
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
+	var captive: bool = v2_rescue_controller.get_rescue_state(rescue_id) == "captive"
 	v2_rescue_marker.visible = captive and (visibility_state == null or visibility_state.is_cell_observed(rescue_pos))
+
+func _get_v2_rescue_entity_id() -> StringName:
+	for raw_entity in map_data.get("entities", []):
+		if raw_entity is Dictionary and String(raw_entity.get("type", "")) == "objective_primary":
+			return StringName(String(raw_entity.get("id", "rescue_scout")))
+	return &"rescue_scout"
+
+func _get_v2_rescue_character_id() -> StringName:
+	if v2_mission_flow != null:
+		var configured := String(v2_mission_flow.mission.get("rescue_character", ""))
+		if not configured.is_empty():
+			return StringName(configured)
+	for raw_entity in map_data.get("entities", []):
+		if raw_entity is Dictionary and String(raw_entity.get("type", "")) == "objective_primary":
+			var character_id := String(raw_entity.get("character_id", ""))
+			if not character_id.is_empty():
+				return StringName(character_id)
+	return &"scout"
+
+func _get_v2_rescue_character_name() -> String:
+	var character_id := "scout"
+	if v2_mission_flow != null:
+		character_id = String(v2_mission_flow.mission.get("rescue_character", character_id))
+	return "狙击手" if character_id == "sniper" else "侦察兵"
 
 
 ## 常驻撤离区域提示，既标出队伍可分散站立的位置，也不阻挡地图点击。
@@ -2636,18 +2668,21 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		var rescued_ids: Array = []
 		for rescued_id in v2_result_snapshot.get("rescued_characters", {}).keys():
 			rescued_ids.append(String(rescued_id))
-		var v2_rescued_scout := "scout" in rescued_ids
+		var rescue_character_id := String(v2_result_snapshot.get("rescue_character", _get_v2_rescue_character_id()))
+		var v2_rescued_target := rescue_character_id in rescued_ids
+		var mission_flags: Dictionary = v2_result_snapshot.get("mission_flags", {})
+		var optional_done := bool(v2_result_snapshot.get("optional_complete", false)) or bool(mission_flags.get("cooling_nozzles_shutdown", false))
 		var v2_unlocked_modules: Array[String] = []
-		if v2_rescued_scout:
-			v2_unlocked_modules.append("scout_a")
-			if bool(v2_result_snapshot.get("optional_complete", false)):
-				v2_unlocked_modules.append("scout_b")
+		if v2_rescued_target:
+			v2_unlocked_modules.append("sniper_a" if rescue_character_id == "sniper" else "scout_a")
+			if optional_done:
+				v2_unlocked_modules.append("assault_b" if rescue_character_id == "sniper" else "scout_b")
 		battle_result["mission_id"] = level_id
-		battle_result["primary_objective"] = "找到失联侦察兵并一起撤离"
-		battle_result["optional_objective"] = "上传事故记录"
-		battle_result["optional_record"] = bool(v2_result_snapshot.get("optional_complete", false))
+		battle_result["primary_objective"] = "解除区域封锁并救出狙击手" if level_id == "ch1_m2" else "找到失联侦察兵并一起撤离"
+		battle_result["optional_objective"] = "关闭冷却控制室" if level_id == "ch1_m2" else "上传事故记录"
+		battle_result["optional_record"] = optional_done
 		battle_result["rescued"] = rescued_ids
-		battle_result["rescue_character"] = "scout" if v2_rescued_scout else ""
+		battle_result["rescue_character"] = rescue_character_id if v2_rescued_target else ""
 		battle_result["unlocked_modules"] = v2_unlocked_modules
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
@@ -3183,6 +3218,8 @@ func _finalize_v2_move(result: Dictionary) -> void:
 			"position": selected_unit.grid_pos,
 		})
 		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
+			if has_method("_prepare_v2_m2_evac"):
+				call("_prepare_v2_m2_evac")
 			_apply_v2_mission_event(&"evac_checked")
 	_update_v2_encounters([])
 	_advance_v2_tutorial(&"unit_moved", {

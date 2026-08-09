@@ -130,6 +130,14 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			result["changed"] = true
 			result["evac_intercept_started"] = true
 			result["enemy_ids"] = payload.get("enemy_ids", [])
+		&"cooling_nozzles_shutdown":
+			_mission_flags["cooling_nozzles_shutdown"] = true
+			result["changed"] = true
+			result["hazard_closed"] = true
+		&"engineer_countermeasure_started":
+			_mission_flags["engineer_countermeasure_started"] = true
+			result["changed"] = true
+			result["engineer_countermeasure_started"] = true
 		&"unit_moved":
 			_remember_moved_payload(payload)
 			result["changed"] = true
@@ -410,8 +418,9 @@ func _find_mission_entities() -> void:
 			continue
 		var entity: Dictionary = raw_entity
 		var entity_type := String(entity.get("type", ""))
-		if String(entity.get("id", "")) == _rescue_entity_id:
+		if String(entity.get("id", "")) == _rescue_entity_id or entity_type == "objective_primary":
 			_rescue_entity_id = String(entity.get("id", _rescue_entity_id))
+			_rescue_character_id = String(entity.get("character_id", _rescue_character_id))
 		if entity_type in ["evac", "extract", "evac_zone"]:
 			_evac_center = Vector2i(int(entity.get("x", -1)), int(entity.get("y", -1)))
 			_evac_radius = maxi(0, int(entity.get("radius", 1)))

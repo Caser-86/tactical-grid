@@ -12,6 +12,7 @@
     "res://tests/v2/v2_m2_config_test.gd",
     "res://tests/v2/v2_m1_map_test.gd",
     "res://tests/v2/v2_m2_map_test.gd",
+    "res://tests/v2/v2_m2_expanded_flow_test.gd",
     "res://tests/v2/v2_m1_expansion_test.gd",
     "res://tests/v2/v2_m1_art_baseline_test.gd",
     "res://tests/v2/v2_unit_art_distinction_test.gd",
