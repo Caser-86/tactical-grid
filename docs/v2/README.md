@@ -2,7 +2,7 @@
 
 > version: V2
 > name: Infiltration
-> status: M1 graybox playable; H1 first-player gate pending
+> status: M1/M2 automation ready; H1-R2 player and package gates pending
 > branch: `codex/ch1-infiltration-v2`
 > worktree: `.worktrees/ch1-infiltration-v2`
 
@@ -19,13 +19,13 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 - Godot 项目名称：`Tactical Grid V2: Infiltration`。
 - Godot 用户目录：`TacticalGrid_V2_Infiltration`。
 - V2 玩法规格：已于 2026-08-05 获用户批准。
-- V2 实施计划：78 个可提交任务与 H1-H3 三个真人硬门已写入。
-- P1、P2、M101-M113：已完成并通过 V2 独立门禁。
-- M1 灰盒：可从 V2 新档完整游玩，包含移动、攻击、敌方回合、迷雾、营救、撤离、失败重试和进度保存。
-- M1 当前质量状态：自动化 E2E 与视觉矩阵已通过；单位占位、攻击范围、移动路径和死亡幽灵修正已验证。
-- H1 三名首次玩家门：待项目负责人组织真实玩家执行，AI 不代替该验收。
-- V2 自动化发布门：已通过（71/71 项，1592/1592 断言）。
-- V2 发布资格：`NOT_READY`；真人首次试玩、完整逐图人工审查和包内完整 M1/M2 流程仍待执行。
+- V2 实施计划：原 78 项任务、H1-H3 真人硬门和 2026-08-09 审查后的 NX 执行队列均已写入唯一主计划。
+- P1、P2、M101-M113、C02、C03：已完成并通过 V2 独立门禁。
+- M1/M2：均可从 V2 新档完整游玩，包含移动、攻击、敌方回合、迷雾、营救、撤离、失败重试和进度保存。
+- 当前质量状态：自动化 E2E、场景契约和视觉矩阵已通过；结算呈现、设置持久化、范围层、移动路径和死亡实体清理均有回归测试。
+- V2 自动化发布门：已通过（74/74 项，1633/1633 断言；M1 42/42、M2 54/54 视觉快照）。
+- H1-R2 三名首次玩家门：待项目负责人组织真实玩家执行，AI 不代替该验收。
+- V2 发布资格：`NOT_READY`；当前提交的 Windows 包重建、完整包内流程、真人试玩和逐图人工审查仍待执行。
 
 ## Windows 发布包
 
@@ -47,10 +47,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test
 
 ## 执行顺序
 
-1. 从 [V2 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md) 的 F01 建立独立发布门。
-2. 按 F01-F12 完成技术骨架，按 I01-I12 完成操作与 HUD。
-3. 先按 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 执行 H1，记录真实卡点。
-4. 若 H1 失败，执行 M114 最小修正；若 H1 通过，锁定 M1 灰盒后执行 A01-A14 和 C01-C14，最后执行 R01-R12 与 H3。
+1. 按 [V2 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md) 的 Section 17 执行当前 NX 队列。
+2. 先完成 NX-020 至 NX-050：主/可选目标地图断言、当前提交的 Windows 包重建与包内全流程验证。
+3. 再按 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 组织 H1-R2 无指导试玩，记录真实卡点。
+4. 只有通过 H1-R2 后才锁定 M1/M2 内容，继续 M3-M6 设计冻结、实现和 H3 发布验收。
 
 ## 计划文件
 
