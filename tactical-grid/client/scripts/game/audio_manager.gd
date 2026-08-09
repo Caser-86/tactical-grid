@@ -18,6 +18,9 @@ var current_bgm: String = ""
 var battle_music_layer: int = -1
 var audio_cache: Dictionary = {}
 
+func _is_headless_runtime() -> bool:
+	return DisplayServer.get_name() == "headless"
+
 func _ready() -> void:
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.name = "BGMPlayer"
@@ -90,6 +93,10 @@ func _set_bus_volume(bus_name: StringName, volume: float) -> void:
 
 ## 播放 BGM
 func play_bgm(bgm_id: String) -> void:
+	# Headless scene tests do not have an audio device. Avoid creating decoded
+	# playback streams that Godot cannot release before the test process exits.
+	if _is_headless_runtime():
+		return
 	if bgm_id == current_bgm:
 		return
 	current_bgm = bgm_id
@@ -118,6 +125,8 @@ func stop_bgm() -> void:
 
 ## 播放音效
 func play_sfx(sfx_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
 		sfx_player.stream = stream
@@ -125,6 +134,8 @@ func play_sfx(sfx_id: String) -> void:
 
 ## AUDIO-01: Play SFX through the polyphonic pool so concurrent sounds do not interrupt each other.
 func play_sfx_pooled(sfx_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
 		var player: AudioStreamPlayer = _sfx_pool[_sfx_pool_index]
@@ -159,6 +170,8 @@ func sfx_beacon_delay() -> void:
 
 ## 播放环境音
 func play_ambient(ambient_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("ambient", ambient_id)
 	if stream:
 		ambient_player.stream = stream
