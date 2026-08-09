@@ -1750,6 +1750,12 @@ func _render_v2_rescue_marker() -> void:
 	v2_rescue_marker = null
 	if not _is_v2_battle() or v2_rescue_controller == null or map_layer == null:
 		return
+	# Keep the objective marker hidden until the mission flow reaches the rescue
+	# step. Showing it during route setup makes an unavailable action look like a
+	# broken interaction.
+	if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count"):
+		if int(v2_mission_flow.get_objective_step_count()) > 0 and String(v2_mission_flow.get_current_step_complete_event()) != "character_rescued":
+			return
 	var rescue_id := _get_v2_rescue_entity_id()
 	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
 	if rescue_pos.x < 0:

@@ -560,6 +560,16 @@ func show_action_reason(reason: Variant) -> void:
 			text = "目标格不可通行"
 		"move_too_far":
 			text = "目标格超出移动范围"
+		"rescue_locked_until_objective":
+			text = "请先完成顶部任务提示中的前置目标"
+		"required_flags_unsatisfied":
+			text = "请先完成营救前置目标"
+		"rescue_too_far":
+			text = "请站在营救标记相邻格，再点击营救标记"
+		"rescue_unavailable":
+			text = "当前营救目标不可用"
+		"already_rescued":
+			text = "该队员已经加入小队"
 	set_context_prompt(text)
 
 func get_context_prompt_text() -> String:

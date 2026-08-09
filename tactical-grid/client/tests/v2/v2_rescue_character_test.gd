@@ -102,6 +102,7 @@ func _initialize() -> void:
 	var rejected_rescue := Rescue.new()
 	rejected_rescue.setup(rejected_map, rejected_players, enemies, rejected_action_service, rejected_flow, Callable(self, "_create_rejected_scout"), Callable(self, "_register_unit"))
 	var rejected_preview := rejected_rescue.query_rescue(rejected_assault, &"rescue_scout")
+	t.check(not bool(rejected_preview.get("valid", false)) and rejected_preview.get("reason") == &"rescue_locked_until_objective", "前置目标未完成时营救动作明确锁定")
 	var rejected_result := rejected_rescue.commit_rescue(rejected_preview)
 	t.check(not bool(rejected_result.get("success", true)) and not rejected_players.has(_rejected_created) and not rejected_flow.player_units.has(_rejected_created) and not rejected_action_service._players.has(_rejected_created) and not _registered.has(_rejected_created) and not is_instance_valid(_rejected_created), "任务流拒绝营救时不会注册或保留新单位")
 

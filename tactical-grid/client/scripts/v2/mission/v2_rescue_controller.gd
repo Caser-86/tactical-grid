@@ -53,6 +53,12 @@ func query_rescue(actor: Unit, rescue_id: StringName) -> Dictionary:
 		return {"valid": false, "reason": &"rescue_unavailable", "rescue_id": id}
 	if _rescued.has(id) or String(entity.get("state", "captive")) == "rescued":
 		return {"valid": false, "reason": &"already_rescued", "rescue_id": id}
+	# Rescue is only available when the mission flow has reached its rescue step.
+	# Without this guard, the marker can be discovered early and the player gets
+	# a generic failure after appearing to do the right thing.
+	if _mission_flow != null and is_instance_valid(_mission_flow) and _mission_flow.has_method("get_objective_step_count"):
+		if int(_mission_flow.get_objective_step_count()) > 0 and String(_mission_flow.get_current_step_complete_event()) != "character_rescued":
+			return {"valid": false, "reason": &"rescue_locked_until_objective", "rescue_id": id}
 	if actor == null or not is_instance_valid(actor) or not _players.has(actor):
 		return {"valid": false, "reason": &"invalid_actor", "rescue_id": id}
 	if actor.team != "player" or not actor.is_alive:
