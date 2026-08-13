@@ -52,13 +52,17 @@ All commands ran from `tactical-grid/client`:
 |---|---:|---|
 | `--headless --path . --editor --quit-after 1` | `0` | Editor scan completed; no parse errors. Godot emitted its existing `Scan thread aborted...` shutdown warning. |
 | `--script res://tests/v2/v2_m1_player_facing_progress_test.gd` | `0` | `Passed: 7`, `Failed: 0` |
-| `--script res://tests/v2/v2_objective_hud_contract_test.gd` | `0` | `Passed: 31`, `Failed: 0` |
+| `--script res://tests/v2/v2_objective_hud_contract_test.gd` | `0` | `Passed: 35`, `Failed: 0` |
 | `res://tests/v2/v2_player_turn_e2e_test.tscn` | `0` | `Passed: 78`, `Failed: 0` |
 | `--script res://tests/v2/v2_context_action_resolver_test.gd` | `0` | `Passed: 29`, `Failed: 0` |
 | `--script res://tests/v2/v2_direct_move_input_test.gd` | `0` | `Passed: 21`, `Failed: 0` |
 | `--script res://tests/v2/v2_attack_input_test.gd` | `0` | `Passed: 19`, `Failed: 0` |
 | `--script res://tests/v2/v2_enemy_occupancy_test.gd` | `0` | `Passed: 6`, `Failed: 0` |
 | `powershell -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test.ps1` | `0` | `V2 release isolation passed` |
+
+The HUD contract was hardened after review to render the final `3/3` state
+directly, using a rescued player unit in the evacuation zone rather than only
+checking the mission-flow string.
 
 ## E2E Shutdown Diagnostics
 

@@ -4,6 +4,7 @@ const Runner = preload("res://tests/v2/test_runner.gd")
 const HUDScript = preload("res://scripts/ui/hud.gd")
 const PresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
 const FlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
+const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
 
@@ -44,7 +45,7 @@ func _run() -> void:
 	_assert_priority(hud, presenter)
 	_assert_long_text_layout(hud, presenter)
 	_assert_missing_optional_fields(hud, presenter)
-	_assert_m1_player_facing_progress()
+	_assert_m1_player_facing_progress(hud, presenter)
 	_assert_v1_isolation()
 
 	presenter = null
@@ -102,7 +103,7 @@ func _assert_missing_optional_fields(hud: HUD, presenter: RefCounted) -> void:
 	t.check(hud.turn_label.text == "回合 -", "后续快照缺少回合字段时清除旧回合标签")
 	t.check(_no_popup_descendant(hud), "缺少可选字段时不创建模态")
 
-func _assert_m1_player_facing_progress() -> void:
+func _assert_m1_player_facing_progress(hud: HUD, presenter: RefCounted) -> void:
 	var mission_file := FileAccess.open("res://data/v2/missions.json", FileAccess.READ)
 	if mission_file == null:
 		t.check(false, "加载 shipped M1 任务数据")
@@ -110,8 +111,18 @@ func _assert_m1_player_facing_progress() -> void:
 	var missions: Variant = JSON.parse_string(mission_file.get_as_text())
 	mission_file.close()
 	var mission: Dictionary = missions.get("ch1_m1", {}) if missions is Dictionary else {}
+	var player: Unit = UnitScript.new()
+	player.entity_id = "player_assault"
+	player.team = "player"
+	player.grid_pos = Vector2i(0, 0)
+	player.is_alive = true
+	var rescued_unit: Unit = UnitScript.new()
+	rescued_unit.entity_id = "player_scout"
+	rescued_unit.team = "player"
+	rescued_unit.grid_pos = Vector2i(0, 0)
+	rescued_unit.is_alive = true
 	var flow := FlowScript.new()
-	flow.setup(mission, {}, [], [])
+	flow.setup(mission, {"entities": [{"type": "evac", "x": 0, "y": 0, "radius": 0}]}, [player], [])
 	t.check(int(flow.call("get_objective_step_count")) == 3, "M1 保留三个原始目标步骤供存档和测试")
 	var supports_display_progress := flow.has_method("get_display_objective_step_index") \
 		and flow.has_method("get_display_objective_step_count")
@@ -124,7 +135,7 @@ func _assert_m1_player_facing_progress() -> void:
 		and flow.get_current_guide_text().contains("流程 1/3"),
 		"M1 营救前 HUD 进度与玩家指南均为 1/3"
 	)
-	var rescue := flow.apply_event(&"character_rescued", {"character_id": "scout"})
+	var rescue := flow.apply_event(&"character_rescued", {"character_id": "scout", "new_unit": rescued_unit})
 	t.check(bool(rescue.get("success", false)), "M1 进度断言可推进真实营救事件")
 	t.check(
 		int(flow.call("get_objective_step_index")) == 1
@@ -133,6 +144,26 @@ func _assert_m1_player_facing_progress() -> void:
 		and flow.get_current_guide_text().contains("流程 2/3"),
 		"M1 营救后 pre-evac HUD 进度与玩家指南均为 2/3"
 	)
+	var evac := flow.apply_event(&"evac_checked", {"character_id": "scout"})
+	t.check(bool(evac.get("success", false)), "M1 进度断言可推进真实撤离事件")
+	t.check(
+		int(flow.call("get_display_objective_step_index")) == 2
+		and int(flow.call("get_display_objective_step_count")) == 3
+		and flow.get_current_guide_text().contains("流程 3/3"),
+		"M1 撤离前 HUD 进度与玩家指南均为 3/3"
+	)
+	presenter.render({
+		"mission_id": "ch1_m1",
+		"step_index": int(flow.call("get_display_objective_step_index")),
+		"step_count": int(flow.call("get_display_objective_step_count")),
+		"objective_text": flow.get_primary_text(),
+		"guide_text": flow.get_current_guide_text(),
+		"phase": "玩家回合",
+	})
+	t.check(hud.objective_label.text.contains("3/3"), "M1 HUD 渲染器显示最终 3/3 进度")
+	t.check(_v2_guide_text(hud).contains("流程 3/3"), "M1 HUD 底栏渲染最终 3/3 指南")
+	player.free()
+	rescued_unit.free()
 
 func _assert_v1_isolation() -> void:
 	var hud: HUD = _make_hud()
