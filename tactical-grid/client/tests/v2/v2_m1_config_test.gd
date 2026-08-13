@@ -26,6 +26,7 @@ func _initialize() -> void:
 	t.check(int(mission.get("enemy_total", 0)) == 12 and int(mission.get("active_cap", 0)) == 3, "十二敌编制且同时最多三敌")
 	t.check(duration.size() == 2 and int(duration[0]) == 20 and int(duration[1]) == 25, "首次时长目标固定为 20 到 25 分钟")
 	t.check(String(mission.get("flow_mode", "")) == "expanded_m1" and (mission.get("expanded_objective_steps", []) as Array).size() == 5, "M1 使用五阶段扩展流程")
+	t.check(int(mission.get("max_turns", 0)) == 24 and int(mission.get("enemy_passive_turns", 0)) == 3, "V2 M1 独立回合预算与前三回合宽限")
 	t.check(tutorial_steps == ["select", "move", "attack", "intent", "camera", "evac"], "教学步骤按单条信息递进")
 	t.check(String(scout.get("name", "")) == "侦察兵", "营救角色名称固定")
 	t.check(scout.get("unlock", {}) == {"mission": "ch1_m1", "event": "scout_rescued"}, "侦察兵仅在营救事件后解锁")

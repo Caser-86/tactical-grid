@@ -214,12 +214,40 @@ func get_current_guide_text() -> String:
 		return "任务完成：小队已进入撤离区，系统正在打开结算。"
 	if state == State.FAILED:
 		return "任务失败：重新开始后完成当前任务目标。"
-	var guide := String(_current_objective_step().get("guide_text", ""))
+	var step := _current_objective_step()
+	var guide := _player_action_guide(step)
 	if guide.is_empty() or guide.contains("流程"):
 		return guide
 	var display_total := get_display_objective_step_count()
 	var display_index := get_display_objective_step_index() + 1
 	return "流程 %d/%d：%s" % [display_index, display_total, guide]
+
+func _player_action_guide(step: Dictionary) -> String:
+	var configured := String(step.get("guide_text", ""))
+	if not bool(mission.get("expanded_flow", false)):
+		return configured
+	match String(step.get("id", "")):
+		"search_route_split":
+			return "现在：沿黄色“下一步”标记移动到路线分叉；完成：到达后选择一条推进路线。"
+		"select_route":
+			return "现在：在路线分叉处选择维修摄像头或货柜突破；完成：两条路线都能到达吊机。"
+		"operate_gantry":
+			return "现在：靠近黄色吊机控制台并点击；完成：选择“放下吊桥”打开救援通路。"
+		"rescue_scout":
+			return "现在：沿打开的通路前往青色侦察标记；完成：靠近后点击“营救”。"
+		"evacuate_squad":
+			return "现在：沿吊桥通路前往绿色撤离标记；完成：让所有当前存活队员进入绿色撤离区。"
+	return configured
+
+func get_current_guide_cell() -> Vector2i:
+	var raw_cell: Variant = _current_objective_step().get("guide_cell", null)
+	if raw_cell is Vector2i:
+		return raw_cell
+	if raw_cell is Array and raw_cell.size() >= 2:
+		return Vector2i(int(raw_cell[0]), int(raw_cell[1]))
+	if raw_cell is Dictionary:
+		return Vector2i(int(raw_cell.get("x", -1)), int(raw_cell.get("y", -1)))
+	return Vector2i(-1, -1)
 
 func get_guide_text() -> String:
 	return get_current_guide_text()
@@ -249,6 +277,7 @@ func get_snapshot() -> Dictionary:
 		"step_count": get_objective_step_count(),
 		"primary_text": get_primary_text(),
 		"guide_text": get_current_guide_text(),
+		"guide_cell": get_current_guide_cell(),
 		"completed_step_ids": _completed_step_ids.duplicate(true),
 		"mission_flags": _mission_flags.duplicate(true),
 		"rescued_characters": rescued_characters.duplicate(true),
