@@ -50,6 +50,7 @@ var _network_overlay_visible: bool = false
 var _threat_label: Label = null
 var _v2_mission_card: Panel = null
 var _v2_mission_card_label: Label = null
+var _v2_camera_return_button: Button = null
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -291,6 +292,33 @@ func set_context_prompt(text: String) -> void:
 	if _context_prompt:
 		_context_prompt.text = text
 		_context_prompt.visible = true
+
+func set_v2_camera_return_visible(visible: bool) -> void:
+	var button := _ensure_v2_camera_return_button()
+	if button != null:
+		button.visible = visible
+
+func _ensure_v2_camera_return_button() -> Button:
+	if _v2_camera_return_button != null and is_instance_valid(_v2_camera_return_button):
+		return _v2_camera_return_button
+	_v2_camera_return_button = Button.new()
+	_v2_camera_return_button.name = "V2CameraReturnButton"
+	_v2_camera_return_button.text = "返回队员 [F]"
+	_v2_camera_return_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_v2_camera_return_button.offset_left = -190.0
+	_v2_camera_return_button.offset_top = TOP_BAR_HEIGHT + 10.0
+	_v2_camera_return_button.offset_right = -14.0
+	_v2_camera_return_button.offset_bottom = TOP_BAR_HEIGHT + 42.0
+	_v2_camera_return_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_v2_camera_return_button.visible = false
+	_v2_camera_return_button.pressed.connect(_on_v2_camera_return_pressed)
+	_style_button(_v2_camera_return_button)
+	add_child(_v2_camera_return_button)
+	return _v2_camera_return_button
+
+func _on_v2_camera_return_pressed() -> void:
+	if _battle_controller != null and _battle_controller.has_method("return_to_v2_camera_player"):
+		_battle_controller.call("return_to_v2_camera_player")
 
 ## V2: 以一个快照驱动整块战斗 HUD，保证目标、预算和下一步后果不会互相覆盖。
 ## 该入口只改变 V2 显示状态，V1 仍使用原有的 update_* 方法。

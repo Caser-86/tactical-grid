@@ -29,6 +29,9 @@ func _input(event: InputEvent) -> void:
 func _route_v2_input(event: InputEvent) -> bool:
 	if not _is_v2_battle() or v2_input_router == null:
 		return false
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE and is_v2_camera_inspecting():
+		return_to_v2_camera_player()
+		return true
 	if not _is_v2_routed_event(event):
 		return false
 	return v2_input_router.handle_event(event, _screen_to_cell, _v2_pointer_context)
@@ -752,16 +755,12 @@ func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	super._apply_v2_interaction_result(result)
 	var action_id := String(result.get("action_id", ""))
-	if action_id in ["view_camera_east", "view_rescue_zone"] and camera != null:
+	if action_id in ["view_camera_east", "view_rescue_zone"]:
 		var center: Vector2i = result.get("reveal_center", selected_unit.grid_pos if selected_unit else Vector2i(-1, -1))
-		if center.x >= 0:
-			camera.focus_cell(center)
-			# Camera2D applies its canvas transform on the next idle frame. Flush it
-			# here so the very next real click still maps to the visible grid cell.
-			if camera.has_method("force_update_scroll"):
-				camera.call("force_update_scroll")
-		if hud:
-			hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野；Home 可回到当前队员")
+		if center.x >= 0 and center.y >= 0:
+			begin_v2_camera_inspection(center, maxi(7, int(result.get("reveal_radius", 7))))
+		if hud and is_v2_camera_inspecting():
+			hud.set_context_prompt("摄像头视角：查看东侧区域；按 F 或返回队员继续战术行动。")
 	if level_id == "ch1_m2":
 		if action_id in ["cut_power_grid", "bypass_security_door"]:
 			_apply_v2_map_changes(result.get("map_changes", []), "open")

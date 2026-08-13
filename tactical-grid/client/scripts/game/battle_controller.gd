@@ -21,6 +21,7 @@ const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoin
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2PlaytestRecorderScript = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
 const V2CameraFocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
+const V2CameraNavigationScript = preload("res://scripts/v2/runtime/v2_camera_navigation.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -119,6 +120,8 @@ var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
 var v2_damage_presenter: RefCounted = null
 var v2_input_router: V2BattleInputRouter = null
+var v2_camera_navigation: RefCounted = null
+var _v2_camera_return_handled := false
 var v2_damage_signal_suppressed := false
 var v2_pending_move_preview: Dictionary = {}
 ## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
@@ -654,11 +657,14 @@ func _init_subsystems() -> void:
 	v2_input_router.camera_pan_requested.connect(_on_v2_camera_pan)
 	v2_input_router.camera_zoom_requested.connect(_on_v2_camera_zoom)
 	v2_input_router.focus_requested.connect(_on_v2_camera_focus)
+	v2_input_router.camera_inspect_cancel_requested.connect(_on_v2_camera_inspect_cancel_requested)
 	v2_input_router.network_overlay_requested.connect(_on_toggle_network)
 
 func _setup_v2_services() -> void:
 	if v2_action_service == null:
 		return
+	if _is_v2_battle():
+		v2_camera_navigation = V2CameraNavigationScript.new()
 	# V2 uses one move budget and one action budget for every live combat unit.
 	# Enable this before TurnManager starts the first player phase so the first
 	# real click can query and commit an action without a legacy AP fallback.
@@ -718,6 +724,8 @@ func _setup_v2_services() -> void:
 	v2_interaction_service.setup(interaction_map, tactical_network_state, visibility_state, alert_state, v2_mission_flow)
 	if camera:
 		camera.set_input_router_mode(_is_v2_battle())
+	if hud and _is_v2_battle():
+		hud.set_v2_camera_return_visible(false)
 
 ## M1 intentionally has one readable front escalation: hidden -> searching.
 ## Story difficulty grants one ignored recognition event; standard does not.
@@ -3281,6 +3289,11 @@ func _finalize_v2_move(result: Dictionary) -> void:
 func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	if not _is_v2_battle():
 		return
+	if is_v2_camera_inspecting() and v2_interaction_service != null:
+		var inspected_facility: Dictionary = v2_interaction_service.get_facility_at(cell)
+		if String(inspected_facility.get("type", "")) == "camera":
+			return_to_v2_camera_player()
+			return
 	# A facility picker owns the pointer until it is cancelled or an option is
 	# chosen. Do not let a map click leak through and move the selected unit.
 	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
@@ -3588,6 +3601,12 @@ func _get_v2_unit_by_id(target_id: String) -> Unit:
 	return null
 
 func _on_v2_cancel_requested() -> void:
+	if _v2_camera_return_handled:
+		_v2_camera_return_handled = false
+		return
+	if is_v2_camera_inspecting():
+		return_to_v2_camera_player()
+		return
 	var previous_state := v2_input_router.get_last_cancelled_state() if v2_input_router else V2BattleInputRouter.State.FREE_SELECT
 	if hud:
 		hud.hide_action_picker()
@@ -3621,11 +3640,51 @@ func _on_v2_camera_zoom(amount: int) -> void:
 		camera.zoom_at(float(amount), get_viewport().get_mouse_position())
 
 func _on_v2_camera_focus() -> void:
+	if is_v2_camera_inspecting():
+		return_to_v2_camera_player()
+		return
 	if camera == null:
 		return
 	var focus_unit := get_v2_camera_focus_unit()
 	if focus_unit != null:
 		camera.focus_cell(focus_unit.grid_pos)
+
+func _on_v2_camera_inspect_cancel_requested() -> void:
+	if is_v2_camera_inspecting():
+		_v2_camera_return_handled = true
+		return_to_v2_camera_player()
+
+func is_v2_camera_inspecting() -> bool:
+	return _is_v2_battle() and v2_camera_navigation != null and v2_camera_navigation.is_inspecting()
+
+func begin_v2_camera_inspection(center: Vector2i, radius: int) -> Dictionary:
+	if not _is_v2_battle() or v2_camera_navigation == null:
+		return {"success": false, "reason": &"camera_navigation_unavailable"}
+	var result: Dictionary = v2_camera_navigation.begin_inspect(center, radius, _get_v2_live_player_cell())
+	_apply_v2_camera_navigation_result(result)
+	return result
+
+func return_to_v2_camera_player() -> Dictionary:
+	if not _is_v2_battle() or v2_camera_navigation == null:
+		return {"success": false, "reason": &"camera_navigation_unavailable"}
+	var result: Dictionary = v2_camera_navigation.focus_player(_get_v2_live_player_cell())
+	_apply_v2_camera_navigation_result(result)
+	return result
+
+func _get_v2_live_player_cell() -> Vector2i:
+	var focus_unit := get_v2_camera_focus_unit()
+	return focus_unit.grid_pos if focus_unit != null else Vector2i.ZERO
+
+func _apply_v2_camera_navigation_result(result: Dictionary) -> void:
+	if not _is_v2_battle() or result.is_empty() or not result.get("focus_cell") is Vector2i:
+		return
+	if camera:
+		camera.zoom = Vector2.ONE * clampf(float(result.get("zoom_hint", 1.0)), 0.65, 1.5)
+		camera.focus_cell(result.get("focus_cell") as Vector2i)
+		if camera.has_method("force_update_scroll"):
+			camera.call("force_update_scroll")
+	if hud:
+		hud.set_v2_camera_return_visible(bool(result.get("show_return", false)))
 
 ## Home must still work after a facility interaction clears selection. V2 keeps
 ## the camera shortcut independent from tactical selection state.
@@ -3703,7 +3762,7 @@ func _on_v2_interaction_action_selected(action_id: String, entity_id: String) ->
 	_advance_context_hint("interact")
 	_render_v2_hud()
 	if camera_action and hud:
-		hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野。角色仍可操作：左键蓝格移动，左键红色敌人攻击，Home 回到角色。")
+		hud.set_context_prompt("摄像头视角：查看东侧区域；按 F 或返回队员继续战术行动。")
 		_render_v2_hud()
 
 func _apply_v2_interaction_result(result: Dictionary) -> void:

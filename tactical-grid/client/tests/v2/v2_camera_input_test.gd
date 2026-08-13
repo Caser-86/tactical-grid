@@ -3,12 +3,15 @@ extends SceneTree
 const Runner = preload("res://tests/v2/test_runner.gd")
 const RouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const FocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
+const NavigationScript = preload("res://scripts/v2/runtime/v2_camera_navigation.gd")
 const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
 var _pan_delta := Vector2.ZERO
 var _zoom_amount := 0
 var _focus_count := 0
+var _navigation: RefCounted = null
+var _live_player_cell := Vector2i(12, 14)
 
 func _initialize() -> void:
 	var camera_script: Script = ResourceLoader.load("res://scripts/game/battle_camera_controller.gd") as Script
@@ -31,6 +34,7 @@ func _initialize() -> void:
 
 	var router: V2BattleInputRouter = RouterScript.new()
 	root.add_child(router)
+	_navigation = NavigationScript.new()
 	router.camera_pan_requested.connect(_on_pan)
 	router.camera_zoom_requested.connect(_on_zoom)
 	router.focus_requested.connect(_on_focus)
@@ -60,12 +64,15 @@ func _initialize() -> void:
 	t.check(_zoom_amount == 1, "输入路由器转发滚轮缩放")
 	t.check(_focus_count == 1 and router.get_state_name() == "free_select", "Home 聚焦不改变战术状态")
 
+	var inspection: Dictionary = _navigation.begin_inspect(Vector2i(15, 5), 7, _live_player_cell)
+	t.check(bool(inspection.get("success", false)) and _navigation.is_inspecting(), "摄像头查看可等待 F 返回队员")
 	var f_key := InputEventKey.new()
 	f_key.keycode = KEY_F
 	f_key.physical_keycode = KEY_F
 	f_key.pressed = true
 	t.check(router.handle_event(f_key, Callable()), "F 被聚焦动作消费")
 	t.check(_focus_count == 2 and router.get_state_name() == "free_select", "F 请求聚焦且不改变战术状态")
+	t.check(not _navigation.is_inspecting() and _navigation.cancel_inspect().get("focus_cell") == _live_player_cell, "F 通过现有聚焦输入返回当前队员")
 
 	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "镜头键测试进入单位选择")
 	var state_before_wasd := router.get_state_name()
@@ -104,6 +111,8 @@ func _on_zoom(amount: int) -> void:
 
 func _on_focus() -> void:
 	_focus_count += 1
+	if _navigation != null:
+		_navigation.focus_player(_live_player_cell)
 
 func _action_has_physical_key(action: StringName, physical_keycode: Key) -> bool:
 	if not InputMap.has_action(action):

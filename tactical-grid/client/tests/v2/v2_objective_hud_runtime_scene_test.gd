@@ -19,6 +19,7 @@ func _run() -> void:
 
 	await _assert_controller_mapping(manager)
 	await _assert_m1_rescue_and_pre_evac(manager)
+	await _assert_camera_return_controls(manager)
 	await _stop_test_audio()
 	t.finish(get_tree())
 
@@ -48,6 +49,77 @@ func _assert_controller_mapping(manager: Node) -> void:
 	t.check(guide != null and guide.text.contains("路线：沿测试路线前进") and guide.text.contains("检查点：cp_start"), "真实 HUD 控件显示路线与检查点")
 	t.check(guide != null and guide.text.contains("危险："), "真实 HUD 控件显示危险提示")
 	await _cleanup_battle(battle)
+
+func _assert_camera_return_controls(manager: Node) -> void:
+	manager.call("begin_v2_new_game_for_test", 0)
+	manager.set("current_level_id", "ch1_m1")
+	manager.set("current_save", _with_known_tutorials(manager.get("current_save")))
+	var battle := BattleScene.instantiate()
+	t.check(battle != null and battle.get_script() == BattleControllerScript, "摄像头返回测试实例化正式 V2 battle scene")
+	if battle == null:
+		return
+	add_child(battle)
+	var ready := await _wait_for_player_phase(battle)
+	t.check(ready, "摄像头返回测试进入真实玩家回合")
+	if not ready:
+		await _cleanup_battle(battle)
+		return
+	var player: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
+	battle.selected_unit = player
+	var selected_before: Unit = battle.selected_unit
+	var return_button := battle.hud.get_node_or_null("V2CameraReturnButton") as Button
+	t.check(return_button != null and not return_button.visible, "普通 V2 状态隐藏摄像头返回控件")
+
+	var inspection: Dictionary = battle.begin_v2_camera_inspection(Vector2i(15, 5), 7)
+	await get_tree().process_frame
+	t.check(bool(inspection.get("success", false)) and battle.is_v2_camera_inspecting(), "摄像头查看进入独立导航状态")
+	t.check(return_button != null and return_button.visible and return_button.text == "返回队员 [F]", "摄像头查看显示紧凑返回控件")
+	var viewport_center := get_viewport().get_visible_rect().get_center()
+	t.check(return_button != null and return_button.mouse_filter == Control.MOUSE_FILTER_STOP and not return_button.get_global_rect().has_point(viewport_center), "返回控件只消费自身点击且不遮挡地图中心")
+
+	var f_key := InputEventKey.new()
+	f_key.keycode = KEY_F
+	f_key.physical_keycode = KEY_F
+	f_key.pressed = true
+	battle._input(f_key)
+	await get_tree().process_frame
+	t.check(not battle.is_v2_camera_inspecting() and battle.selected_unit == selected_before, "F 返回当前队员且保留普通 V2 选择")
+	t.check(return_button != null and not return_button.visible, "F 返回后隐藏摄像头返回控件")
+
+	battle.begin_v2_camera_inspection(Vector2i(15, 5), 7)
+	return_button.emit_signal("pressed")
+	await get_tree().process_frame
+	t.check(not battle.is_v2_camera_inspecting() and battle.selected_unit == selected_before, "HUD 返回控件不改变普通 V2 选择")
+
+	battle.begin_v2_camera_inspection(Vector2i(15, 5), 7)
+	var escape_key := InputEventKey.new()
+	escape_key.keycode = KEY_ESCAPE
+	escape_key.pressed = true
+	battle._input(escape_key)
+	await get_tree().process_frame
+	t.check(not battle.is_v2_camera_inspecting() and battle.selected_unit == selected_before, "Esc 返回当前队员且保留普通 V2 选择")
+
+	battle.begin_v2_camera_inspection(Vector2i(15, 5), 7)
+	var camera_facility: Dictionary = _find_camera_facility(battle.v2_mission_flow.map_data)
+	t.check(String(camera_facility.get("type", "")) == "camera", "M1 运行时提供可重复点击的摄像头设施")
+	var camera_cell: Vector2i = camera_facility.get("position", Vector2i(-1, -1))
+	battle.call("_on_v2_cell_left_clicked", camera_cell)
+	await get_tree().process_frame
+	t.check(not battle.is_v2_camera_inspecting(), "重复点击摄像头设施返回当前队员")
+	t.check(battle.selected_unit == selected_before, "重复点击摄像头设施保留普通 V2 选择")
+	await _cleanup_battle(battle)
+
+func _find_camera_facility(map: Dictionary) -> Dictionary:
+	for raw_facility in map.get("facilities", []):
+		if not raw_facility is Dictionary:
+			continue
+		var facility: Dictionary = raw_facility
+		if String(facility.get("type", "")) == "camera":
+			return {
+				"type": "camera",
+				"position": Vector2i(int(facility.get("x", -1)), int(facility.get("y", -1))),
+			}
+	return {}
 
 func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 	manager.call("begin_v2_new_game_for_test", 0)
