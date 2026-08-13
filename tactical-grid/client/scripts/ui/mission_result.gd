@@ -40,7 +40,7 @@ func show_result(data: Dictionary) -> void:
 		title_label.text = "任务失败"
 		title_label.modulate = Color.RED
 		# CH1-080: 失败页明确说明最近失败原因
-		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")), is_v2)
+		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")), is_v2, data)
 		var reason_label := Label.new()
 		reason_label.text = reason_text
 		reason_label.add_theme_font_size_override("font_size", 18)
@@ -146,6 +146,19 @@ func _show_v2_summary(data: Dictionary) -> void:
 	completion_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	completion_guide.modulate = Color("b8d7dc")
 	loot_container.add_child(completion_guide)
+	var phase_line := String(summary.get("phase_line", ""))
+	if not phase_line.is_empty():
+		var phase_label := Label.new()
+		phase_label.text = phase_line
+		phase_label.modulate = Color("f4b45a") if data.get("result", "defeat") != "victory" else Color("b8d7dc")
+		loot_container.add_child(phase_label)
+	var next_action := String(summary.get("next_action", ""))
+	if not next_action.is_empty():
+		var next_label := Label.new()
+		next_label.text = next_action
+		next_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		next_label.modulate = Color("b8d7dc")
+		loot_container.add_child(next_label)
 	var optional := Label.new()
 	optional.text = String(summary.get("optional_line", "可选目标：未完成"))
 	optional.modulate = Color("7ee68a") if bool(data.get("optional_record", false)) else Color("9aa9ad")
@@ -289,15 +302,22 @@ func get_failure_actions(has_checkpoint: bool) -> Array[StringName]:
 	return actions
 
 ## CH1-080: 失败原因文案
-func _get_defeat_reason_text(reason: String, is_v2: bool = false) -> String:
+func _get_defeat_reason_text(reason: String, is_v2: bool = false, data: Dictionary = {}) -> String:
 	if is_v2:
+		var rescued: Array = data.get("rescued", [])
+		var survived := int(data.get("units_survived", 0))
+		var total := int(data.get("units_total", 0))
+		var phase := String(data.get("mission_step_text", ""))
+		if phase.is_empty():
+			phase = "营救前推进" if rescued.is_empty() else "营救后撤离"
+		var next_action := "先沿黄色“下一步”标记推进，完成吊桥操作后再营救侦察兵。" if rescued.is_empty() else "把所有当前存活队员带入绿色撤离区。"
 		match reason:
 			"turn_limit":
-				return "失败原因：回合上限耗尽。必做流程：1.营救侦察兵；2.让突击兵和侦察兵进入绿色撤离区。进入后自动结束任务。可选事故记录不是通关必需。"
+				return "失败原因：回合上限耗尽。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
 			"all_units_down":
-				return "失败原因：队员全部失能。必做流程：营救侦察兵后撤离；可利用掩体，或按 Space 结束回合让敌人停止当前回合。"
+				return "失败原因：队员全部失能。当前阶段：%s。下一步：%s 可利用掩体；Space 只会结束我方回合并让敌人行动，不会停止敌人。" % [phase, next_action]
 			_:
-				return "失败原因：未完成必做流程。先营救侦察兵，再让两名存活队员进入绿色撤离区；可选事故记录不是通关必需。"
+				return "失败原因：未完成必做流程。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
 	match reason:
 		"all_units_down":
 			return "失败原因：全队阵亡。注意利用掩体和网络节点减少伤害。"
