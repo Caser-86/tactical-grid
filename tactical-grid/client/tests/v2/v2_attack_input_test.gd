@@ -10,7 +10,7 @@ const UnitScript = preload("res://scripts/game/unit.gd")
 var t := Runner.new()
 
 func _initialize() -> void:
-	var battle_script: Script = ResourceLoader.load("res://scripts/game/battle_controller.gd") as Script
+	var battle_script: Script = ResourceLoader.load("res://scripts/v2/runtime/v2_battle_controller.gd") as Script
 	t.check(battle_script != null, "BattleController 攻击输入接口可加载")
 	if battle_script == null:
 		t.finish(self)
@@ -26,6 +26,7 @@ func _initialize() -> void:
 	var target: Unit = first_battle.get("target")
 	var battle: Node = first_battle.get("battle")
 	var hud: HUD = first_battle.get("hud")
+	t.check(_has_property(battle, "v2_context_action_resolver"), "V2 攻击输入通过上下文行动解析器路由")
 
 	battle.call("_on_v2_cell_hovered", target.grid_pos)
 	t.check(hud.get_attack_preview_text().contains("7 → 4"), "悬停显示 HP 前后变化")
@@ -191,3 +192,9 @@ func _cleanup(data: Dictionary) -> void:
 	for unit in players:
 		if unit and is_instance_valid(unit):
 			unit.free()
+
+func _has_property(object: Object, property_name: String) -> bool:
+	for property in object.get_property_list():
+		if String(property.get("name", "")) == property_name:
+			return true
+	return false

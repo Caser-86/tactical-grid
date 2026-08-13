@@ -5,12 +5,16 @@ const V2IntentExecutorScript = preload("res://scripts/v2/ai/v2_intent_executor.g
 const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
 const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
+const V2ContextActionResolverScript = preload("res://scripts/v2/input/v2_context_action_resolver.gd")
 
 var v2_hazard_controller: RefCounted = null
 var _v2_hazard_turn_state: Dictionary = {}
 var _v2_restore_attempted := false
 var _v2_restore_failure: Dictionary = {}
 var _v2_guidance_layer: Node2D = null
+
+func _init() -> void:
+	v2_context_action_resolver = V2ContextActionResolverScript.new()
 
 ## V2 owns its map, roster, onboarding, and enemy turn. The shared controller
 ## remains a rendering/turn-system base so the V1 branch is never changed.
@@ -69,6 +73,23 @@ func _v2_drag_allowed_at(cell: Vector2i) -> bool:
 	if v2_rescue_controller != null and v2_rescue_controller.is_reserved_cell(cell):
 		return false
 	return true
+
+func _build_v2_context_action_context(cell: Vector2i) -> Dictionary:
+	if not _is_v2_battle():
+		return super._build_v2_context_action_context(cell)
+	var clicked_unit: Unit = _get_unit_at(cell)
+	var friendly: Unit = clicked_unit if clicked_unit != null and clicked_unit.team == "player" else null
+	var enemy: Unit = clicked_unit if clicked_unit != null and clicked_unit.team != "player" else null
+	var facility: Dictionary = v2_interaction_service.get_facility_at(cell) if v2_interaction_service != null else {}
+	return {
+		"selected_unit": selected_unit,
+		"friendly_at": friendly,
+		"enemy_at": enemy,
+		"facility_at": facility,
+		"move_query": Callable(self, "_query_v2_context_move"),
+		"attack_query": Callable(self, "_query_v2_attack_preview"),
+		"interaction_query": Callable(self, "_query_v2_context_interaction"),
+	}
 
 func _v2_hud_control_at(screen_position: Vector2, node: Node = hud) -> bool:
 	if node == null:

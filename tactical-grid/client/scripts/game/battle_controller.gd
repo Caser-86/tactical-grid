@@ -120,6 +120,7 @@ var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_hud_presenter: RefCounted = null
 var v2_damage_presenter: RefCounted = null
 var v2_input_router: V2BattleInputRouter = null
+var v2_context_action_resolver: RefCounted = null
 var v2_camera_navigation: RefCounted = null
 var _v2_camera_return_handled := false
 var v2_damage_signal_suppressed := false
@@ -3159,9 +3160,10 @@ func _cancel_action() -> void:
 	else:
 		_deselect_unit()
 
-## V2 直接地图移动：安全格一次点击，危险格同格二次确认。
+## V2 直接地图移动：解析器提供的地图点击预览立即提交；低层 API
+## 仍为危险格保留显式二次确认，供非地图调用方使用。
 ## 该入口不依赖底部 MoveButton，也不调用 V1 ActionSystem。
-func request_move(cell: Vector2i) -> Dictionary:
+func request_move(cell: Vector2i, resolved_preview: Dictionary = {}) -> Dictionary:
 	if selected_unit == null or not is_instance_valid(selected_unit):
 		return {"success": false, "committed": false, "reason": &"no_selected_unit"}
 	if v2_action_service == null:
@@ -3181,7 +3183,11 @@ func request_move(cell: Vector2i) -> Dictionary:
 			hud.set_context_prompt("该格已有单位，不能移动；请点击蓝色格。")
 		return {"success": false, "committed": false, "reason": &"occupied"}
 
-	if not v2_pending_move_preview.is_empty():
+	var from_context_click := not resolved_preview.is_empty()
+	if from_context_click and not v2_pending_move_preview.is_empty():
+		v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+		v2_pending_move_preview.clear()
+	elif not v2_pending_move_preview.is_empty():
 		var pending_target: Vector2i = v2_pending_move_preview.get("target", Vector2i(-1, -1))
 		if pending_target == cell:
 			var confirmed: Dictionary = v2_action_service.commit_action(v2_pending_move_preview)
@@ -3193,18 +3199,20 @@ func request_move(cell: Vector2i) -> Dictionary:
 		v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
 		v2_pending_move_preview.clear()
 
-	var preview: Dictionary = v2_action_service.query_action({
-		"action": &"move",
-		"unit": selected_unit,
-		"target": cell,
-	})
+	var preview: Dictionary = resolved_preview
+	if not from_context_click:
+		preview = v2_action_service.query_action({
+			"action": &"move",
+			"unit": selected_unit,
+			"target": cell,
+		})
 	if not bool(preview.get("valid", false)):
 		var reason: StringName = preview.get("reason", &"invalid_move")
 		if hud:
 			hud.set_context_prompt(_v2_move_failure_prompt(reason))
 		_render_v2_hud()
 		return {"success": false, "committed": false, "reason": reason, "preview": preview}
-	if bool(preview.get("dangerous", false)):
+	if bool(preview.get("dangerous", false)) and not from_context_click:
 		v2_pending_move_preview = preview
 		if v2_input_router:
 			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
@@ -3301,20 +3309,84 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	# Heal any legacy/checkpoint overlap before resolving the clicked occupant.
 	# Otherwise _get_unit_at can select the wrong object and preserve the bad state.
 	_reconcile_v2_unit_occupancy()
-	var clicked_unit: Unit = _get_unit_at(cell)
-	if clicked_unit != null and clicked_unit.team == "player":
-		if clicked_unit != selected_unit:
-			_select_unit(clicked_unit)
+	var context := _build_v2_context_action_context(cell)
+	if v2_context_action_resolver == null or not is_instance_valid(v2_context_action_resolver):
+		_present_v2_context_action_failure(&"resolver_unavailable")
 		return
-	if selected_unit == null:
+	var raw_resolution: Variant = v2_context_action_resolver.call("resolve_click", cell, context)
+	if not raw_resolution is Dictionary:
+		_present_v2_context_action_failure(&"malformed_resolution")
 		return
-	if clicked_unit != null and clicked_unit.team != "player":
-		# 基础攻击采用单击提交：悬停已经展示伤害，点击敌人即完成攻击。
-		var preview := request_attack_preview(clicked_unit)
-		if bool(preview.get("valid", false)):
-			confirm_locked_attack(clicked_unit)
-		return
-	if v2_rescue_controller:
+	var resolution: Dictionary = raw_resolution
+	match StringName(resolution.get("kind", &"invalid")):
+		&"select":
+			var unit: Unit = resolution.get("unit") as Unit
+			if unit != null and unit != selected_unit:
+				_select_unit(unit)
+			return
+		&"move":
+			request_move(cell, resolution.get("move_preview", {}))
+			return
+		&"attack":
+			var target: Unit = resolution.get("target") as Unit
+			var preview := request_attack_preview(target, resolution.get("attack_preview", {}))
+			if bool(preview.get("valid", false)):
+				confirm_locked_attack(target)
+			return
+		&"interact":
+			var facility: Dictionary = resolution.get("facility", {})
+			_open_v2_interaction_menu(
+				String(facility.get("id", "")),
+				resolution.get("interaction_preview", {})
+			)
+			return
+	_dispatch_invalid_v2_context_action(cell, context, resolution)
+
+func _build_v2_context_action_context(_cell: Vector2i) -> Dictionary:
+	return {
+		"selected_unit": null,
+		"friendly_at": null,
+		"enemy_at": null,
+		"facility_at": {},
+		"move_query": Callable(),
+		"attack_query": Callable(),
+		"interaction_query": Callable(),
+	}
+
+func _query_v2_context_move(cell: Vector2i) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "reason": &"no_selected_unit"}
+	if v2_action_service == null:
+		return {"valid": false, "reason": &"v2_action_service_unavailable"}
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(cell):
+		return {"valid": false, "reason": &"rescue_interaction_required"}
+	if _is_occupied_by_other_unit(cell, selected_unit):
+		return {"valid": false, "reason": &"occupied"}
+	return v2_action_service.query_action({
+		"action": &"move",
+		"unit": selected_unit,
+		"target": cell,
+	})
+
+func _query_v2_context_interaction(facility: Dictionary) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "reason": &"no_selected_unit", "facility": facility, "actions": []}
+	if v2_interaction_service == null:
+		return {"valid": false, "reason": &"interaction_service_unavailable", "facility": facility, "actions": []}
+	var entity_id := String(facility.get("id", ""))
+	var actions: Array = v2_interaction_service.query_actions(selected_unit, entity_id)
+	for raw_action in actions:
+		if raw_action is Dictionary and bool(raw_action.get("enabled", false)):
+			return {"valid": true, "reason": &"usable_facility", "facility": facility, "actions": actions}
+	var reason := &"interaction_unavailable"
+	if not actions.is_empty() and actions[0] is Dictionary:
+		reason = StringName(String(actions[0].get("reason", reason)))
+	return {"valid": false, "reason": reason, "facility": facility, "actions": actions}
+
+func _dispatch_invalid_v2_context_action(cell: Vector2i, context: Dictionary, resolution: Dictionary) -> void:
+	# Rescue stays on its existing transaction path without expanding the pure
+	# resolver's seven-key context contract.
+	if selected_unit != null and v2_rescue_controller:
 		var rescue_id: String = v2_rescue_controller.get_rescue_id_at(cell)
 		if not rescue_id.is_empty():
 			var rescue_preview: Dictionary = v2_rescue_controller.query_rescue(selected_unit, StringName(rescue_id))
@@ -3322,20 +3394,30 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 				var rescue_result: Dictionary = v2_rescue_controller.commit_rescue(rescue_preview)
 				if not bool(rescue_result.get("success", false)) and hud:
 					hud.show_action_reason(rescue_result.get("reason", &"rescue_failed"))
-			else:
-				if hud:
-					hud.show_action_reason(rescue_preview.get("reason", &"rescue_unavailable"))
+			elif hud:
+				hud.show_action_reason(rescue_preview.get("reason", &"rescue_unavailable"))
 			return
-	if v2_interaction_service:
-		var facility: Dictionary = v2_interaction_service.get_facility_at(cell)
-		if not facility.is_empty():
-			_open_v2_interaction_menu(String(facility.get("id", "")))
-			return
-	if not v2_locked_attack_preview.is_empty():
-		if hud:
-			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消预览")
+	var enemy: Unit = context.get("enemy_at") as Unit
+	if enemy != null:
+		request_attack_preview(enemy, resolution.get("attack_preview", {}))
 		return
-	request_move(cell)
+	var facility: Dictionary = context.get("facility_at", {})
+	if not facility.is_empty():
+		_open_v2_interaction_menu(
+			String(facility.get("id", "")),
+			resolution.get("interaction_preview", {})
+		)
+		return
+	var move_preview: Dictionary = resolution.get("move_preview", {})
+	if not move_preview.is_empty():
+		request_move(cell, move_preview)
+		return
+	_present_v2_context_action_failure(StringName(resolution.get("reason", &"invalid")))
+
+func _present_v2_context_action_failure(reason: StringName) -> void:
+	if hud:
+		hud.show_action_reason(reason)
+	_render_v2_hud()
 
 func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	if not _is_v2_battle() or selected_unit == null or v2_affordance_presenter == null:
@@ -3387,12 +3469,12 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		_render_v2_hud()
 
 ## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
-func request_attack_preview(target: Unit) -> Dictionary:
+func request_attack_preview(target: Unit, resolved_preview: Dictionary = {}) -> Dictionary:
 	if selected_unit == null or not is_instance_valid(selected_unit):
 		return {"valid": false, "success": false, "reason": &"no_selected_unit"}
 	if target == null or not is_instance_valid(target):
 		return {"valid": false, "success": false, "reason": &"invalid_target"}
-	var preview := _query_v2_attack_preview(target)
+	var preview: Dictionary = resolved_preview if not resolved_preview.is_empty() else _query_v2_attack_preview(target)
 	if not bool(preview.get("valid", false)):
 		preview["success"] = false
 		if hud:
@@ -3692,11 +3774,11 @@ func get_v2_camera_focus_unit() -> Unit:
 	return V2CameraFocusScript.resolve(selected_unit, player_units)
 
 ## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
-func _open_v2_interaction_menu(entity_id: String) -> void:
+func _open_v2_interaction_menu(entity_id: String, resolved_preview: Dictionary = {}) -> void:
 	if selected_unit == null or selected_unit.team != "player" or v2_interaction_service == null:
 		return
 	var facility: Dictionary = v2_interaction_service.get_facility(entity_id)
-	var actions: Array = v2_interaction_service.query_actions(selected_unit, entity_id)
+	var actions: Array = resolved_preview.get("actions", []) if not resolved_preview.is_empty() else v2_interaction_service.query_actions(selected_unit, entity_id)
 	if facility.is_empty() or actions.is_empty():
 		if hud:
 			hud.set_context_prompt("这里没有可用的设施操作")

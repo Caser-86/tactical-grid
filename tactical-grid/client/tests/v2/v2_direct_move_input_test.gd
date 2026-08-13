@@ -7,12 +7,35 @@ const Pathfinding = preload("res://scripts/core/pathfinding.gd")
 
 var t := Runner.new()
 
+class TrackingResolver:
+	extends RefCounted
+	var call_count := 0
+	var context_key_count := 0
+	var has_exact_context_keys := false
+
+	func resolve_click(cell: Vector2i, context: Dictionary) -> Dictionary:
+		call_count += 1
+		context_key_count = context.size()
+		var expected_keys := [
+			"selected_unit", "friendly_at", "enemy_at", "facility_at",
+			"move_query", "attack_query", "interaction_query",
+		]
+		has_exact_context_keys = expected_keys.all(func(key: String): return context.has(key))
+		var preview: Variant = (context.get("move_query") as Callable).call(cell)
+		return {
+			"kind": &"move",
+			"reason": &"reachable",
+			"cell": cell,
+			"move_preview": preview,
+		}
+
 func _initialize() -> void:
-	var controller_script: Script = ResourceLoader.load("res://scripts/game/battle_controller.gd") as Script
+	var controller_script: Script = ResourceLoader.load("res://scripts/v2/runtime/v2_battle_controller.gd") as Script
 	t.check(controller_script != null, "BattleController 可加载")
 	if controller_script == null:
 		t.finish(self)
 		return
+	_set_v2_game_line()
 	var reachable := Pathfinding.get_reachable_cells(
 		Vector2i(1, 1), 1, 8, 8,
 		func(_cell: Vector2i) -> int: return 1,
@@ -21,11 +44,29 @@ func _initialize() -> void:
 	t.check(reachable.has(Vector2i(2, 1)) and not reachable.has(Vector2i(3, 1)), "移动范围不包含超出移动点数的边界格")
 
 	var battle: Node = controller_script.new()
+	var click_unit: Unit = _make_unit("player_click", Vector2i(1, 1), 5)
+	var click_service := V2ActionService.new()
+	click_service.setup(_make_map(), [click_unit], [])
+	battle.set("v2_action_service", click_service)
+	battle.set("selected_unit", click_unit)
+	battle.set("player_units", [click_unit])
+	battle.set("enemy_units", [])
+	var tracking_resolver := TrackingResolver.new()
+	var has_resolver_slot := _has_property(battle, "v2_context_action_resolver")
+	t.check(has_resolver_slot, "V2 控制器提供上下文行动解析器槽位")
+	if has_resolver_slot:
+		battle.set("v2_context_action_resolver", tracking_resolver)
+		battle.call("_on_v2_cell_left_clicked", Vector2i(2, 1))
+		t.check(tracking_resolver.call_count == 1, "一次地图点击只解析一个上下文快照")
+		t.check(tracking_resolver.context_key_count == 7 and tracking_resolver.has_exact_context_keys, "上下文快照只包含七个规定键")
+		t.check(click_unit.grid_pos == Vector2i(2, 1) and not click_unit.v2_turn_state.move_available, "解析出的合法移动预览通过现有路径一次提交")
+
 	var safe_unit: Unit = _make_unit("player_safe", Vector2i(1, 1), 5)
 	var safe_service := V2ActionService.new()
 	safe_service.setup(_make_map(), [safe_unit], [])
 	battle.set("v2_action_service", safe_service)
 	battle.set("selected_unit", safe_unit)
+	battle.set("player_units", [safe_unit])
 
 	var safe_destination := Vector2i(2, 1)
 	var safe_result: Dictionary = battle.call("request_move", safe_destination)
@@ -83,6 +124,7 @@ func _initialize() -> void:
 	t.check(not bool(no_selection.get("success", true)) and no_selection.get("reason", &"") == &"no_selected_unit", "未选择单位拒绝移动")
 
 	battle.free()
+	click_unit.free()
 	safe_unit.free()
 	reserve_unit.free()
 	pending_enemy.free()
@@ -116,3 +158,14 @@ func _make_map(danger_cells: Array = []) -> Dictionary:
 		"layers": {"base_terrain": terrain, "blocker": blockers},
 		"danger_cells": danger_cells,
 	}
+
+func _set_v2_game_line() -> void:
+	var manager := root.get_node_or_null("GameManager")
+	if manager:
+		manager.current_save["game_line"] = "v2_infiltration"
+
+func _has_property(object: Object, property_name: String) -> bool:
+	for property in object.get_property_list():
+		if String(property.get("name", "")) == property_name:
+			return true
+	return false
