@@ -1,0 +1,23 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] 移动不能穿过敌方占用格
+  [PASS] 穿越敌人只能走绕行路径并因超出步数被拒绝
+  [PASS] 绕过敌人仍可生成移动预览
+  [PASS] 移动预览包含真实绕行路径
+  [PASS] 移动预览有效
+  [PASS] 未变化移动预览可提交
+  [PASS] 移动提交更新位置
+  [PASS] 移动只消费移动预算
+  [PASS] 移动预览不能重复提交
+  [PASS] 攻击预览有效
+  [PASS] 目标变化后拒绝提交
+  [PASS] 陈旧预览不消费行动或伤害
+  [PASS] 提交陈旧预览返回失败
+  [PASS] 同格攻击被明确拒绝
+  [PASS] 攻击提交应用确定性伤害
+  [PASS] 移动后攻击消费行动预算
+  [PASS] 攻击预览不能重复提交
+  [PASS] 未知动作被拒绝
+  [PASS] 取消预览后不能提交
+Passed: 19
+Failed: 0

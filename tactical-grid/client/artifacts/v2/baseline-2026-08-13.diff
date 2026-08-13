@@ -1,0 +1,1722 @@
+diff --git a/tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json b/tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json
+index 0803ac9..79b6fcc 100644
+--- a/tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json
++++ b/tactical-grid/client/data/v2/locked_maps/ch1_m1_echo_yard_v4.json
+@@ -3137,7 +3137,7 @@
+         8
+       ],
+       "name": "维修摄像头",
+-      "reveal_radius": 4
++      "reveal_radius": 7
+     },
+     {
+       "action_id": "view_rescue_zone",
+@@ -3152,7 +3152,7 @@
+         8
+       ],
+       "name": "东侧观察摄像头",
+-      "reveal_radius": 3
++      "reveal_radius": 7
+     },
+     {
+       "name": "事故记录终端",
+diff --git a/tactical-grid/client/data/v2/missions.json b/tactical-grid/client/data/v2/missions.json
+index 3e0f8f4..93688e5 100644
+--- a/tactical-grid/client/data/v2/missions.json
++++ b/tactical-grid/client/data/v2/missions.json
+@@ -12,6 +12,8 @@
+     "optional": "上传事故记录",
+     "enemy_total": 12,
+     "active_cap": 3,
++    "max_turns": 24,
++    "enemy_passive_turns": 3,
+     "duration_minutes": [20, 25],
+     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],
+     "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_route", "ch1_m1_gantry", "ch1_m1_rescue", "ch1_m1_intercept", "ch1_m1_record", "ch1_m1_outro"],
+@@ -21,11 +23,11 @@
+       {"id": "evacuate", "objective_text": "完成撤离", "guide_text": "确认小队已全部进入撤离区。", "complete_event": "mission_completed", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued"], "player_facing": false}
+     ],
+     "expanded_objective_steps": [
+-      {"id": "search_route_split", "objective_text": "抵达路线分叉", "guide_text": "前往南侧货运坪上方的黄色分叉标记；到达后选择一条推进路线。", "complete_event": "entered_route_split", "checkpoint_id": "cp_start", "required_flags": []},
+-      {"id": "select_route", "objective_text": "选择推进路线", "guide_text": "在路线分叉处选择维修摄像头路线或货柜突破路线。两条路线都能到达吊机。", "complete_event": "route_selected", "checkpoint_id": "cp_start", "required_flags": []},
+-      {"id": "operate_gantry", "objective_text": "放下吊桥", "guide_text": "前往地图中上方的吊机控制台，点击后选择“放下吊桥”。", "complete_event": "gantry_lowered", "checkpoint_id": "cp_start", "required_flags": ["route_selected"]},
+-      {"id": "rescue_scout", "objective_text": "营救失联侦察兵", "guide_text": "沿已打开的通路前往中部青色侦察标记，靠近后点击营救。", "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "required_flags": ["route_selected", "gantry_lowered"]},
+-      {"id": "evacuate_squad", "objective_text": "带小队撤离", "guide_text": "撤离路线已改变；避开东北封锁，沿吊桥通路前往右上方绿色撤离标记，两名存活队员进入后完成。", "complete_event": "evac_checked", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued", "gantry_lowered"]}
++      {"id": "search_route_split", "objective_text": "抵达路线分叉", "guide_text": "前往南侧货运坪上方的黄色分叉标记；到达后选择一条推进路线。", "route_hint": "目标地点：南侧货运坪上方黄色分叉标记", "guide_cell": [8, 14], "complete_event": "entered_route_split", "checkpoint_id": "cp_start", "required_flags": []},
++      {"id": "select_route", "objective_text": "选择推进路线", "guide_text": "在路线分叉处选择维修摄像头路线或货柜突破路线。两条路线都能到达吊机。", "route_hint": "目标地点：地图中上方吊机控制台", "guide_cell": [13, 5], "complete_event": "route_selected", "checkpoint_id": "cp_start", "required_flags": []},
++      {"id": "operate_gantry", "objective_text": "放下吊桥", "guide_text": "前往地图中上方的吊机控制台，点击后选择“放下吊桥”。", "route_hint": "目标地点：黄色吊机控制台，靠近后点击设施", "guide_cell": [13, 5], "complete_event": "gantry_lowered", "checkpoint_id": "cp_start", "required_flags": ["route_selected"]},
++      {"id": "rescue_scout", "objective_text": "营救失联侦察兵", "guide_text": "沿已打开的通路前往中部青色侦察标记，靠近后点击营救。", "route_hint": "目标地点：中部青色侦察标记，靠近后点击营救", "guide_cell": [16, 8], "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "required_flags": ["route_selected", "gantry_lowered"]},
++      {"id": "evacuate_squad", "objective_text": "带小队撤离", "guide_text": "撤离路线已改变；避开东北封锁，沿吊桥通路前往右上方绿色撤离标记，两名存活队员进入后完成。", "route_hint": "目标地点：右上方绿色撤离标记；两名存活队员进入后完成", "guide_cell": [23, 2], "complete_event": "evac_checked", "checkpoint_id": "cp_pre_evac", "required_flags": ["scout_rescued", "gantry_lowered"]}
+     ]
+   },
+   "ch1_m2": {
+diff --git a/tactical-grid/client/scripts/data/art_catalog.gd b/tactical-grid/client/scripts/data/art_catalog.gd
+index 1ab39af..8c61638 100644
+--- a/tactical-grid/client/scripts/data/art_catalog.gd
++++ b/tactical-grid/client/scripts/data/art_catalog.gd
+@@ -181,6 +181,8 @@ const PATHS := {
+ 		&"v2_drone": V2_UNIT_ROOT + "v2_drone_128.png",
+ 		&"v2_shield_guard": V2_UNIT_ROOT + "v2_shield_guard_128.png",
+ 		&"v2_sniper_sentry": V2_UNIT_ROOT + "v2_sniper_sentry_128.png",
++		&"v2_protocol_engineer": ROOT + "units/protocol_engineer_96.png",
++		&"v2_hunter": ROOT + "units/hunter_96.png",
+ 		&"assault": ROOT + "units/assault_96.png",
+ 		&"sniper": ROOT + "units/sniper_96.png",
+ 		&"heavy": ROOT + "units/heavy_96.png",
+diff --git a/tactical-grid/client/scripts/game/battle_controller.gd b/tactical-grid/client/scripts/game/battle_controller.gd
+index e6c52bd..c8cd8b9 100644
+--- a/tactical-grid/client/scripts/game/battle_controller.gd
++++ b/tactical-grid/client/scripts/game/battle_controller.gd
+@@ -20,6 +20,7 @@ const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.
+ const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
+ const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
+ const V2PlaytestRecorderScript = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
++const V2CameraFocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
+ 
+ ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
+ ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
+@@ -2690,6 +2691,9 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
+ 		battle_result["rescued"] = rescued_ids
+ 		battle_result["rescue_character"] = rescue_character_id if v2_rescued_target else ""
+ 		battle_result["unlocked_modules"] = v2_unlocked_modules
++		battle_result["starting_unit_count"] = player_units.size()
++		battle_result["mission_step_id"] = String(v2_result_snapshot.get("step_id", ""))
++		battle_result["mission_step_text"] = String(v2_result_snapshot.get("guide_text", ""))
+ 	# 收集遥测数据并附加到 battle_result
+ 	battle_result = _finalize_telemetry(battle_result)
+ 	if _is_v2_battle():
+@@ -3159,7 +3163,7 @@ func request_move(cell: Vector2i) -> Dictionary:
+ 			v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+ 			v2_pending_move_preview.clear()
+ 		if hud:
+-			hud.set_context_prompt("该格已有单位，不能移动到同一位置")
++			hud.set_context_prompt("该格已有单位，不能移动；请点击蓝色格。")
+ 		return {"success": false, "committed": false, "reason": &"occupied"}
+ 
+ 	if not v2_pending_move_preview.is_empty():
+@@ -3180,15 +3184,19 @@ func request_move(cell: Vector2i) -> Dictionary:
+ 		"target": cell,
+ 	})
+ 	if not bool(preview.get("valid", false)):
+-		return {"success": false, "committed": false, "reason": preview.get("reason", &"invalid_move"), "preview": preview}
++		var reason: StringName = preview.get("reason", &"invalid_move")
++		if hud:
++			hud.set_context_prompt(_v2_move_failure_prompt(reason))
++		_render_v2_hud()
++		return {"success": false, "committed": false, "reason": reason, "preview": preview}
+ 	if bool(preview.get("dangerous", false)):
+ 		v2_pending_move_preview = preview
+ 		if v2_input_router:
+ 			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+ 		if hud:
+-			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消")
++			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消预览")
+ 		if v2_affordance_presenter:
+-			v2_affordance_presenter.show_path([selected_unit.grid_pos, cell], true)
++			v2_affordance_presenter.show_path(_get_v2_preview_path(preview), true)
+ 		_render_v2_hud()
+ 		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
+ 
+@@ -3200,6 +3208,33 @@ func request_move(cell: Vector2i) -> Dictionary:
+ 		result["committed"] = false
+ 	return result
+ 
++func _v2_move_failure_prompt(reason: StringName) -> String:
++	match reason:
++		&"move_unavailable":
++			return "本回合移动已用；点击红色敌人攻击，或按 Space 结束回合。"
++		&"blocked":
++			return "该格被障碍物阻挡，不能移动；请点击蓝色格。"
++		&"move_too_far":
++			return "该格超出移动范围，不能移动；请点击蓝色格或悬停查看路径。"
++		&"no_path":
++			return "该格没有可通行路径，不能移动；请点击蓝色格。"
++		&"occupied":
++			return "该格已有单位，不能移动；请点击蓝色格。"
++		_:
++			return "不能移动到该格；请点击蓝色格，红色敌人可直接攻击。"
++
++func _get_v2_preview_path(preview: Dictionary) -> Array[Vector2i]:
++	var path: Array[Vector2i] = []
++	var raw_path: Variant = preview.get("path", [])
++	if raw_path is Array:
++		path.append(preview.get("from", selected_unit.grid_pos) as Vector2i)
++		for raw_cell in raw_path:
++			if raw_cell is Vector2i:
++				path.append(raw_cell)
++	if path.size() >= 2:
++		return path
++	return [selected_unit.grid_pos, preview.get("target", selected_unit.grid_pos)]
++
+ func _finalize_v2_move(result: Dictionary) -> void:
+ 	if v2_affordance_presenter:
+ 		v2_affordance_presenter.clear_preview()
+@@ -3278,7 +3313,7 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
+ 			return
+ 	if not v2_locked_attack_preview.is_empty():
+ 		if hud:
+-			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消")
++			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消预览")
+ 		return
+ 	request_move(cell)
+ 
+@@ -3297,6 +3332,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
+ 			v2_affordance_presenter.show_attack_focus(cell, false)
+ 			if hud:
+ 				hud.show_attack_preview(hover_preview, hovered_unit, false)
++				hud.set_context_prompt("%s · 左键攻击" % hud.get_context_prompt_text())
+ 			_render_v2_hud()
+ 			return
+ 	_clear_v2_hover_preview()
+@@ -3327,7 +3363,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
+ 		display_path.append_array(path)
+ 		v2_affordance_presenter.show_path(display_path, false)
+ 		if hud:
+-			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消选择。" % [cell.x + 1, cell.y + 1])
++			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消预览；Esc取消选择。" % [cell.x + 1, cell.y + 1])
+ 		_render_v2_hud()
+ 
+ ## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
+@@ -3556,13 +3592,21 @@ func _on_v2_cancel_requested() -> void:
+ 	if v2_affordance_presenter:
+ 		v2_affordance_presenter.clear_preview()
+ 	if previous_state == V2BattleInputRouter.State.UNIT_SELECTED and selected_unit != null:
+-		_deselect_unit()
++		# Escape changes the router to FREE_SELECT and truly clears selection;
++		# right-click keeps UNIT_SELECTED and only cancels the active preview.
++		if v2_input_router == null or v2_input_router.get_state() == V2BattleInputRouter.State.FREE_SELECT:
++			_deselect_unit()
++		else:
++			_refresh_selected_unit_affordances(selected_unit)
++			if hud:
++				hud.set_context_prompt("已保留角色选择：点击蓝色格移动，点击红色敌人攻击；Esc取消选择。")
+ 	elif selected_unit:
+ 		_refresh_selected_unit_affordances(selected_unit)
+ 	_render_v2_hud()
+ 
+ func _on_v2_camera_pan(delta: Vector2) -> void:
+ 	if camera:
++		camera.clear_follow_target()
+ 		camera.pan_by_screen_delta(delta)
+ 
+ func _on_v2_camera_zoom(amount: int) -> void:
+@@ -3570,8 +3614,16 @@ func _on_v2_camera_zoom(amount: int) -> void:
+ 		camera.zoom_at(float(amount), get_viewport().get_mouse_position())
+ 
+ func _on_v2_camera_focus() -> void:
+-	if camera and selected_unit:
+-		camera.focus_cell(selected_unit.grid_pos)
++	if camera == null:
++		return
++	var focus_unit := get_v2_camera_focus_unit()
++	if focus_unit != null:
++		camera.focus_cell(focus_unit.grid_pos)
++
++## Home must still work after a facility interaction clears selection. V2 keeps
++## the camera shortcut independent from tactical selection state.
++func get_v2_camera_focus_unit() -> Unit:
++	return V2CameraFocusScript.resolve(selected_unit, player_units)
+ 
+ ## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
+ func _open_v2_interaction_menu(entity_id: String) -> void:
+@@ -3615,12 +3667,13 @@ func _open_v2_interaction_menu(entity_id: String) -> void:
+ 			actions,
+ 			Callable(self, "_on_v2_interaction_action_selected").bind(entity_id)
+ 		)
+-		hud.set_context_prompt("选择设施操作；右键取消")
++		hud.set_context_prompt("选择设施操作；右键取消菜单")
+ 	_render_v2_hud()
+ 
+ func _on_v2_interaction_action_selected(action_id: String, entity_id: String) -> void:
+ 	if v2_interaction_service == null or selected_unit == null:
+ 		return
++	var camera_action := action_id in ["view_camera_east", "view_rescue_zone"]
+ 	var result: Dictionary = v2_interaction_service.commit_action(
+ 		selected_unit, entity_id, action_id, v2_interaction_service.get_state_revision()
+ 	)
+@@ -3642,14 +3695,25 @@ func _on_v2_interaction_action_selected(action_id: String, entity_id: String) ->
+ 			hud.update_unit_info(selected_unit)
+ 	_advance_context_hint("interact")
+ 	_render_v2_hud()
++	if camera_action and hud:
++		hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野。角色仍可操作：左键蓝格移动，左键红色敌人攻击，Home 回到角色。")
++		_render_v2_hud()
+ 
+ func _apply_v2_interaction_result(result: Dictionary) -> void:
+ 	var facility_id := String(result.get("facility_id", ""))
+ 	var facility: Dictionary = v2_interaction_service.get_facility(facility_id) if v2_interaction_service else {}
++	var action_id := String(result.get("action_id", ""))
++	var is_camera_view := action_id in ["view_camera_east", "view_rescue_zone"]
+ 	var reveal_radius := int(result.get("reveal_radius", 0))
+ 	if reveal_radius > 0 and visibility_state:
+ 		var center: Vector2i = result.get("reveal_center", facility.get("position", selected_unit.grid_pos))
+-		var cells := VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
++		var cells: Array[Vector2i] = []
++		if _is_v2_battle() and result.get("camera_zone_cells", []) is Array:
++			for raw_cell in result.get("camera_zone_cells", []):
++				if raw_cell is Vector2i:
++					cells.append(raw_cell)
++		else:
++			cells = VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
+ 		visibility_state.reveal_cells(cells)
+ 		if result.has("camera_zone_id"):
+ 			_sync_camera_zone_cells()
+@@ -3660,17 +3724,13 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
+ 		_update_visibility()
+ 	var v2_alert_result: Dictionary = {}
+ 	var consequence := String(result.get("consequence", "操作完成"))
+-	if _is_v2_battle() and String(result.get("action_id", "")) == "view_camera_east" and alert_state:
++	if _is_v2_battle() and is_camera_view and alert_state:
+ 		v2_alert_result = alert_state.apply_event("camera_identified_player")
+-	if String(result.get("action_id", "")) == "view_camera_east":
++	if is_camera_view:
+ 		var camera_effect := "摄像头用途：揭示东侧区域并持续保持视野"
+ 		if reveal_radius > 0:
+-			var revealed_count := VisionSystem.get_visible_cells(
+-				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)),
+-				reveal_radius,
+-				map_width,
+-				map_height,
+-				_is_vision_blocking
++			var revealed_count := (result.get("camera_zone_cells", []) as Array).size() if _is_v2_battle() else VisionSystem.get_visible_cells(
++				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)), reveal_radius, map_width, map_height, _is_vision_blocking
+ 			).size()
+ 			camera_effect = "摄像头已揭示东侧区域 %d 格，并持续保持视野" % revealed_count
+ 		consequence = camera_effect
+@@ -3683,7 +3743,7 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
+ 		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
+ 	elif bool(v2_alert_result.get("grace", false)):
+ 		consequence = "故事宽限：摄像头暂未触发搜索；%s" % consequence
+-	if String(result.get("action_id", "")) == "view_camera_east":
++	if is_camera_view:
+ 		_advance_v2_tutorial(&"camera_viewed", {"facility_id": facility_id})
+ 	_log("设施 %s：%s" % [facility_id, consequence])
+ 	if String(result.get("reward_module", "")) != "":
+@@ -3901,7 +3961,7 @@ func _show_attack_preview(target: Unit) -> void:
+ 	var hit_percent := int(roundf(float(preview.get("hit_chance", 0.0)) * 100.0))
+ 	var expected_damage := int(preview.get("damage", 0))
+ 	hud.set_context_prompt(
+-		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消" % [
++		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消预览" % [
+ 			target.unit_name, hit_percent, expected_damage, target.current_hp, target.max_hp
+ 		]
+ 	)
+diff --git a/tactical-grid/client/scripts/game/mission_objective_state.gd b/tactical-grid/client/scripts/game/mission_objective_state.gd
+index 6c2227f..f83e394 100644
+--- a/tactical-grid/client/scripts/game/mission_objective_state.gd
++++ b/tactical-grid/client/scripts/game/mission_objective_state.gd
+@@ -29,6 +29,7 @@ const TYPE_DEFEND := "defend"
+ const RULE_NO_OVERWATCH := "no_overwatch"
+ const RULE_NO_ITEMS := "no_items"
+ const RULE_ENEMY_PASSIVE_TURN_1 := "enemy_passive_turn_1"
++const RULE_ENEMY_PASSIVE_TURN_3 := "enemy_passive_turn_3"
+ 
+ ## ===== 任务阶段常量（infiltrate 三阶段流） =====
+ const STAGE_APPROACH := &"approach"
+@@ -109,11 +110,27 @@ func setup(level_config: Dictionary, map_data: Dictionary, players: Array, enemi
+ 	boss_unit = special_designations.get("boss_unit", null)
+ 	escort_vip = special_designations.get("escort_vip", null)
+ 	# 应用 enemy_passive_turn_1：首回合敌人待命
+-	if is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_1):
++	if is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_3):
++		_enemy_passive_until_turn = 3
++	elif is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_1):
+ 		_enemy_passive_until_turn = 1
+ 	# 初始化阶段化任务流（infiltrate）
+ 	_setup_mission_flow(map_data)
+ 
++## V2-only mission pacing override. Kept out of shared level data so the V1
++## campaign retains its original turn budget and tutorial rules.
++func apply_v2_tutorial_overrides(turn_limit: int, passive_turns: int) -> void:
++	if turn_limit > 0:
++		max_turns = turn_limit
++	if passive_turns <= 0:
++		return
++	_enemy_passive_until_turn = passive_turns
++	var rule_id := RULE_ENEMY_PASSIVE_TURN_3 if passive_turns >= 3 else RULE_ENEMY_PASSIVE_TURN_1
++	special_rules[rule_id] = {
++		"enabled": true,
++		"reason": "教学关：前%d回合敌人待命，便于掌握路线和交互" % passive_turns,
++	}
++
+ 
+ ## 解析 special_rules，兼容两种形式：
+ ## 1. 数组：["no_overwatch", "no_items"]（使用默认原因）
+@@ -158,6 +175,8 @@ func _default_reason(rule_id: String) -> String:
+ 			return "本关禁用物品"
+ 		RULE_ENEMY_PASSIVE_TURN_1:
+ 			return "首回合敌人待命"
++		RULE_ENEMY_PASSIVE_TURN_3:
++			return "前三回合敌人待命"
+ 		_:
+ 			return "本关特殊规则：%s" % rule_id
+ 
+diff --git a/tactical-grid/client/scripts/game/unit_sprite.gd b/tactical-grid/client/scripts/game/unit_sprite.gd
+index 825f703..ac3ac12 100644
+--- a/tactical-grid/client/scripts/game/unit_sprite.gd
++++ b/tactical-grid/client/scripts/game/unit_sprite.gd
+@@ -36,7 +36,8 @@ func _ready() -> void:
+ func _process(delta: float) -> void:
+ 	if not art_sprite or current_state != &"idle":
+ 		return
+-	if GameManager.get_settings().get("reduce_motion", false):
++	var game_manager := _get_runtime_node("GameManager")
++	if game_manager != null and game_manager.has_method("get_settings") and game_manager.call("get_settings").get("reduce_motion", false):
+ 		art_sprite.position = Vector2.ZERO
+ 		art_sprite.rotation = 0.0
+ 		return
+@@ -111,12 +112,16 @@ func _refresh_art_texture() -> void:
+ 	if not unit:
+ 		art_sprite.texture = null
+ 		return
++	var catalog := _get_runtime_node("ArtCatalog")
++	if catalog == null:
++		art_sprite.texture = null
++		return
+ 	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else unit.v2_art_key if not unit.v2_art_key.is_empty() else StringName(unit.job)
+-	if not ArtCatalog.has_texture(&"unit", key):
++	if not catalog.call("has_texture", &"unit", key):
+ 		key = StringName(unit.job)
+-	if not ArtCatalog.has_texture(&"unit", key):
++	if not catalog.call("has_texture", &"unit", key):
+ 		key = &"cyber_guard" if unit.team == "enemy" else &"assault"
+-	art_sprite.texture = ArtCatalog.get_texture(&"unit", key)
++	art_sprite.texture = catalog.call("get_texture", &"unit", key)
+ 	if art_sprite.texture:
+ 		var texture_size := art_sprite.texture.get_size()
+ 		var longest_side := maxf(texture_size.x, texture_size.y)
+@@ -131,8 +136,16 @@ func _is_boss_unit() -> bool:
+ 	return unit != null and not unit.boss_art_key.is_empty()
+ 
+ func _get_normal_art_max_size() -> float:
+-	if unit != null and unit.job == "heavy":
+-		return HEAVY_ART_MAX_SIZE
++	if unit != null:
++		if unit.job == "heavy":
++			return HEAVY_ART_MAX_SIZE
++		if unit.team == "enemy":
++			match String(unit.job):
++				"drone": return 58.0
++				"shield_guard", "sniper_sentry": return 84.0
++				"protocol_engineer": return 72.0
++				"hunter": return 78.0
++				_: return 70.0
+ 	return ART_MAX_SIZE
+ 
+ func get_rendered_art_size() -> float:
+@@ -162,7 +175,7 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
+ 	_begin_state(state)
+ 	var state_direction := direction.normalized() if direction.length_squared() > 0.01 else Vector2.RIGHT
+ 	var base_duration := duration_override if duration_override > 0.0 else _default_state_duration(state)
+-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
++	var duration := _get_effect_duration(base_duration)
+ 
+ 	match state:
+ 		&"attack":
+@@ -193,7 +206,7 @@ func play_move_to(target_position: Vector2, duration_override: float = -1.0) ->
+ 		z_index = 100 + unit.grid_pos.y
+ 	var distance := position.distance_to(target_position)
+ 	var base_duration := duration_override if duration_override > 0.0 else clampf(distance / 420.0, 0.14, 0.42)
+-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
++	var duration := _get_effect_duration(base_duration)
+ 	art_sprite.rotation = 0.045
+ 	_state_tween = create_tween()
+ 	_state_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+@@ -215,7 +228,7 @@ func snap_to(target_position: Vector2) -> void:
+ func play_death(duration_override: float = -1.0) -> void:
+ 	_begin_state(&"death")
+ 	var base_duration := duration_override if duration_override > 0.0 else 0.55
+-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
++	var duration := _get_effect_duration(base_duration)
+ 	_state_tween = create_tween()
+ 	_state_tween.set_parallel(true)
+ 	_state_tween.tween_property(art_sprite, "rotation", 0.72, duration)
+@@ -297,6 +310,18 @@ func _default_state_duration(state: StringName) -> float:
+ 		&"skill": return 0.42
+ 		_: return 0.20
+ 
++func _get_runtime_node(node_name: String) -> Node:
++	var main_loop := Engine.get_main_loop()
++	if main_loop is SceneTree:
++		return (main_loop as SceneTree).root.get_node_or_null(node_name)
++	return null
++
++func _get_effect_duration(base_duration: float) -> float:
++	var settings := _get_runtime_node("AccessibilitySettings")
++	if settings != null and settings.has_method("get_effect_duration"):
++		return float(settings.call("get_effect_duration", base_duration))
++	return base_duration
++
+ func _get_unit_color() -> Color:
+ 	if unit.team == "player":
+ 		return GameTheme.PLAYER_COLOR
+@@ -327,9 +352,39 @@ func _draw_role_accent(radius: int) -> void:
+ 			draw_circle(marker_center + Vector2(3, -2), 1.5, accent)
+ 		"heavy":
+ 			draw_rect(Rect2(marker_center - Vector2(4, 3), Vector2(8, 6)), accent, true)
++		"sentry":
++			draw_colored_polygon(PackedVector2Array([
++				marker_center + Vector2(0, -5), marker_center + Vector2(5, 4), marker_center + Vector2(-5, 4),
++			]), accent)
++		"drone":
++			draw_colored_polygon(PackedVector2Array([
++				marker_center + Vector2(0, -5), marker_center + Vector2(5, 0), marker_center + Vector2(0, 5), marker_center + Vector2(-5, 0),
++			]), accent)
++			draw_line(marker_center + Vector2(-5, 0), marker_center + Vector2(5, 0), Color.WHITE, 1.5)
++		"sniper_sentry":
++			draw_arc(marker_center, 4.0, 0, TAU, 16, accent, 2.0)
++			draw_line(marker_center + Vector2(-6, 0), marker_center + Vector2(6, 0), accent, 1.5)
++			draw_line(marker_center + Vector2(0, -6), marker_center + Vector2(0, 6), accent, 1.5)
++		"shield_guard":
++			draw_colored_polygon(PackedVector2Array([
++				marker_center + Vector2(0, -5), marker_center + Vector2(5, -2), marker_center + Vector2(4, 4), marker_center + Vector2(0, 6), marker_center + Vector2(-4, 4), marker_center + Vector2(-5, -2),
++			]), accent)
++		"protocol_engineer":
++			draw_rect(Rect2(marker_center - Vector2(4, 4), Vector2(8, 8)), accent, false, 2.0)
++			draw_line(marker_center + Vector2(-3, 3), marker_center + Vector2(4, -4), accent, 2.0)
++		"hunter":
++			draw_colored_polygon(PackedVector2Array([
++				marker_center + Vector2(0, -6), marker_center + Vector2(3, -2), marker_center + Vector2(6, 0), marker_center + Vector2(3, 2), marker_center + Vector2(0, 6), marker_center + Vector2(-3, 2), marker_center + Vector2(-6, 0), marker_center + Vector2(-3, -2),
++			]), accent)
+ 		_:
+ 			draw_circle(marker_center, 3.5, accent)
+ 	draw_arc(Vector2.ZERO, radius + 3, -0.85, 0.15, 10, accent, 2.5)
++	var badge := _get_role_badge()
++	if not badge.is_empty():
++		var badge_rect := Rect2(Vector2(-radius - 7, -radius - 26), Vector2(18, 18))
++		draw_rect(badge_rect, Color(0.02, 0.03, 0.04, 0.94), true)
++		draw_rect(badge_rect, accent, false, 2.0)
++		draw_string(ThemeDB.fallback_font, badge_rect.position + Vector2(2, 14), badge, HORIZONTAL_ALIGNMENT_CENTER, 14, 12, Color.WHITE)
+ 
+ func _get_role_accent() -> Color:
+ 	match String(unit.job):
+@@ -337,12 +392,28 @@ func _get_role_accent() -> Color:
+ 		"scout": return Color("55e7ff")
+ 		"sniper": return Color("c7a0ff")
+ 		"heavy": return Color("ffd35a")
+-		"protocol_engineer": return Color("b46cff")
++		"sentry": return Color("ff614d")
++		"drone": return Color("4fe7ff")
++		"sniper_sentry": return Color("d18cff")
++		"shield_guard": return Color("ffd35a")
++		"protocol_engineer": return Color("ff9a42")
+ 		"hunter": return Color("ff5f9e")
+ 		"sentry_basic", "sentry_sniper": return Color("ff694f")
+ 		"drone_scout", "drone_assault": return Color("ff9b45")
+ 		_: return _get_unit_color().lightened(0.22)
+ 
++func _get_role_badge() -> String:
++	if unit == null or unit.team != "enemy":
++		return ""
++	match String(unit.job):
++		"sentry": return "哨"
++		"drone": return "机"
++		"sniper_sentry": return "狙"
++		"shield_guard": return "盾"
++		"protocol_engineer": return "工"
++		"hunter": return "猎"
++		_: return "敌"
++
+ func _draw_tactical_silhouette(team_color: Color) -> void:
+ 	var body_color := Color(0.075, 0.10, 0.13) if unit.team == "player" else Color(0.17, 0.055, 0.045)
+ 	var highlight := team_color.lightened(0.22)
+diff --git a/tactical-grid/client/scripts/game/visibility_renderer.gd b/tactical-grid/client/scripts/game/visibility_renderer.gd
+index bf54c49..b63362c 100644
+--- a/tactical-grid/client/scripts/game/visibility_renderer.gd
++++ b/tactical-grid/client/scripts/game/visibility_renderer.gd
+@@ -16,7 +16,8 @@ const COLOR_HIDDEN_GRID := Color(0.10, 0.16, 0.20, 0.22)
+ ## 已记录格的降饱和叠加色（保留地形可见但明显变暗）
+ const COLOR_DIMMED := Color(0.04, 0.06, 0.10, 0.55)
+ ## 摄像头区域微调色相，让玩家能识别"由摄像头维持的观察区"
+-const COLOR_CAMERA_TINT := Color(0.10, 0.32, 0.40, 0.18)
++const COLOR_CAMERA_TINT := Color(0.08, 0.54, 0.66, 0.26)
++const COLOR_CAMERA_BORDER := Color(0.24, 0.92, 1.0, 0.72)
+ 
+ var _visibility_state: VisibilityState
+ var _cell_size: float = 64.0
+@@ -77,10 +78,24 @@ func _draw() -> void:
+ 					draw_rect(rect, Color(0.10, 0.16, 0.22, 0.35), false, 1.0)
+ 				VisibilityState.RENDER_VISIBLE:
+ 					# 正在观察区无遮挡；若由摄像头维持则加微调色提示
+-					if _camera_cells.has(cell):
++					if show_hidden_silhouette and _camera_cells.has(cell):
+ 						draw_rect(rect, COLOR_CAMERA_TINT, true)
++						_draw_camera_edges(cell, rect)
+ 				_:
+-					draw_rect(rect, COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN, true)
++						draw_rect(rect, COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN, true)
++
++func _draw_camera_edges(cell: Vector2i, rect: Rect2) -> void:
++	if not show_hidden_silhouette:
++		return
++	var width := 2.0
++	if not _camera_cells.has(Vector2i(cell.x, cell.y - 1)):
++		draw_line(rect.position, rect.position + Vector2(rect.size.x, 0), COLOR_CAMERA_BORDER, width)
++	if not _camera_cells.has(Vector2i(cell.x + 1, cell.y)):
++		draw_line(rect.position + Vector2(rect.size.x, 0), rect.position + rect.size, COLOR_CAMERA_BORDER, width)
++	if not _camera_cells.has(Vector2i(cell.x, cell.y + 1)):
++		draw_line(rect.position + Vector2(0, rect.size.y), rect.position + Vector2(rect.size.x, rect.size.y), COLOR_CAMERA_BORDER, width)
++	if not _camera_cells.has(Vector2i(cell.x - 1, cell.y)):
++		draw_line(rect.position, rect.position + Vector2(0, rect.size.y), COLOR_CAMERA_BORDER, width)
+ 
+ 
+ ## CH1-040: 获取某格的渲染状态字符串（供测试断言）
+diff --git a/tactical-grid/client/scripts/ui/hud.gd b/tactical-grid/client/scripts/ui/hud.gd
+index f3e8827..943552e 100644
+--- a/tactical-grid/client/scripts/ui/hud.gd
++++ b/tactical-grid/client/scripts/ui/hud.gd
+@@ -48,6 +48,8 @@ var _network_overlay: Control = null
+ var _network_overlay_visible: bool = false
+ ## CH1-050: 敌方意图威胁摘要标签，显示在警报标签下方。
+ var _threat_label: Label = null
++var _v2_mission_card: Panel = null
++var _v2_mission_card_label: Label = null
+ 
+ func _ready() -> void:
+ 	_apply_visual_theme()
+@@ -116,6 +118,27 @@ func _ready() -> void:
+ 	if not _pending_v2_snapshot.is_empty():
+ 		render_v2_snapshot(_pending_v2_snapshot)
+ 
++func _ensure_v2_mission_card() -> Label:
++	if _v2_mission_card_label != null and is_instance_valid(_v2_mission_card_label):
++		return _v2_mission_card_label
++	_v2_mission_card = Panel.new()
++	_v2_mission_card.name = "V2MissionCard"
++	_v2_mission_card.position = Vector2(12, TOP_BAR_HEIGHT + 8)
++	_v2_mission_card.size = Vector2(430, 128)
++	_v2_mission_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	_v2_mission_card.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.055, 0.075, 0.94), Color(1.0, 0.72, 0.18, 0.82)))
++	_v2_mission_card_label = Label.new()
++	_v2_mission_card_label.name = "MissionCardText"
++	_v2_mission_card_label.position = Vector2(12, 8)
++	_v2_mission_card_label.size = Vector2(406, 112)
++	_v2_mission_card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
++	_v2_mission_card_label.add_theme_font_size_override("font_size", 13)
++	_v2_mission_card_label.add_theme_color_override("font_color", Color(0.92, 0.96, 0.96, 0.98))
++	_v2_mission_card_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	_v2_mission_card.add_child(_v2_mission_card_label)
++	add_child(_v2_mission_card)
++	return _v2_mission_card_label
++
+ ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
+ func _apply_visual_theme() -> void:
+ 	$TopBar.add_theme_stylebox_override("panel", _make_panel_style(Color(0.035, 0.055, 0.075, 0.94), Color(0.18, 0.72, 0.82, 0.62)))
+@@ -346,10 +369,10 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
+ 	var mission_guide := String(snapshot.get("mission_guide", ""))
+ 	var shortcut_hint := get_node_or_null("BottomBar/ShortcutHint") as Label
+ 	if shortcut_hint != null and mission_guide != "":
+-		shortcut_hint.text = "%s\nSpace结束回合 · 右键取消 · 中键拖动地图" % mission_guide
++		shortcut_hint.text = "%s\n右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色\nSpace结束回合" % mission_guide
+ 	var v2_control_guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+ 	if v2_control_guide != null and mission_guide != "":
+-		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图\nSpace结束回合" % mission_guide
++		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择\n中键拖动地图 · Home回到角色 · Space结束回合" % mission_guide
+ 
+ func _is_canonical_v2_snapshot(snapshot: Dictionary) -> bool:
+ 	return snapshot.has("mission_id") or snapshot.has("objective_text") or snapshot.has("step_id") or snapshot.has("guide_text") or snapshot.has("route_hint") or snapshot.has("hazard_warning") or snapshot.has("checkpoint_id") or snapshot.has("status") or snapshot.has("outcome_text") or snapshot.has("ordinary_controls")
+@@ -362,7 +385,14 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
+ 	var checkpoint_id := String(snapshot.get("checkpoint_id", "")).strip_edges()
+ 	var ordinary_controls := String(snapshot.get("ordinary_controls", "")).strip_edges()
+ 	if ordinary_controls.is_empty():
+-		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消 · Space结束回合"
++		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · Space结束回合"
++	var mission_card := _ensure_v2_mission_card()
++	mission_card.text = "当前任务\n%s\n%s\n%s\n操作：左键队员看范围；左键蓝格移动；红色敌人攻击；Space结束回合" % [
++		objective,
++		route_hint if not route_hint.is_empty() else "目标地点：地图上的黄色“下一步”标记",
++		_v2_completion_hint(objective),
++	]
++	_v2_mission_card.visible = true
+ 
+ 	var step_count := maxi(0, int(snapshot.get("step_count", 0)))
+ 	var step_index := maxi(0, int(snapshot.get("step_index", 0)))
+@@ -513,6 +543,19 @@ func _v2_state_label(state: String) -> String:
+ 		_:
+ 			return state
+ 
++func _v2_completion_hint(objective: String) -> String:
++	if objective.contains("路线分叉"):
++		return "完成：走到黄色分叉标记，随后选择一条路线"
++	if objective.contains("选择推进"):
++		return "完成：点击任意一条路线按钮"
++	if objective.contains("吊桥"):
++		return "完成：靠近吊机后点击设施并选择放下吊桥"
++	if objective.contains("营救"):
++		return "完成：靠近青色标记后点击营救"
++	if objective.contains("撤离"):
++		return "完成：所有当前存活队员进入绿色撤离区（营救后会增加可操作队员）"
++	return "完成：按地图黄色标记和顶部目标推进"
++
+ ## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
+ func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:
+ 	if target == null:
+@@ -689,6 +732,9 @@ func show_interaction_actions(facility_name: String, actions: Array, on_selected
+ ## 隐藏行动选择面板
+ func hide_action_picker() -> void:
+ 	if _action_picker != null and is_instance_valid(_action_picker):
++		# Hide immediately before queue_free so a just-completed facility click
++		# cannot leave a one-frame modal window intercepting the next map click.
++		_action_picker.hide()
+ 		_action_picker.queue_free()
+ 	_action_picker = null
+ 	_action_picker_callback = Callable()
+diff --git a/tactical-grid/client/scripts/ui/mission_result.gd b/tactical-grid/client/scripts/ui/mission_result.gd
+index b978453..06cb97a 100644
+--- a/tactical-grid/client/scripts/ui/mission_result.gd
++++ b/tactical-grid/client/scripts/ui/mission_result.gd
+@@ -40,7 +40,7 @@ func show_result(data: Dictionary) -> void:
+ 		title_label.text = "任务失败"
+ 		title_label.modulate = Color.RED
+ 		# CH1-080: 失败页明确说明最近失败原因
+-		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")), is_v2)
++		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")), is_v2, data)
+ 		var reason_label := Label.new()
+ 		reason_label.text = reason_text
+ 		reason_label.add_theme_font_size_override("font_size", 18)
+@@ -146,6 +146,19 @@ func _show_v2_summary(data: Dictionary) -> void:
+ 	completion_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ 	completion_guide.modulate = Color("b8d7dc")
+ 	loot_container.add_child(completion_guide)
++	var phase_line := String(summary.get("phase_line", ""))
++	if not phase_line.is_empty():
++		var phase_label := Label.new()
++		phase_label.text = phase_line
++		phase_label.modulate = Color("f4b45a") if data.get("result", "defeat") != "victory" else Color("b8d7dc")
++		loot_container.add_child(phase_label)
++	var next_action := String(summary.get("next_action", ""))
++	if not next_action.is_empty():
++		var next_label := Label.new()
++		next_label.text = next_action
++		next_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
++		next_label.modulate = Color("b8d7dc")
++		loot_container.add_child(next_label)
+ 	var optional := Label.new()
+ 	optional.text = String(summary.get("optional_line", "可选目标：未完成"))
+ 	optional.modulate = Color("7ee68a") if bool(data.get("optional_record", false)) else Color("9aa9ad")
+@@ -289,15 +302,22 @@ func get_failure_actions(has_checkpoint: bool) -> Array[StringName]:
+ 	return actions
+ 
+ ## CH1-080: 失败原因文案
+-func _get_defeat_reason_text(reason: String, is_v2: bool = false) -> String:
++func _get_defeat_reason_text(reason: String, is_v2: bool = false, data: Dictionary = {}) -> String:
+ 	if is_v2:
++		var rescued: Array = data.get("rescued", [])
++		var survived := int(data.get("units_survived", 0))
++		var total := int(data.get("units_total", 0))
++		var phase := String(data.get("mission_step_text", ""))
++		if phase.is_empty():
++			phase = "营救前推进" if rescued.is_empty() else "营救后撤离"
++		var next_action := "先沿黄色“下一步”标记推进，完成吊桥操作后再营救侦察兵。" if rescued.is_empty() else "把所有当前存活队员带入绿色撤离区。"
+ 		match reason:
+ 			"turn_limit":
+-				return "失败原因：回合上限耗尽。必做流程：1.营救侦察兵；2.让突击兵和侦察兵进入绿色撤离区。进入后自动结束任务。可选事故记录不是通关必需。"
++				return "失败原因：回合上限耗尽。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
+ 			"all_units_down":
+-				return "失败原因：队员全部失能。必做流程：营救侦察兵后撤离；可利用掩体，或按 Space 结束回合让敌人停止当前回合。"
++				return "失败原因：队员全部失能。当前阶段：%s。下一步：%s 可利用掩体；Space 只会结束我方回合并让敌人行动，不会停止敌人。" % [phase, next_action]
+ 			_:
+-				return "失败原因：未完成必做流程。先营救侦察兵，再让两名存活队员进入绿色撤离区；可选事故记录不是通关必需。"
++				return "失败原因：未完成必做流程。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
+ 	match reason:
+ 		"all_units_down":
+ 			return "失败原因：全队阵亡。注意利用掩体和网络节点减少伤害。"
+diff --git a/tactical-grid/client/scripts/v2/combat/v2_action_service.gd b/tactical-grid/client/scripts/v2/combat/v2_action_service.gd
+index b01ba88..32a8319 100644
+--- a/tactical-grid/client/scripts/v2/combat/v2_action_service.gd
++++ b/tactical-grid/client/scripts/v2/combat/v2_action_service.gd
+@@ -3,6 +3,7 @@ class_name V2ActionService
+ 
+ const V2CombatRulesScript = preload("res://scripts/v2/combat/v2_combat_rules.gd")
+ const V2AbilityRulesScript = preload("res://scripts/v2/combat/v2_ability_rules.gd")
++const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
+ 
+ var _map_data: Dictionary = {}
+ var _players: Array = []
+@@ -128,10 +129,13 @@ func _query_move(request: Dictionary) -> Dictionary:
+ 		return {"valid": false, "reason": &"blocked"}
+ 	if _is_occupied(target, unit):
+ 		return {"valid": false, "reason": &"occupied"}
+-	var distance := _manhattan(unit.grid_pos, target)
+-	if distance <= 0:
++	if unit.grid_pos == target:
+ 		return {"valid": false, "reason": &"same_position"}
+-	if distance > maxi(1, unit.move_points):
++	var path: Array[Vector2i] = _find_move_path(unit, target)
++	if path.is_empty():
++		return {"valid": false, "reason": &"unreachable"}
++	var move_cost := _path_cost(path, unit)
++	if move_cost > maxi(1, unit.move_points):
+ 		return {"valid": false, "reason": &"move_too_far"}
+ 	var preview := {
+ 		"valid": true,
+@@ -140,7 +144,9 @@ func _query_move(request: Dictionary) -> Dictionary:
+ 		"unit_id": unit.entity_id,
+ 		"from": unit.grid_pos,
+ 		"target": target,
+-		"distance": distance,
++		"distance": move_cost,
++		"path": path,
++		"path_cost": move_cost,
+ 		"dangerous": _is_dangerous(target),
+ 		"cost": {"move": true},
+ 	}
+@@ -218,7 +224,11 @@ func _is_fresh(preview: Dictionary) -> bool:
+ 		return false
+ 	var action := StringName(String(preview.get("action", "")))
+ 	if action == &"move":
+-		return unit.grid_pos == preview.get("from", Vector2i(-1, -1)) and unit.can_move()
++		if unit.grid_pos != preview.get("from", Vector2i(-1, -1)) or not unit.can_move():
++			return false
++		var target: Vector2i = preview.get("target", Vector2i(-1, -1))
++		var path: Array[Vector2i] = _find_move_path(unit, target)
++		return not path.is_empty() and _path_cost(path, unit) <= maxi(1, unit.move_points)
+ 	if action == &"attack":
+ 		var target: Unit = preview.get("target_unit", null)
+ 		if target == null or not is_instance_valid(target) or not target.is_alive:
+@@ -324,6 +334,8 @@ func _parse_cell(raw_cell: Variant) -> Vector2i:
+ 
+ func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
+ 	for raw_unit in _players + _enemies:
++		if not raw_unit is Unit or not is_instance_valid(raw_unit):
++			continue
+ 		var unit: Unit = raw_unit
+ 		# Encounter enemies are inactive before discovery, but their authored spawn
+ 		# cells are reserved. A downed enemy is the only non-living unit that frees a cell.
+@@ -332,6 +344,43 @@ func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
+ 			return true
+ 	return false
+ 
++func _find_move_path(unit: Unit, target: Vector2i) -> Array[Vector2i]:
++	var size: Dictionary = _map_data.get("size", {})
++	return PathfindingScript.find_path(
++		unit.grid_pos,
++		target,
++		int(size.get("width", 0)),
++		int(size.get("height", 0)),
++		_get_move_cost.bind(unit),
++		_is_move_blocked.bind(unit)
++	)
++
++func _is_move_blocked(cell: Vector2i, unit: Unit) -> bool:
++	return not _is_passable(cell) or _is_occupied(cell, unit)
++
++func _get_move_cost(cell: Vector2i, unit: Unit) -> int:
++	var terrain: Variant = _layer_value(_map_data.get("layers", {}).get("base_terrain", []), cell)
++	if terrain == null:
++		return 1
++	# V2ActionService is also loaded by isolated headless tests where autoload
++	# identifiers are not available to the script compiler. Resolve the node at
++	# runtime and keep a deterministic default for fixture maps without it.
++	var main_loop := Engine.get_main_loop()
++	if main_loop is SceneTree:
++		var game_data := (main_loop as SceneTree).root.get_node_or_null("GameData")
++		if game_data != null and game_data.has_method("get_move_cost"):
++			return maxi(1, int(game_data.call("get_move_cost", unit.job, int(terrain))))
++	return 1
++
++func _path_cost(path: Array[Vector2i], unit: Unit) -> int:
++	var total := 0
++	for cell in path:
++		var step_cost := _get_move_cost(cell, unit)
++		if step_cost < 0:
++			return 999999
++		total += step_cost
++	return total
++
+ func _is_dangerous(cell: Vector2i) -> bool:
+ 	for raw_cell in _map_data.get("danger_cells", []):
+ 		if raw_cell is Vector2i and raw_cell == cell:
+diff --git a/tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd b/tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd
+index 411dafc..5e3488e 100644
+--- a/tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd
++++ b/tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd
+@@ -68,6 +68,11 @@ func get_state_name() -> String:
+ func get_state() -> State:
+ 	return _state
+ 
++## The V2 controller uses this during _input so a HUD Control cannot swallow
++## the motion event before it reaches the unhandled-input router.
++func is_camera_panning() -> bool:
++	return _middle_dragging
++
+ func get_last_cancelled_state() -> State:
+ 	return _last_cancelled_state
+ 
+@@ -137,7 +142,9 @@ func _handle_cancel() -> bool:
+ 			set_state(State.UNIT_SELECTED)
+ 			pointer_cancel_requested.emit()
+ 		State.UNIT_SELECTED:
+-			set_state(State.FREE_SELECT)
++			# Right-click is a tactical back action, not a deselect action. Keep
++			# the unit selected so the player can immediately choose another blue
++			# cell, red target, or facility after cancelling a preview.
+ 			pointer_cancel_requested.emit()
+ 		State.FREE_SELECT, State.ENEMY_TURN, State.PAUSED:
+ 			return true
+diff --git a/tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd b/tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd
+index 73f669c..c33f6d7 100644
+--- a/tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd
++++ b/tactical-grid/client/scripts/v2/mission/v2_mission_flow.gd
+@@ -214,13 +214,41 @@ func get_current_guide_text() -> String:
+ 		return "任务完成：小队已进入撤离区，系统正在打开结算。"
+ 	if state == State.FAILED:
+ 		return "任务失败：重新开始后完成当前任务目标。"
+-	var guide := String(_current_objective_step().get("guide_text", ""))
++	var step := _current_objective_step()
++	var guide := _player_action_guide(step)
+ 	if guide.is_empty() or guide.contains("流程"):
+ 		return guide
+ 	var display_total := get_display_objective_step_count()
+ 	var display_index := get_display_objective_step_index() + 1
+ 	return "流程 %d/%d：%s" % [display_index, display_total, guide]
+ 
++func _player_action_guide(step: Dictionary) -> String:
++	var configured := String(step.get("guide_text", ""))
++	if not bool(mission.get("expanded_flow", false)):
++		return configured
++	match String(step.get("id", "")):
++		"search_route_split":
++			return "现在：沿黄色“下一步”标记移动到路线分叉；完成：到达后选择一条推进路线。"
++		"select_route":
++			return "现在：在路线分叉处选择维修摄像头或货柜突破；完成：两条路线都能到达吊机。"
++		"operate_gantry":
++			return "现在：靠近黄色吊机控制台并点击；完成：选择“放下吊桥”打开救援通路。"
++		"rescue_scout":
++			return "现在：沿打开的通路前往青色侦察标记；完成：靠近后点击“营救”。"
++		"evacuate_squad":
++			return "现在：沿吊桥通路前往绿色撤离标记；完成：让所有当前存活队员进入绿色撤离区。"
++	return configured
++
++func get_current_guide_cell() -> Vector2i:
++	var raw_cell: Variant = _current_objective_step().get("guide_cell", null)
++	if raw_cell is Vector2i:
++		return raw_cell
++	if raw_cell is Array and raw_cell.size() >= 2:
++		return Vector2i(int(raw_cell[0]), int(raw_cell[1]))
++	if raw_cell is Dictionary:
++		return Vector2i(int(raw_cell.get("x", -1)), int(raw_cell.get("y", -1)))
++	return Vector2i(-1, -1)
++
+ func get_guide_text() -> String:
+ 	return get_current_guide_text()
+ 
+@@ -249,6 +277,7 @@ func get_snapshot() -> Dictionary:
+ 		"step_count": get_objective_step_count(),
+ 		"primary_text": get_primary_text(),
+ 		"guide_text": get_current_guide_text(),
++		"guide_cell": get_current_guide_cell(),
+ 		"completed_step_ids": _completed_step_ids.duplicate(true),
+ 		"mission_flags": _mission_flags.duplicate(true),
+ 		"rescued_characters": rescued_characters.duplicate(true),
+diff --git a/tactical-grid/client/scripts/v2/mission/v2_tutorial_flow.gd b/tactical-grid/client/scripts/v2/mission/v2_tutorial_flow.gd
+index 22e61d8..4ce9235 100644
+--- a/tactical-grid/client/scripts/v2/mission/v2_tutorial_flow.gd
++++ b/tactical-grid/client/scripts/v2/mission/v2_tutorial_flow.gd
+@@ -1,8 +1,8 @@
+ extends RefCounted
+ class_name V2TutorialFlow
+ 
+-## M1 onboarding is a small deterministic state machine, not a queue of long
+-## keybind paragraphs. Each action unlocks exactly one next instruction.
++## M1 onboarding is a soft hint track. It explains the controls in a useful
++## order, but optional combat/observation hints never block the mission path.
+ const STEPS: Array[StringName] = [
+ 	&"select",
+ 	&"move",
+@@ -13,12 +13,12 @@ const STEPS: Array[StringName] = [
+ ]
+ 
+ const COPY := {
+-	&"select": "点击突击兵查看可行动范围",
+-	&"move": "点击蓝色格移动",
+-	&"attack": "悬停查看伤害，点击红色敌人攻击",
+-	&"intent": "箭头显示敌人下一步",
+-	&"camera": "查看摄像头：揭示区域并持续保持视野",
+-	&"evac": "两名队员进入撤离区",
++	&"select": "点击角色：蓝色可移动，红色可攻击",
++	&"move": "点击蓝色格移动；右键取消预览",
++	&"attack": "想攻击时点击红色敌人，悬停先看预计伤害",
++	&"intent": "敌人头顶箭头是下一步动作（可选观察）",
++	&"camera": "摄像头可揭示大片区域（可选操作）",
++	&"evac": "沿黄色下一步标记推进；撤离时带上所有存活队员",
+ }
+ 
+ const EXPECTED_EVENTS := {
+@@ -30,6 +30,8 @@ const EXPECTED_EVENTS := {
+ 	&"evac": &"evac_completed",
+ }
+ 
++const OPTIONAL_STEPS := [&"attack", &"intent", &"camera"]
++
+ var _step_index := 0
+ var _skipped := false
+ var _complete := false
+@@ -56,8 +58,9 @@ func is_complete() -> bool:
+ func is_skipped() -> bool:
+ 	return _skipped
+ 
+-## Advance only when the event belongs to the current step. Payload is kept in
+-## the contract so future steps can require a specific unit or facility.
++## A matching event may complete a later hint: combat, intent and camera are
++## optional teaching, not gates in the actual mission. Evacuation always closes
++## the tutorial because it is the real end-of-mission action.
+ func on_event(event_name: StringName, _payload: Dictionary = {}) -> Dictionary:
+ 	if _complete or _skipped:
+ 		return {
+@@ -65,15 +68,39 @@ func on_event(event_name: StringName, _payload: Dictionary = {}) -> Dictionary:
+ 			"reason": &"tutorial_inactive",
+ 			"current_step": current_step(),
+ 		}
+-	var expected: StringName = EXPECTED_EVENTS.get(current_step(), &"")
+-	if event_name != expected:
++	if event_name == &"evac_completed":
++		var completed_step := current_step()
++		_complete = true
++		return {
++			"advanced": true,
++			"completed_step": completed_step,
++			"dismiss_hint": true,
++			"show_hint": false,
++			"current_step": &"",
++		}
++	var current := current_step()
++	var expected_current: StringName = EXPECTED_EVENTS.get(current, &"")
++	# Selection and movement teach the two primary actions in order. Only the
++	# optional combat/observation hints may be reached by a later event.
++	if current not in OPTIONAL_STEPS and event_name != expected_current:
++		return {
++			"advanced": false,
++			"reason": &"wrong_step_event",
++			"current_step": current_step(),
++		}
++	var matching_index := -1
++	for index in range(_step_index, STEPS.size()):
++		if StringName(EXPECTED_EVENTS.get(STEPS[index], &"")) == event_name:
++			matching_index = index
++			break
++	if matching_index < 0:
+ 		return {
+ 			"advanced": false,
+ 			"reason": &"wrong_step_event",
+ 			"current_step": current_step(),
+ 		}
+-	var completed_step := current_step()
+-	_step_index += 1
++	var completed_step := STEPS[matching_index]
++	_step_index = matching_index + 1
+ 	if _step_index >= STEPS.size():
+ 		_complete = true
+ 	return {
+diff --git a/tactical-grid/client/scripts/v2/presentation/v2_result_presentation.gd b/tactical-grid/client/scripts/v2/presentation/v2_result_presentation.gd
+index d35d232..2dbd425 100644
+--- a/tactical-grid/client/scripts/v2/presentation/v2_result_presentation.gd
++++ b/tactical-grid/client/scripts/v2/presentation/v2_result_presentation.gd
+@@ -2,11 +2,12 @@ extends RefCounted
+ class_name V2ResultPresentation
+ 
+ const MISSION_GUIDES := {
+-	"ch1_m1": "救出侦察兵后，让两名存活队员进入绿色撤离区；全员进入后自动完成。",
++	"ch1_m1": "营救侦察兵后，让所有当前存活队员进入绿色撤离区；全员进入后自动完成。",
+ 	"ch1_m2": "关闭封锁、救出狙击手并确认远程火力后，让全部存活队员进入撤离区。",
+ }
+ 
+ const CHARACTER_NAMES := {
++	"assault": "突击兵",
+ 	"scout": "侦察兵",
+ 	"sniper": "狙击手",
+ 	"heavy": "重装兵",
+@@ -39,9 +40,38 @@ static func build_summary(data: Dictionary, repository: Node) -> Dictionary:
+ 	var optional_line := "可选记录：%s" % ("已上传" if optional_done else "未上传")
+ 	if mission_id != "ch1_m1":
+ 		optional_line = "可选目标：%s · %s" % [optional_name, "已完成" if optional_done else "未完成"]
++	var mission: Dictionary = repository.get_mission(StringName(mission_id)) if repository != null and repository.has_method("get_mission") else {}
++	var starting_count := int(data.get("starting_unit_count", (mission.get("starting_roster", []) as Array).size()))
++	var rescued_count: int = (data.get("rescued", []) as Array).size()
++	var completion_guide := String(MISSION_GUIDES.get(mission_id, "完成当前任务目标并让全部存活队员进入撤离区。"))
++	if mission_id == "ch1_m1":
++		completion_guide = "本关从 %d 名突击兵出发；营救侦察兵后最多 %d 名队员。撤离时让所有当前存活队员进入绿色撤离区。" % [starting_count, starting_count + rescued_count]
++	var phase_line := ""
++	var next_action := ""
++	match String(data.get("mission_step_id", "")):
++		"search_route_split":
++			phase_line = "当前阶段：前往路线分叉"
++			next_action = "下一步：沿黄色“下一步”标记移动。"
++		"select_route":
++			phase_line = "当前阶段：选择推进路线"
++			next_action = "下一步：选择维修摄像头或货柜突破。"
++		"operate_gantry":
++			phase_line = "当前阶段：放下吊桥"
++			next_action = "下一步：靠近吊机控制台并点击设施。"
++		"rescue_scout":
++			phase_line = "当前阶段：营救侦察兵"
++			next_action = "下一步：靠近青色侦察标记后点击营救。"
++		"rescue_sniper":
++			phase_line = "当前阶段：营救狙击手"
++			next_action = "下一步：靠近狙击手标记后点击营救。"
++		"evacuate_squad":
++			phase_line = "当前阶段：小队撤离"
++			next_action = "下一步：让所有当前存活队员进入绿色撤离区。"
+ 
+ 	return {
+-		"completion_guide": String(MISSION_GUIDES.get(mission_id, "完成当前任务目标并让全部存活队员进入撤离区。")),
++		"completion_guide": completion_guide,
++		"phase_line": phase_line,
++		"next_action": next_action,
+ 		"optional_line": optional_line,
+ 		"rescued_lines": rescued_lines,
+ 		"module_lines": module_lines,
+diff --git a/tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd b/tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd
+index a269b83..f1b647f 100644
+--- a/tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd
++++ b/tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd
+@@ -4,17 +4,138 @@ const V2EnemyBrainScript = preload("res://scripts/v2/ai/v2_enemy_brain.gd")
+ const V2IntentExecutorScript = preload("res://scripts/v2/ai/v2_intent_executor.gd")
+ const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
+ const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
++const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
+ 
+ var v2_hazard_controller: RefCounted = null
+ var _v2_hazard_turn_state: Dictionary = {}
+ var _v2_restore_attempted := false
+ var _v2_restore_failure: Dictionary = {}
++var _v2_guidance_layer: Node2D = null
+ 
+ ## V2 owns its map, roster, onboarding, and enemy turn. The shared controller
+ ## remains a rendering/turn-system base so the V1 branch is never changed.
+ func _ready() -> void:
+ 	super._ready()
++	# Capture camera gestures before HUD/map Controls get a chance to consume
++	# them. This is intentionally V2-only; V1 keeps its original input path.
++	set_process_input(true)
+ 	_install_v2_control_guide()
++	_ensure_v2_guidance_layer()
++
++func _input(event: InputEvent) -> void:
++	if not _is_v2_battle() or v2_input_router == null:
++		return
++	var camera_event := false
++	if event is InputEventMouseButton:
++		var mouse_button := event as InputEventMouseButton
++		camera_event = mouse_button.button_index == MOUSE_BUTTON_MIDDLE \
++			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP \
++			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN
++	elif event is InputEventMouseMotion:
++		camera_event = v2_input_router.is_camera_panning()
++	if camera_event and v2_input_router.handle_event(event, Callable()):
++		get_viewport().set_input_as_handled()
++
++func _ensure_v2_guidance_layer() -> Node2D:
++	if _v2_guidance_layer != null and is_instance_valid(_v2_guidance_layer):
++		return _v2_guidance_layer
++	_v2_guidance_layer = Node2D.new()
++	_v2_guidance_layer.name = "V2ObjectiveGuidance"
++	_v2_guidance_layer.z_index = 15
++	add_child(_v2_guidance_layer)
++	return _v2_guidance_layer
++
++func _render_v2_guidance() -> void:
++	var layer := _ensure_v2_guidance_layer()
++	for child in layer.get_children():
++		# Guidance nodes have no animation or external signal ownership. Free them
++		# immediately so repeated HUD refreshes cannot leave stale routes behind or
++		# force Godot to rename the next route node.
++		child.free()
++	if not _is_v2_battle() or v2_mission_flow == null or v2_mission_flow.is_victory() or v2_mission_flow.is_defeat():
++		return
++	var guide_cell: Vector2i = v2_mission_flow.get_current_guide_cell() if v2_mission_flow.has_method("get_current_guide_cell") else Vector2i(-1, -1)
++	if guide_cell.x < 0 or guide_cell.x >= map_width or guide_cell.y < 0 or guide_cell.y >= map_height:
++		return
++	var actor: Unit = selected_unit if selected_unit != null and is_instance_valid(selected_unit) and selected_unit.is_alive else player_units[0] if not player_units.is_empty() else null
++	if actor != null:
++		var route := _find_v2_guidance_route(actor, guide_cell)
++		# The beacon is the long-term objective, but the route line must never
++		# promise a destination outside this unit's current movement budget.
++		var reachable_route: Array[Vector2i] = [actor.grid_pos]
++		var spent_move := 0
++		for cell in route:
++			var step_cost := maxi(1, int(_get_move_cost(cell, actor.job)))
++			if spent_move + step_cost > maxi(0, actor.move_points):
++				break
++			spent_move += step_cost
++			reachable_route.append(cell)
++		if reachable_route.size() > 1:
++			var line := Line2D.new()
++			line.name = "V2ObjectiveRoute"
++			line.width = 4.0
++			line.default_color = Color(1.0, 0.78, 0.22, 0.88)
++			line.joint_mode = Line2D.LINE_JOINT_ROUND
++			line.begin_cap_mode = Line2D.LINE_CAP_ROUND
++			line.end_cap_mode = Line2D.LINE_CAP_ROUND
++			line.z_index = 0
++			line.add_point(_get_cell_center(actor.grid_pos))
++			for cell in reachable_route.slice(1):
++				line.add_point(_get_cell_center(cell))
++			layer.add_child(line)
++	var marker := Node2D.new()
++	marker.name = "V2ObjectiveBeacon"
++	marker.position = _get_cell_center(guide_cell)
++	marker.z_index = 2
++	var diamond := Polygon2D.new()
++	diamond.polygon = PackedVector2Array([
++		Vector2(0, -24), Vector2(24, 0), Vector2(0, 24), Vector2(-24, 0),
++	])
++	diamond.color = Color(1.0, 0.72, 0.16, 0.34)
++	marker.add_child(diamond)
++	var ring := Line2D.new()
++	ring.width = 3.0
++	ring.default_color = Color(1.0, 0.90, 0.40, 0.98)
++	ring.closed = true
++	ring.points = PackedVector2Array([
++		Vector2(0, -29), Vector2(29, 0), Vector2(0, 29), Vector2(-29, 0),
++	])
++	marker.add_child(ring)
++	var label := Label.new()
++	label.text = "下一步"
++	label.position = Vector2(-42, -60)
++	label.size = Vector2(84, 28)
++	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
++	label.add_theme_font_size_override("font_size", 14)
++	label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.48, 1.0))
++	label.add_theme_color_override("font_outline_color", Color(0.04, 0.05, 0.06, 0.95))
++	label.add_theme_constant_override("outline_size", 4)
++	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	marker.add_child(label)
++	layer.add_child(marker)
++
++func _find_v2_guidance_route(actor: Unit, guide_cell: Vector2i) -> Array[Vector2i]:
++	var candidates: Array[Vector2i] = [guide_cell]
++	# A mission beacon may be occupied by an enemy encounter. Route the line to
++	# the nearest legal approach cell instead of drawing through that unit.
++	if _is_blocked(guide_cell):
++		candidates.clear()
++		for neighbor in GridSystem.get_neighbors(guide_cell):
++			if GridSystem.is_in_bounds(neighbor, map_width, map_height) and not _is_blocked(neighbor):
++				candidates.append(neighbor)
++	var best_route: Array[Vector2i] = []
++	for candidate in candidates:
++		var route: Array[Vector2i] = PathfindingScript.find_path(
++			actor.grid_pos,
++			candidate,
++			map_width,
++			map_height,
++			_get_move_cost.bind(actor.job),
++			_is_blocked
++		)
++		if not route.is_empty() and (best_route.is_empty() or route.size() < best_route.size()):
++			best_route = route
++	return best_route
+ 
+ func _install_v2_control_guide() -> void:
+ 	if hud == null:
+@@ -32,13 +153,32 @@ func _install_v2_control_guide() -> void:
+ 	guide.name = "V2DirectControlGuide"
+ 	guide.position = Vector2(14, 6)
+ 	guide.size = Vector2(510, 54)
+-	guide.text = "左键队员：显示范围  ·  左键蓝格：移动\n左键红色敌人：攻击  ·  右键：取消选择  ·  中键：拖动地图"
++	guide.text = "左键角色：显示范围  ·  左键蓝格：移动\n左键红色敌人：攻击  ·  右键取消预览  ·  Esc取消选择\n中键拖动地图  ·  Home回到角色  ·  Space结束我方回合（随后敌人行动）"
+ 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ 	guide.add_theme_font_size_override("font_size", 12)
+ 	guide.add_theme_color_override("font_color", Color(0.64, 0.86, 0.93, 0.96))
+ 	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ 	bottom_bar.add_child(guide)
+ 
++func _setup_objective_state() -> void:
++	# Start from the shared objective extraction, then apply V2-only pacing from
++	# the V2 mission repository. This keeps V1 levels.json behavior untouched.
++	super._setup_objective_state()
++	if not _is_v2_battle() or mission_objective_state == null:
++		return
++	var repository := get_node_or_null("/root/V2Data")
++	if repository == null or not repository.has_method("get_mission"):
++		return
++	var mission: Dictionary = repository.call("get_mission", StringName(level_id))
++	if mission.is_empty() or not mission_objective_state.has_method("apply_v2_tutorial_overrides"):
++		return
++	mission_objective_state.call(
++		"apply_v2_tutorial_overrides",
++		int(mission.get("max_turns", 0)),
++		int(mission.get("enemy_passive_turns", 0))
++	)
++	_sync_objective_state_from_mos()
++
+ func _setup_v2_services() -> void:
+ 	super._setup_v2_services()
+ 	if not _is_v2_battle():
+@@ -501,7 +641,16 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
+ func _run_enemy_turn() -> void:
+ 	await run_v2_enemy_turn()
+ 
++func _is_v2_enemy_turn_passive() -> bool:
++	return _is_v2_battle() and mission_objective_state != null and mission_objective_state.is_enemy_passive(turn_manager.turn_number if turn_manager else 1)
++
+ func run_v2_enemy_turn() -> void:
++	if _is_v2_enemy_turn_passive():
++		_log("教学宽限：敌人观察小队，本回合不执行攻击或移动")
++		_refresh_v2_runtime_state()
++		if turn_manager and not turn_manager.battle_over:
++			turn_manager.end_enemy_turn()
++		return
+ 	for raw_enemy in enemy_units:
+ 		var enemy: Unit = raw_enemy
+ 		if enemy == null or not enemy.is_alive or turn_manager == null or turn_manager.battle_over:
+@@ -527,6 +676,8 @@ func _advance_v2_hazard_player_turn() -> Dictionary:
+ func _consume_v2_hazard_enemy_phase() -> Array:
+ 	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("consume_enemy_phase_damage"):
+ 		return []
++	if _is_v2_enemy_turn_passive():
++		return []
+ 	var turn := turn_manager.turn_number if turn_manager else 1
+ 	var events: Array = v2_hazard_controller.consume_enemy_phase_damage(turn)
+ 	if events.is_empty():
+@@ -558,6 +709,16 @@ func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
+ func _apply_v2_interaction_result(result: Dictionary) -> void:
+ 	super._apply_v2_interaction_result(result)
+ 	var action_id := String(result.get("action_id", ""))
++	if action_id in ["view_camera_east", "view_rescue_zone"] and camera != null:
++		var center: Vector2i = result.get("reveal_center", selected_unit.grid_pos if selected_unit else Vector2i(-1, -1))
++		if center.x >= 0:
++			camera.focus_cell(center)
++			# Camera2D applies its canvas transform on the next idle frame. Flush it
++			# here so the very next real click still maps to the visible grid cell.
++			if camera.has_method("force_update_scroll"):
++				camera.call("force_update_scroll")
++		if hud:
++			hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野；Home 可回到当前队员")
+ 	if level_id == "ch1_m2":
+ 		if action_id in ["cut_power_grid", "bypass_security_door"]:
+ 			_apply_v2_map_changes(result.get("map_changes", []), "open")
+@@ -729,6 +890,7 @@ func _apply_v2_hazard_prompt(state: Dictionary) -> void:
+ func _render_v2_hud(context_override: String = "") -> void:
+ 	if not _is_v2_battle() or v2_hud_presenter == null or hud == null:
+ 		return
++	_render_v2_guidance()
+ 	v2_hud_presenter.render(_build_v2_hud_snapshot(context_override))
+ 
+ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
+@@ -745,7 +907,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
+ 	if checkpoint_id.is_empty():
+ 		checkpoint_id = String(v2_last_checkpoint.get("checkpoint_id", ""))
+ 	var phase_text := _get_v2_phase_text()
+-	var ordinary_controls := "左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图 · Space结束回合"
++	var ordinary_controls := "左键角色显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色 · Space结束我方回合（随后敌人行动）"
+ 	var context_prompt := context_override
+ 	if context_prompt.is_empty() and hud != null:
+ 		context_prompt = hud.get_context_prompt_text()
+@@ -781,6 +943,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
+ 		"step_count": step_count,
+ 		"objective_text": objective_text,
+ 		"guide_text": guide_text,
++		"guide_cell": v2_mission_flow.get_current_guide_cell() if v2_mission_flow != null and v2_mission_flow.has_method("get_current_guide_cell") else Vector2i(-1, -1),
+ 		"route_hint": route_hint,
+ 		"hazard_warning": hazard_warning,
+ 		"checkpoint_id": checkpoint_id,
+@@ -822,7 +985,7 @@ func _get_v2_route_hint(mission_snapshot: Dictionary, step_index: int) -> String
+ 		return route_hint
+ 	if v2_mission_flow != null:
+ 		var mission_data: Dictionary = v2_mission_flow.mission
+-		var steps: Variant = mission_data.get("objective_steps", [])
++		var steps: Variant = mission_data.get("expanded_objective_steps", []) if bool(mission_data.get("expanded_flow", false)) else mission_data.get("objective_steps", [])
+ 		if steps is Array and step_index >= 0 and step_index < steps.size() and steps[step_index] is Dictionary:
+ 			route_hint = String((steps[step_index] as Dictionary).get("route_hint", ""))
+ 		if route_hint.is_empty():
+diff --git a/tactical-grid/client/tests/v2/v2_action_service_test.gd b/tactical-grid/client/tests/v2/v2_action_service_test.gd
+index a037d23..004b8af 100644
+--- a/tactical-grid/client/tests/v2/v2_action_service_test.gd
++++ b/tactical-grid/client/tests/v2/v2_action_service_test.gd
+@@ -17,6 +17,20 @@ func _initialize() -> void:
+ 	attacker.weapon_damage = [3, 3]
+ 	var service = V2ActionService.new()
+ 	service.setup(map_data, [attacker], [target])
++	# Regression: a live enemy is a solid occupant, not a waypoint. The direct
++	# route is blocked, while a longer path around it remains legal.
++	var blocker: Unit = _make_unit("blocker", "enemy", Vector2i(2, 1), 4)
++	service.refresh_units([attacker], [blocker])
++	attacker.grid_pos = Vector2i(1, 1)
++	attacker.move_points = 4
++	var crossed: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(4, 1)})
++	t.check(not bool(crossed.get("valid", true)), "移动不能穿过敌方占用格")
++	t.check(crossed.get("reason", &"") == &"move_too_far", "穿越敌人只能走绕行路径并因超出步数被拒绝")
++	var around: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(3, 0)})
++	t.check(bool(around.get("valid", false)), "绕过敌人仍可生成移动预览")
++	t.check((around.get("path", []) as Array).has(Vector2i(2, 0)), "移动预览包含真实绕行路径")
++	blocker.free()
++	service.refresh_units([attacker], [target])
+ 
+ 	var move: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(2, 1)})
+ 	t.check(bool(move.get("valid", false)) and int(move.get("preview_id", 0)) > 0, "移动预览有效")
+diff --git a/tactical-grid/client/tests/v2/v2_camera_input_test.gd b/tactical-grid/client/tests/v2/v2_camera_input_test.gd
+index ea18504..5ac61ef 100644
+--- a/tactical-grid/client/tests/v2/v2_camera_input_test.gd
++++ b/tactical-grid/client/tests/v2/v2_camera_input_test.gd
+@@ -2,6 +2,8 @@ extends SceneTree
+ 
+ const Runner = preload("res://tests/v2/test_runner.gd")
+ const RouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
++const FocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
++const UnitScript = preload("res://scripts/game/unit.gd")
+ 
+ var t := Runner.new()
+ var _pan_delta := Vector2.ZERO
+@@ -56,8 +58,21 @@ func _initialize() -> void:
+ 	t.check(_zoom_amount == 1, "输入路由器转发滚轮缩放")
+ 	t.check(_focus_count == 1 and router.get_state_name() == "free_select", "Home 聚焦不改变战术状态")
+ 
++	var player = UnitScript.new()
++	player.team = "player"
++	player.is_alive = true
++	player.grid_pos = Vector2i(12, 14)
++	var second_player = UnitScript.new()
++	second_player.team = "player"
++	second_player.is_alive = true
++	second_player.grid_pos = Vector2i(4, 4)
++	t.check(FocusScript.resolve(null, [player, second_player]) == player, "取消选中后 Home 仍回到存活玩家")
++	t.check(FocusScript.resolve(second_player, [player, second_player]) == second_player, "有选中玩家时 Home 优先回到当前玩家")
++
+ 	camera.free()
+ 	router.free()
++	player.free()
++	second_player.free()
+ 	t.finish(self)
+ 
+ func _on_pan(delta: Vector2) -> void:
+diff --git a/tactical-grid/client/tests/v2/v2_input_router_test.gd b/tactical-grid/client/tests/v2/v2_input_router_test.gd
+index 192d600..008ca8c 100644
+--- a/tactical-grid/client/tests/v2/v2_input_router_test.gd
++++ b/tactical-grid/client/tests/v2/v2_input_router_test.gd
+@@ -78,8 +78,8 @@ func _initialize() -> void:
+ 	t.check(_cancelled == 0, "暂停不伪造取消信号")
+ 
+ 	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "暂停恢复单位选择")
+-	t.check(router.handle_event(right, Callable()), "单位选择右键返回自由选择")
+-	t.check(router.get_state_name() == "free_select", "单位选择右键取消选择")
++	t.check(router.handle_event(right, Callable()), "单位选择右键被消费")
++	t.check(router.get_state_name() == "unit_selected", "单位选择右键只取消当前预览并保留选择")
+ 	router.free()
+ 	t.finish(self)
+ 
+diff --git a/tactical-grid/client/tests/v2/v2_m1_config_test.gd b/tactical-grid/client/tests/v2/v2_m1_config_test.gd
+index ad4543e..4bc7b83 100644
+--- a/tactical-grid/client/tests/v2/v2_m1_config_test.gd
++++ b/tactical-grid/client/tests/v2/v2_m1_config_test.gd
+@@ -26,6 +26,7 @@ func _initialize() -> void:
+ 	t.check(int(mission.get("enemy_total", 0)) == 12 and int(mission.get("active_cap", 0)) == 3, "十二敌编制且同时最多三敌")
+ 	t.check(duration.size() == 2 and int(duration[0]) == 20 and int(duration[1]) == 25, "首次时长目标固定为 20 到 25 分钟")
+ 	t.check(String(mission.get("flow_mode", "")) == "expanded_m1" and (mission.get("expanded_objective_steps", []) as Array).size() == 5, "M1 使用五阶段扩展流程")
++	t.check(int(mission.get("max_turns", 0)) == 24 and int(mission.get("enemy_passive_turns", 0)) == 3, "V2 M1 独立回合预算与前三回合宽限")
+ 	t.check(tutorial_steps == ["select", "move", "attack", "intent", "camera", "evac"], "教学步骤按单条信息递进")
+ 	t.check(String(scout.get("name", "")) == "侦察兵", "营救角色名称固定")
+ 	t.check(scout.get("unlock", {}) == {"mission": "ch1_m1", "event": "scout_rescued"}, "侦察兵仅在营救事件后解锁")
+diff --git a/tactical-grid/client/tests/v2/v2_m1_interaction_test.gd b/tactical-grid/client/tests/v2/v2_m1_interaction_test.gd
+index 967d31f..b456c20 100644
+--- a/tactical-grid/client/tests/v2/v2_m1_interaction_test.gd
++++ b/tactical-grid/client/tests/v2/v2_m1_interaction_test.gd
+@@ -38,6 +38,8 @@ func _initialize() -> void:
+ 	)
+ 	t.check(bool(camera_result.get("success", false)), "摄像头查看操作提交成功")
+ 	t.check(camera_result.get("camera_zone_id", "") == "camera_rescue_zone", "摄像头返回持久区域 ID")
++	t.check(int(camera_result.get("reveal_radius", 0)) >= 7, "M1 摄像头揭示大范围地图")
++	t.check((camera_result.get("camera_zone_cells", []) as Array).size() >= 80, "M1 摄像头覆盖至少 80 个地图格")
+ 	t.check(camera_result.get("module_camera_disable_turns", 0) == 1, "侦察模块 B 额外短暂关闭摄像头")
+ 	t.check(visibility.is_cell_observed(Vector2i(16, 8)), "摄像头提交后救援中心格立即可见")
+ 	visibility.update_visibility([], [])
+diff --git a/tactical-grid/client/tests/v2/v2_m1_tutorial_test.gd b/tactical-grid/client/tests/v2/v2_m1_tutorial_test.gd
+index d069c02..646f3f6 100644
+--- a/tactical-grid/client/tests/v2/v2_m1_tutorial_test.gd
++++ b/tactical-grid/client/tests/v2/v2_m1_tutorial_test.gd
+@@ -9,34 +9,31 @@ func _initialize() -> void:
+ 	var flow := TutorialFlowScript.new()
+ 	flow.setup()
+ 	t.check(flow.current_step() == &"select", "首先教学选择")
+-	t.check(flow.current_text().length() <= 28, "提示不超过 28 字")
++	t.check("蓝色" in flow.current_text() and "红色" in flow.current_text(), "选择提示同时解释移动和攻击颜色")
+ 	t.check(flow.get_visible_hint_count() == 1, "一次只显示一条提示")
+ 	var wrong := flow.on_event(&"unit_moved")
+ 	t.check(not bool(wrong.get("advanced", false)), "未选择不能跳过步骤")
+ 	var selected := flow.on_event(&"unit_selected")
+ 	t.check(bool(selected.get("advanced", false)), "完成选择后推进")
+ 	t.check(flow.current_step() == &"move", "第二步教学移动")
+-	t.check(flow.current_text() == "点击蓝色格移动", "移动提示使用短文案")
++	t.check("蓝色格" in flow.current_text() and "右键" in flow.current_text(), "移动提示说明可移动格和取消方式")
+ 
+-	for expected in [
+-		{"event": &"unit_moved", "step": &"attack", "text": "悬停查看伤害，点击红色敌人攻击"},
+-		{"event": &"attack_committed", "step": &"intent", "text": "箭头显示敌人下一步"},
+-		{"event": &"enemy_intent_observed", "step": &"camera", "text": "查看摄像头：揭示区域并持续保持视野"},
+-		{"event": &"camera_viewed", "step": &"evac", "text": "两名队员进入撤离区"},
+-	]:
+-		var result: Dictionary = flow.on_event(expected.event)
+-		t.check(bool(result.get("advanced", false)), "行为推进：%s" % String(expected.event))
+-		t.check(flow.current_step() == expected.step, "推进到步骤：%s" % String(expected.step))
+-		t.check(flow.current_text() == expected.text, "步骤文案明确：%s" % String(expected.step))
+-		t.check(flow.get_visible_hint_count() <= 1, "步骤切换不叠加提示：%s" % String(expected.step))
+-
+-	var evac_wait := flow.on_event(&"unit_moved")
+-	t.check(not bool(evac_wait.get("advanced", false)), "单名队员移动不能完成撤离教学")
++	var moved := flow.on_event(&"unit_moved")
++	t.check(bool(moved.get("advanced", false)), "完成移动后推进到后续提示")
++	t.check(flow.current_step() == &"attack", "移动后进入攻击提示而非阻塞主线")
+ 	var completed := flow.on_event(&"evac_completed")
+-	t.check(bool(completed.get("advanced", false)), "两名队员撤离后完成教学")
+-	t.check(flow.is_complete(), "六步教学完成")
++	t.check(bool(completed.get("advanced", false)), "主线撤离事件可直接完成软引导")
++	t.check(flow.is_complete(), "主线完成后教学结束")
+ 	t.check(flow.get_visible_hint_count() == 0, "教学完成后没有残留提示")
+ 
++	var optional := TutorialFlowScript.new()
++	optional.setup()
++	optional.on_event(&"unit_selected")
++	optional.on_event(&"unit_moved")
++	var camera_first := optional.on_event(&"camera_viewed")
++	t.check(bool(camera_first.get("advanced", false)) and optional.current_step() == &"evac", "摄像头教学可选且不会要求先攻击或观察敌人")
++	t.check(bool(optional.on_event(&"evac_completed").get("advanced", false)) and optional.is_complete(), "可选教学之后仍可直接结束")
++
+ 	var skipped := TutorialFlowScript.new()
+ 	skipped.setup()
+ 	var skip_result := skipped.skip()
+diff --git a/tactical-grid/client/tests/v2/v2_objective_hud_runtime_scene_test.gd b/tactical-grid/client/tests/v2/v2_objective_hud_runtime_scene_test.gd
+index 62fbdad..93913eb 100644
+--- a/tactical-grid/client/tests/v2/v2_objective_hud_runtime_scene_test.gd
++++ b/tactical-grid/client/tests/v2/v2_objective_hud_runtime_scene_test.gd
+@@ -63,10 +63,25 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
+ 	if not ready:
+ 		await _cleanup_battle(battle)
+ 		return
++	t.check(battle.turn_manager.max_turns == 24, "V2 M1 使用独立 24 回合预算")
++	t.check(battle.mission_objective_state.is_enemy_passive(3) and not battle.mission_objective_state.is_enemy_passive(4), "V2 M1 前三回合敌人保持教学宽限")
++	t.check(bool(battle.call("_is_v2_enemy_turn_passive")), "V2 敌人回合实际读取前三回合安全教学")
++	battle.turn_manager.turn_number = 4
++	t.check(not bool(battle.call("_is_v2_enemy_turn_passive")), "V2 第四回合恢复敌方行动")
++	battle.turn_manager.turn_number = 1
+ 	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
+ 	t.check(String(initial.get("step_id", "")) == "search_route_split" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 5, "M1 路线分叉前真实 HUD 快照为 1/5")
++	t.check(initial.get("guide_cell", Vector2i(-1, -1)) == Vector2i(8, 14), "M1 快照提供当前目标坐标")
+ 	t.check(battle.hud.objective_label.text.contains("1/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/5"), "M1 路线分叉前真实 HUD 控件显示 1/5")
+-	var assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
++	var mission_card := battle.hud.get_node_or_null("V2MissionCard") as Panel
++	t.check(mission_card != null and mission_card.visible and String(mission_card.get_node("MissionCardText").text).contains("黄色分叉标记"), "M1 HUD 显示持久任务卡和具体目的地")
++	var guidance := battle.get_node_or_null("V2ObjectiveGuidance") as Node2D
++	var beacon := guidance.get_node_or_null("V2ObjectiveBeacon") if guidance != null else null
++	t.check(beacon != null, "M1 地图显示下一步目标信标")
++	var initial_assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
++	var route_line := guidance.get_node_or_null("V2ObjectiveRoute") as Line2D if guidance != null else null
++	t.check(route_line != null and route_line.points.size() > 1 and initial_assault != null and route_line.points.size() <= initial_assault.move_points + 1, "M1 路线指引只显示本回合可达路径")
++	var assault: Unit = initial_assault
+ 	if assault != null and battle.v2_rescue_controller != null:
+ 		assault.grid_pos = Vector2i(8, 14)
+ 		battle.call("_update_unit_sprite_pos", assault, false)
+diff --git a/tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd b/tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd
+index 98cd739..33d2d4e 100644
+--- a/tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd
++++ b/tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd
+@@ -65,7 +65,7 @@ func _run() -> void:
+ 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
+ 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
+ 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
+-	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键") and v2_guide.text.contains("Space结束回合"), "V2 底栏固定显示任务流程和直接操作指南")
++	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键取消预览") and v2_guide.text.contains("Esc取消选择") and v2_guide.text.contains("Home回到角色") and v2_guide.text.contains("Space结束我方回合"), "V2 底栏固定显示统一的直接操作指南")
+ 	if player == null:
+ 		_cleanup_battle(battle)
+ 		t.finish(get_tree())
+@@ -78,6 +78,10 @@ func _run() -> void:
+ 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "选中角色后保持单位选择状态")
+ 	t.check(battle.v2_affordance_presenter.get_child_count() > 0, "选中角色后显示移动/攻击范围")
+ 	t.check(battle.hud.context_label.text.contains("蓝色") and battle.hud.context_label.text.contains("红色"), "选中角色后提示蓝色移动与红色攻击")
++	var invalid_move_target := _find_invalid_move_target(battle, player)
++	if invalid_move_target.x >= 0:
++		battle.call("_on_v2_cell_left_clicked", invalid_move_target)
++		t.check(battle.hud.get_context_prompt_text().contains("蓝色格") and battle.hud.get_context_prompt_text().contains("不能移动"), "点击不可移动格明确解释原因和下一步")
+ 	var hover_move_target := _find_safe_move_target(battle, player)
+ 	if hover_move_target.x >= 0:
+ 		await _move_mouse_to_cell(battle, hover_move_target)
+@@ -88,6 +92,43 @@ func _run() -> void:
+ 	# M107 bridge: a completed camera observation changes the real battle front
+ 	# state and immediately reaches the V2 HUD snapshot.
+ 	t.check(battle.alert_state.get_front_state() == &"hidden", "M1 实战初始警戒为潜伏")
++	# Regression: a real camera interaction moves the viewport to the rescue
++	# zone. The next map click must still resolve to the displayed grid cell.
++	var camera_test_origin := player.grid_pos
++	player.grid_pos = Vector2i(7, 14)
++	battle.call("_update_unit_sprite_pos", player, false)
++	battle.call("_refresh_selected_unit_affordances", player)
++	battle.call("_open_v2_interaction_menu", "facility_camera_console_south")
++	t.check(battle.v2_input_router.get_state_name() == "interaction_menu", "摄像头设施打开交互菜单")
++	await get_tree().process_frame
++	var camera_picker: PopupPanel = battle.hud._action_picker
++	var camera_button: Button = null
++	if camera_picker != null and is_instance_valid(camera_picker):
++		var camera_box := camera_picker.get_node_or_null("VBox") as VBoxContainer
++		if camera_box != null:
++			for child in camera_box.get_children():
++				if child is Button and String((child as Button).text).begins_with("查看"):
++					camera_button = child as Button
++					break
++	t.check(camera_button != null, "摄像头菜单提供查看选项")
++	if camera_button != null:
++		camera_button.emit_signal("pressed")
++	await get_tree().process_frame
++	await get_tree().process_frame
++	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "摄像头操作后恢复角色操作状态")
++	t.check(battle.selected_unit == player, "摄像头操作后保留当前角色选择")
++	var post_camera_move_target := _find_safe_move_target(battle, player)
++	t.check(post_camera_move_target.x >= 0, "摄像头操作后仍存在可移动格")
++	if post_camera_move_target.x >= 0:
++		await _move_mouse_to_cell(battle, post_camera_move_target)
++		await _click_left()
++		await get_tree().process_frame
++		t.check(player.grid_pos == post_camera_move_target, "摄像头操作后真实鼠标仍可移动角色")
++	player.grid_pos = camera_test_origin
++	player.v2_turn_state.begin_turn()
++	battle.call("_update_unit_sprite_pos", player, false)
++	battle.call("_refresh_selected_unit_affordances", player)
++
+ 	battle.call("_apply_v2_interaction_result", {
+ 		"success": true,
+ 		"facility_id": "facility_camera_console_south",
+@@ -122,6 +163,7 @@ func _run() -> void:
+ 		var hp_before := target.current_hp
+ 		await _move_mouse_to_cell(battle, attack_cell)
+ 		t.check(battle.hud.get_attack_preview_text().contains("悬停预览"), "悬停敌人显示攻击预览")
++		t.check(battle.hud.get_context_prompt_text().contains("左键攻击"), "悬停敌人主提示明确说明左键攻击")
+ 		var expected_hp_after := int(battle.v2_hover_attack_preview.get("hp_after", hp_before))
+ 		await _click_left()
+ 		await get_tree().process_frame
+@@ -156,13 +198,21 @@ func _run() -> void:
+ 	var camera_before := battle.camera.position
+ 	await _drag_camera()
+ 	t.check(battle.camera.position != camera_before, "中键拖动真实改变战场镜头")
++	# Regression: the shipped window may let HUD/map Controls consume the event
++	# before _unhandled_input. Exercise the V2 controller's front-door bridge
++	# directly so this test covers the same path used by the real window.
++	var frontdoor_camera_before := battle.camera.position
++	await _drag_camera_through_v2_frontdoor(battle)
++	t.check(battle.camera.position != frontdoor_camera_before, "V2 前置输入入口接管被 UI 消费的中键拖动")
+ 	var zoom_before := battle.camera.zoom.x
+ 	await _wheel_zoom()
+ 	t.check(battle.camera.zoom.x > zoom_before, "滚轮真实放大镜头")
+ 
+-	# 5. 右键取消当前选择，重新左键选中后用 G 查看网络层。
++	# 5. 右键取消当前预览但保留角色选择；Esc 才清除选择，随后用 G 查看网络层。
+ 	await _click_right()
+-	t.check(battle.selected_unit == null and battle.v2_input_router.get_state_name() == "free_select", "右键取消选择并回到自由选择")
++	t.check(battle.selected_unit == player and battle.v2_input_router.get_state_name() == "unit_selected", "右键取消预览但保留角色选择")
++	await _press_key(KEY_ESCAPE)
++	t.check(battle.selected_unit == null and battle.v2_input_router.get_state_name() == "free_select", "Esc 取消选择并回到自由选择")
+ 	await _move_mouse_to_cell(battle, player.grid_pos)
+ 	await _click_left()
+ 	await _press_key(KEY_G)
+@@ -287,6 +337,20 @@ func _find_safe_move_target(battle: BattleController, player: Unit) -> Vector2i:
+ 			return cell
+ 	return Vector2i(-1, -1)
+ 
++func _find_invalid_move_target(battle: BattleController, player: Unit) -> Vector2i:
++	for y in range(battle.map_height):
++		for x in range(battle.map_width):
++			var cell := Vector2i(x, y)
++			if cell == player.grid_pos or battle.reachable_cells.has(cell):
++				continue
++			if battle.call("_get_unit_at", cell) != null:
++				continue
++			var facility: Dictionary = battle.v2_interaction_service.get_facility_at(cell) if battle.v2_interaction_service else {}
++			if not facility.is_empty():
++				continue
++			return cell
++	return Vector2i(-1, -1)
++
+ func _prepare_adjacent_target(battle: BattleController, player: Unit, target: Unit) -> Vector2i:
+ 	if target == null:
+ 		return Vector2i(-1, -1)
+@@ -332,6 +396,26 @@ func _drag_camera() -> void:
+ 	get_viewport().push_input(release)
+ 	await get_tree().process_frame
+ 
++func _drag_camera_through_v2_frontdoor(battle: Node) -> void:
++	var start := Vector2(600.0, 400.0)
++	var end := Vector2(700.0, 400.0)
++	var press := InputEventMouseButton.new()
++	press.button_index = MOUSE_BUTTON_MIDDLE
++	press.pressed = true
++	press.position = start
++	battle.call("_input", press)
++	await get_tree().process_frame
++	var motion := InputEventMouseMotion.new()
++	motion.position = end
++	battle.call("_input", motion)
++	await get_tree().process_frame
++	var release := InputEventMouseButton.new()
++	release.button_index = MOUSE_BUTTON_MIDDLE
++	release.pressed = false
++	release.position = end
++	battle.call("_input", release)
++	await get_tree().process_frame
++
+ func _wheel_zoom() -> void:
+ 	var event := InputEventMouseButton.new()
+ 	event.button_index = MOUSE_BUTTON_WHEEL_UP
+diff --git a/tactical-grid/client/tests/v2/v2_result_presentation_test.gd b/tactical-grid/client/tests/v2/v2_result_presentation_test.gd
+index 608e7a2..b58286b 100644
+--- a/tactical-grid/client/tests/v2/v2_result_presentation_test.gd
++++ b/tactical-grid/client/tests/v2/v2_result_presentation_test.gd
+@@ -19,11 +19,14 @@ func _initialize() -> void:
+ 	var m1: Dictionary = presentation.build_summary({
+ 		"level_id": "ch1_m1",
+ 		"result": "victory",
++		"starting_unit_count": 1,
+ 		"optional_record": true,
+ 		"rescued": ["scout"],
+ 		"unlocked_modules": ["scout_a", "scout_b"],
+ 	}, repository)
+-	t.check("两名" in String(m1.get("completion_guide", "")), "M1 结算说明两名队员撤离条件")
++	var m1_guide := String(m1.get("completion_guide", ""))
++	t.check("1 名突击兵出发" in m1_guide and "最多 2 名队员" in m1_guide and "所有当前存活队员" in m1_guide, "M1 结算按实际队伍说明撤离条件")
++	t.check(not m1_guide.contains("两名存活队员"), "M1 结算不再写死两名存活队员")
+ 	t.check(m1.get("module_lines", []) == ["扩展扫描", "静默扫描"], "M1 模块名称按数据本地化")
+ 
+ 	var m2: Dictionary = presentation.build_summary({
+@@ -42,10 +45,12 @@ func _initialize() -> void:
+ 	var failed_after_rescue: Dictionary = presentation.build_summary({
+ 		"level_id": "ch1_m2",
+ 		"result": "defeat",
++		"mission_step_id": "rescue_sniper",
+ 		"rescued": ["sniper"],
+ 		"unlocked_modules": ["sniper_a"],
+ 	}, repository)
+ 	t.check(failed_after_rescue.get("rescued_lines", []).is_empty(), "V2 失败结算不宣称临时营救角色已加入基地")
+ 	t.check(failed_after_rescue.get("module_lines", []).is_empty(), "V2 失败结算不宣称未持久化模块已解锁")
++	t.check(String(failed_after_rescue.get("phase_line", "")).contains("营救狙击手"), "V2 失败结算显示当前任务阶段")
+ 	repository.free()
+ 	t.finish(self)
+diff --git a/tactical-grid/client/tests/v2/v2_unit_art_distinction_test.gd b/tactical-grid/client/tests/v2/v2_unit_art_distinction_test.gd
+index b738433..b85d58b 100644
+--- a/tactical-grid/client/tests/v2/v2_unit_art_distinction_test.gd
++++ b/tactical-grid/client/tests/v2/v2_unit_art_distinction_test.gd
+@@ -1,6 +1,8 @@
+ extends SceneTree
+ 
+ const Runner = preload("res://tests/v2/test_runner.gd")
++const UnitScript = preload("res://scripts/game/unit.gd")
++const UnitSpriteScript = preload("res://scripts/game/unit_sprite.gd")
+ 
+ var t := Runner.new()
+ 
+@@ -22,4 +24,20 @@ func _initialize() -> void:
+ 		t.check(image != null and image.get_pixel(0, 0).a < 0.1, "V2 角色图带透明背景：%s" % key)
+ 		var path_ok := FileAccess.file_exists("res://assets/v2/units/%s_128.png" % String(key))
+ 		t.check(path_ok, "V2 角色图不回退到 V1 路径：%s" % key)
++	for key in [&"v2_protocol_engineer", &"v2_hunter"]:
++		t.check(catalog.has_texture(&"unit", key), "V2 扩展敌人角色图存在：%s" % key)
++		t.check(FileAccess.file_exists("res://assets/generated/chapter1/runtime/units/%s_96.png" % String(key).trim_prefix("v2_")), "V2 扩展敌人复用已验证资源：%s" % key)
++	var badges := {}
++	for job in ["sentry", "drone", "sniper_sentry", "shield_guard", "protocol_engineer", "hunter"]:
++		var unit: Unit = UnitScript.new()
++		unit.team = "enemy"
++		unit.job = job
++		var sprite: Node = UnitSpriteScript.new()
++		sprite.update_unit(unit)
++		var badge := String(sprite.call("_get_role_badge"))
++		t.check(not badge.is_empty(), "敌方原型有可读徽章：%s" % job)
++		badges[badge] = true
++		sprite.free()
++		unit.free()
++	t.check(badges.size() == 6, "六类敌人徽章全部区分")
+ 	t.finish(self)

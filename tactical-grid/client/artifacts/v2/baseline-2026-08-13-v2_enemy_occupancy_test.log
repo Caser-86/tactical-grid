@@ -1,0 +1,10 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] 远距离敌人选择移动而不是等待
+  [PASS] 敌方 AI 不选择玩家占用格
+  [PASS] 敌方 AI 不选择自身所在格
+  [PASS] 占用出生格的敌人保持等待并记录 spawn_cell_occupied
+  [PASS] 出生格释放后按稳定顺序晋升等待敌人
+  [PASS] 存活敌人占用出生格时等待队列不生成重叠敌人
+Passed: 6
+Failed: 0
