@@ -53,4 +53,4 @@ V1 的 `PROJECT_STATUS.md`、`docs/PROJECT_TAKEOVER_ROADMAP.md` 和 2026-07-30 �
 
 ## 下一步
 
-P1、P2、M101-M113 已完成，M114 的单击攻击和单位占位修正已通过 V2 独立门禁；下一步严格按 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 组织三名首次玩家，保存匿名 JSON 和人工记录，随后依据真实卡点完成 M1 灰盒锁。M1 未通过 H1 三名首次玩家门前，不扩展后续章节正式内容。
+下一步仅按 [2026-08-13 正式游戏设计](../docs/superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md) -> [第一章主路线图](../docs/superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md) -> [当前 M1 核心乐趣实施计划](../docs/superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md) 执行。2026-08-05 规格、主实施计划和旧 H1 流程文档仅保留为实现历史，不构成当前队列。
