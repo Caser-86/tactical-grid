@@ -181,6 +181,8 @@ const PATHS := {
 		&"v2_drone": V2_UNIT_ROOT + "v2_drone_128.png",
 		&"v2_shield_guard": V2_UNIT_ROOT + "v2_shield_guard_128.png",
 		&"v2_sniper_sentry": V2_UNIT_ROOT + "v2_sniper_sentry_128.png",
+		&"v2_protocol_engineer": ROOT + "units/protocol_engineer_96.png",
+		&"v2_hunter": ROOT + "units/hunter_96.png",
 		&"assault": ROOT + "units/assault_96.png",
 		&"sniper": ROOT + "units/sniper_96.png",
 		&"heavy": ROOT + "units/heavy_96.png",
