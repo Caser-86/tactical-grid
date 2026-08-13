@@ -68,6 +68,11 @@ func get_state_name() -> String:
 func get_state() -> State:
 	return _state
 
+## The V2 controller uses this during _input so a HUD Control cannot swallow
+## the motion event before it reaches the unhandled-input router.
+func is_camera_panning() -> bool:
+	return _middle_dragging
+
 func get_last_cancelled_state() -> State:
 	return _last_cancelled_state
 
@@ -137,7 +142,9 @@ func _handle_cancel() -> bool:
 			set_state(State.UNIT_SELECTED)
 			pointer_cancel_requested.emit()
 		State.UNIT_SELECTED:
-			set_state(State.FREE_SELECT)
+			# Right-click is a tactical back action, not a deselect action. Keep
+			# the unit selected so the player can immediately choose another blue
+			# cell, red target, or facility after cancelling a preview.
 			pointer_cancel_requested.emit()
 		State.FREE_SELECT, State.ENEMY_TURN, State.PAUSED:
 			return true

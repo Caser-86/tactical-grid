@@ -20,6 +20,7 @@ const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.
 const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
 const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2PlaytestRecorderScript = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
+const V2CameraFocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -2690,6 +2691,9 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		battle_result["rescued"] = rescued_ids
 		battle_result["rescue_character"] = rescue_character_id if v2_rescued_target else ""
 		battle_result["unlocked_modules"] = v2_unlocked_modules
+		battle_result["starting_unit_count"] = player_units.size()
+		battle_result["mission_step_id"] = String(v2_result_snapshot.get("step_id", ""))
+		battle_result["mission_step_text"] = String(v2_result_snapshot.get("guide_text", ""))
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
 	if _is_v2_battle():
@@ -3159,7 +3163,7 @@ func request_move(cell: Vector2i) -> Dictionary:
 			v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
 			v2_pending_move_preview.clear()
 		if hud:
-			hud.set_context_prompt("该格已有单位，不能移动到同一位置")
+			hud.set_context_prompt("该格已有单位，不能移动；请点击蓝色格。")
 		return {"success": false, "committed": false, "reason": &"occupied"}
 
 	if not v2_pending_move_preview.is_empty():
@@ -3180,15 +3184,19 @@ func request_move(cell: Vector2i) -> Dictionary:
 		"target": cell,
 	})
 	if not bool(preview.get("valid", false)):
-		return {"success": false, "committed": false, "reason": preview.get("reason", &"invalid_move"), "preview": preview}
+		var reason: StringName = preview.get("reason", &"invalid_move")
+		if hud:
+			hud.set_context_prompt(_v2_move_failure_prompt(reason))
+		_render_v2_hud()
+		return {"success": false, "committed": false, "reason": reason, "preview": preview}
 	if bool(preview.get("dangerous", false)):
 		v2_pending_move_preview = preview
 		if v2_input_router:
 			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 		if hud:
-			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消")
+			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消预览")
 		if v2_affordance_presenter:
-			v2_affordance_presenter.show_path([selected_unit.grid_pos, cell], true)
+			v2_affordance_presenter.show_path(_get_v2_preview_path(preview), true)
 		_render_v2_hud()
 		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
 
@@ -3199,6 +3207,33 @@ func request_move(cell: Vector2i) -> Dictionary:
 	else:
 		result["committed"] = false
 	return result
+
+func _v2_move_failure_prompt(reason: StringName) -> String:
+	match reason:
+		&"move_unavailable":
+			return "本回合移动已用；点击红色敌人攻击，或按 Space 结束回合。"
+		&"blocked":
+			return "该格被障碍物阻挡，不能移动；请点击蓝色格。"
+		&"move_too_far":
+			return "该格超出移动范围，不能移动；请点击蓝色格或悬停查看路径。"
+		&"no_path":
+			return "该格没有可通行路径，不能移动；请点击蓝色格。"
+		&"occupied":
+			return "该格已有单位，不能移动；请点击蓝色格。"
+		_:
+			return "不能移动到该格；请点击蓝色格，红色敌人可直接攻击。"
+
+func _get_v2_preview_path(preview: Dictionary) -> Array[Vector2i]:
+	var path: Array[Vector2i] = []
+	var raw_path: Variant = preview.get("path", [])
+	if raw_path is Array:
+		path.append(preview.get("from", selected_unit.grid_pos) as Vector2i)
+		for raw_cell in raw_path:
+			if raw_cell is Vector2i:
+				path.append(raw_cell)
+	if path.size() >= 2:
+		return path
+	return [selected_unit.grid_pos, preview.get("target", selected_unit.grid_pos)]
 
 func _finalize_v2_move(result: Dictionary) -> void:
 	if v2_affordance_presenter:
@@ -3278,7 +3313,7 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 			return
 	if not v2_locked_attack_preview.is_empty():
 		if hud:
-			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消")
+			hud.set_context_prompt("攻击目标已锁定：再次点击同一红色敌人确认，右键取消预览")
 		return
 	request_move(cell)
 
@@ -3297,6 +3332,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 			v2_affordance_presenter.show_attack_focus(cell, false)
 			if hud:
 				hud.show_attack_preview(hover_preview, hovered_unit, false)
+				hud.set_context_prompt("%s · 左键攻击" % hud.get_context_prompt_text())
 			_render_v2_hud()
 			return
 	_clear_v2_hover_preview()
@@ -3327,7 +3363,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		display_path.append_array(path)
 		v2_affordance_presenter.show_path(display_path, false)
 		if hud:
-			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消选择。" % [cell.x + 1, cell.y + 1])
+			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消预览；Esc取消选择。" % [cell.x + 1, cell.y + 1])
 		_render_v2_hud()
 
 ## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
@@ -3556,13 +3592,21 @@ func _on_v2_cancel_requested() -> void:
 	if v2_affordance_presenter:
 		v2_affordance_presenter.clear_preview()
 	if previous_state == V2BattleInputRouter.State.UNIT_SELECTED and selected_unit != null:
-		_deselect_unit()
+		# Escape changes the router to FREE_SELECT and truly clears selection;
+		# right-click keeps UNIT_SELECTED and only cancels the active preview.
+		if v2_input_router == null or v2_input_router.get_state() == V2BattleInputRouter.State.FREE_SELECT:
+			_deselect_unit()
+		else:
+			_refresh_selected_unit_affordances(selected_unit)
+			if hud:
+				hud.set_context_prompt("已保留角色选择：点击蓝色格移动，点击红色敌人攻击；Esc取消选择。")
 	elif selected_unit:
 		_refresh_selected_unit_affordances(selected_unit)
 	_render_v2_hud()
 
 func _on_v2_camera_pan(delta: Vector2) -> void:
 	if camera:
+		camera.clear_follow_target()
 		camera.pan_by_screen_delta(delta)
 
 func _on_v2_camera_zoom(amount: int) -> void:
@@ -3570,8 +3614,16 @@ func _on_v2_camera_zoom(amount: int) -> void:
 		camera.zoom_at(float(amount), get_viewport().get_mouse_position())
 
 func _on_v2_camera_focus() -> void:
-	if camera and selected_unit:
-		camera.focus_cell(selected_unit.grid_pos)
+	if camera == null:
+		return
+	var focus_unit := get_v2_camera_focus_unit()
+	if focus_unit != null:
+		camera.focus_cell(focus_unit.grid_pos)
+
+## Home must still work after a facility interaction clears selection. V2 keeps
+## the camera shortcut independent from tactical selection state.
+func get_v2_camera_focus_unit() -> Unit:
+	return V2CameraFocusScript.resolve(selected_unit, player_units)
 
 ## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
 func _open_v2_interaction_menu(entity_id: String) -> void:
@@ -3615,12 +3667,13 @@ func _open_v2_interaction_menu(entity_id: String) -> void:
 			actions,
 			Callable(self, "_on_v2_interaction_action_selected").bind(entity_id)
 		)
-		hud.set_context_prompt("选择设施操作；右键取消")
+		hud.set_context_prompt("选择设施操作；右键取消菜单")
 	_render_v2_hud()
 
 func _on_v2_interaction_action_selected(action_id: String, entity_id: String) -> void:
 	if v2_interaction_service == null or selected_unit == null:
 		return
+	var camera_action := action_id in ["view_camera_east", "view_rescue_zone"]
 	var result: Dictionary = v2_interaction_service.commit_action(
 		selected_unit, entity_id, action_id, v2_interaction_service.get_state_revision()
 	)
@@ -3642,14 +3695,25 @@ func _on_v2_interaction_action_selected(action_id: String, entity_id: String) ->
 			hud.update_unit_info(selected_unit)
 	_advance_context_hint("interact")
 	_render_v2_hud()
+	if camera_action and hud:
+		hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野。角色仍可操作：左键蓝格移动，左键红色敌人攻击，Home 回到角色。")
+		_render_v2_hud()
 
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	var facility_id := String(result.get("facility_id", ""))
 	var facility: Dictionary = v2_interaction_service.get_facility(facility_id) if v2_interaction_service else {}
+	var action_id := String(result.get("action_id", ""))
+	var is_camera_view := action_id in ["view_camera_east", "view_rescue_zone"]
 	var reveal_radius := int(result.get("reveal_radius", 0))
 	if reveal_radius > 0 and visibility_state:
 		var center: Vector2i = result.get("reveal_center", facility.get("position", selected_unit.grid_pos))
-		var cells := VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
+		var cells: Array[Vector2i] = []
+		if _is_v2_battle() and result.get("camera_zone_cells", []) is Array:
+			for raw_cell in result.get("camera_zone_cells", []):
+				if raw_cell is Vector2i:
+					cells.append(raw_cell)
+		else:
+			cells = VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
 		visibility_state.reveal_cells(cells)
 		if result.has("camera_zone_id"):
 			_sync_camera_zone_cells()
@@ -3660,17 +3724,13 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 		_update_visibility()
 	var v2_alert_result: Dictionary = {}
 	var consequence := String(result.get("consequence", "操作完成"))
-	if _is_v2_battle() and String(result.get("action_id", "")) == "view_camera_east" and alert_state:
+	if _is_v2_battle() and is_camera_view and alert_state:
 		v2_alert_result = alert_state.apply_event("camera_identified_player")
-	if String(result.get("action_id", "")) == "view_camera_east":
+	if is_camera_view:
 		var camera_effect := "摄像头用途：揭示东侧区域并持续保持视野"
 		if reveal_radius > 0:
-			var revealed_count := VisionSystem.get_visible_cells(
-				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)),
-				reveal_radius,
-				map_width,
-				map_height,
-				_is_vision_blocking
+			var revealed_count := (result.get("camera_zone_cells", []) as Array).size() if _is_v2_battle() else VisionSystem.get_visible_cells(
+				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)), reveal_radius, map_width, map_height, _is_vision_blocking
 			).size()
 			camera_effect = "摄像头已揭示东侧区域 %d 格，并持续保持视野" % revealed_count
 		consequence = camera_effect
@@ -3683,7 +3743,7 @@ func _apply_v2_interaction_result(result: Dictionary) -> void:
 		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
 	elif bool(v2_alert_result.get("grace", false)):
 		consequence = "故事宽限：摄像头暂未触发搜索；%s" % consequence
-	if String(result.get("action_id", "")) == "view_camera_east":
+	if is_camera_view:
 		_advance_v2_tutorial(&"camera_viewed", {"facility_id": facility_id})
 	_log("设施 %s：%s" % [facility_id, consequence])
 	if String(result.get("reward_module", "")) != "":
@@ -3901,7 +3961,7 @@ func _show_attack_preview(target: Unit) -> void:
 	var hit_percent := int(roundf(float(preview.get("hit_chance", 0.0)) * 100.0))
 	var expected_damage := int(preview.get("damage", 0))
 	hud.set_context_prompt(
-		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消" % [
+		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消预览" % [
 			target.unit_name, hit_percent, expected_damage, target.current_hp, target.max_hp
 		]
 	)

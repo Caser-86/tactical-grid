@@ -16,7 +16,8 @@ const COLOR_HIDDEN_GRID := Color(0.10, 0.16, 0.20, 0.22)
 ## 已记录格的降饱和叠加色（保留地形可见但明显变暗）
 const COLOR_DIMMED := Color(0.04, 0.06, 0.10, 0.55)
 ## 摄像头区域微调色相，让玩家能识别"由摄像头维持的观察区"
-const COLOR_CAMERA_TINT := Color(0.10, 0.32, 0.40, 0.18)
+const COLOR_CAMERA_TINT := Color(0.08, 0.54, 0.66, 0.26)
+const COLOR_CAMERA_BORDER := Color(0.24, 0.92, 1.0, 0.72)
 
 var _visibility_state: VisibilityState
 var _cell_size: float = 64.0
@@ -77,10 +78,24 @@ func _draw() -> void:
 					draw_rect(rect, Color(0.10, 0.16, 0.22, 0.35), false, 1.0)
 				VisibilityState.RENDER_VISIBLE:
 					# 正在观察区无遮挡；若由摄像头维持则加微调色提示
-					if _camera_cells.has(cell):
+					if show_hidden_silhouette and _camera_cells.has(cell):
 						draw_rect(rect, COLOR_CAMERA_TINT, true)
+						_draw_camera_edges(cell, rect)
 				_:
-					draw_rect(rect, COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN, true)
+						draw_rect(rect, COLOR_HIDDEN_SILHOUETTE if show_hidden_silhouette else COLOR_HIDDEN, true)
+
+func _draw_camera_edges(cell: Vector2i, rect: Rect2) -> void:
+	if not show_hidden_silhouette:
+		return
+	var width := 2.0
+	if not _camera_cells.has(Vector2i(cell.x, cell.y - 1)):
+		draw_line(rect.position, rect.position + Vector2(rect.size.x, 0), COLOR_CAMERA_BORDER, width)
+	if not _camera_cells.has(Vector2i(cell.x + 1, cell.y)):
+		draw_line(rect.position + Vector2(rect.size.x, 0), rect.position + rect.size, COLOR_CAMERA_BORDER, width)
+	if not _camera_cells.has(Vector2i(cell.x, cell.y + 1)):
+		draw_line(rect.position + Vector2(0, rect.size.y), rect.position + Vector2(rect.size.x, rect.size.y), COLOR_CAMERA_BORDER, width)
+	if not _camera_cells.has(Vector2i(cell.x - 1, cell.y)):
+		draw_line(rect.position, rect.position + Vector2(0, rect.size.y), COLOR_CAMERA_BORDER, width)
 
 
 ## CH1-040: 获取某格的渲染状态字符串（供测试断言）

@@ -4,17 +4,138 @@ const V2EnemyBrainScript = preload("res://scripts/v2/ai/v2_enemy_brain.gd")
 const V2IntentExecutorScript = preload("res://scripts/v2/ai/v2_intent_executor.gd")
 const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
+const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
 
 var v2_hazard_controller: RefCounted = null
 var _v2_hazard_turn_state: Dictionary = {}
 var _v2_restore_attempted := false
 var _v2_restore_failure: Dictionary = {}
+var _v2_guidance_layer: Node2D = null
 
 ## V2 owns its map, roster, onboarding, and enemy turn. The shared controller
 ## remains a rendering/turn-system base so the V1 branch is never changed.
 func _ready() -> void:
 	super._ready()
+	# Capture camera gestures before HUD/map Controls get a chance to consume
+	# them. This is intentionally V2-only; V1 keeps its original input path.
+	set_process_input(true)
 	_install_v2_control_guide()
+	_ensure_v2_guidance_layer()
+
+func _input(event: InputEvent) -> void:
+	if not _is_v2_battle() or v2_input_router == null:
+		return
+	var camera_event := false
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		camera_event = mouse_button.button_index == MOUSE_BUTTON_MIDDLE \
+			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP \
+			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN
+	elif event is InputEventMouseMotion:
+		camera_event = v2_input_router.is_camera_panning()
+	if camera_event and v2_input_router.handle_event(event, Callable()):
+		get_viewport().set_input_as_handled()
+
+func _ensure_v2_guidance_layer() -> Node2D:
+	if _v2_guidance_layer != null and is_instance_valid(_v2_guidance_layer):
+		return _v2_guidance_layer
+	_v2_guidance_layer = Node2D.new()
+	_v2_guidance_layer.name = "V2ObjectiveGuidance"
+	_v2_guidance_layer.z_index = 15
+	add_child(_v2_guidance_layer)
+	return _v2_guidance_layer
+
+func _render_v2_guidance() -> void:
+	var layer := _ensure_v2_guidance_layer()
+	for child in layer.get_children():
+		# Guidance nodes have no animation or external signal ownership. Free them
+		# immediately so repeated HUD refreshes cannot leave stale routes behind or
+		# force Godot to rename the next route node.
+		child.free()
+	if not _is_v2_battle() or v2_mission_flow == null or v2_mission_flow.is_victory() or v2_mission_flow.is_defeat():
+		return
+	var guide_cell: Vector2i = v2_mission_flow.get_current_guide_cell() if v2_mission_flow.has_method("get_current_guide_cell") else Vector2i(-1, -1)
+	if guide_cell.x < 0 or guide_cell.x >= map_width or guide_cell.y < 0 or guide_cell.y >= map_height:
+		return
+	var actor: Unit = selected_unit if selected_unit != null and is_instance_valid(selected_unit) and selected_unit.is_alive else player_units[0] if not player_units.is_empty() else null
+	if actor != null:
+		var route := _find_v2_guidance_route(actor, guide_cell)
+		# The beacon is the long-term objective, but the route line must never
+		# promise a destination outside this unit's current movement budget.
+		var reachable_route: Array[Vector2i] = [actor.grid_pos]
+		var spent_move := 0
+		for cell in route:
+			var step_cost := maxi(1, int(_get_move_cost(cell, actor.job)))
+			if spent_move + step_cost > maxi(0, actor.move_points):
+				break
+			spent_move += step_cost
+			reachable_route.append(cell)
+		if reachable_route.size() > 1:
+			var line := Line2D.new()
+			line.name = "V2ObjectiveRoute"
+			line.width = 4.0
+			line.default_color = Color(1.0, 0.78, 0.22, 0.88)
+			line.joint_mode = Line2D.LINE_JOINT_ROUND
+			line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+			line.end_cap_mode = Line2D.LINE_CAP_ROUND
+			line.z_index = 0
+			line.add_point(_get_cell_center(actor.grid_pos))
+			for cell in reachable_route.slice(1):
+				line.add_point(_get_cell_center(cell))
+			layer.add_child(line)
+	var marker := Node2D.new()
+	marker.name = "V2ObjectiveBeacon"
+	marker.position = _get_cell_center(guide_cell)
+	marker.z_index = 2
+	var diamond := Polygon2D.new()
+	diamond.polygon = PackedVector2Array([
+		Vector2(0, -24), Vector2(24, 0), Vector2(0, 24), Vector2(-24, 0),
+	])
+	diamond.color = Color(1.0, 0.72, 0.16, 0.34)
+	marker.add_child(diamond)
+	var ring := Line2D.new()
+	ring.width = 3.0
+	ring.default_color = Color(1.0, 0.90, 0.40, 0.98)
+	ring.closed = true
+	ring.points = PackedVector2Array([
+		Vector2(0, -29), Vector2(29, 0), Vector2(0, 29), Vector2(-29, 0),
+	])
+	marker.add_child(ring)
+	var label := Label.new()
+	label.text = "下一步"
+	label.position = Vector2(-42, -60)
+	label.size = Vector2(84, 28)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.48, 1.0))
+	label.add_theme_color_override("font_outline_color", Color(0.04, 0.05, 0.06, 0.95))
+	label.add_theme_constant_override("outline_size", 4)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.add_child(label)
+	layer.add_child(marker)
+
+func _find_v2_guidance_route(actor: Unit, guide_cell: Vector2i) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = [guide_cell]
+	# A mission beacon may be occupied by an enemy encounter. Route the line to
+	# the nearest legal approach cell instead of drawing through that unit.
+	if _is_blocked(guide_cell):
+		candidates.clear()
+		for neighbor in GridSystem.get_neighbors(guide_cell):
+			if GridSystem.is_in_bounds(neighbor, map_width, map_height) and not _is_blocked(neighbor):
+				candidates.append(neighbor)
+	var best_route: Array[Vector2i] = []
+	for candidate in candidates:
+		var route: Array[Vector2i] = PathfindingScript.find_path(
+			actor.grid_pos,
+			candidate,
+			map_width,
+			map_height,
+			_get_move_cost.bind(actor.job),
+			_is_blocked
+		)
+		if not route.is_empty() and (best_route.is_empty() or route.size() < best_route.size()):
+			best_route = route
+	return best_route
 
 func _install_v2_control_guide() -> void:
 	if hud == null:
@@ -32,12 +153,31 @@ func _install_v2_control_guide() -> void:
 	guide.name = "V2DirectControlGuide"
 	guide.position = Vector2(14, 6)
 	guide.size = Vector2(510, 54)
-	guide.text = "左键队员：显示范围  ·  左键蓝格：移动\n左键红色敌人：攻击  ·  右键：取消选择  ·  中键：拖动地图"
+	guide.text = "左键角色：显示范围  ·  左键蓝格：移动\n左键红色敌人：攻击  ·  右键取消预览  ·  Esc取消选择\n中键拖动地图  ·  Home回到角色  ·  Space结束我方回合（随后敌人行动）"
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	guide.add_theme_font_size_override("font_size", 12)
 	guide.add_theme_color_override("font_color", Color(0.64, 0.86, 0.93, 0.96))
 	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom_bar.add_child(guide)
+
+func _setup_objective_state() -> void:
+	# Start from the shared objective extraction, then apply V2-only pacing from
+	# the V2 mission repository. This keeps V1 levels.json behavior untouched.
+	super._setup_objective_state()
+	if not _is_v2_battle() or mission_objective_state == null:
+		return
+	var repository := get_node_or_null("/root/V2Data")
+	if repository == null or not repository.has_method("get_mission"):
+		return
+	var mission: Dictionary = repository.call("get_mission", StringName(level_id))
+	if mission.is_empty() or not mission_objective_state.has_method("apply_v2_tutorial_overrides"):
+		return
+	mission_objective_state.call(
+		"apply_v2_tutorial_overrides",
+		int(mission.get("max_turns", 0)),
+		int(mission.get("enemy_passive_turns", 0))
+	)
+	_sync_objective_state_from_mos()
 
 func _setup_v2_services() -> void:
 	super._setup_v2_services()
@@ -501,7 +641,16 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 func _run_enemy_turn() -> void:
 	await run_v2_enemy_turn()
 
+func _is_v2_enemy_turn_passive() -> bool:
+	return _is_v2_battle() and mission_objective_state != null and mission_objective_state.is_enemy_passive(turn_manager.turn_number if turn_manager else 1)
+
 func run_v2_enemy_turn() -> void:
+	if _is_v2_enemy_turn_passive():
+		_log("教学宽限：敌人观察小队，本回合不执行攻击或移动")
+		_refresh_v2_runtime_state()
+		if turn_manager and not turn_manager.battle_over:
+			turn_manager.end_enemy_turn()
+		return
 	for raw_enemy in enemy_units:
 		var enemy: Unit = raw_enemy
 		if enemy == null or not enemy.is_alive or turn_manager == null or turn_manager.battle_over:
@@ -526,6 +675,8 @@ func _advance_v2_hazard_player_turn() -> Dictionary:
 
 func _consume_v2_hazard_enemy_phase() -> Array:
 	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("consume_enemy_phase_damage"):
+		return []
+	if _is_v2_enemy_turn_passive():
 		return []
 	var turn := turn_manager.turn_number if turn_manager else 1
 	var events: Array = v2_hazard_controller.consume_enemy_phase_damage(turn)
@@ -558,6 +709,16 @@ func _commit_v2_hazard_close_action(action_id: String) -> Dictionary:
 func _apply_v2_interaction_result(result: Dictionary) -> void:
 	super._apply_v2_interaction_result(result)
 	var action_id := String(result.get("action_id", ""))
+	if action_id in ["view_camera_east", "view_rescue_zone"] and camera != null:
+		var center: Vector2i = result.get("reveal_center", selected_unit.grid_pos if selected_unit else Vector2i(-1, -1))
+		if center.x >= 0:
+			camera.focus_cell(center)
+			# Camera2D applies its canvas transform on the next idle frame. Flush it
+			# here so the very next real click still maps to the visible grid cell.
+			if camera.has_method("force_update_scroll"):
+				camera.call("force_update_scroll")
+		if hud:
+			hud.set_context_prompt("摄像头用途：揭示东侧大范围区域并持续保持视野；Home 可回到当前队员")
 	if level_id == "ch1_m2":
 		if action_id in ["cut_power_grid", "bypass_security_door"]:
 			_apply_v2_map_changes(result.get("map_changes", []), "open")
@@ -729,6 +890,7 @@ func _apply_v2_hazard_prompt(state: Dictionary) -> void:
 func _render_v2_hud(context_override: String = "") -> void:
 	if not _is_v2_battle() or v2_hud_presenter == null or hud == null:
 		return
+	_render_v2_guidance()
 	v2_hud_presenter.render(_build_v2_hud_snapshot(context_override))
 
 func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
@@ -745,7 +907,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 	if checkpoint_id.is_empty():
 		checkpoint_id = String(v2_last_checkpoint.get("checkpoint_id", ""))
 	var phase_text := _get_v2_phase_text()
-	var ordinary_controls := "左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图 · Space结束回合"
+	var ordinary_controls := "左键角色显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色 · Space结束我方回合（随后敌人行动）"
 	var context_prompt := context_override
 	if context_prompt.is_empty() and hud != null:
 		context_prompt = hud.get_context_prompt_text()
@@ -781,6 +943,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		"step_count": step_count,
 		"objective_text": objective_text,
 		"guide_text": guide_text,
+		"guide_cell": v2_mission_flow.get_current_guide_cell() if v2_mission_flow != null and v2_mission_flow.has_method("get_current_guide_cell") else Vector2i(-1, -1),
 		"route_hint": route_hint,
 		"hazard_warning": hazard_warning,
 		"checkpoint_id": checkpoint_id,
@@ -822,7 +985,7 @@ func _get_v2_route_hint(mission_snapshot: Dictionary, step_index: int) -> String
 		return route_hint
 	if v2_mission_flow != null:
 		var mission_data: Dictionary = v2_mission_flow.mission
-		var steps: Variant = mission_data.get("objective_steps", [])
+		var steps: Variant = mission_data.get("expanded_objective_steps", []) if bool(mission_data.get("expanded_flow", false)) else mission_data.get("objective_steps", [])
 		if steps is Array and step_index >= 0 and step_index < steps.size() and steps[step_index] is Dictionary:
 			route_hint = String((steps[step_index] as Dictionary).get("route_hint", ""))
 		if route_hint.is_empty():

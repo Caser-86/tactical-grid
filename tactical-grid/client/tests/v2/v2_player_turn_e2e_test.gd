@@ -65,7 +65,7 @@ func _run() -> void:
 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
-	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键") and v2_guide.text.contains("Space结束回合"), "V2 底栏固定显示任务流程和直接操作指南")
+	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键取消预览") and v2_guide.text.contains("Esc取消选择") and v2_guide.text.contains("Home回到角色") and v2_guide.text.contains("Space结束我方回合"), "V2 底栏固定显示统一的直接操作指南")
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
@@ -78,6 +78,10 @@ func _run() -> void:
 	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "选中角色后保持单位选择状态")
 	t.check(battle.v2_affordance_presenter.get_child_count() > 0, "选中角色后显示移动/攻击范围")
 	t.check(battle.hud.context_label.text.contains("蓝色") and battle.hud.context_label.text.contains("红色"), "选中角色后提示蓝色移动与红色攻击")
+	var invalid_move_target := _find_invalid_move_target(battle, player)
+	if invalid_move_target.x >= 0:
+		battle.call("_on_v2_cell_left_clicked", invalid_move_target)
+		t.check(battle.hud.get_context_prompt_text().contains("蓝色格") and battle.hud.get_context_prompt_text().contains("不能移动"), "点击不可移动格明确解释原因和下一步")
 	var hover_move_target := _find_safe_move_target(battle, player)
 	if hover_move_target.x >= 0:
 		await _move_mouse_to_cell(battle, hover_move_target)
@@ -88,6 +92,43 @@ func _run() -> void:
 	# M107 bridge: a completed camera observation changes the real battle front
 	# state and immediately reaches the V2 HUD snapshot.
 	t.check(battle.alert_state.get_front_state() == &"hidden", "M1 实战初始警戒为潜伏")
+	# Regression: a real camera interaction moves the viewport to the rescue
+	# zone. The next map click must still resolve to the displayed grid cell.
+	var camera_test_origin := player.grid_pos
+	player.grid_pos = Vector2i(7, 14)
+	battle.call("_update_unit_sprite_pos", player, false)
+	battle.call("_refresh_selected_unit_affordances", player)
+	battle.call("_open_v2_interaction_menu", "facility_camera_console_south")
+	t.check(battle.v2_input_router.get_state_name() == "interaction_menu", "摄像头设施打开交互菜单")
+	await get_tree().process_frame
+	var camera_picker: PopupPanel = battle.hud._action_picker
+	var camera_button: Button = null
+	if camera_picker != null and is_instance_valid(camera_picker):
+		var camera_box := camera_picker.get_node_or_null("VBox") as VBoxContainer
+		if camera_box != null:
+			for child in camera_box.get_children():
+				if child is Button and String((child as Button).text).begins_with("查看"):
+					camera_button = child as Button
+					break
+	t.check(camera_button != null, "摄像头菜单提供查看选项")
+	if camera_button != null:
+		camera_button.emit_signal("pressed")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	t.check(battle.v2_input_router.get_state_name() == "unit_selected", "摄像头操作后恢复角色操作状态")
+	t.check(battle.selected_unit == player, "摄像头操作后保留当前角色选择")
+	var post_camera_move_target := _find_safe_move_target(battle, player)
+	t.check(post_camera_move_target.x >= 0, "摄像头操作后仍存在可移动格")
+	if post_camera_move_target.x >= 0:
+		await _move_mouse_to_cell(battle, post_camera_move_target)
+		await _click_left()
+		await get_tree().process_frame
+		t.check(player.grid_pos == post_camera_move_target, "摄像头操作后真实鼠标仍可移动角色")
+	player.grid_pos = camera_test_origin
+	player.v2_turn_state.begin_turn()
+	battle.call("_update_unit_sprite_pos", player, false)
+	battle.call("_refresh_selected_unit_affordances", player)
+
 	battle.call("_apply_v2_interaction_result", {
 		"success": true,
 		"facility_id": "facility_camera_console_south",
@@ -122,6 +163,7 @@ func _run() -> void:
 		var hp_before := target.current_hp
 		await _move_mouse_to_cell(battle, attack_cell)
 		t.check(battle.hud.get_attack_preview_text().contains("悬停预览"), "悬停敌人显示攻击预览")
+		t.check(battle.hud.get_context_prompt_text().contains("左键攻击"), "悬停敌人主提示明确说明左键攻击")
 		var expected_hp_after := int(battle.v2_hover_attack_preview.get("hp_after", hp_before))
 		await _click_left()
 		await get_tree().process_frame
@@ -156,13 +198,21 @@ func _run() -> void:
 	var camera_before := battle.camera.position
 	await _drag_camera()
 	t.check(battle.camera.position != camera_before, "中键拖动真实改变战场镜头")
+	# Regression: the shipped window may let HUD/map Controls consume the event
+	# before _unhandled_input. Exercise the V2 controller's front-door bridge
+	# directly so this test covers the same path used by the real window.
+	var frontdoor_camera_before := battle.camera.position
+	await _drag_camera_through_v2_frontdoor(battle)
+	t.check(battle.camera.position != frontdoor_camera_before, "V2 前置输入入口接管被 UI 消费的中键拖动")
 	var zoom_before := battle.camera.zoom.x
 	await _wheel_zoom()
 	t.check(battle.camera.zoom.x > zoom_before, "滚轮真实放大镜头")
 
-	# 5. 右键取消当前选择，重新左键选中后用 G 查看网络层。
+	# 5. 右键取消当前预览但保留角色选择；Esc 才清除选择，随后用 G 查看网络层。
 	await _click_right()
-	t.check(battle.selected_unit == null and battle.v2_input_router.get_state_name() == "free_select", "右键取消选择并回到自由选择")
+	t.check(battle.selected_unit == player and battle.v2_input_router.get_state_name() == "unit_selected", "右键取消预览但保留角色选择")
+	await _press_key(KEY_ESCAPE)
+	t.check(battle.selected_unit == null and battle.v2_input_router.get_state_name() == "free_select", "Esc 取消选择并回到自由选择")
 	await _move_mouse_to_cell(battle, player.grid_pos)
 	await _click_left()
 	await _press_key(KEY_G)
@@ -287,6 +337,20 @@ func _find_safe_move_target(battle: BattleController, player: Unit) -> Vector2i:
 			return cell
 	return Vector2i(-1, -1)
 
+func _find_invalid_move_target(battle: BattleController, player: Unit) -> Vector2i:
+	for y in range(battle.map_height):
+		for x in range(battle.map_width):
+			var cell := Vector2i(x, y)
+			if cell == player.grid_pos or battle.reachable_cells.has(cell):
+				continue
+			if battle.call("_get_unit_at", cell) != null:
+				continue
+			var facility: Dictionary = battle.v2_interaction_service.get_facility_at(cell) if battle.v2_interaction_service else {}
+			if not facility.is_empty():
+				continue
+			return cell
+	return Vector2i(-1, -1)
+
 func _prepare_adjacent_target(battle: BattleController, player: Unit, target: Unit) -> Vector2i:
 	if target == null:
 		return Vector2i(-1, -1)
@@ -330,6 +394,26 @@ func _drag_camera() -> void:
 	release.pressed = false
 	release.position = end
 	get_viewport().push_input(release)
+	await get_tree().process_frame
+
+func _drag_camera_through_v2_frontdoor(battle: Node) -> void:
+	var start := Vector2(600.0, 400.0)
+	var end := Vector2(700.0, 400.0)
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_MIDDLE
+	press.pressed = true
+	press.position = start
+	battle.call("_input", press)
+	await get_tree().process_frame
+	var motion := InputEventMouseMotion.new()
+	motion.position = end
+	battle.call("_input", motion)
+	await get_tree().process_frame
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_MIDDLE
+	release.pressed = false
+	release.position = end
+	battle.call("_input", release)
 	await get_tree().process_frame
 
 func _wheel_zoom() -> void:
