@@ -2917,7 +2917,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION:
 		return
-	if _is_v2_battle() and v2_input_router and v2_input_router.handle_event(event, _screen_to_cell):
+	if _is_v2_battle():
+		if v2_input_router and v2_input_router.handle_event(event, _screen_to_cell, _v2_pointer_context):
+			get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed("pause"):
@@ -2959,6 +2961,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _screen_to_cell(screen_position: Vector2) -> Vector2i:
 	var world_position := get_viewport().canvas_transform.affine_inverse() * screen_position
 	return GridSystem.world_to_grid(world_position)
+
+## V2 overrides this with scene-aware map, HUD, and drag-origin classification.
+## The shared fallback only satisfies the V2-only guarded call above.
+func _v2_pointer_context(_screen_position: Vector2) -> Dictionary:
+	return {"over_map": false, "over_hud": true, "drag_allowed": false}
 
 ## 右键是移动快捷键：点击友军立即显示可达范围；移动模式下再次右键取消。
 func _handle_right_click(world_pos: Vector2) -> void:

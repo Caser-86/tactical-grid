@@ -23,18 +23,61 @@ func _ready() -> void:
 	_ensure_v2_guidance_layer()
 
 func _input(event: InputEvent) -> void:
+	if _route_v2_input(event):
+		get_viewport().set_input_as_handled()
+
+func _route_v2_input(event: InputEvent) -> bool:
 	if not _is_v2_battle() or v2_input_router == null:
-		return
-	var camera_event := false
+		return false
+	if not _is_v2_routed_event(event):
+		return false
+	return v2_input_router.handle_event(event, _screen_to_cell, _v2_pointer_context)
+
+func _is_v2_routed_event(event: InputEvent) -> bool:
 	if event is InputEventMouseButton:
 		var mouse_button := event as InputEventMouseButton
-		camera_event = mouse_button.button_index == MOUSE_BUTTON_MIDDLE \
+		return mouse_button.button_index == MOUSE_BUTTON_LEFT \
+			or mouse_button.button_index == MOUSE_BUTTON_RIGHT \
+			or mouse_button.button_index == MOUSE_BUTTON_MIDDLE \
 			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP \
 			or mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN
-	elif event is InputEventMouseMotion:
-		camera_event = v2_input_router.is_camera_panning()
-	if camera_event and v2_input_router.handle_event(event, Callable()):
-		get_viewport().set_input_as_handled()
+	if event is InputEventMouseMotion:
+		return v2_input_router.is_camera_panning()
+	return event is InputEventKey
+
+func _v2_pointer_context(screen_position: Vector2) -> Dictionary:
+	var cell := _screen_to_cell(screen_position)
+	var over_hud := _v2_hud_control_at(screen_position)
+	var over_map := GridSystem.is_in_bounds(cell, map_width, map_height)
+	return {
+		"over_map": over_map,
+		"over_hud": over_hud,
+		"drag_allowed": over_map and not over_hud and _v2_drag_allowed_at(cell),
+	}
+
+func _v2_drag_allowed_at(cell: Vector2i) -> bool:
+	if _has_active_input_mode() or not v2_pending_move_preview.is_empty() or not v2_locked_attack_preview.is_empty():
+		return false
+	var unit := _get_unit_at(cell)
+	if unit != null and unit.is_alive:
+		return false
+	if v2_interaction_service != null and not v2_interaction_service.get_facility_at(cell).is_empty():
+		return false
+	if v2_rescue_controller != null and v2_rescue_controller.is_reserved_cell(cell):
+		return false
+	return true
+
+func _v2_hud_control_at(screen_position: Vector2, node: Node = hud) -> bool:
+	if node == null:
+		return false
+	for child in node.get_children():
+		if child is Control:
+			var control := child as Control
+			if control.is_visible_in_tree() and control.mouse_filter != Control.MOUSE_FILTER_IGNORE and control.get_global_rect().has_point(screen_position):
+				return true
+		if _v2_hud_control_at(screen_position, child):
+			return true
+	return false
 
 func _ensure_v2_guidance_layer() -> Node2D:
 	if _v2_guidance_layer != null and is_instance_valid(_v2_guidance_layer):

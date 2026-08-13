@@ -2,6 +2,8 @@ extends SceneTree
 
 const Runner = preload("res://tests/v2/test_runner.gd")
 const V2BattleInputRouter = preload("res://scripts/v2/input/v2_battle_input_router.gd")
+const V2BattleControllerPath := "res://scripts/v2/runtime/v2_battle_controller.gd"
+const SharedBattleControllerPath := "res://scripts/game/battle_controller.gd"
 
 var t := Runner.new()
 var _left_cells: Array[Vector2i] = []
@@ -15,6 +17,8 @@ var _inspect_cancelled := 0
 var _pan_delta := Vector2.ZERO
 
 func _initialize() -> void:
+	_assert_v2_input_entry_wiring()
+
 	var router: V2BattleInputRouter = V2BattleInputRouter.new()
 	router.cell_left_clicked.connect(_on_left_cell)
 	router.cancel_requested.connect(_on_cancel)
@@ -98,6 +102,10 @@ func _initialize() -> void:
 	var hud_pan_before := _pan_delta
 	t.check(not _route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(1120, 120)), to_cell, hud_context), "HUD 上的左键按下不启动地图手势")
 	t.check(_pan_delta == hud_pan_before and not router.is_camera_panning(), "HUD 起点不会启动镜头平移")
+	var hud_middle_down := _mouse_button(MOUSE_BUTTON_MIDDLE, true, Vector2(1120, 120))
+	var hud_middle_up := _mouse_button(MOUSE_BUTTON_MIDDLE, false, Vector2(1120, 120))
+	t.check(not _route(router, hud_middle_down, Callable(), hud_context), "HUD 上的中键按下不启动地图拖拽")
+	_route(router, hud_middle_up, Callable(), hud_context)
 
 	var space := InputEventKey.new()
 	space.keycode = KEY_SPACE
@@ -173,6 +181,28 @@ func _on_inspect_cancel() -> void:
 
 func _on_pan(delta: Vector2) -> void:
 	_pan_delta += delta
+
+func _assert_v2_input_entry_wiring() -> void:
+	var v2_source := FileAccess.get_file_as_string(V2BattleControllerPath)
+	var shared_source := FileAccess.get_file_as_string(SharedBattleControllerPath)
+	var v2_input_body := _function_body(v2_source, "_input")
+	var v2_route_body := _function_body(v2_source, "_route_v2_input")
+	var pointer_context_body := _function_body(v2_source, "_v2_pointer_context")
+	var shared_unhandled_body := _function_body(shared_source, "_unhandled_input")
+	t.check(v2_input_body.contains("_route_v2_input(event)"), "V2 _input 在 HUD 与 unhandled 之前进入专属输入路由")
+	t.check(v2_route_body.contains("handle_event(event, _screen_to_cell, _v2_pointer_context)"), "V2 专属入口向路由器传入真实第三个 pointer_context 参数")
+	t.check(pointer_context_body.contains("_screen_to_cell(screen_position)") and pointer_context_body.contains("over_map") and pointer_context_body.contains("over_hud") and pointer_context_body.contains("drag_allowed"), "V2 pointer context 同时判定地图、HUD 和可拖动起点")
+	t.check(v2_route_body.contains("not _is_v2_battle()"), "V2 专属入口以 V1 guard 拒绝非 V2 战斗")
+	t.check(shared_unhandled_body.contains("if _is_v2_battle():") and shared_unhandled_body.contains("handle_event(event, _screen_to_cell, _v2_pointer_context)") and shared_unhandled_body.contains("set_input_as_handled()"), "共享 unhandled 路径只在 V2 guard 内使用三参数并标记已处理")
+
+func _function_body(source: String, function_name: String) -> String:
+	var start := source.find("func %s(" % function_name)
+	if start < 0:
+		return ""
+	var end := source.find("\nfunc ", start + 1)
+	if end < 0:
+		return source.substr(start)
+	return source.substr(start, end - start)
 
 func _route(router: V2BattleInputRouter, event: InputEvent, screen_to_cell: Callable, pointer_context: Callable) -> bool:
 	if _handle_event_argument_count(router) >= 3:

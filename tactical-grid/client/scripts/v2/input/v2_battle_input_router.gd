@@ -95,15 +95,23 @@ func handle_event(event: InputEvent, screen_to_cell: Callable, pointer_context: 
 func _handle_mouse_button(event: InputEventMouseButton, screen_to_cell: Callable, pointer_context: Callable) -> bool:
 	if event.button_index == MOUSE_BUTTON_MIDDLE:
 		if event.pressed:
+			if not _pointer_allows_map_gesture(event.position, pointer_context):
+				_clear_pointer_gesture()
+				return false
 			_begin_pointer_gesture(MOUSE_BUTTON_MIDDLE, event.position, true)
-		else:
+		elif _drag_button == MOUSE_BUTTON_MIDDLE:
 			_clear_pointer_gesture()
-		return true
+			return true
+		return false
 
 	if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		if not _pointer_allows_map_gesture(event.position, pointer_context):
+			return false
 		camera_zoom_requested.emit(1)
 		return true
 	if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		if not _pointer_allows_map_gesture(event.position, pointer_context):
+			return false
 		camera_zoom_requested.emit(-1)
 		return true
 	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
@@ -133,6 +141,15 @@ func _handle_mouse_button(event: InputEventMouseButton, screen_to_cell: Callable
 		return true
 
 	return _finish_pointer_gesture(event.button_index, event.position, screen_to_cell)
+
+func _pointer_allows_map_gesture(position: Vector2, pointer_context: Callable) -> bool:
+	if not pointer_context.is_valid():
+		return true
+	var raw_context: Variant = pointer_context.call(position)
+	if not raw_context is Dictionary:
+		return false
+	var context: Dictionary = raw_context
+	return bool(context.get("over_map", false)) and not bool(context.get("over_hud", false))
 
 func _handle_mouse_motion(event: InputEventMouseMotion, screen_to_cell: Callable) -> bool:
 	if _drag_button != MOUSE_BUTTON_NONE:
