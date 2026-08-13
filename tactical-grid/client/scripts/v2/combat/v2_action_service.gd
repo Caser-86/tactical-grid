@@ -3,7 +3,6 @@ class_name V2ActionService
 
 const V2CombatRulesScript = preload("res://scripts/v2/combat/v2_combat_rules.gd")
 const V2AbilityRulesScript = preload("res://scripts/v2/combat/v2_ability_rules.gd")
-const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
 
 var _map_data: Dictionary = {}
 var _players: Array = []
@@ -129,13 +128,10 @@ func _query_move(request: Dictionary) -> Dictionary:
 		return {"valid": false, "reason": &"blocked"}
 	if _is_occupied(target, unit):
 		return {"valid": false, "reason": &"occupied"}
-	if unit.grid_pos == target:
+	var distance := _manhattan(unit.grid_pos, target)
+	if distance <= 0:
 		return {"valid": false, "reason": &"same_position"}
-	var path: Array[Vector2i] = _find_move_path(unit, target)
-	if path.is_empty():
-		return {"valid": false, "reason": &"unreachable"}
-	var move_cost := _path_cost(path, unit)
-	if move_cost > maxi(1, unit.move_points):
+	if distance > maxi(1, unit.move_points):
 		return {"valid": false, "reason": &"move_too_far"}
 	var preview := {
 		"valid": true,
@@ -144,9 +140,7 @@ func _query_move(request: Dictionary) -> Dictionary:
 		"unit_id": unit.entity_id,
 		"from": unit.grid_pos,
 		"target": target,
-		"distance": move_cost,
-		"path": path,
-		"path_cost": move_cost,
+		"distance": distance,
 		"dangerous": _is_dangerous(target),
 		"cost": {"move": true},
 	}
@@ -224,11 +218,7 @@ func _is_fresh(preview: Dictionary) -> bool:
 		return false
 	var action := StringName(String(preview.get("action", "")))
 	if action == &"move":
-		if unit.grid_pos != preview.get("from", Vector2i(-1, -1)) or not unit.can_move():
-			return false
-		var target: Vector2i = preview.get("target", Vector2i(-1, -1))
-		var path: Array[Vector2i] = _find_move_path(unit, target)
-		return not path.is_empty() and _path_cost(path, unit) <= maxi(1, unit.move_points)
+		return unit.grid_pos == preview.get("from", Vector2i(-1, -1)) and unit.can_move()
 	if action == &"attack":
 		var target: Unit = preview.get("target_unit", null)
 		if target == null or not is_instance_valid(target) or not target.is_alive:
@@ -334,8 +324,6 @@ func _parse_cell(raw_cell: Variant) -> Vector2i:
 
 func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
 	for raw_unit in _players + _enemies:
-		if not raw_unit is Unit or not is_instance_valid(raw_unit):
-			continue
 		var unit: Unit = raw_unit
 		# Encounter enemies are inactive before discovery, but their authored spawn
 		# cells are reserved. A downed enemy is the only non-living unit that frees a cell.
@@ -343,43 +331,6 @@ func _is_occupied(cell: Vector2i, except_unit: Unit) -> bool:
 		if unit != null and unit != except_unit and (unit.is_alive or reserves_cell) and unit.grid_pos == cell:
 			return true
 	return false
-
-func _find_move_path(unit: Unit, target: Vector2i) -> Array[Vector2i]:
-	var size: Dictionary = _map_data.get("size", {})
-	return PathfindingScript.find_path(
-		unit.grid_pos,
-		target,
-		int(size.get("width", 0)),
-		int(size.get("height", 0)),
-		_get_move_cost.bind(unit),
-		_is_move_blocked.bind(unit)
-	)
-
-func _is_move_blocked(cell: Vector2i, unit: Unit) -> bool:
-	return not _is_passable(cell) or _is_occupied(cell, unit)
-
-func _get_move_cost(cell: Vector2i, unit: Unit) -> int:
-	var terrain: Variant = _layer_value(_map_data.get("layers", {}).get("base_terrain", []), cell)
-	if terrain == null:
-		return 1
-	# V2ActionService is also loaded by isolated headless tests where autoload
-	# identifiers are not available to the script compiler. Resolve the node at
-	# runtime and keep a deterministic default for fixture maps without it.
-	var main_loop := Engine.get_main_loop()
-	if main_loop is SceneTree:
-		var game_data := (main_loop as SceneTree).root.get_node_or_null("GameData")
-		if game_data != null and game_data.has_method("get_move_cost"):
-			return maxi(1, int(game_data.call("get_move_cost", unit.job, int(terrain))))
-	return 1
-
-func _path_cost(path: Array[Vector2i], unit: Unit) -> int:
-	var total := 0
-	for cell in path:
-		var step_cost := _get_move_cost(cell, unit)
-		if step_cost < 0:
-			return 999999
-		total += step_cost
-	return total
 
 func _is_dangerous(cell: Vector2i) -> bool:
 	for raw_cell in _map_data.get("danger_cells", []):

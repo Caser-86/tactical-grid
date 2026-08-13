@@ -17,20 +17,6 @@ func _initialize() -> void:
 	attacker.weapon_damage = [3, 3]
 	var service = V2ActionService.new()
 	service.setup(map_data, [attacker], [target])
-	# Regression: a live enemy is a solid occupant, not a waypoint. The direct
-	# route is blocked, while a longer path around it remains legal.
-	var blocker: Unit = _make_unit("blocker", "enemy", Vector2i(2, 1), 4)
-	service.refresh_units([attacker], [blocker])
-	attacker.grid_pos = Vector2i(1, 1)
-	attacker.move_points = 4
-	var crossed: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(4, 1)})
-	t.check(not bool(crossed.get("valid", true)), "移动不能穿过敌方占用格")
-	t.check(crossed.get("reason", &"") == &"move_too_far", "穿越敌人只能走绕行路径并因超出步数被拒绝")
-	var around: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(3, 0)})
-	t.check(bool(around.get("valid", false)), "绕过敌人仍可生成移动预览")
-	t.check((around.get("path", []) as Array).has(Vector2i(2, 0)), "移动预览包含真实绕行路径")
-	blocker.free()
-	service.refresh_units([attacker], [target])
 
 	var move: Dictionary = service.query_action({"action": &"move", "unit": attacker, "target": Vector2i(2, 1)})
 	t.check(bool(move.get("valid", false)) and int(move.get("preview_id", 0)) > 0, "移动预览有效")

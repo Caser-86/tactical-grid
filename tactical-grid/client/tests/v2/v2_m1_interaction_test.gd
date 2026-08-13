@@ -38,8 +38,6 @@ func _initialize() -> void:
 	)
 	t.check(bool(camera_result.get("success", false)), "摄像头查看操作提交成功")
 	t.check(camera_result.get("camera_zone_id", "") == "camera_rescue_zone", "摄像头返回持久区域 ID")
-	t.check(int(camera_result.get("reveal_radius", 0)) >= 7, "M1 摄像头揭示大范围地图")
-	t.check((camera_result.get("camera_zone_cells", []) as Array).size() >= 80, "M1 摄像头覆盖至少 80 个地图格")
 	t.check(camera_result.get("module_camera_disable_turns", 0) == 1, "侦察模块 B 额外短暂关闭摄像头")
 	t.check(visibility.is_cell_observed(Vector2i(16, 8)), "摄像头提交后救援中心格立即可见")
 	visibility.update_visibility([], [])

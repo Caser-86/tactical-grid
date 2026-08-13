@@ -78,8 +78,8 @@ func _initialize() -> void:
 	t.check(_cancelled == 0, "暂停不伪造取消信号")
 
 	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "暂停恢复单位选择")
-	t.check(router.handle_event(right, Callable()), "单位选择右键被消费")
-	t.check(router.get_state_name() == "unit_selected", "单位选择右键只取消当前预览并保留选择")
+	t.check(router.handle_event(right, Callable()), "单位选择右键返回自由选择")
+	t.check(router.get_state_name() == "free_select", "单位选择右键取消选择")
 	router.free()
 	t.finish(self)
 

@@ -9,30 +9,33 @@ func _initialize() -> void:
 	var flow := TutorialFlowScript.new()
 	flow.setup()
 	t.check(flow.current_step() == &"select", "首先教学选择")
-	t.check("蓝色" in flow.current_text() and "红色" in flow.current_text(), "选择提示同时解释移动和攻击颜色")
+	t.check(flow.current_text().length() <= 28, "提示不超过 28 字")
 	t.check(flow.get_visible_hint_count() == 1, "一次只显示一条提示")
 	var wrong := flow.on_event(&"unit_moved")
 	t.check(not bool(wrong.get("advanced", false)), "未选择不能跳过步骤")
 	var selected := flow.on_event(&"unit_selected")
 	t.check(bool(selected.get("advanced", false)), "完成选择后推进")
 	t.check(flow.current_step() == &"move", "第二步教学移动")
-	t.check("蓝色格" in flow.current_text() and "右键" in flow.current_text(), "移动提示说明可移动格和取消方式")
+	t.check(flow.current_text() == "点击蓝色格移动", "移动提示使用短文案")
 
-	var moved := flow.on_event(&"unit_moved")
-	t.check(bool(moved.get("advanced", false)), "完成移动后推进到后续提示")
-	t.check(flow.current_step() == &"attack", "移动后进入攻击提示而非阻塞主线")
+	for expected in [
+		{"event": &"unit_moved", "step": &"attack", "text": "悬停查看伤害，点击红色敌人攻击"},
+		{"event": &"attack_committed", "step": &"intent", "text": "箭头显示敌人下一步"},
+		{"event": &"enemy_intent_observed", "step": &"camera", "text": "查看摄像头：揭示区域并持续保持视野"},
+		{"event": &"camera_viewed", "step": &"evac", "text": "两名队员进入撤离区"},
+	]:
+		var result: Dictionary = flow.on_event(expected.event)
+		t.check(bool(result.get("advanced", false)), "行为推进：%s" % String(expected.event))
+		t.check(flow.current_step() == expected.step, "推进到步骤：%s" % String(expected.step))
+		t.check(flow.current_text() == expected.text, "步骤文案明确：%s" % String(expected.step))
+		t.check(flow.get_visible_hint_count() <= 1, "步骤切换不叠加提示：%s" % String(expected.step))
+
+	var evac_wait := flow.on_event(&"unit_moved")
+	t.check(not bool(evac_wait.get("advanced", false)), "单名队员移动不能完成撤离教学")
 	var completed := flow.on_event(&"evac_completed")
-	t.check(bool(completed.get("advanced", false)), "主线撤离事件可直接完成软引导")
-	t.check(flow.is_complete(), "主线完成后教学结束")
+	t.check(bool(completed.get("advanced", false)), "两名队员撤离后完成教学")
+	t.check(flow.is_complete(), "六步教学完成")
 	t.check(flow.get_visible_hint_count() == 0, "教学完成后没有残留提示")
-
-	var optional := TutorialFlowScript.new()
-	optional.setup()
-	optional.on_event(&"unit_selected")
-	optional.on_event(&"unit_moved")
-	var camera_first := optional.on_event(&"camera_viewed")
-	t.check(bool(camera_first.get("advanced", false)) and optional.current_step() == &"evac", "摄像头教学可选且不会要求先攻击或观察敌人")
-	t.check(bool(optional.on_event(&"evac_completed").get("advanced", false)) and optional.is_complete(), "可选教学之后仍可直接结束")
 
 	var skipped := TutorialFlowScript.new()
 	skipped.setup()

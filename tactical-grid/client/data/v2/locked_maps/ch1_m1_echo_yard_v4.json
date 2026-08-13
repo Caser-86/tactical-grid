@@ -3137,7 +3137,7 @@
         8
       ],
       "name": "维修摄像头",
-      "reveal_radius": 7
+      "reveal_radius": 4
     },
     {
       "action_id": "view_rescue_zone",
@@ -3152,7 +3152,7 @@
         8
       ],
       "name": "东侧观察摄像头",
-      "reveal_radius": 7
+      "reveal_radius": 3
     },
     {
       "name": "事故记录终端",

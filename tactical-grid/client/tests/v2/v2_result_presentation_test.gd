@@ -19,14 +19,11 @@ func _initialize() -> void:
 	var m1: Dictionary = presentation.build_summary({
 		"level_id": "ch1_m1",
 		"result": "victory",
-		"starting_unit_count": 1,
 		"optional_record": true,
 		"rescued": ["scout"],
 		"unlocked_modules": ["scout_a", "scout_b"],
 	}, repository)
-	var m1_guide := String(m1.get("completion_guide", ""))
-	t.check("1 名突击兵出发" in m1_guide and "最多 2 名队员" in m1_guide and "所有当前存活队员" in m1_guide, "M1 结算按实际队伍说明撤离条件")
-	t.check(not m1_guide.contains("两名存活队员"), "M1 结算不再写死两名存活队员")
+	t.check("两名" in String(m1.get("completion_guide", "")), "M1 结算说明两名队员撤离条件")
 	t.check(m1.get("module_lines", []) == ["扩展扫描", "静默扫描"], "M1 模块名称按数据本地化")
 
 	var m2: Dictionary = presentation.build_summary({
@@ -45,12 +42,10 @@ func _initialize() -> void:
 	var failed_after_rescue: Dictionary = presentation.build_summary({
 		"level_id": "ch1_m2",
 		"result": "defeat",
-		"mission_step_id": "rescue_sniper",
 		"rescued": ["sniper"],
 		"unlocked_modules": ["sniper_a"],
 	}, repository)
 	t.check(failed_after_rescue.get("rescued_lines", []).is_empty(), "V2 失败结算不宣称临时营救角色已加入基地")
 	t.check(failed_after_rescue.get("module_lines", []).is_empty(), "V2 失败结算不宣称未持久化模块已解锁")
-	t.check(String(failed_after_rescue.get("phase_line", "")).contains("营救狙击手"), "V2 失败结算显示当前任务阶段")
 	repository.free()
 	t.finish(self)

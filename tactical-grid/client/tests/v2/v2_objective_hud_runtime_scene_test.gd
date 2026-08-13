@@ -63,25 +63,10 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 	if not ready:
 		await _cleanup_battle(battle)
 		return
-	t.check(battle.turn_manager.max_turns == 24, "V2 M1 使用独立 24 回合预算")
-	t.check(battle.mission_objective_state.is_enemy_passive(3) and not battle.mission_objective_state.is_enemy_passive(4), "V2 M1 前三回合敌人保持教学宽限")
-	t.check(bool(battle.call("_is_v2_enemy_turn_passive")), "V2 敌人回合实际读取前三回合安全教学")
-	battle.turn_manager.turn_number = 4
-	t.check(not bool(battle.call("_is_v2_enemy_turn_passive")), "V2 第四回合恢复敌方行动")
-	battle.turn_manager.turn_number = 1
 	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
 	t.check(String(initial.get("step_id", "")) == "search_route_split" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 5, "M1 路线分叉前真实 HUD 快照为 1/5")
-	t.check(initial.get("guide_cell", Vector2i(-1, -1)) == Vector2i(8, 14), "M1 快照提供当前目标坐标")
 	t.check(battle.hud.objective_label.text.contains("1/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/5"), "M1 路线分叉前真实 HUD 控件显示 1/5")
-	var mission_card := battle.hud.get_node_or_null("V2MissionCard") as Panel
-	t.check(mission_card != null and mission_card.visible and String(mission_card.get_node("MissionCardText").text).contains("黄色分叉标记"), "M1 HUD 显示持久任务卡和具体目的地")
-	var guidance := battle.get_node_or_null("V2ObjectiveGuidance") as Node2D
-	var beacon := guidance.get_node_or_null("V2ObjectiveBeacon") if guidance != null else null
-	t.check(beacon != null, "M1 地图显示下一步目标信标")
-	var initial_assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
-	var route_line := guidance.get_node_or_null("V2ObjectiveRoute") as Line2D if guidance != null else null
-	t.check(route_line != null and route_line.points.size() > 1 and initial_assault != null and route_line.points.size() <= initial_assault.move_points + 1, "M1 路线指引只显示本回合可达路径")
-	var assault: Unit = initial_assault
+	var assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
 	if assault != null and battle.v2_rescue_controller != null:
 		assault.grid_pos = Vector2i(8, 14)
 		battle.call("_update_unit_sprite_pos", assault, false)

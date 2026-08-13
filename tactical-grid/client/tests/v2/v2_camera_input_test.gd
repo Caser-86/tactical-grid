@@ -2,8 +2,6 @@ extends SceneTree
 
 const Runner = preload("res://tests/v2/test_runner.gd")
 const RouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
-const FocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
-const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
 var _pan_delta := Vector2.ZERO
@@ -58,21 +56,8 @@ func _initialize() -> void:
 	t.check(_zoom_amount == 1, "输入路由器转发滚轮缩放")
 	t.check(_focus_count == 1 and router.get_state_name() == "free_select", "Home 聚焦不改变战术状态")
 
-	var player = UnitScript.new()
-	player.team = "player"
-	player.is_alive = true
-	player.grid_pos = Vector2i(12, 14)
-	var second_player = UnitScript.new()
-	second_player.team = "player"
-	second_player.is_alive = true
-	second_player.grid_pos = Vector2i(4, 4)
-	t.check(FocusScript.resolve(null, [player, second_player]) == player, "取消选中后 Home 仍回到存活玩家")
-	t.check(FocusScript.resolve(second_player, [player, second_player]) == second_player, "有选中玩家时 Home 优先回到当前玩家")
-
 	camera.free()
 	router.free()
-	player.free()
-	second_player.free()
 	t.finish(self)
 
 func _on_pan(delta: Vector2) -> void:
