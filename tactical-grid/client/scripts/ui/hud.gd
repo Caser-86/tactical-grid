@@ -48,6 +48,8 @@ var _network_overlay: Control = null
 var _network_overlay_visible: bool = false
 ## CH1-050: 敌方意图威胁摘要标签，显示在警报标签下方。
 var _threat_label: Label = null
+var _v2_mission_card: Panel = null
+var _v2_mission_card_label: Label = null
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -115,6 +117,27 @@ func _ready() -> void:
 	$RightPanel.add_child(_threat_label)
 	if not _pending_v2_snapshot.is_empty():
 		render_v2_snapshot(_pending_v2_snapshot)
+
+func _ensure_v2_mission_card() -> Label:
+	if _v2_mission_card_label != null and is_instance_valid(_v2_mission_card_label):
+		return _v2_mission_card_label
+	_v2_mission_card = Panel.new()
+	_v2_mission_card.name = "V2MissionCard"
+	_v2_mission_card.position = Vector2(12, TOP_BAR_HEIGHT + 8)
+	_v2_mission_card.size = Vector2(430, 128)
+	_v2_mission_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_mission_card.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.055, 0.075, 0.94), Color(1.0, 0.72, 0.18, 0.82)))
+	_v2_mission_card_label = Label.new()
+	_v2_mission_card_label.name = "MissionCardText"
+	_v2_mission_card_label.position = Vector2(12, 8)
+	_v2_mission_card_label.size = Vector2(406, 112)
+	_v2_mission_card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_v2_mission_card_label.add_theme_font_size_override("font_size", 13)
+	_v2_mission_card_label.add_theme_color_override("font_color", Color(0.92, 0.96, 0.96, 0.98))
+	_v2_mission_card_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_mission_card.add_child(_v2_mission_card_label)
+	add_child(_v2_mission_card)
+	return _v2_mission_card_label
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -346,10 +369,10 @@ func render_v2_snapshot(snapshot: Dictionary) -> void:
 	var mission_guide := String(snapshot.get("mission_guide", ""))
 	var shortcut_hint := get_node_or_null("BottomBar/ShortcutHint") as Label
 	if shortcut_hint != null and mission_guide != "":
-		shortcut_hint.text = "%s\nSpace结束回合 · 右键取消 · 中键拖动地图" % mission_guide
+		shortcut_hint.text = "%s\n右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色\nSpace结束回合" % mission_guide
 	var v2_control_guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
 	if v2_control_guide != null and mission_guide != "":
-		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消 · 中键拖动地图\nSpace结束回合" % mission_guide
+		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择\n中键拖动地图 · Home回到角色 · Space结束回合" % mission_guide
 
 func _is_canonical_v2_snapshot(snapshot: Dictionary) -> bool:
 	return snapshot.has("mission_id") or snapshot.has("objective_text") or snapshot.has("step_id") or snapshot.has("guide_text") or snapshot.has("route_hint") or snapshot.has("hazard_warning") or snapshot.has("checkpoint_id") or snapshot.has("status") or snapshot.has("outcome_text") or snapshot.has("ordinary_controls")
@@ -362,7 +385,14 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 	var checkpoint_id := String(snapshot.get("checkpoint_id", "")).strip_edges()
 	var ordinary_controls := String(snapshot.get("ordinary_controls", "")).strip_edges()
 	if ordinary_controls.is_empty():
-		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消 · Space结束回合"
+		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · Space结束回合"
+	var mission_card := _ensure_v2_mission_card()
+	mission_card.text = "当前任务\n%s\n%s\n%s\n操作：左键队员看范围；左键蓝格移动；红色敌人攻击；Space结束回合" % [
+		objective,
+		route_hint if not route_hint.is_empty() else "目标地点：地图上的黄色“下一步”标记",
+		_v2_completion_hint(objective),
+	]
+	_v2_mission_card.visible = true
 
 	var step_count := maxi(0, int(snapshot.get("step_count", 0)))
 	var step_index := maxi(0, int(snapshot.get("step_index", 0)))
@@ -512,6 +542,19 @@ func _v2_state_label(state: String) -> String:
 			return "已暂停"
 		_:
 			return state
+
+func _v2_completion_hint(objective: String) -> String:
+	if objective.contains("路线分叉"):
+		return "完成：走到黄色分叉标记，随后选择一条路线"
+	if objective.contains("选择推进"):
+		return "完成：点击任意一条路线按钮"
+	if objective.contains("吊桥"):
+		return "完成：靠近吊机后点击设施并选择放下吊桥"
+	if objective.contains("营救"):
+		return "完成：靠近青色标记后点击营救"
+	if objective.contains("撤离"):
+		return "完成：所有当前存活队员进入绿色撤离区（营救后会增加可操作队员）"
+	return "完成：按地图黄色标记和顶部目标推进"
 
 ## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
 func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:
@@ -689,6 +732,9 @@ func show_interaction_actions(facility_name: String, actions: Array, on_selected
 ## 隐藏行动选择面板
 func hide_action_picker() -> void:
 	if _action_picker != null and is_instance_valid(_action_picker):
+		# Hide immediately before queue_free so a just-completed facility click
+		# cannot leave a one-frame modal window intercepting the next map click.
+		_action_picker.hide()
 		_action_picker.queue_free()
 	_action_picker = null
 	_action_picker_callback = Callable()
