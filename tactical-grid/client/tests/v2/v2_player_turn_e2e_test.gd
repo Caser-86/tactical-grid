@@ -43,7 +43,10 @@ func _run() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
-	t.check(battle.hud.objective_label.text.contains("路线分叉") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示路线分叉主目标而非旧上传目标")
+	var mission_snapshot: Dictionary = battle.v2_mission_flow.get_snapshot()
+	t.check(String(mission_snapshot.get("step_id", "")) == "search_scout" and int(mission_snapshot.get("step_index", -1)) == 0 and int(mission_snapshot.get("step_count", 0)) == 3, "V2 M1 从正式三段流程的 search_scout 开始")
+	t.check(battle.hud.objective_label.text.contains("1/3") and battle.hud.objective_label.text.contains("找到失联侦察兵") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示第一段营救目标而非旧上传目标")
+	t.check(String(mission_snapshot.get("guide_text", "")).contains("前往青色侦察标记") and String(mission_snapshot.get("guide_text", "")).contains("营救侦察兵"), "V2 M1 引导明确指向青色侦察标记和营救操作")
 	t.check(battle.map_layer.get_node_or_null("V2EvacMarker") != null, "V2 地图按 entities 数据渲染撤离标记")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)
@@ -65,7 +68,7 @@ func _run() -> void:
 	var legacy_shortcut: Label = battle.hud.get_node("BottomBar/ShortcutHint")
 	var v2_guide: Label = battle.hud.get_node_or_null("BottomBar/V2DirectControlGuide")
 	t.check(not legacy_shortcut.visible, "V2 隐藏旧版底栏操作文案")
-	t.check(v2_guide != null and v2_guide.text.contains("流程 1/5") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键取消预览") and v2_guide.text.contains("Esc取消选择") and v2_guide.text.contains("Home回到角色") and v2_guide.text.contains("Space结束我方回合"), "V2 底栏固定显示统一的直接操作指南")
+	t.check(v2_guide != null and v2_guide.text.contains("流程 1/3") and v2_guide.text.contains("前往青色侦察标记") and v2_guide.text.contains("蓝格") and v2_guide.text.contains("红色敌人") and v2_guide.text.contains("右键取消预览") and v2_guide.text.contains("Esc取消选择") and v2_guide.text.contains("Home回到角色") and v2_guide.text.contains("Space结束我方回合"), "V2 底栏固定显示正式三段流程与直接操作指南")
 	if player == null:
 		_cleanup_battle(battle)
 		t.finish(get_tree())
@@ -138,7 +141,10 @@ func _run() -> void:
 	})
 	t.check(battle.alert_state.get_front_state() == &"searching", "M1 实战摄像头识别进入搜索")
 	t.check(battle.hud.get_node("TopBar/AlertLabel").text.contains("搜索"), "M1 HUD 立即显示搜索状态")
-	t.check(battle.hud.get_context_prompt_text().contains("摄像头用途") and battle.hud.get_context_prompt_text().contains("持续保持视野"), "M1 摄像头结果明确说明实际用途")
+	var camera_return_button := battle.hud.get_node_or_null("V2CameraReturnButton") as Button
+	t.check(battle.is_v2_camera_inspecting() and battle.hud.get_context_prompt_text().contains("摄像头视角") and battle.hud.get_context_prompt_text().contains("查看东侧区域") and battle.hud.get_context_prompt_text().contains("F") and camera_return_button != null and camera_return_button.visible, "M1 摄像头结果说明查看区域并提供返回队员入口")
+	await _press_key(KEY_F)
+	t.check(not battle.is_v2_camera_inspecting() and battle.selected_unit == player, "按 F 从摄像头视角返回且保留角色选择")
 
 	# 2. 左键蓝色安全格：一次点击完成移动，不依赖底部按钮。
 	var move_target := _find_safe_move_target(battle, player)
