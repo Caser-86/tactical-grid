@@ -2,7 +2,7 @@
   "ch1_m1": {
     "id": "ch1_m1",
     "map_id": "ch1_m1_echo_yard_v4",
-    "flow_mode": "expanded_m1",
+    "flow_mode": "m1_production",
     "name": "回声失联",
     "starting_roster": ["assault"],
     "rescue_character": "scout",
@@ -10,11 +10,12 @@
     "deployment_limit": 2,
     "primary": "找到失联侦察兵并一起撤离",
     "optional": "上传事故记录",
-    "enemy_total": 12,
+    "enemy_total": 8,
+    "encounter_count": 3,
     "active_cap": 3,
     "max_turns": 24,
     "enemy_passive_turns": 3,
-    "duration_minutes": [20, 25],
+    "target_duration_minutes": [12, 18],
     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],
     "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_route", "ch1_m1_gantry", "ch1_m1_rescue", "ch1_m1_intercept", "ch1_m1_record", "ch1_m1_outro"],
     "objective_steps": [

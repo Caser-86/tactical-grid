@@ -5,6 +5,10 @@
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
 
+## 当前权威链
+
+第一章当前执行顺序为：[2026-08-13 正式游戏设计](../docs/superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md) -> [第一章主路线图](../docs/superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md) -> [当前 M1 核心乐趣实施计划](../docs/superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md)。[2026-08-05 主实施计划](../docs/superpowers/plans/2026-08-05-v2-master-implementation.md)及其阶段计划保留为实现历史，不是当前执行队列。
+
 ## 已完成
 
 - 从 V1 `main` 当前基线建立独立 Git worktree。

@@ -1,5 +1,7 @@
 # V2 第一关与第二关内容扩充设计
 
+> Supersession notice (2026-08-13): The 12/13-enemy duration plan and route-choice modal in this document are superseded by the [Chapter One production game design](2026-08-13-v2-chapter-one-production-game-design.md). Its implemented data-driven mission, checkpoint, stable-ID, and isolation infrastructure remains historical and reusable evidence.
+
 ## 决策状态
 
 - 设计方向已于 2026-08-06 获项目负责人批准。

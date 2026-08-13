@@ -4,6 +4,10 @@
 
 V2 的唯一开发入口见 [V2 版本说明](docs/v2/README.md)。V1 文档和旧规格仅作为历史基线，不属于 V2 的执行任务。
 
+## V2 权威链
+
+当前 V2 第一章按以下顺序执行：[第一章正式游戏设计](docs/superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md) -> [第一章主路线图](docs/superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md) -> [当前 M1 核心乐趣实施计划](docs/superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md)。[2026-08-05 主实施计划](docs/superpowers/plans/2026-08-05-v2-master-implementation.md)保留为实现历史，不是当前执行队列。
+
 ## V2 当前状态
 
 - V2 已完成独立 worktree、Git 分支、Godot 项目身份和用户数据目录隔离。
@@ -40,8 +44,11 @@ godot --path tactical-grid/client
 - [项目模块说明](tactical-grid/README.md)：安装、启动、测试和目录结构。
 - [V2 当前状态](tactical-grid/PROJECT_STATUS_V2.md)：V2 当前状态与发布阻断项。
 - [V2 版本说明](docs/v2/README.md)：V2 唯一执行入口、边界与后续规格。
-- [V2 总规格](docs/v2/V2_MASTER_SPEC.md)：产品、玩法、内容、技术、资源、测试与发布的唯一权威要求。
-- [V2 主实施计划](docs/superpowers/plans/2026-08-05-v2-master-implementation.md)：78 个实施任务、依赖、模型分工、提交边界和 H1-H3 验收门。
+- [第一章正式游戏设计](docs/superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md)：第一章产品与玩法权威。
+- [第一章主路线图](docs/superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md)：组合调度与阶段解锁。
+- [当前 M1 核心乐趣实施计划](docs/superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md)：当前执行队列。
+- [V2 总规格](docs/v2/V2_MASTER_SPEC.md)：与生产设计不冲突的基础架构、隔离、存档、资源、测试与发布要求。
+- [2026-08-05 主实施计划](docs/superpowers/plans/2026-08-05-v2-master-implementation.md)：实现历史，不是当前执行队列。
 
 ## 贡献约定
 

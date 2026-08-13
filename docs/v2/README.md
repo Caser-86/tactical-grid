@@ -18,8 +18,8 @@ V2 可以复制 V1 的稳定代码和合法资源作为起点，但复制后在 
 - 独立 Git 分支：已建立。
 - Godot 项目名称：`Tactical Grid V2: Infiltration`。
 - Godot 用户目录：`TacticalGrid_V2_Infiltration`。
-- V2 玩法规格：已于 2026-08-05 获用户批准。
-- V2 实施计划：原 78 项任务、H1-H3 真人硬门和 2026-08-09 审查后的 NX 执行队列均已写入唯一主计划。
+- 第一章当前权威：2026-08-13 正式游戏设计 -> 第一章主路线图 -> 当前 M1 核心乐趣实施计划。
+- 2026-08-05 V2 玩法规格和主实施计划保留为实现历史，不是当前执行队列。
 - P1、P2、M101-M113、C02、C03：已完成并通过 V2 独立门禁。
 - M1/M2：均可从 V2 新档完整游玩，包含移动、攻击、敌方回合、迷雾、营救、撤离、失败重试和进度保存。
 - 当前质量状态：自动化 E2E、场景契约和视觉矩阵已通过；结算呈现、设置持久化、范围层、移动路径和死亡实体清理均有回归测试。
@@ -47,14 +47,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test
 
 ## 执行顺序
 
-1. 按 [V2 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md) 的 Section 17 执行当前 NX 队列。
-2. 先完成 NX-020 至 NX-050：主/可选目标地图断言、当前提交的 Windows 包重建与包内全流程验证。
-3. 再按 `docs/v2/playtests/M1_FIRST_PLAYER_PROTOCOL.md` 组织 H1-R2 无指导试玩，记录真实卡点。
-4. 只有通过 H1-R2 后才锁定 M1/M2 内容，继续 M3-M6 设计冻结、实现和 H3 发布验收。
+1. 以 [第一章正式游戏设计](../superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md) 为产品权威。
+2. 按 [第一章主路线图](../superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md) 确认当前已解锁阶段。
+3. 执行 [当前 M1 核心乐趣实施计划](../superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md) 的当前任务。
 
 ## 计划文件
 
-- [主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md)：唯一顺序、依赖、模型分工和状态索引。
+- [第一章正式游戏设计](../superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md)：产品权威。
+- [第一章主路线图](../superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md)：组合调度与阶段解锁。
+- [当前 M1 核心乐趣实施计划](../superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md)：当前执行队列。
+- [2026-08-05 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md)：实现历史，不是当前执行队列。
 - [P1 技术基础](../superpowers/plans/2026-08-05-v2-p1-foundation.md)：数据、地图、存档、战斗、能力、检查点和敌方意图。
 - [P2 操作与 HUD](../superpowers/plans/2026-08-05-v2-p2-interaction-hud.md)：地图点击、攻击预览、镜头、迷雾、HUD 和设置。
 - [P3-P5 M1](../superpowers/plans/2026-08-05-v2-p3-p5-m1-vertical-slice.md)：第一关灰盒、教学、真人门和正式垂直切片。

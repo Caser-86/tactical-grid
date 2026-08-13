@@ -7,13 +7,13 @@
 > approved: 2026-08-05
 > branch: `codex/ch1-infiltration-v2`
 > baseline: `v1-chapter1-baseline`
-> authority: 本文件是 V2 产品、玩法、内容、技术、资源、测试与发布要求的唯一规格
+> authority: 第一章产品与玩法以 2026-08-13 正式游戏设计为准；本文件保留与其不冲突的 V2 基础架构、隔离、存档、资源、测试与发布要求
 
 ## 1. 文档权威与版本隔离
 
 V2 是独立产品线，不是 V1 的补丁包。V1“战术网络控制版”继续保留在 `main`、`v1-chapter1-baseline` 标签和 2026-07-30 设计规格中。V2 不修改 V1 的源码、存档、资源、测试报告或发布产物。
 
-本文件只约束 V2。V1 文档可以作为历史和技术参考，但不能成为 V2 的任务来源。若 V2 其他文档与本文件冲突，以本文件为准；已批准实施任务统一写入 `docs/superpowers/plans/2026-08-05-v2-master-implementation.md` 及其六份子计划。
+本文件只约束 V2。V1 文档可以作为历史和技术参考，但不能成为 V2 的任务来源。第一章当前权威链为：[2026-08-13 正式游戏设计](../superpowers/specs/2026-08-13-v2-chapter-one-production-game-design.md) -> [第一章主路线图](../superpowers/plans/2026-08-13-v2-chapter-one-master-roadmap.md) -> [当前 M1 核心乐趣实施计划](../superpowers/plans/2026-08-13-v2-m1-core-fun-implementation.md)。若本文件内容目标与正式游戏设计冲突，以正式游戏设计为准；[2026-08-05 主实施计划](../superpowers/plans/2026-08-05-v2-master-implementation.md)及其六份子计划保留为实现历史，不是当前执行队列。
 
 V2 的运行身份固定为：
 
