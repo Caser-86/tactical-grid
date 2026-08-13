@@ -120,18 +120,18 @@ func _assert_m1_player_facing_progress() -> void:
 		return
 	t.check(
 		int(flow.call("get_display_objective_step_index")) == 0
-		and int(flow.call("get_display_objective_step_count")) == 2
-		and flow.get_current_guide_text().contains("流程 1/2"),
-		"M1 营救前 HUD 进度与玩家指南均为 1/2"
+		and int(flow.call("get_display_objective_step_count")) == 3
+		and flow.get_current_guide_text().contains("流程 1/3"),
+		"M1 营救前 HUD 进度与玩家指南均为 1/3"
 	)
 	var rescue := flow.apply_event(&"character_rescued", {"character_id": "scout"})
 	t.check(bool(rescue.get("success", false)), "M1 进度断言可推进真实营救事件")
 	t.check(
 		int(flow.call("get_objective_step_index")) == 1
 		and int(flow.call("get_display_objective_step_index")) == 1
-		and int(flow.call("get_display_objective_step_count")) == 2
-		and flow.get_current_guide_text().contains("流程 2/2"),
-		"M1 营救后 pre-evac HUD 进度与玩家指南均为 2/2"
+		and int(flow.call("get_display_objective_step_count")) == 3
+		and flow.get_current_guide_text().contains("流程 2/3"),
+		"M1 营救后 pre-evac HUD 进度与玩家指南均为 2/3"
 	)
 
 func _assert_v1_isolation() -> void:
