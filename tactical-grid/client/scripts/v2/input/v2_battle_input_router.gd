@@ -8,6 +8,7 @@ signal pointer_cancel_requested()
 signal end_turn_requested()
 signal next_unit_requested()
 signal focus_requested()
+signal camera_inspect_cancel_requested()
 signal network_overlay_requested()
 signal camera_pan_requested(delta: Vector2)
 signal camera_zoom_requested(amount: int)
@@ -31,10 +32,16 @@ const TRANSITIONS := {
 	State.ENEMY_TURN: [State.FREE_SELECT, State.UNIT_SELECTED, State.PAUSED],
 	State.PAUSED: [State.FREE_SELECT, State.UNIT_SELECTED, State.ENEMY_TURN],
 }
+const DRAG_THRESHOLD := 8.0
+const KEYBOARD_PAN_STEP := 32.0
 
 var _state: State = State.FREE_SELECT
-var _middle_dragging := false
+var _drag_button: MouseButton = MOUSE_BUTTON_NONE
+var _drag_origin := Vector2.ZERO
 var _last_pointer_position := Vector2.ZERO
+var _drag_distance := 0.0
+var _drag_allowed := false
+var _drag_threshold_crossed := false
 var _last_cancelled_state: State = State.FREE_SELECT
 
 func set_state(next_state: State) -> Dictionary:
@@ -71,49 +78,65 @@ func get_state() -> State:
 ## The V2 controller uses this during _input so a HUD Control cannot swallow
 ## the motion event before it reaches the unhandled-input router.
 func is_camera_panning() -> bool:
-	return _middle_dragging
+	return _drag_button == MOUSE_BUTTON_MIDDLE or (_drag_button != MOUSE_BUTTON_NONE and _drag_allowed)
 
 func get_last_cancelled_state() -> State:
 	return _last_cancelled_state
 
-func handle_event(event: InputEvent, screen_to_cell: Callable) -> bool:
+func handle_event(event: InputEvent, screen_to_cell: Callable, pointer_context: Callable = Callable()) -> bool:
 	if event is InputEventMouseButton:
-		return _handle_mouse_button(event as InputEventMouseButton, screen_to_cell)
+		return _handle_mouse_button(event as InputEventMouseButton, screen_to_cell, pointer_context)
 	if event is InputEventMouseMotion:
 		return _handle_mouse_motion(event as InputEventMouseMotion, screen_to_cell)
 	if event is InputEventKey:
 		return _handle_key(event as InputEventKey)
 	return false
 
-func _handle_mouse_button(event: InputEventMouseButton, screen_to_cell: Callable) -> bool:
+func _handle_mouse_button(event: InputEventMouseButton, screen_to_cell: Callable, pointer_context: Callable) -> bool:
 	if event.button_index == MOUSE_BUTTON_MIDDLE:
 		if event.pressed:
-			_middle_dragging = true
-			_last_pointer_position = event.position
+			_begin_pointer_gesture(MOUSE_BUTTON_MIDDLE, event.position, true)
 		else:
-			_middle_dragging = false
+			_clear_pointer_gesture()
 		return true
 
-	if not event.pressed:
-		return false
-
-	if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+	if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		camera_zoom_requested.emit(1)
 		return true
-	if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+	if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		camera_zoom_requested.emit(-1)
 		return true
-	if event.button_index == MOUSE_BUTTON_RIGHT:
-		return _handle_cancel()
-	if event.button_index == MOUSE_BUTTON_LEFT:
+	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
+		return false
+
+	# Existing two-argument call sites retain their press-time behavior. Scene-aware
+	# gesture classification begins only when a pointer context is supplied.
+	if not pointer_context.is_valid():
+		if not event.pressed:
+			return false
+		_clear_pointer_gesture()
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			camera_inspect_cancel_requested.emit()
+			return _handle_cancel()
 		return _handle_left_click(event.position, screen_to_cell)
-	return false
+
+	if event.pressed:
+		var raw_context: Variant = pointer_context.call(event.position)
+		if not raw_context is Dictionary:
+			_clear_pointer_gesture()
+			return false
+		var context: Dictionary = raw_context
+		if bool(context.get("over_hud", false)) or not bool(context.get("over_map", false)):
+			_clear_pointer_gesture()
+			return false
+		_begin_pointer_gesture(event.button_index, event.position, bool(context.get("drag_allowed", false)))
+		return true
+
+	return _finish_pointer_gesture(event.button_index, event.position, screen_to_cell)
 
 func _handle_mouse_motion(event: InputEventMouseMotion, screen_to_cell: Callable) -> bool:
-	if _middle_dragging:
-		var delta: Vector2 = event.position - _last_pointer_position
-		_last_pointer_position = event.position
-		camera_pan_requested.emit(delta)
+	if _drag_button != MOUSE_BUTTON_NONE:
+		_update_pointer_gesture(event.position)
 		return true
 	if _state == State.ENEMY_TURN or _state == State.PAUSED:
 		return true
@@ -124,6 +147,56 @@ func _handle_mouse_motion(event: InputEventMouseMotion, screen_to_cell: Callable
 		cell_hovered.emit(cell)
 		return true
 	return false
+
+func _begin_pointer_gesture(button: MouseButton, position: Vector2, drag_allowed: bool) -> void:
+	_drag_button = button
+	_drag_origin = position
+	_last_pointer_position = position
+	_drag_distance = 0.0
+	_drag_allowed = drag_allowed
+	_drag_threshold_crossed = button == MOUSE_BUTTON_MIDDLE
+
+func _update_pointer_gesture(position: Vector2) -> bool:
+	if _drag_button == MOUSE_BUTTON_NONE:
+		return false
+	var segment := position - _last_pointer_position
+	var was_over_threshold := _drag_threshold_crossed
+	_drag_distance += segment.length()
+	_last_pointer_position = position
+	if _drag_button == MOUSE_BUTTON_MIDDLE:
+		if not segment.is_zero_approx():
+			camera_pan_requested.emit(segment)
+		return true
+	if not _drag_allowed:
+		return true
+	_drag_threshold_crossed = _drag_distance >= DRAG_THRESHOLD
+	if not _drag_threshold_crossed:
+		return true
+	var pan_delta := segment if was_over_threshold else position - _drag_origin
+	if not pan_delta.is_zero_approx():
+		camera_pan_requested.emit(pan_delta)
+	return true
+
+func _finish_pointer_gesture(button: MouseButton, position: Vector2, screen_to_cell: Callable) -> bool:
+	if _drag_button != button:
+		return false
+	_update_pointer_gesture(position)
+	var is_click := _drag_distance < DRAG_THRESHOLD
+	_clear_pointer_gesture()
+	if not is_click:
+		return true
+	if button == MOUSE_BUTTON_RIGHT:
+		camera_inspect_cancel_requested.emit()
+		return _handle_cancel()
+	return _handle_left_click(position, screen_to_cell)
+
+func _clear_pointer_gesture() -> void:
+	_drag_button = MOUSE_BUTTON_NONE
+	_drag_origin = Vector2.ZERO
+	_last_pointer_position = Vector2.ZERO
+	_drag_distance = 0.0
+	_drag_allowed = false
+	_drag_threshold_crossed = false
 
 func _handle_left_click(position: Vector2, screen_to_cell: Callable) -> bool:
 	if _state == State.ENEMY_TURN or _state == State.PAUSED:
@@ -153,6 +226,21 @@ func _handle_cancel() -> bool:
 func _handle_key(event: InputEventKey) -> bool:
 	if not event.pressed or event.echo:
 		return false
+	if event.is_action_pressed(&"camera_up") or _event_matches_key(event, KEY_W):
+		camera_pan_requested.emit(Vector2(0.0, KEYBOARD_PAN_STEP))
+		return true
+	if event.is_action_pressed(&"camera_down") or _event_matches_key(event, KEY_S):
+		camera_pan_requested.emit(Vector2(0.0, -KEYBOARD_PAN_STEP))
+		return true
+	if event.is_action_pressed(&"camera_left") or _event_matches_key(event, KEY_A):
+		camera_pan_requested.emit(Vector2(KEYBOARD_PAN_STEP, 0.0))
+		return true
+	if event.is_action_pressed(&"camera_right") or _event_matches_key(event, KEY_D):
+		camera_pan_requested.emit(Vector2(-KEYBOARD_PAN_STEP, 0.0))
+		return true
+	if event.is_action_pressed(&"focus_unit") or _event_matches_key(event, KEY_F) or _event_matches_key(event, KEY_HOME):
+		focus_requested.emit()
+		return true
 	match event.keycode:
 		KEY_ESCAPE:
 			return _handle_escape()
@@ -164,13 +252,13 @@ func _handle_key(event: InputEventKey) -> bool:
 			if _state != State.ENEMY_TURN and _state != State.PAUSED:
 				next_unit_requested.emit()
 			return true
-		KEY_HOME:
-			focus_requested.emit()
-			return true
 		KEY_G:
 			network_overlay_requested.emit()
 			return true
 	return false
+
+func _event_matches_key(event: InputEventKey, key: Key) -> bool:
+	return event.keycode == key or event.physical_keycode == key
 
 func _handle_escape() -> bool:
 	if _state == State.PAUSED:

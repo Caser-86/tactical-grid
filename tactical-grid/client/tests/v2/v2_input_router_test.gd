@@ -10,6 +10,9 @@ var _ended := 0
 var _next_unit := 0
 var _focused := 0
 var _network_requested := 0
+var _pointer_cancelled := 0
+var _inspect_cancelled := 0
+var _pan_delta := Vector2.ZERO
 
 func _initialize() -> void:
 	var router: V2BattleInputRouter = V2BattleInputRouter.new()
@@ -19,23 +22,82 @@ func _initialize() -> void:
 	router.next_unit_requested.connect(_on_next_unit)
 	router.focus_requested.connect(_on_focus)
 	router.network_overlay_requested.connect(_on_network)
+	router.pointer_cancel_requested.connect(_on_pointer_cancel)
+	router.camera_pan_requested.connect(_on_pan)
+	if router.has_signal("camera_inspect_cancel_requested"):
+		router.connect("camera_inspect_cancel_requested", _on_inspect_cancel)
 
 	t.check(router.get_state_name() == "free_select", "初始为自由选择")
+	t.check(_handle_event_argument_count(router) == 3, "handle_event 提供可选 pointer_context 参数")
+	t.check(router.has_signal("camera_inspect_cancel_requested"), "输入路由器暴露镜头查看取消信号")
 	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "自由选择进入单位选择")
 	t.check(bool(router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED).get("success", false)), "单位选择进入攻击锁定")
 
-	var right := InputEventMouseButton.new()
-	right.button_index = MOUSE_BUTTON_RIGHT
-	right.pressed = true
-	t.check(router.handle_event(right, Callable()), "右键被路由器消费")
-	t.check(router.get_state_name() == "unit_selected", "右键取消攻击锁定")
+	var map_context := func(_screen: Vector2): return {"drag_allowed": true, "over_map": true, "over_hud": false}
+	var target_context := func(_screen: Vector2): return {"drag_allowed": false, "over_map": true, "over_hud": false}
+	var hud_context := func(_screen: Vector2): return {"drag_allowed": true, "over_map": false, "over_hud": true}
+	var to_cell := func(_screen: Vector2): return Vector2i(2, 3)
 
-	var left := InputEventMouseButton.new()
-	left.button_index = MOUSE_BUTTON_LEFT
-	left.pressed = true
-	left.position = Vector2(160, 96)
-	t.check(router.handle_event(left, func(_screen: Vector2): return Vector2i(2, 3)), "左键网格点击被消费")
+	var right_down := _mouse_button(MOUSE_BUTTON_RIGHT, true, Vector2(160, 96))
+	var right_up := _mouse_button(MOUSE_BUTTON_RIGHT, false, Vector2(160, 96))
+	t.check(_route(router, right_down, Callable(), map_context), "右键按下开始短按候选")
+	t.check(router.get_state_name() == "attack_locked", "右键按下尚不提前取消攻击锁定")
+	t.check(_route(router, right_up, Callable(), map_context), "右键短按释放被路由器消费")
+	t.check(router.get_state_name() == "unit_selected", "右键短按释放取消攻击锁定")
+
+	var left_down := _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(160, 96))
+	var left_up := _mouse_button(MOUSE_BUTTON_LEFT, false, Vector2(164, 96))
+	t.check(_route(router, left_down, to_cell, target_context), "左键按下开始点击候选")
+	t.check(_left_cells.is_empty(), "左键按下尚不提交格子点击")
+	t.check(_route(router, left_up, to_cell, target_context), "阈值内左键释放被消费")
 	t.check(_left_cells == [Vector2i(2, 3)], "左键发出确定格子")
+
+	var left_drag_pan_before := _pan_delta
+	var left_drag_clicks_before := _left_cells.size()
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(200, 120)), to_cell, map_context)
+	t.check(router.is_camera_panning(), "空地左键按下进入镜头平移候选")
+	_route(router, _mouse_motion(Vector2(220, 120)), to_cell, map_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, false, Vector2(220, 120)), to_cell, map_context)
+	t.check(_pan_delta != left_drag_pan_before and _left_cells.size() == left_drag_clicks_before, "空地左键拖动平移且不提交格子点击")
+	t.check(not router.is_camera_panning(), "空地左键释放结束镜头平移")
+
+	var right_drag_pan_before := _pan_delta
+	var right_drag_cancel_before := _pointer_cancelled
+	var right_drag_inspect_before := _inspect_cancelled
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, true, Vector2(240, 120)), Callable(), map_context)
+	_route(router, _mouse_motion(Vector2(260, 140)), Callable(), map_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, false, Vector2(260, 140)), Callable(), map_context)
+	t.check(_pan_delta != right_drag_pan_before and _pointer_cancelled == right_drag_cancel_before and _inspect_cancelled == right_drag_inspect_before, "右键拖动平移且不发出取消")
+
+	var short_cancel_before := _pointer_cancelled
+	var short_inspect_before := _inspect_cancelled
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, true, Vector2(240, 120)), Callable(), map_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, false, Vector2(244, 120)), Callable(), map_context)
+	t.check(_pointer_cancelled == short_cancel_before + 1 and _inspect_cancelled == short_inspect_before + 1, "短右键释放仍发出战术与镜头查看取消")
+
+	var threshold_clicks_before := _left_cells.size()
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(280, 120)), to_cell, map_context)
+	_route(router, _mouse_motion(Vector2(288, 120)), to_cell, map_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, false, Vector2(288, 120)), to_cell, map_context)
+	t.check(_left_cells.size() == threshold_clicks_before, "累计移动恰好 8 像素不再视为点击")
+
+	var cumulative_clicks_before := _left_cells.size()
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(300, 160)), to_cell, map_context)
+	_route(router, _mouse_motion(Vector2(306, 160)), to_cell, map_context)
+	_route(router, _mouse_motion(Vector2(302, 160)), to_cell, map_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, false, Vector2(302, 160)), to_cell, map_context)
+	t.check(_left_cells.size() == cumulative_clicks_before, "折返累计移动超过阈值时不误判为点击")
+
+	var blocked_pan_before := _pan_delta
+	var blocked_clicks_before := _left_cells.size()
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(300, 120)), to_cell, target_context)
+	_route(router, _mouse_motion(Vector2(320, 120)), to_cell, target_context)
+	_route(router, _mouse_button(MOUSE_BUTTON_LEFT, false, Vector2(320, 120)), to_cell, target_context)
+	t.check(_pan_delta == blocked_pan_before and _left_cells.size() == blocked_clicks_before and not router.is_camera_panning(), "drag_allowed 为 false 时不启动平移且拖动不误点")
+
+	var hud_pan_before := _pan_delta
+	t.check(not _route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(1120, 120)), to_cell, hud_context), "HUD 上的左键按下不启动地图手势")
+	t.check(_pan_delta == hud_pan_before and not router.is_camera_panning(), "HUD 起点不会启动镜头平移")
 
 	var space := InputEventKey.new()
 	space.keycode = KEY_SPACE
@@ -67,18 +129,20 @@ func _initialize() -> void:
 
 	t.check(bool(router.set_state(V2BattleInputRouter.State.ENEMY_TURN).get("success", false)), "进入敌方回合")
 	t.check(not bool(router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED).get("success", true)), "敌方回合拒绝玩家预览")
-	t.check(router.handle_event(left, func(_screen: Vector2): return Vector2i(4, 4)), "敌方回合消费左键避免穿透")
+	t.check(_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(160, 96)), func(_screen: Vector2): return Vector2i(4, 4), target_context), "敌方回合消费左键避免穿透")
 	t.check(_left_cells.size() == 1, "敌方回合不发出玩家格子点击")
 	t.check(router.handle_event(space, Callable()), "敌方回合消费结束键")
 	t.check(_ended == 1, "敌方回合不重复请求结束")
 
 	t.check(bool(router.set_state(V2BattleInputRouter.State.PAUSED).get("success", false)), "可进入暂停")
 	t.check(not bool(router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED).get("success", true)), "暂停拒绝战斗预览")
-	t.check(router.handle_event(right, Callable()), "暂停消费右键")
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, true, Vector2(160, 96)), Callable(), map_context)
+	t.check(_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, false, Vector2(160, 96)), Callable(), map_context), "暂停消费右键")
 	t.check(_cancelled == 0, "暂停不伪造取消信号")
 
 	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "暂停恢复单位选择")
-	t.check(router.handle_event(right, Callable()), "单位选择右键被消费")
+	_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, true, Vector2(160, 96)), Callable(), map_context)
+	t.check(_route(router, _mouse_button(MOUSE_BUTTON_RIGHT, false, Vector2(160, 96)), Callable(), map_context), "单位选择右键被消费")
 	t.check(router.get_state_name() == "unit_selected", "单位选择右键只取消当前预览并保留选择")
 	router.free()
 	t.finish(self)
@@ -100,3 +164,36 @@ func _on_focus() -> void:
 
 func _on_network() -> void:
 	_network_requested += 1
+
+func _on_pointer_cancel() -> void:
+	_pointer_cancelled += 1
+
+func _on_inspect_cancel() -> void:
+	_inspect_cancelled += 1
+
+func _on_pan(delta: Vector2) -> void:
+	_pan_delta += delta
+
+func _route(router: V2BattleInputRouter, event: InputEvent, screen_to_cell: Callable, pointer_context: Callable) -> bool:
+	if _handle_event_argument_count(router) >= 3:
+		return bool(router.callv("handle_event", [event, screen_to_cell, pointer_context]))
+	return router.handle_event(event, screen_to_cell)
+
+func _handle_event_argument_count(router: V2BattleInputRouter) -> int:
+	for method in router.get_method_list():
+		if String(method.get("name", "")) == "handle_event":
+			var arguments: Array = method.get("args", [])
+			return arguments.size()
+	return 0
+
+func _mouse_button(button: MouseButton, pressed: bool, position: Vector2) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = button
+	event.pressed = pressed
+	event.position = position
+	return event
+
+func _mouse_motion(position: Vector2) -> InputEventMouseMotion:
+	var event := InputEventMouseMotion.new()
+	event.position = position
+	return event

@@ -34,6 +34,8 @@ func _initialize() -> void:
 	router.camera_pan_requested.connect(_on_pan)
 	router.camera_zoom_requested.connect(_on_zoom)
 	router.focus_requested.connect(_on_focus)
+	t.check(InputMap.has_action("camera_up") and InputMap.has_action("camera_down") and InputMap.has_action("camera_left") and InputMap.has_action("camera_right"), "工程输入映射包含 WASD 镜头动作")
+	t.check(_action_has_physical_key("focus_unit", KEY_F), "focus_unit 映射包含 F")
 	var middle_down := InputEventMouseButton.new()
 	middle_down.button_index = MOUSE_BUTTON_MIDDLE
 	middle_down.pressed = true
@@ -58,6 +60,23 @@ func _initialize() -> void:
 	t.check(_zoom_amount == 1, "输入路由器转发滚轮缩放")
 	t.check(_focus_count == 1 and router.get_state_name() == "free_select", "Home 聚焦不改变战术状态")
 
+	var f_key := InputEventKey.new()
+	f_key.keycode = KEY_F
+	f_key.physical_keycode = KEY_F
+	f_key.pressed = true
+	t.check(router.handle_event(f_key, Callable()), "F 被聚焦动作消费")
+	t.check(_focus_count == 2 and router.get_state_name() == "free_select", "F 请求聚焦且不改变战术状态")
+
+	t.check(bool(router.set_state(V2BattleInputRouter.State.UNIT_SELECTED).get("success", false)), "镜头键测试进入单位选择")
+	var state_before_wasd := router.get_state_name()
+	var pan_before_wasd := _pan_delta
+	var w_key := InputEventKey.new()
+	w_key.keycode = KEY_W
+	w_key.physical_keycode = KEY_W
+	w_key.pressed = true
+	t.check(router.handle_event(w_key, Callable()), "W 被镜头动作消费")
+	t.check(_pan_delta != pan_before_wasd and router.get_state_name() == state_before_wasd, "WASD 发出非零镜头平移且不改变战术状态")
+
 	var player = UnitScript.new()
 	player.team = "player"
 	player.is_alive = true
@@ -67,7 +86,9 @@ func _initialize() -> void:
 	second_player.is_alive = true
 	second_player.grid_pos = Vector2i(4, 4)
 	t.check(FocusScript.resolve(null, [player, second_player]) == player, "取消选中后 Home 仍回到存活玩家")
-	t.check(FocusScript.resolve(second_player, [player, second_player]) == second_player, "有选中玩家时 Home 优先回到当前玩家")
+	t.check(FocusScript.resolve(second_player, [player, second_player]) == second_player, "有选中玩家时 F/Home 优先回到当前玩家")
+	second_player.is_alive = false
+	t.check(FocusScript.resolve(second_player, [player, second_player]) == player, "当前玩家失效时 F/Home 回到首个存活玩家")
 
 	camera.free()
 	router.free()
@@ -83,3 +104,11 @@ func _on_zoom(amount: int) -> void:
 
 func _on_focus() -> void:
 	_focus_count += 1
+
+func _action_has_physical_key(action: StringName, physical_keycode: Key) -> bool:
+	if not InputMap.has_action(action):
+		return false
+	for raw_event in InputMap.action_get_events(action):
+		if raw_event is InputEventKey and (raw_event as InputEventKey).physical_keycode == physical_keycode:
+			return true
+	return false

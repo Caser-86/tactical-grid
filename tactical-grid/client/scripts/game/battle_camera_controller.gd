@@ -37,9 +37,9 @@ var _last_drag_screen_pos: Vector2 = Vector2.ZERO
 var _in_overview: bool = false
 var _saved_zoom: Vector2 = Vector2.ONE
 var _saved_position: Vector2 = Vector2.ZERO
-## Home 键目标
+## F/Home 聚焦目标
 var _home_target: Vector2 = Vector2.ZERO
-## V2 使用 BattleInputRouter 转发镜头输入时，关闭本脚本的旧 _input 路径，避免双倍平移/缩放。
+## V2 使用 BattleInputRouter 转发指针、WASD 和聚焦输入时，关闭旧 _input 路径，避免重复处理。
 var _router_input_mode: bool = false
 
 func _ready() -> void:
@@ -159,7 +159,7 @@ func drag_to(screen_pos: Vector2) -> void:
 	_last_drag_screen_pos = screen_pos
 	_clamp_to_bounds()
 
-## 由 V2 输入路由器转发的中键拖动增量。
+## 由 V2 输入路由器转发的指针拖动或键盘平移增量。
 func pan_by_screen_delta(delta: Vector2) -> void:
 	position -= delta / zoom
 	_clamp_to_bounds()
@@ -174,7 +174,7 @@ func zoom_at(direction: float, anchor: Vector2) -> void:
 		return
 	_zoom_at(anchor, ZOOM_STEP if direction > 0.0 else 1.0 / ZOOM_STEP)
 
-## 以地图格子为目标聚焦，供 Home 快捷键使用。
+## 以地图格子为目标聚焦，供 F/Home 快捷键使用。
 func focus_cell(cell: Vector2i) -> void:
 	focus_home(GridSystem.grid_to_world(cell) + Vector2(32.0, 32.0))
 
