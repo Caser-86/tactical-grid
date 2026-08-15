@@ -9,6 +9,7 @@ const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
 const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
 const V2InteractionServiceScript = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
 const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
+const V2ActionPreviewScript = preload("res://scripts/v2/presentation/v2_action_preview.gd")
 const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
 const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
@@ -117,6 +118,7 @@ var v2_encounter_activation: RefCounted = null
 var v2_tutorial_flow: RefCounted = null
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
+var v2_action_preview: V2ActionPreview = null
 var v2_hud_presenter: RefCounted = null
 var v2_damage_presenter: RefCounted = null
 var v2_input_router: V2BattleInputRouter = null
@@ -1006,6 +1008,7 @@ func _setup_v2_affordance_presenter() -> void:
 	v2_affordance_presenter.name = "V2AffordancePresenter"
 	v2_affordance_presenter.cell_size = float(CELL_SIZE)
 	v2_affordance_layer.add_child(v2_affordance_presenter)
+	v2_action_preview = V2ActionPreviewScript.new()
 
 func _setup_v2_hud_presenter() -> void:
 	if hud == null:
@@ -3219,7 +3222,7 @@ func request_move(cell: Vector2i, resolved_preview: Dictionary = {}) -> Dictiona
 		if hud:
 			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消预览")
 		if v2_affordance_presenter:
-			v2_affordance_presenter.show_path(_get_v2_preview_path(preview), true)
+			v2_affordance_presenter.show_move_preview(_build_v2_move_affordance(cell, preview))
 		_render_v2_hud()
 		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
 
@@ -3431,7 +3434,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		if bool(hover_preview.get("valid", false)):
 			_cancel_v2_preview(v2_hover_attack_preview)
 			v2_hover_attack_preview = hover_preview.duplicate(true)
-			v2_affordance_presenter.show_attack_focus(cell, false)
+			v2_affordance_presenter.show_attack_preview(_build_v2_attack_affordance(hovered_unit, hover_preview, false))
 			if hud:
 				hud.show_attack_preview(hover_preview, hovered_unit, false)
 				hud.set_context_prompt("%s · 左键攻击" % hud.get_context_prompt_text())
@@ -3452,18 +3455,10 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 	if not reachable_cells.has(cell):
 		v2_affordance_presenter.clear_preview()
 		return
-	var path: Array[Vector2i] = Pathfinding.find_path(
-		selected_unit.grid_pos, cell,
-		map_width, map_height,
-		_get_move_cost.bind(selected_unit.job),
-		_is_blocked
-	)
-	if not path.is_empty():
-		# Pathfinding returns steps without the start cell, while the V2 presenter
-		# intentionally skips index 0 so the unit's own tile is never highlighted.
-		var display_path: Array[Vector2i] = [selected_unit.grid_pos]
-		display_path.append_array(path)
-		v2_affordance_presenter.show_path(display_path, false)
+	var move_query := _query_v2_context_move(cell)
+	if bool(move_query.get("valid", false)):
+		v2_affordance_presenter.show_move_preview(_build_v2_move_affordance(cell, move_query))
+		_cancel_v2_preview(move_query)
 		if hud:
 			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消预览；Esc取消选择。" % [cell.x + 1, cell.y + 1])
 		_render_v2_hud()
@@ -3489,7 +3484,7 @@ func request_attack_preview(target: Unit, resolved_preview: Dictionary = {}) -> 
 			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 		v2_input_router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED)
 	if v2_affordance_presenter:
-		v2_affordance_presenter.show_attack_focus(target.grid_pos, true)
+		v2_affordance_presenter.show_attack_preview(_build_v2_attack_affordance(target, preview, true))
 	if hud:
 		hud.show_attack_preview(preview, target, true)
 	_render_v2_hud()
@@ -3668,6 +3663,21 @@ func _clear_v2_locked_attack() -> void:
 	v2_locked_attack_target_id = ""
 	if hud:
 		hud.clear_attack_preview()
+
+func _get_v2_action_preview() -> V2ActionPreview:
+	if v2_action_preview == null:
+		v2_action_preview = V2ActionPreviewScript.new()
+	return v2_action_preview
+
+func _build_v2_move_affordance(cell: Vector2i, query: Dictionary) -> Dictionary:
+	var preview := _get_v2_action_preview().build_move(selected_unit, cell, query)
+	preview["origin"] = selected_unit.grid_pos if selected_unit else Vector2i(-1, -1)
+	return preview
+
+func _build_v2_attack_affordance(target: Unit, query: Dictionary, locked: bool) -> Dictionary:
+	var preview := _get_v2_action_preview().build_attack(selected_unit, target, query)
+	preview["locked"] = locked
+	return preview
 
 func _cancel_v2_preview(preview: Dictionary) -> void:
 	if v2_action_service and not preview.is_empty():
@@ -3940,7 +3950,7 @@ func _show_move_range(unit: Unit) -> void:
 				_highlight_cell(move_highlight, term_pos, _highlight_color("target", COLOR_TARGET))
 
 ## 选中单位后的默认可发现性层：同时展示移动与攻击信息。
-## 玩家不需要先找到隐藏的“攻击模式”按钮，红色区域就是当前武器的有效范围。
+## 玩家不需要先找到隐藏的“攻击模式”按钮；合法敌人描边，悬停后才显示确定预览。
 func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	if not unit or not is_instance_valid(unit):
 		return
@@ -3963,10 +3973,8 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 		return
 	_show_attack_range(unit)
 	if _is_v2_battle() and v2_affordance_presenter:
-		v2_affordance_presenter.show_for_unit(unit, {"reachable": reachable_cells}, {
-			"range_cells": v2_attack_range_cells,
-			"targets": attack_targets,
-		})
+		v2_affordance_presenter.show_reachable(reachable_cells)
+		v2_affordance_presenter.show_attackable(attack_targets)
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
@@ -3974,12 +3982,12 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	if attack_targets.is_empty():
 		if hud:
 			hud.set_context_prompt(
-				"%s蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % [move_note, range_text]
+				"%s蓝色格 = 可移动；红色描边敌人 = 可攻击（%s）。当前没有合法目标，先移动到射程内或结束回合。" % [move_note, range_text]
 			)
 	else:
 		if hud:
 			hud.set_context_prompt(
-			"%s蓝色格 = 可移动；红色敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % [move_note, range_text]
+				"%s蓝色格 = 可移动；红色描边敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % [move_note, range_text]
 			)
 	_render_v2_hud()
 
@@ -4036,8 +4044,7 @@ func _show_attack_range(unit: Unit) -> void:
 	v2_attack_range_cells.clear()
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
-	# 先显示完整可射击区域，再用更亮的格子标出真实敌人/目标，
-	# 让玩家即使暂时没有敌人也能理解武器射程。
+	# 仍计算视线内的射程格，供合法目标查询与 HUD 数值说明使用；V2 不把整片范围绘制成红色。
 	for y in range(maxi(0, unit.grid_pos.y - max_range), mini(map_height, unit.grid_pos.y + max_range + 1)):
 		for x in range(maxi(0, unit.grid_pos.x - max_range), mini(map_width, unit.grid_pos.x + max_range + 1)):
 			var cell := Vector2i(x, y)

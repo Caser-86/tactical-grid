@@ -62,7 +62,7 @@ func _run() -> void:
 	else:
 		await _prepare_battle_stage(manager, battle)
 	_dismiss_tutorial_hint(battle)
-	if stage != "result":
+	if stage != "result" and stage != "combat":
 		battle.camera.toggle_overview()
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -111,6 +111,16 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 	match stage:
 		"start":
 			battle.call("_deselect_unit")
+		"combat":
+			battle.call("_select_unit", actor)
+			var target := _prepare_attack_target(battle, actor)
+			t.check(target != null, "M112 combat 阶段找到可合法攻击的敌人")
+			if target != null:
+				battle.call("_refresh_selected_unit_affordances", actor)
+				battle.call("_on_v2_cell_hovered", target.grid_pos)
+				battle.call("_dismiss_context_hint")
+				battle.camera.focus_cell(actor.grid_pos)
+				await get_tree().process_frame
 		"route_split":
 			actor.grid_pos = Vector2i(8, 14)
 			battle.call("_update_unit_sprite_pos", actor, false)
@@ -244,6 +254,12 @@ func _validate_stage(manager: Node, battle: BattleController) -> void:
 	if stage == "result":
 		return
 	t.check(battle.hud.objective_label.text != "", "M112 %s HUD 目标文本存在" % stage)
+	if stage == "combat":
+		var presenter: Node = battle.v2_affordance_presenter
+		t.check(presenter != null and _group_count(presenter, "v2_move_overlay") > 0, "M112 combat 显示真实可达青色格")
+		t.check(presenter != null and _group_count(presenter, "v2_attackable_outline") == 1, "M112 combat 只描边一个合法敌方目标")
+		t.check(presenter != null and _group_count(presenter, "v2_attack_preview") == 1, "M112 combat 只显示一个查询支持的攻击预览")
+		t.check(presenter != null and _legacy_red_fill_count(presenter) == 0, "M112 combat 不绘制旧式全范围红色填充")
 	if stage == "route_split":
 		t.check(battle.v2_mission_flow.get_current_step_id() == "select_route", "M112 route_split 阶段显示路线选择状态")
 	if stage == "record_room":
@@ -277,8 +293,22 @@ func _parse_user_args() -> void:
 			_explicit_output = true
 	if not visual_mode in ["normal", "grayscale", "deuteranopia_assist"]:
 		visual_mode = "normal"
-	if not stage in ["start", "route_split", "record_room", "gantry_open", "rescue", "evac_intercept", "evac", "dialogue", "result"]:
+	if not stage in ["start", "combat", "route_split", "record_room", "gantry_open", "rescue", "evac_intercept", "evac", "dialogue", "result"]:
 		stage = "start"
+
+func _group_count(node: Node, group_name: StringName) -> int:
+	var count := 0
+	for child in node.get_children():
+		if child.is_in_group(group_name):
+			count += 1
+	return count
+
+func _legacy_red_fill_count(node: Node) -> int:
+	var count := 0
+	for child in node.get_children():
+		if child is ColorRect and child.is_in_group("v2_attack_overlay"):
+			count += 1
+	return count
 
 func _with_known_tutorials(save: Dictionary) -> Dictionary:
 	var next := save.duplicate(true)
