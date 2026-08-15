@@ -27,6 +27,49 @@ func _ready() -> void:
 	_install_v2_control_guide()
 	_ensure_v2_guidance_layer()
 
+## V2 owns the temporary battle presentation tree as well as the detached
+## Unit data nodes.  Release those owners in one order during scene teardown:
+## visual nodes first, services that retain unit references second, and the
+## base controller's unit arrays last.  V1 never reaches this override.
+func _cleanup_units() -> void:
+	_cleanup_v2_runtime_children()
+	# These services keep duplicated unit arrays or previews. Drop them before
+	# the base method frees detached Unit nodes, otherwise they survive until
+	# process shutdown and Godot reports orphan Node2D/RefCounted instances.
+	v2_action_service = null
+	v2_interaction_service = null
+	v2_hazard_controller = null
+	v2_camera_navigation = null
+	v2_action_preview = null
+	v2_hud_presenter = null
+	v2_damage_presenter = null
+	v2_context_action_resolver = null
+	v2_mission_event_bridge = null
+	v2_rescue_controller = null
+	v2_encounter_activation = null
+	v2_tutorial_flow = null
+	super._cleanup_units()
+
+func _cleanup_v2_runtime_children() -> void:
+	# Unit sprites, affordance panels, guidance routes and attack feedback are
+	# all transient V2 children. Free them synchronously instead of relying on
+	# a deferred queue while their parent is leaving the scene tree.
+	for layer in [unit_layer, v2_affordance_layer, _v2_guidance_layer, effect_layer]:
+		if layer == null or not is_instance_valid(layer):
+			continue
+		for child in layer.get_children():
+			if child != null and is_instance_valid(child):
+				child.free()
+	if visibility_renderer != null and is_instance_valid(visibility_renderer):
+		visibility_renderer.free()
+	visibility_renderer = null
+	if enemy_intent_renderer != null and is_instance_valid(enemy_intent_renderer):
+		enemy_intent_renderer.free()
+	enemy_intent_renderer = null
+	_v2_guidance_layer = null
+	v2_affordance_presenter = null
+	v2_input_router = null
+
 func _input(event: InputEvent) -> void:
 	if _route_v2_input(event):
 		get_viewport().set_input_as_handled()

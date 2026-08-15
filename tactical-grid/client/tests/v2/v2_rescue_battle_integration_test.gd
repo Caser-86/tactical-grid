@@ -150,11 +150,27 @@ func _wait_for_player_phase(battle: BattleController) -> bool:
 
 func _cleanup_battle(battle: Node) -> void:
 	if battle != null and is_instance_valid(battle):
+		var unit_refs: Array = []
+		for raw_unit in battle.get("player_units") + battle.get("enemy_units"):
+			if raw_unit != null:
+				unit_refs.append(raw_unit)
+		var ghost_unit_refs: Array = []
+		for raw_ghost in battle.get("_last_known_ghosts").values():
+			var ghost: Node = raw_ghost
+			if ghost != null and is_instance_valid(ghost) and ghost.get("unit") != null:
+				ghost_unit_refs.append(ghost.get("unit"))
 		# Unit data nodes are intentionally detached from the battle tree. Release
 		# them before queueing the scene root so test shutdown does not rely on a
 		# deferred lifecycle callback.
 		battle.call("_cleanup_units")
-		battle.queue_free()
+		var unit_layer := battle.get_node_or_null("UnitLayer")
+		t.check(unit_layer == null or unit_layer.get_child_count() == 0, "营救测试退出前 V2 单位表现节点已清空")
+		t.check(battle.get("v2_action_service") == null and battle.get("v2_interaction_service") == null, "营救测试退出前 V2 服务已解除单位引用")
+		for unit_ref in unit_refs:
+			t.check(not is_instance_valid(unit_ref), "营救测试退出前单位数据节点已逐个释放")
+		for ghost_unit_ref in ghost_unit_refs:
+			t.check(not is_instance_valid(ghost_unit_ref), "营救测试退出前幽灵临时单位已释放")
+		battle.free()
 		await get_tree().process_frame
 		t.check(not is_instance_valid(battle), "营救测试退出前已销毁战斗根节点")
 
