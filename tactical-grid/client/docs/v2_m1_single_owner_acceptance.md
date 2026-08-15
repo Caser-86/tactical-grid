@@ -16,7 +16,7 @@ On 2026-08-15 the project owner reported that the exported candidate was playabl
 - Mission version: `v2_m1`
 - Difficulty: `story` or `standard`
 - Playtest ID: `OWNER`
-- Build identifier: fill after Task 16 creates the candidate
+- Build identifier: `ae5ca19` automated candidate; human acceptance remains incomplete
 - Date/time: fill after the owner run
 
 ## Run Procedure
