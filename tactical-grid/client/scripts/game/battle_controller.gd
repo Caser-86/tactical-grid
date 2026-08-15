@@ -3851,9 +3851,7 @@ func _open_v2_interaction_menu(entity_id: String, resolved_preview: Dictionary =
 		return
 	v2_pending_interaction_facility_id = entity_id
 	_clear_v2_hover_preview()
-	_cancel_v2_preview(v2_locked_attack_preview)
-	v2_locked_attack_preview.clear()
-	v2_locked_attack_target_id = ""
+	_clear_v2_locked_attack()
 	if v2_input_router:
 		v2_input_router.set_state(V2BattleInputRouter.State.INTERACTION_MENU)
 	if hud:

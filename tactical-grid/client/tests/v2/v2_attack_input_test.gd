@@ -5,6 +5,7 @@ const HUDScript = preload("res://scripts/ui/hud.gd")
 const RouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const PresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
 const V2ActionService = preload("res://scripts/v2/combat/v2_action_service.gd")
+const V2InteractionService = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
 const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
@@ -102,6 +103,27 @@ func _initialize() -> void:
 	t.check(cancel_battle.v2_input_router.get_state_name() == "unit_selected", "右键取消攻击锁定并保留单位选择")
 	t.check(cancel_battle.v2_locked_attack_preview.is_empty() and cancel_target.current_hp == 7, "右键清除锁定且不造成伤害")
 
+	var menu_data := _make_battle(battle_script, [
+		_make_unit("player_menu", "player", Vector2i(1, 1), 7),
+	], [
+		_make_unit("enemy_menu", "enemy", Vector2i(3, 1), 7),
+	])
+	var menu_battle: Node = menu_data.get("battle")
+	var menu_presenter: V2AffordancePresenter = menu_data.get("presenter")
+	var menu_target: Unit = menu_data.get("target")
+	var menu_map := _make_map()
+	menu_map["facilities"] = [{"id": "camera_menu_test", "type": "camera", "name": "测试摄像头", "x": 1, "y": 2}]
+	var menu_service := V2InteractionService.new()
+	menu_service.setup(menu_map)
+	menu_battle.set("v2_interaction_service", menu_service)
+	# The focused test does not need a real PopupPanel; keeping HUD absent avoids
+	# exercising the unrelated CanvasLayer fixture while still entering the menu path.
+	menu_battle.set("hud", null)
+	var menu_preview: Dictionary = menu_battle.call("request_attack_preview", menu_target)
+	t.check(bool(menu_preview.get("valid", false)) and _group_count(menu_presenter, "v2_attack_preview") == 1 and _group_count(menu_presenter, "v2_attack_preview_numbers") == 1, "打开设施菜单前存在锁定攻击视觉")
+	menu_battle.call("_open_v2_interaction_menu", "camera_menu_test")
+	t.check(menu_battle.v2_locked_attack_preview.is_empty() and _group_count(menu_presenter, "v2_attack_preview") == 0 and _group_count(menu_presenter, "v2_attack_preview_numbers") == 0 and _group_count(menu_presenter, "v2_intent_change_cue") == 0, "打开设施菜单清除锁定攻击视觉")
+
 	var cover_data := _make_battle(battle_script, [
 		_make_unit("player_cover", "player", Vector2i(1, 1), 7),
 	], [
@@ -126,6 +148,7 @@ func _initialize() -> void:
 	_cleanup(hover_battle_data)
 	_cleanup(stale_data)
 	_cleanup(cancel_data)
+	_cleanup(menu_data)
 	_cleanup(cover_data)
 	t.finish(self)
 
