@@ -42,6 +42,23 @@ var _completed_step_ids: Dictionary = {}
 var _mission_flags: Dictionary = {}
 var m1_safe_tutorial_complete := false
 
+## Release the flow's copied unit rosters and mission payload before the V2
+## battle scene is freed. This keeps a RefCounted flow from extending Unit
+## lifetimes beyond the scene that owns it.
+func dispose() -> void:
+	mission.clear()
+	map_data.clear()
+	player_units.clear()
+	enemy_units.clear()
+	rescued_characters.clear()
+	optional_reward_flags.clear()
+	event_history.clear()
+	_rescued_units.clear()
+	_positions.clear()
+	_objective_steps.clear()
+	_completed_step_ids.clear()
+	_mission_flags.clear()
+
 func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, enemies: Array) -> void:
 	mission = mission_data.duplicate(true)
 	map_data = locked_map.duplicate(true)

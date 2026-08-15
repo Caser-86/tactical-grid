@@ -35,6 +35,7 @@ func _test_m1_alert_front() -> void:
 	t.check(alert.get_alert_level() == AlertStateScript.LEVEL_SUSPICIOUS, "重复识别不进入封锁")
 	alert.on_turn_end()
 	t.check(alert.get_front_state() == &"searching", "搜索状态不会在回合边界闪回潜伏")
+	alert.free()
 
 func _test_story_grace() -> void:
 	var alert := AlertStateScript.new()
@@ -49,6 +50,7 @@ func _test_story_grace() -> void:
 	t.check(bool(first.get("grace", false)), "宽限结果明确标记")
 	var second := alert.apply_event("camera_identified_player")
 	t.check(bool(second.get("changed", false)), "故事难度第二个识别事件进入搜索")
+	alert.free()
 
 func _test_visibility_delta() -> void:
 	var visibility := VisibilityStateScript.new()
@@ -64,3 +66,4 @@ func _test_visibility_delta() -> void:
 	t.check(int(second.get("newly_observed_cells", 0)) == 1, "移动后同事务返回新增视野格数")
 	t.check(int(second.get("newly_revealed_enemies", 0)) == 1, "移动后同事务返回新揭示敌人数")
 	t.check(visibility.get_last_update_summary().get("observed_enemy_ids", []).has("enemy_test"), "迷雾摘要保留当前可见敌人")
+	visibility.free()

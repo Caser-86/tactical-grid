@@ -32,10 +32,20 @@ func _ready() -> void:
 ## visual nodes first, services that retain unit references second, and the
 ## base controller's unit arrays last.  V1 never reaches this override.
 func _cleanup_units() -> void:
+	_clear_v2_last_known_ghosts()
 	_cleanup_v2_runtime_children()
+	var rescue_controller: RefCounted = v2_rescue_controller
 	# These services keep duplicated unit arrays or previews. Drop them before
 	# the base method frees detached Unit nodes, otherwise they survive until
 	# process shutdown and Godot reports orphan Node2D/RefCounted instances.
+	if v2_rescue_controller != null and v2_rescue_controller.has_method("dispose"):
+		v2_rescue_controller.dispose()
+	if v2_action_service != null and v2_action_service.has_method("dispose"):
+		v2_action_service.dispose()
+	if v2_mission_flow != null and v2_mission_flow.has_method("dispose"):
+		v2_mission_flow.dispose()
+	if v2_interaction_service != null and v2_interaction_service.has_method("dispose"):
+		v2_interaction_service.dispose()
 	v2_action_service = null
 	v2_interaction_service = null
 	v2_hazard_controller = null
@@ -49,6 +59,26 @@ func _cleanup_units() -> void:
 	v2_encounter_activation = null
 	v2_tutorial_flow = null
 	super._cleanup_units()
+	if rescue_controller != null and rescue_controller.has_method("dispose"):
+		rescue_controller.dispose(true)
+
+## V2 keeps the legacy ghost presentation but owns its temporary Unit data. The
+## base implementation only queues the ghost sprite, so repeated fog refreshes
+## would orphan the detached placeholder Unit after the dictionary is cleared.
+func _refresh_last_known_ghosts() -> void:
+	_clear_v2_last_known_ghosts()
+	super._refresh_last_known_ghosts()
+
+func _clear_v2_last_known_ghosts() -> void:
+	for raw_ghost in _last_known_ghosts.values():
+		var ghost: Node = raw_ghost
+		if ghost == null or not is_instance_valid(ghost):
+			continue
+		var placeholder: Node = ghost.get("unit")
+		if placeholder != null and is_instance_valid(placeholder):
+			placeholder.free()
+		ghost.free()
+	_last_known_ghosts.clear()
 
 func _cleanup_v2_runtime_children() -> void:
 	# Unit sprites, affordance panels, guidance routes and attack feedback are

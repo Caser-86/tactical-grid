@@ -150,6 +150,10 @@ func _wait_for_player_phase(battle: BattleController) -> bool:
 
 func _cleanup_battle(battle: Node) -> void:
 	if battle != null and is_instance_valid(battle):
+		var action_service: RefCounted = battle.get("v2_action_service")
+		var mission_flow: RefCounted = battle.get("v2_mission_flow")
+		var interaction_service: RefCounted = battle.get("v2_interaction_service")
+		var rescue_controller: RefCounted = battle.get("v2_rescue_controller")
 		var unit_refs: Array = []
 		for raw_unit in battle.get("player_units") + battle.get("enemy_units"):
 			if raw_unit != null:
@@ -166,6 +170,16 @@ func _cleanup_battle(battle: Node) -> void:
 		var unit_layer := battle.get_node_or_null("UnitLayer")
 		t.check(unit_layer == null or unit_layer.get_child_count() == 0, "营救测试退出前 V2 单位表现节点已清空")
 		t.check(battle.get("v2_action_service") == null and battle.get("v2_interaction_service") == null, "营救测试退出前 V2 服务已解除单位引用")
+		if rescue_controller != null and is_instance_valid(rescue_controller):
+			t.check((rescue_controller.get("_players") as Array).is_empty() and (rescue_controller.get("_enemies") as Array).is_empty(), "营救控制器退出前不再持有单位数组")
+			t.check(rescue_controller.get("_mission_flow") == null, "营救控制器退出前不再持有任务流程")
+			t.check(not (rescue_controller.get("_create_unit") as Callable).is_valid() and not (rescue_controller.get("_register_unit") as Callable).is_valid(), "营救控制器退出前解除 BattleController 回调闭环")
+		if action_service != null and is_instance_valid(action_service):
+			t.check((action_service.get("_players") as Array).is_empty() and (action_service.get("_enemies") as Array).is_empty(), "动作服务退出前不再持有单位数组")
+		if mission_flow != null and is_instance_valid(mission_flow):
+			t.check((mission_flow.get("player_units") as Array).is_empty() and (mission_flow.get("enemy_units") as Array).is_empty(), "任务流程退出前不再持有单位数组")
+		if interaction_service != null and is_instance_valid(interaction_service):
+			t.check(interaction_service.get("_mission_flow") == null, "交互服务退出前不再持有任务流程")
 		for unit_ref in unit_refs:
 			t.check(not is_instance_valid(unit_ref), "营救测试退出前单位数据节点已逐个释放")
 		for ghost_unit_ref in ghost_unit_refs:

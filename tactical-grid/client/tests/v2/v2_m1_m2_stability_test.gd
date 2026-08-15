@@ -60,6 +60,8 @@ func _run_mission(mission_id: String) -> void:
 	for unit in players:
 		if unit != null and is_instance_valid(unit):
 			unit.free()
+	if turn_manager != null and is_instance_valid(turn_manager):
+		turn_manager.free()
 
 func _state_sets_are_disjoint(snapshot: Dictionary) -> bool:
 	var seen := {}

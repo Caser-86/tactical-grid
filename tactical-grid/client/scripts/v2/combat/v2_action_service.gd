@@ -13,6 +13,15 @@ var _committed_previews: Dictionary = {}
 var _state_revision: int = 0
 var _next_preview_id: int = 1
 
+## Release copied unit arrays and preview payloads before the owning battle
+## scene leaves the tree. These are detached V2-only service references.
+func dispose() -> void:
+	_map_data.clear()
+	_players.clear()
+	_enemies.clear()
+	_previews.clear()
+	_committed_previews.clear()
+
 func setup(map_data: Dictionary, players: Array, enemies: Array) -> void:
 	_map_data = map_data.duplicate(true)
 	_players = players.duplicate()

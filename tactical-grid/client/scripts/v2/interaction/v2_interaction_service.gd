@@ -20,6 +20,17 @@ var _state_revision: int = 0
 var _selected_route_id := ""
 var _cleared_encounters: Dictionary = {}
 
+## Release facility handlers and the mission-flow reference before the V2
+## battle scene is freed.
+func dispose() -> void:
+	_map_data.clear()
+	_facilities_by_id.clear()
+	_handlers.clear()
+	_visibility_state = null
+	_mission_flow = null
+	_selected_route_id = ""
+	_cleared_encounters.clear()
+
 func setup(
 	map_data: Dictionary,
 	_network_state: Node = null,

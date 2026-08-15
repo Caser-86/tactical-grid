@@ -76,7 +76,7 @@ func _run_route(route_id: String, source_mission: Dictionary, map: Dictionary) -
 		flow.apply_event(&"unit_moved", {"unit": unit, "unit_id": unit.entity_id, "position": unit.grid_pos})
 	var evac := flow.apply_event(&"evac_checked")
 	t.check(bool(evac.get("victory", false)) and flow.is_victory(), "%s 三名存活队员进入撤离区后胜利" % route_id)
-	for unit in players + [rescued_sniper, turbine_actor]:
+	for unit in players + [sniper, rescued_sniper, turbine_actor]:
 		if unit != null and is_instance_valid(unit):
 			unit.free()
 

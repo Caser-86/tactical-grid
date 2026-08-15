@@ -46,6 +46,21 @@ func setup(
 		if raw_entity is Dictionary and String((raw_entity as Dictionary).get("state", "")) == "rescued":
 			_rescued[String((raw_entity as Dictionary).get("id", ""))] = true
 
+## Break the controller's ownership graph before its BattleController owner is
+## released. The factory/register callables point back to that owner, while the
+## mission flow and unit arrays retain detached Unit nodes.
+func dispose(clear_unit_refs: bool = false) -> void:
+	_previews.clear()
+	_rescued.clear()
+	_map_data.clear()
+	_action_service = null
+	_mission_flow = null
+	_create_unit = Callable()
+	_register_unit = Callable()
+	if clear_unit_refs:
+		_players.clear()
+		_enemies.clear()
+
 func query_rescue(actor: Unit, rescue_id: StringName) -> Dictionary:
 	var id := String(rescue_id)
 	var entity := _get_rescue_entity(id)
