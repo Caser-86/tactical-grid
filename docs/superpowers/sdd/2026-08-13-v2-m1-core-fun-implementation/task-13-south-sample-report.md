@@ -1,12 +1,12 @@
-# Task 13 South-Facing Art Sample Report
+# Task 13 M1 Directional Art Report
 
 Date: 2026-08-15
 Branch: `codex/ch1-infiltration-v2`
-Status: south-facing sample checkpoint passed; four-direction integration remains pending.
+Status: four-direction integration passed; Task 13 is ready for independent commit review.
 
 ## Scope
 
-This checkpoint produces and integrates one south-facing runtime sample for five V2 unit identities:
+This task produces and integrates four authored direction views for five V2 unit identities:
 
 - `v2_assault`
 - `v2_scout`
@@ -20,16 +20,16 @@ The work is V2-only. Existing V1 assets, directionless V2 fallback assets, and V
 
 - Source method: AI-generated with OpenAI ImageGen.
 - Source record: `tactical-grid/client/assets/v2/source/units/m1_identity_art_brief.json`.
-- Source images: one isolated south-facing subject per PNG under `tactical-grid/client/assets/v2/source/units/player/` and `tactical-grid/client/assets/v2/source/units/enemy/`.
+- Source images: one isolated subject per direction (`north`, `east`, `south`, `west`) under `tactical-grid/client/assets/v2/source/units/player/` and `tactical-grid/client/assets/v2/source/units/enemy/`.
 - Processing tool: `tactical-grid/client/tools/process_v2_unit_art.ps1`.
-- Processing: edge-connected alpha cleanup, transparent-bound crop with padding, bicubic scale into a 112px subject box, and placement on a 128x128 RGBA canvas with a shared bottom anchor.
+- Processing: true-alpha detection, edge-connected near-black/near-white background cleanup for opaque generator output, transparent-bound crop with padding, bicubic scale into a 112px subject box, and placement on a 128x128 RGBA canvas with a shared bottom anchor.
 - License status: project-owned generated source; no external asset license is required.
 
 ## Runtime Integration
 
-The five runtime files are registered as V2 catalog keys and resolved by `UnitSprite` only when a V2 unit provides `v2_art_key`. V1 units keep the existing directionless path.
+The twenty runtime files are registered as V2 catalog keys and resolved by `UnitSprite` only when a V2 unit provides `v2_art_key`. Movement and attack vectors select `north`, `east`, `south`, or `west`; a missing directional frame falls back to the approved south frame and then the existing directionless V2 key. V1 units keep the existing directionless path.
 
-The sample snapshot renders all five units on the existing Echo Yard floor at 100%, 75%, grayscale, and color-assist presentations. The visual check confirms the silhouettes remain identifiable without relying on text badges:
+The direction snapshot renders all five identities on the existing Echo Yard floor at runtime scale. The visual check confirms the silhouettes remain identifiable without relying on text badges:
 
 - Assault: compact rifle, forward stance, cyan forearm plates.
 - Scout: lower profile, asymmetric antenna pack, lime panels.
@@ -37,13 +37,15 @@ The sample snapshot renders all five units on the existing Echo Yard floor at 10
 - Drone: wide disk/wing silhouette, cyan scan lens, warning lights.
 - Shield guard: broad grounded body and dominant orange hexagonal shield.
 
+The Windows render is stored at `tactical-grid/client/assets/v2/source/units/m1_identity_direction_contact_sheet.png`. The previously approved south-facing sample remains at `m1_identity_contact_sheet.png` and is not overwritten.
+
 ## Verification Evidence
 
-Focused unit-art test:
+Focused unit-art and direction-selection test:
 
 ```text
 v2_unit_art_distinction_test.gd
-Passed: 69
+Passed: 184
 Failed: 0
 ```
 
@@ -68,12 +70,6 @@ V2 RELEASE GATE PASSED
 
 Godot still reports non-fatal teardown diagnostics about leaked RIDs, ObjectDB instances, and resources in some isolated test processes. They do not produce a failed test item in this gate and remain a later test-harness cleanup task.
 
-## Remaining Work
+## Completion Boundary
 
-This is deliberately not the completion of Task 13. The following remain pending:
-
-1. Generate north, east, and west views for the five approved identities.
-2. Preserve each identity's equipment, color blocks, asymmetric details, lighting, and anchor across directions.
-3. Extend the catalog, runtime selection, image checks, and snapshot coverage to all four directions.
-4. Re-run the M1 visual matrix after direction integration.
-5. Commit the four-direction integration separately from this south-facing sample checkpoint.
+Task 13 covers the five-unit four-direction art sample only. It does not claim that the full M1 art pass, audio pass, or release package is complete. The next gates are the M1 visual matrix, player-turn regression, full V2 gate, audio/feedback sample, and Windows release validation.

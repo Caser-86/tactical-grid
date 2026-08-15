@@ -848,6 +848,7 @@ git commit -m "feat(v2): make combat outcomes immediate and readable"
 - Create: `tactical-grid/client/assets/v2/source/units/player/`
 - Create: `tactical-grid/client/assets/v2/source/units/enemy/`
 - Create: `tactical-grid/client/assets/v2/source/units/m1_identity_contact_sheet.png`
+- Create: `tactical-grid/client/assets/v2/source/units/m1_identity_direction_contact_sheet.png`
 - Create: `tactical-grid/client/assets/v2/source/units/m1_identity_art_brief.json`
 - Create: `tactical-grid/client/assets/v2/units/v2_assault_{north,east,south,west}_128.png`
 - Create: `tactical-grid/client/assets/v2/units/v2_scout_{north,east,south,west}_128.png`
@@ -858,6 +859,8 @@ git commit -m "feat(v2): make combat outcomes immediate and readable"
 - Modify: `tactical-grid/client/tests/v2/v2_unit_art_distinction_test.gd`
 - Create: `tactical-grid/client/tests/v2/v2_unit_art_sample_snapshot.gd`
 - Create: `tactical-grid/client/tests/v2/v2_unit_art_sample_snapshot.tscn`
+- Create: `tactical-grid/client/tests/v2/v2_unit_art_direction_snapshot.gd`
+- Create: `tactical-grid/client/tests/v2/v2_unit_art_direction_snapshot.tscn`
 - Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 - Modify: `tactical-grid/client/data/v2/resource_manifest.md`
 - Modify: `tactical-grid/client/assets/v2/README.md`
@@ -909,11 +912,11 @@ Project owner approves only if each type can be named at actual and 75% scale wi
 
 If recognition fails, enlarge silhouette features or accent areas. Do not solve recognition by adding text, thicker team circles, or higher source resolution alone.
 
-- [ ] **Step 8: Generate north/east/west directions from the approved identity set**
+- [x] **Step 8: Generate north/east/west directions from the approved identity set**
 
 Each direction is a separately composed view with the same armor, equipment, color blocks, anchor, and lighting. Mirroring is allowed only for symmetric drone elements, not for asymmetric character equipment.
 
-- [ ] **Step 9: Re-run snapshots and visual matrix**
+- [x] **Step 9: Re-run snapshots and visual matrix**
 
 ```powershell
 & $godot --headless --path . --script res://tests/v2/v2_unit_art_distinction_test.gd

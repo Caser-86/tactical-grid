@@ -49,6 +49,17 @@ func _initialize() -> void:
 						max_y = maxi(max_y, y)
 		t.check(image != null and image.get_pixel(0, 0).a < 0.1, "M1 南向样本带透明背景：%s" % key)
 		t.check(visible_pixels >= 400 and min_x > 0 and min_y > 0 and max_x < 127 and max_y < 127, "M1 南向样本可见主体边界有效：%s" % key)
+	var direction_suffixes := [&"north", &"east", &"south", &"west"]
+	var directional_bases := [&"v2_assault", &"v2_scout", &"v2_sentry", &"v2_drone", &"v2_shield_guard"]
+	for base_key in directional_bases:
+		for suffix in direction_suffixes:
+			var key := StringName("%s_%s" % [String(base_key), String(suffix)])
+			t.check(catalog.has_texture(&"unit", key), "M1 四方向角色图存在：%s" % key)
+			var texture: Texture2D = catalog.get_texture(&"unit", key)
+			t.check(texture != null and texture.get_size() == Vector2(128, 128), "M1 四方向统一为 128×128：%s" % key)
+			var image := texture.get_image() if texture != null else null
+			t.check(image != null and image.get_pixel(0, 0).a < 0.1 and image.get_pixel(127, 127).a < 0.1, "M1 四方向背景透明：%s" % key)
+			t.check(FileAccess.file_exists("res://assets/v2/units/%s_128.png" % key), "M1 四方向资源位于 V2 运行时目录：%s" % key)
 	var integration_units := [
 		{"key": &"v2_assault", "job": "assault", "team": "player"},
 		{"key": &"v2_scout", "job": "scout", "team": "player"},
@@ -65,6 +76,19 @@ func _initialize() -> void:
 		sprite.update_unit(unit)
 		var expected: Texture2D = catalog.get_texture(&"unit", StringName("%s_south" % String(entry.key)))
 		t.check(sprite.art_sprite != null and sprite.art_sprite.texture == expected, "V2 M1 角色实际渲染南向样本：%s" % entry.key)
+		t.check(sprite.has_method("set_facing_direction"), "V2 M1 UnitSprite 暴露朝向选帧接口：%s" % entry.key)
+		if sprite.has_method("set_facing_direction"):
+			for suffix in direction_suffixes:
+				sprite.set_facing_direction(suffix)
+				var directional_expected: Texture2D = catalog.get_texture(&"unit", StringName("%s_%s" % [String(entry.key), String(suffix)]))
+				t.check(sprite.art_sprite.texture == directional_expected, "V2 M1 角色实际切换方向帧：%s/%s" % [entry.key, suffix])
+			sprite.position = Vector2.ZERO
+			sprite.play_move_to(Vector2(0, -64), 0.05)
+			t.check(sprite.get_facing_direction() == &"north", "V2 M1 移动到上方时切换北向帧：%s" % entry.key)
+			await create_timer(0.08).timeout
+			sprite.play_state(&"attack", Vector2.RIGHT, 0.05)
+			t.check(sprite.get_facing_direction() == &"east", "V2 M1 攻击右侧目标时切换东向帧：%s" % entry.key)
+			await create_timer(0.08).timeout
 		sprite.free()
 		unit.free()
 	for key in [&"v2_protocol_engineer", &"v2_hunter"]:

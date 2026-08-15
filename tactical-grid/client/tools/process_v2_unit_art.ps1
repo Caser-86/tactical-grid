@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-Deterministically normalizes the V2 south-facing unit sample art.
+Deterministically normalizes V2 unit direction art.
 
 The source images are generated with true alpha. This tool removes only near-zero
-alpha haze, crops transparent bounds, and places every subject on the same 128x128
-runtime canvas with a shared bottom-center anchor. It does not alter the existing V2
-directionless art or any V1 asset.
+alpha haze, removes only edge-connected near-black/near-white backgrounds when a
+generator has baked one into an opaque PNG, crops transparent bounds, and places
+every subject on the same 128x128 runtime canvas with a shared bottom-center
+anchor. It does not alter the existing V2 directionless art or any V1 asset.
 #>
 [CmdletBinding()]
 param(
@@ -28,13 +29,79 @@ $SubjectBox = 112
 $BottomMargin = 6
 $AlphaCutoff = 8
 $Padding = 4
+$BackgroundTolerance = 54
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+
+public static class V2EdgeBackgroundRemoval
+{
+    private static int RowOffset(int y, int height, int stride)
+    {
+        int rowStride = Math.Abs(stride);
+        return stride >= 0 ? y * rowStride : (height - 1 - y) * rowStride;
+    }
+
+    private static bool IsBackground(byte[] bytes, int x, int y, int width, int height, int stride)
+    {
+        int offset = RowOffset(y, height, stride) + x * 4;
+        int r = bytes[offset];
+        int g = bytes[offset + 1];
+        int b = bytes[offset + 2];
+        int max = Math.Max(r, Math.Max(g, b));
+        int min = Math.Min(r, Math.Min(g, b));
+        return (min >= 220 && max - min <= 24) || (max <= 42 && max - min <= 32);
+    }
+
+    private static void Enqueue(Queue<int> queue, bool[] visited, int x, int y, int width, int height)
+    {
+        if (x < 0 || x >= width || y < 0 || y >= height) return;
+        int index = y * width + x;
+        if (visited[index]) return;
+        visited[index] = true;
+        queue.Enqueue(index);
+    }
+
+    public static void Remove(byte[] bytes, int width, int height, int stride)
+    {
+        bool[] visited = new bool[width * height];
+        Queue<int> queue = new Queue<int>();
+        for (int x = 0; x < width; x++)
+        {
+            Enqueue(queue, visited, x, 0, width, height);
+            Enqueue(queue, visited, x, height - 1, width, height);
+        }
+        for (int y = 1; y < height - 1; y++)
+        {
+            Enqueue(queue, visited, 0, y, width, height);
+            Enqueue(queue, visited, width - 1, y, width, height);
+        }
+
+        while (queue.Count > 0)
+        {
+            int index = queue.Dequeue();
+            int x = index % width;
+            int y = index / width;
+            if (!IsBackground(bytes, x, y, width, height, stride)) continue;
+            int offset = RowOffset(y, height, stride) + x * 4;
+            bytes[offset + 3] = 0;
+            Enqueue(queue, visited, x - 1, y, width, height);
+            Enqueue(queue, visited, x + 1, y, width, height);
+            Enqueue(queue, visited, x, y - 1, width, height);
+            Enqueue(queue, visited, x, y + 1, width, height);
+        }
+    }
+}
+"@
 
 $Jobs = @(
-    @{ key = 'v2_assault'; source = 'player\v2_assault_south_source_2026-08-15.png'; output = 'v2_assault_south_128.png' },
-    @{ key = 'v2_scout'; source = 'player\v2_scout_south_source_2026-08-15.png'; output = 'v2_scout_south_128.png' },
-    @{ key = 'v2_sentry'; source = 'enemy\v2_sentry_south_source_2026-08-15.png'; output = 'v2_sentry_south_128.png' },
-    @{ key = 'v2_drone'; source = 'enemy\v2_drone_south_source_2026-08-15.png'; output = 'v2_drone_south_128.png' },
-    @{ key = 'v2_shield_guard'; source = 'enemy\v2_shield_guard_south_source_2026-08-15.png'; output = 'v2_shield_guard_south_128.png' }
+    Get-ChildItem -LiteralPath $SourceRoot -Recurse -Filter '*_source_2026-08-15.png' |
+        Sort-Object FullName |
+        ForEach-Object {
+            $key = $_.BaseName -replace '_source_2026-08-15$', ''
+            @{ key = $key; source = $_.FullName; output = "${key}_128.png" }
+        }
 )
 
 function Convert-To32bppArgb {
@@ -53,8 +120,74 @@ function Get-RowOffset {
     return ($Height - 1 - $Y) * $rowStride
 }
 
+function Test-EdgeBackgroundPixel {
+    param(
+        [int]$X,
+        [int]$Y,
+        [byte[]]$Bytes,
+        [int]$Width,
+        [int]$Height,
+        [int]$Stride,
+        [int]$Tolerance
+    )
+    $rowOffset = Get-RowOffset $Y $Height $Stride
+    $offset = $rowOffset + $X * 4
+    $r = [int]$Bytes[$offset]
+    $g = [int]$Bytes[$offset + 1]
+    $b = [int]$Bytes[$offset + 2]
+    $max = [Math]::Max($r, [Math]::Max($g, $b))
+    $min = [Math]::Min($r, [Math]::Min($g, $b))
+    if ($min -ge 220 -and ($max - $min) -le 24) { return $true }
+    if ($max -le 42 -and ($max - $min) -le 32) { return $true }
+    return $false
+}
+
+function Remove-EdgeConnectedBackground {
+    param(
+        [byte[]]$Bytes,
+        [int]$Width,
+        [int]$Height,
+        [int]$Stride,
+        [int]$Tolerance
+    )
+    $visited = New-Object bool[] ($Width * $Height)
+    $queue = New-Object 'System.Collections.Generic.Queue[System.Drawing.Point]'
+
+    function Enqueue-BackgroundPoint {
+        param([int]$X, [int]$Y)
+        if ($X -lt 0 -or $X -ge $Width -or $Y -lt 0 -or $Y -ge $Height) { return }
+        $index = $Y * $Width + $X
+        if ($visited[$index]) { return }
+        $visited[$index] = $true
+        $queue.Enqueue([System.Drawing.Point]::new($X, $Y))
+    }
+
+    for ($x = 0; $x -lt $Width; $x++) {
+        Enqueue-BackgroundPoint $x 0
+        Enqueue-BackgroundPoint $x ($Height - 1)
+    }
+    for ($y = 1; $y -lt ($Height - 1); $y++) {
+        Enqueue-BackgroundPoint 0 $y
+        Enqueue-BackgroundPoint ($Width - 1) $y
+    }
+
+    while ($queue.Count -gt 0) {
+        $point = $queue.Dequeue()
+        $index = $point.Y * $Width + $point.X
+        if (-not (Test-EdgeBackgroundPixel $point.X $point.Y $Bytes $Width $Height $Stride $Tolerance)) { continue }
+
+        $rowOffset = Get-RowOffset $point.Y $Height $Stride
+        $offset = $rowOffset + $point.X * 4
+        $Bytes[$offset + 3] = 0
+        Enqueue-BackgroundPoint ($point.X - 1) $point.Y
+        Enqueue-BackgroundPoint ($point.X + 1) $point.Y
+        Enqueue-BackgroundPoint $point.X ($point.Y - 1)
+        Enqueue-BackgroundPoint $point.X ($point.Y + 1)
+    }
+}
+
 foreach ($job in $Jobs) {
-    $sourcePath = Join-Path $SourceRoot $job.source
+    $sourcePath = $job.source
     $outputPath = Join-Path $OutputRoot $job.output
     if (-not (Test-Path -LiteralPath $sourcePath)) { throw "Source not found: $sourcePath" }
 
@@ -71,6 +204,7 @@ foreach ($job in $Jobs) {
     $bytes = New-Object byte[] $byteCount
     [System.Runtime.InteropServices.Marshal]::Copy($data.Scan0, $bytes, 0, $byteCount)
 
+    $hasTransparency = $false
     $minX = $width
     $minY = $height
     $maxX = -1
@@ -80,6 +214,7 @@ foreach ($job in $Jobs) {
         for ($x = 0; $x -lt $width; $x++) {
             $offset = $rowOffset + $x * 4
             $alpha = [int]$bytes[$offset + 3]
+            if ($alpha -lt 255) { $hasTransparency = $true }
             if ($alpha -lt $AlphaCutoff) {
                 $bytes[$offset + 3] = 0
                 continue
@@ -89,6 +224,9 @@ foreach ($job in $Jobs) {
             if ($x -gt $maxX) { $maxX = $x }
             if ($y -gt $maxY) { $maxY = $y }
         }
+    }
+    if (-not $hasTransparency) {
+        [V2EdgeBackgroundRemoval]::Remove($bytes, $width, $height, $data.Stride)
     }
     [System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $data.Scan0, $byteCount)
     $source.UnlockBits($data)
@@ -148,4 +286,4 @@ foreach ($job in $Jobs) {
     Write-Host ("Processed {0,-16} visible={1}x{2} output={3}" -f $job.key, $drawWidth, $drawHeight, $job.output)
 }
 
-Write-Host "V2 south-facing sample art written to $OutputRoot"
+Write-Host "V2 direction art written to $OutputRoot"

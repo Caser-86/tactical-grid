@@ -2,7 +2,7 @@
   "id": "m1_identity_art_sample",
   "generated_at": "2026-08-15",
   "source_method": "OpenAI ImageGen, one isolated subject per image",
-  "camera": "south-facing three-quarter top-down",
+  "camera": "four authored three-quarter top-down views: north, east, south, west",
   "canvas": [128, 128],
   "anchor": {
     "kind": "bottom_center",
@@ -43,6 +43,8 @@
     "alpha_cutoff": 8,
     "subject_box": 112,
     "padding_px": 4,
-    "runtime_output": "assets/v2/units/<unit>_south_128.png"
+    "background_mode": "preserve true alpha; otherwise remove only edge-connected near-black/near-white background",
+    "directions": ["north", "east", "south", "west"],
+    "runtime_output": "assets/v2/units/<unit>_<direction>_128.png"
   }
 }

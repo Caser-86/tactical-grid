@@ -16,6 +16,8 @@ var unit: Node
 var selected := false
 var hover := false
 var current_state: StringName = &"idle"
+## V2-only directional art state. V1 keeps its existing single-texture mapping.
+var facing_direction: StringName = &"south"
 var art_sprite: Sprite2D
 
 ## CH1-040: 是否为最后已知位置幽灵标记。幽灵不显示实时生命/AP，只显示半透明轮廓与"?"不确定标记。
@@ -118,9 +120,7 @@ func _refresh_art_texture() -> void:
 		return
 	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else unit.v2_art_key if not unit.v2_art_key.is_empty() else StringName(unit.job)
 	if unit.boss_art_key.is_empty() and not unit.v2_art_key.is_empty():
-		var directional_key := StringName("%s_south" % String(unit.v2_art_key))
-		if catalog.call("has_texture", &"unit", directional_key):
-			key = directional_key
+		key = _resolve_v2_directional_key(catalog, unit.v2_art_key)
 	if not catalog.call("has_texture", &"unit", key):
 		key = StringName(unit.job)
 	if not catalog.call("has_texture", &"unit", key):
@@ -135,6 +135,33 @@ func _refresh_art_texture() -> void:
 	else:
 		_base_art_scale = Vector2.ONE
 	_reset_art_transform()
+
+func _resolve_v2_directional_key(catalog: Node, base_key: StringName) -> StringName:
+	var directional_key := StringName("%s_%s" % [String(base_key), String(facing_direction)])
+	if catalog.call("has_texture", &"unit", directional_key):
+		return directional_key
+	var south_key := StringName("%s_south" % String(base_key))
+	if catalog.call("has_texture", &"unit", south_key):
+		return south_key
+	return base_key
+
+func set_facing_direction(direction: StringName) -> void:
+	if direction not in [&"north", &"east", &"south", &"west"]:
+		return
+	facing_direction = direction
+	if unit != null and unit.boss_art_key.is_empty() and not unit.v2_art_key.is_empty():
+		_refresh_art_texture()
+
+func set_facing_direction_from_vector(direction: Vector2) -> void:
+	if direction.length_squared() <= 0.01:
+		return
+	if absf(direction.x) >= absf(direction.y):
+		set_facing_direction(&"east" if direction.x > 0.0 else &"west")
+	else:
+		set_facing_direction(&"south" if direction.y > 0.0 else &"north")
+
+func get_facing_direction() -> StringName:
+	return facing_direction
 
 func _is_boss_unit() -> bool:
 	return unit != null and not unit.boss_art_key.is_empty()
@@ -178,6 +205,8 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
 
 	_begin_state(state)
 	var state_direction := direction.normalized() if direction.length_squared() > 0.01 else Vector2.RIGHT
+	if state == &"attack":
+		set_facing_direction_from_vector(state_direction)
 	var base_duration := duration_override if duration_override > 0.0 else _default_state_duration(state)
 	var duration := _get_effect_duration(base_duration)
 
@@ -206,6 +235,7 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
 
 func play_move_to(target_position: Vector2, duration_override: float = -1.0) -> void:
 	_begin_state(&"move")
+	set_facing_direction_from_vector(target_position - position)
 	if unit:
 		z_index = 100 + unit.grid_pos.y
 	var distance := position.distance_to(target_position)
