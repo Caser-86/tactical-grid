@@ -4109,6 +4109,8 @@ func _show_attack_range(unit: Unit) -> void:
 				map_width, map_height, _is_vision_blocking
 			)
 			if has_los:
+				if _is_v2_battle() and not bool(_query_v2_attack_preview(enemy).get("valid", false)):
+					continue
 				attack_targets.append(enemy)
 				if not _is_v2_battle():
 					var target_color := _highlight_color("attack", COLOR_ATTACK)

@@ -109,7 +109,7 @@ func clear_attack_focus() -> void:
 
 func clear_temporary_attack_focus() -> void:
 	for child in get_children():
-		if child.is_in_group("v2_attack_focus") and not bool(child.get_meta("v2_focus_locked", false)):
+		if bool(child.get_meta("v2_transient", false)) and not bool(child.get_meta("v2_focus_locked", false)):
 			child.free()
 
 func _spawn_cell(cell: Vector2i, fill: Color, border: Color, group_name: StringName, transient: bool) -> void:

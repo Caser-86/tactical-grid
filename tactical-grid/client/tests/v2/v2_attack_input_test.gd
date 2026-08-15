@@ -63,6 +63,7 @@ func _initialize() -> void:
 	t.check(_group_count(hover_presenter, "v2_attack_focus") == 1, "悬停显示临时目标焦点")
 	hover_battle.call("_on_v2_cell_hovered", Vector2i(0, 0))
 	t.check(hover_hud.get_attack_preview_text() == "", "离开目标清除临时攻击卡片")
+	t.check(_group_count(hover_presenter, "v2_attack_preview_numbers") == 0 and _group_count(hover_presenter, "v2_intent_change_cue") == 0, "离开目标清除临时攻击数字与意图提示")
 	t.check(hover_a.current_hp == 7 and hover_b.current_hp == 7, "悬停和离开不造成伤害")
 
 	var locked: Dictionary = hover_battle.call("request_attack_preview", hover_a)
@@ -100,10 +101,31 @@ func _initialize() -> void:
 	t.check(cancel_battle.v2_input_router.get_state_name() == "unit_selected", "右键取消攻击锁定并保留单位选择")
 	t.check(cancel_battle.v2_locked_attack_preview.is_empty() and cancel_target.current_hp == 7, "右键清除锁定且不造成伤害")
 
+	var cover_data := _make_battle(battle_script, [
+		_make_unit("player_cover", "player", Vector2i(1, 1), 7),
+	], [
+		_make_unit("enemy_cover", "enemy", Vector2i(3, 2), 7),
+	])
+	var cover_battle: Node = cover_data.get("battle")
+	var cover_attacker: Unit = cover_data.get("attacker")
+	var cover_target: Unit = cover_data.get("target")
+	var cover_presenter: V2AffordancePresenter = cover_data.get("presenter")
+	var cover_map := _make_map()
+	(cover_map["layers"]["blocker"] as Array)[2][2] = 6
+	var cover_service := V2ActionService.new()
+	cover_service.setup(cover_map, [cover_attacker], [cover_target])
+	cover_battle.set("v2_action_service", cover_service)
+	cover_battle.set("map_data", cover_map)
+	cover_battle.call("_refresh_selected_unit_affordances", cover_attacker)
+	var cover_preview: Dictionary = cover_battle.call("_query_v2_attack_preview", cover_target)
+	t.check(not bool(cover_preview.get("valid", true)) and cover_preview.get("reason", &"") == &"full_cover", "全掩体目标被战斗查询拒绝")
+	t.check(not cover_target in cover_battle.attack_targets and _group_count(cover_presenter, "v2_attackable_outline") == 0, "全掩体目标不显示为可攻击目标")
+
 	_cleanup(first_battle)
 	_cleanup(hover_battle_data)
 	_cleanup(stale_data)
 	_cleanup(cancel_data)
+	_cleanup(cover_data)
 	t.finish(self)
 
 func _make_battle(battle_script: Script, players: Array, enemies: Array) -> Dictionary:
