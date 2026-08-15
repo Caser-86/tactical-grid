@@ -7,12 +7,12 @@
 ## 构建与版本
 
 - 分支：`codex/ch1-infiltration-v2`
-- 源码自动化验证基线：`dfba897 test(v2): wire single-owner telemetry into runtime`
+- 源码自动化验证基线：`b307bcd feat(v2): expose four role abilities through Q`
 - Godot：4.7.1-stable
 - V2 入口：`res://scenes/v2_boot.tscn`
 - V2 用户目录：`TacticalGrid_V2_Infiltration`
 - Windows 包目录：`build/TacticalGrid_V2_Infiltration/`
-- 当前候选包：2026-08-15 基于 `dfba897` 重建；EXE `109080576` bytes，PCK `44268852` bytes。SHA-256 记录于构建生成的 `build/TacticalGrid_V2_Infiltration/release_manifest.json`：EXE `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62`，PCK `71dcb8c26096ee4638eaa2fe5089e306d9359b52dc8b358b5571615cc0c5c30c`。
+- 当前候选包：2026-08-15 基于 `b307bcd` 重建；EXE `109080576` bytes，PCK `44294068` bytes。SHA-256 记录于构建生成的 `build/TacticalGrid_V2_Infiltration/release_manifest.json`：EXE `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62`，PCK `3bca7a49035a5647bb3617e88fccae09f82e740c85d9c738884598ba0ab1fa76`。
 
 ## 已通过证据
 
@@ -24,7 +24,7 @@
 | M2 视觉矩阵 | `tests/v2/run_m2_visual_matrix.ps1` | 54/54 PNG 通过 |
 | V2 四职业能力入口 | `v2_input_router_test.gd`、`v2_ability_rules_test.gd`、`v2_player_turn_e2e_test.tscn`、`v2_playtest_runtime_wiring_test.gd` | Q 键进入能力目标选择，金色目标格和悬停预览可见，左键提交、右键/Q 取消；输入 52/0、规则 22/0、实战 85/0、接线 12/0 |
 | 结算页可见性 | M1/M2 两分辨率结果阶段断言 | 结算层可见、覆盖当前视口、奖励文本不与按钮重叠 |
-| Windows 构建 | `tools/build_windows.ps1 -GodotPath <Godot>` | 2026-08-15 基于 `dfba897` 重新导出成功，退出码 0 |
+| Windows 构建 | `tools/build_windows.ps1 -GodotPath <Godot>` | 2026-08-15 基于 `b307bcd` 重新导出成功，退出码 0 |
 | Windows 包校验 | `tests/verify_windows_package.ps1` | 当前候选包的 EXE、PCK、版本元数据和冷启动通过，退出码 0 |
 | V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前候选包的 V2 入口、用户目录、旧版文件残留和冷启动通过，退出码 0 |
 | 单人验收遥测 | `v2_playtest_recorder_test.gd`、`v2_playtest_integration_contract_test.gd`、`v2_playtest_runtime_wiring_test.gd` | 42/0、10/0、8/0；运行时已接入无效点击、取消、镜头、伤害、倒地、敌方意图和重试事件；OWNER 记录默认不含截图或个人标识，AI 不能写入 `approved` |
@@ -58,7 +58,7 @@
 1. 三名未参与实现的玩家首次完成 M1 和 M2，并记录真实时长、目标理解、卡点和可选内容使用率。
 2. M1 中位时长达到 20–25 分钟，M2 中位时长达到 25–30 分钟，且无人 5 分钟内通关。
 3. 96 张视觉截图完成逐张人工审查。目前已完成自动矩阵，并人工复核路线、范围层、危险预警和 M1/M2 结算代表画面。
-4. 不打开 Godot 编辑器，从基于 `dfba897` 的 Windows 包完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
+4. 不打开 Godot 编辑器，从基于 `b307bcd` 的 Windows 包完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
 5. 剩余 70 条测试场景退出警告完成风险评估或修复，并把结论补回本报告。
 
 ## 本轮收口结果
