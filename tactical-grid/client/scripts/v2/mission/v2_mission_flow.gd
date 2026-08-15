@@ -77,12 +77,12 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 	var result := {"success": true, "event": event_name, "changed": false}
 	if _event_already_completed(normalized_event):
 		return _finish_event(event_name, _fail(&"event_already_completed"))
-	if state in [State.COMPLETE, State.FAILED] and event_name not in [&"mission_started", &"evac_checked"]:
+	if state in [State.COMPLETE, State.FAILED] and event_name not in [&"mission_started", &"evac_checked", &"squad_evacuated"]:
 		return _finish_event(event_name, _fail(&"mission_finished"))
 
 	var current_step := _current_objective_step()
 	if not current_step.is_empty() and normalized_event == StringName(current_step.get("complete_event", "")):
-		if event_name == &"evac_checked" and not _all_conscious_players_in_evac():
+		if normalized_event in [&"evac_checked", &"squad_evacuated"] and not _all_conscious_players_in_evac():
 			return _finish_event(event_name, _fail(&"evac_not_ready"))
 		if normalized_event == &"character_rescued":
 			var rescue_validation := _validate_rescue(payload)
@@ -100,7 +100,7 @@ func apply_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary
 			for key in ["route_id", "map_changes", "enemy_intent_changes"]:
 				if payload.has(key):
 					result[key] = payload[key]
-		if event_name == &"evac_checked":
+		if normalized_event == &"evac_checked":
 			result["victory"] = false
 		return _finish_event(event_name, _complete_result(result))
 
@@ -367,7 +367,11 @@ func _current_objective_step() -> Dictionary:
 	return _objective_steps[_objective_step_index]
 
 func _normalize_event(event_name: StringName) -> StringName:
-	return &"character_rescued" if event_name == &"scout_rescued" else event_name
+	if event_name == &"scout_rescued":
+		return &"character_rescued"
+	if event_name == &"evac_checked" and String(_current_objective_step().get("complete_event", "")) == "squad_evacuated":
+		return &"squad_evacuated"
+	return event_name
 
 func _advance_current_step(event_name: StringName, payload: Dictionary, result: Dictionary) -> Dictionary:
 	var step := _current_objective_step()
@@ -381,6 +385,8 @@ func _advance_current_step(event_name: StringName, payload: Dictionary, result: 
 		_mission_flags["route_%s" % String(payload.get("route_id", ""))] = true
 	if event_name == &"gantry_lowered":
 		_mission_flags["gantry_lowered"] = true
+	if event_name == &"scout_located":
+		_mission_flags["scout_located"] = true
 	var completed_step_id := String(step.get("id", ""))
 	_completed_step_ids[completed_step_id] = true
 	_mission_flags[completed_step_id] = true
@@ -559,6 +565,6 @@ func _fail(reason: StringName) -> Dictionary:
 
 func _finish_event(event_name: StringName, result: Dictionary) -> Dictionary:
 	_complete_result(result)
-	event_history.append({"event": event_name, "state": get_state_name(), "step_id": get_current_step_id()})
+	event_history.append({"event": event_name, "success": bool(result.get("success", false)), "state": get_state_name(), "step_id": get_current_step_id()})
 	state_changed.emit(get_state_name(), result)
 	return result

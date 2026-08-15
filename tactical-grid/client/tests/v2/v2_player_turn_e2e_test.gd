@@ -44,9 +44,9 @@ func _run() -> void:
 	await get_tree().process_frame
 	_capture_viewport("input-session-720p-initial.png")
 	var mission_snapshot: Dictionary = battle.v2_mission_flow.get_snapshot()
-	t.check(String(mission_snapshot.get("step_id", "")) == "search_scout" and int(mission_snapshot.get("step_index", -1)) == 0 and int(mission_snapshot.get("step_count", 0)) == 3, "V2 M1 从正式三段流程的 search_scout 开始")
+	t.check(String(mission_snapshot.get("step_id", "")) == "find_scout" and int(mission_snapshot.get("step_index", -1)) == 0 and int(mission_snapshot.get("step_count", 0)) == 3, "V2 M1 从正式三段流程的 find_scout 开始")
 	t.check(battle.hud.objective_label.text.contains("1/3") and battle.hud.objective_label.text.contains("找到失联侦察兵") and not battle.hud.objective_label.text.contains("上传"), "V2 HUD 显示第一段营救目标而非旧上传目标")
-	t.check(String(mission_snapshot.get("guide_text", "")).contains("前往青色侦察标记") and String(mission_snapshot.get("guide_text", "")).contains("营救侦察兵"), "V2 M1 引导明确指向青色侦察标记和营救操作")
+	t.check(String(mission_snapshot.get("guide_text", "")).contains("青色侦察标记") and String(mission_snapshot.get("guide_text", "")).contains("营救阶段"), "V2 M1 引导明确指向青色侦察标记和营救操作")
 	t.check(battle.map_layer.get_node_or_null("V2EvacMarker") != null, "V2 地图按 entities 数据渲染撤离标记")
 
 	battle.turn_manager.turn_phase_changed.connect(_on_phase_changed)

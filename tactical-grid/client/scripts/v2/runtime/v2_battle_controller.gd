@@ -261,6 +261,14 @@ func _finalize_v2_move(result: Dictionary) -> void:
 	super._finalize_v2_move(result)
 	if not _is_v2_battle() or level_id != "ch1_m1" or v2_mission_flow == null:
 		return
+	if _is_v2_m1_production_flow():
+		if v2_mission_flow.get_current_step_id() == "find_scout" and selected_unit != null and v2_rescue_controller != null:
+			var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(&"rescue_scout")
+			if rescue_pos.x >= 0 and absi(selected_unit.grid_pos.x - rescue_pos.x) + absi(selected_unit.grid_pos.y - rescue_pos.y) <= 1:
+				var located := _apply_v2_mission_event(&"scout_located", {"position": rescue_pos, "unit_id": selected_unit.entity_id})
+				if bool(located.get("success", false)) and hud:
+					hud.set_context_prompt("已找到侦察兵信号。下一步：靠近青色标记并点击营救。")
+		return
 	if v2_mission_flow.get_current_step_id() != "search_route_split" or selected_unit == null:
 		return
 	if not _v2_cell_in_list(selected_unit.grid_pos, map_data.get("route_split_cells", [])):
@@ -268,6 +276,12 @@ func _finalize_v2_move(result: Dictionary) -> void:
 	var entered := _apply_v2_mission_event(&"entered_route_split", {"position": selected_unit.grid_pos})
 	if bool(entered.get("success", false)):
 		_show_v2_route_choice()
+
+func _is_v2_m1_production_flow() -> bool:
+	if level_id != "ch1_m1" or v2_mission_flow == null:
+		return false
+	var mission_data: Dictionary = v2_mission_flow.mission
+	return String(mission_data.get("flow_mode", "")) == "m1_production" and not bool(mission_data.get("expanded_flow", false))
 
 func _show_v2_route_choice() -> void:
 	if hud == null or v2_interaction_service == null:
@@ -871,6 +885,11 @@ func _on_v2_rescue_committed(result: Dictionary) -> void:
 			GameManager.play_dialogue("ch1_m2_rescue")
 			_render_v2_hud()
 		return
+	if _is_v2_m1_production_flow():
+		if hud:
+			hud.set_context_prompt("侦察兵已加入小队。下一步：沿绿色路线让所有清醒队员进入撤离区。")
+		_render_v2_hud()
+		return
 	var route_changes: Dictionary = map_data.get("route_changes", {})
 	var lockdown: Array = []
 	for raw_cell in route_changes.get("rescue_lockdown", []):
@@ -1289,7 +1308,7 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 		&"scan":
 			if alert_state:
 				alert_state.apply_event(&"drone_scan_completed")
-			_log("侦察无人机扫描 %s，警戒等级更新" % String(result.get("target_cell", enemy.grid_pos)))
+			_log("侦察无人机扫描 %s，警戒等级更新" % str(result.get("target_cell", enemy.grid_pos)))
 		&"protect":
 			_log("盾卫保护 %s，减伤 %d" % [String(result.get("target_id", "")), int(result.get("protect_reduction", 0))])
 		&"guard":

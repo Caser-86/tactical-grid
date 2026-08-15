@@ -885,6 +885,10 @@ func _on_v2_rescue_committed(result: Dictionary) -> void:
 
 func _on_v2_checkpoint_requested(checkpoint_id: StringName, _result: Dictionary) -> void:
 	_save_v2_checkpoint(checkpoint_id)
+	# The rescue signal renders before this checkpoint signal is emitted. Refresh
+	# once more so the player-facing HUD cannot show a stale checkpoint.
+	if _is_v2_battle():
+		_render_v2_hud()
 
 ## Persist the rescue checkpoint through the V2 save identity while retaining
 ## the shared checkpoint schema used by retry and restore tests.
@@ -1766,11 +1770,14 @@ func _render_v2_rescue_marker() -> void:
 	v2_rescue_marker = null
 	if not _is_v2_battle() or v2_rescue_controller == null or map_layer == null:
 		return
-	# Keep the objective marker hidden until the mission flow reaches the rescue
-	# step. Showing it during route setup makes an unavailable action look like a
-	# broken interaction.
+	# In production M1 the marker is the first objective: it is visible as soon
+	# as its cell is observed, and the rescue action unlocks after the player
+	# reaches the adjacent find step. Legacy expanded fixtures retain their
+	# original rescue-step gate.
 	if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count"):
-		if int(v2_mission_flow.get_objective_step_count()) > 0 and String(v2_mission_flow.get_current_step_complete_event()) != "character_rescued":
+		var current_event := String(v2_mission_flow.get_current_step_complete_event())
+		var production_marker := String(v2_mission_flow.mission.get("flow_mode", "")) == "m1_production" and not bool(v2_mission_flow.mission.get("expanded_flow", false))
+		if int(v2_mission_flow.get_objective_step_count()) > 0 and current_event != "character_rescued" and not (production_marker and current_event == "scout_located"):
 			return
 	var rescue_id := _get_v2_rescue_entity_id()
 	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
@@ -3301,7 +3308,10 @@ func _finalize_v2_move(result: Dictionary) -> void:
 		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
 			if has_method("_prepare_v2_m2_evac"):
 				call("_prepare_v2_m2_evac")
-			_apply_v2_mission_event(&"evac_checked")
+			var evacuation_event := StringName(v2_mission_flow.get_current_step_complete_event()) if v2_mission_flow.has_method("get_current_step_complete_event") else &"evac_checked"
+			if evacuation_event not in [&"squad_evacuated", &"evac_checked"]:
+				evacuation_event = &"evac_checked"
+			_apply_v2_mission_event(evacuation_event)
 	_update_v2_encounters([])
 	if selected_unit:
 		_refresh_selected_unit_affordances(selected_unit)

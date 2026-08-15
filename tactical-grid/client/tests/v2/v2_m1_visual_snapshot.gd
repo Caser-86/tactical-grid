@@ -121,30 +121,18 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 				battle.call("_dismiss_context_hint")
 				battle.camera.focus_cell(actor.grid_pos)
 				await get_tree().process_frame
-		"route_split":
-			actor.grid_pos = Vector2i(8, 14)
+		"search":
+			# The production flow starts with a readable search target. Keep the
+			# actor close enough to show the marker without completing the step.
+			var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
+			actor.grid_pos = rescue_pos + Vector2i.LEFT * 3
 			battle.call("_update_unit_sprite_pos", actor, false)
-			battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": actor.grid_pos})
-			battle.call("_show_v2_route_choice")
-		"record_room":
-			actor.grid_pos = Vector2i(4, 5)
-			battle.call("_update_unit_sprite_pos", actor, false)
-			battle.v2_interaction_service.mark_encounter_cleared("m1_e03_record")
-			var record_result := _commit_facility_action(battle, actor, "facility_record")
-			t.check(bool(record_result.get("success", false)), "M112 record_room 展示事故记录室奖励状态")
-		"gantry_open":
-			await _prepare_route_and_gantry(battle, actor)
+			battle.call("refresh_visibility_transaction", &"m112_visual_search")
+			battle.call("_render_v2_hud")
 		"rescue":
-			await _prepare_route_and_gantry(battle, actor)
-			var rescue_result := await _rescue_actor(battle, actor)
-			var rescue_ok := bool(rescue_result.get("success", false))
-			var rescue_label := "M112 rescue 阶段展示已营救状态"
-			if not rescue_ok:
-				rescue_label += ": %s" % String(rescue_result.get("reason", "unknown"))
-			t.check(rescue_ok, rescue_label)
-			await _dismiss_dialogue(manager, 24)
+			await _prepare_rescue_step(battle, actor)
 		"evac":
-			await _prepare_route_and_gantry(battle, actor)
+			await _prepare_rescue_step(battle, actor)
 			var rescue_result := await _rescue_actor(battle, actor)
 			t.check(bool(rescue_result.get("success", false)), "M112 evac 阶段先完成营救状态")
 			await _dismiss_dialogue(manager, 24)
@@ -157,11 +145,6 @@ func _prepare_battle_stage(manager: Node, battle: BattleController) -> void:
 				battle.call("_update_unit_sprite_pos", scout, false)
 				battle.call("refresh_visibility_transaction", &"m112_visual_evac")
 				battle.call("_render_v2_hud")
-		"evac_intercept":
-			await _prepare_route_and_gantry(battle, actor)
-			var rescue_result := await _rescue_actor(battle, actor)
-			t.check(bool(rescue_result.get("success", false)), "M112 evac_intercept 阶段完成营救转折")
-			await _dismiss_dialogue(manager, 24)
 		"dialogue":
 			GameManager.play_dialogue("ch1_m1_rescue")
 			await _wait_for_dialogue(manager)
@@ -208,6 +191,17 @@ func _rescue_actor(battle: BattleController, actor: Unit) -> Dictionary:
 	await get_tree().process_frame
 	return result
 
+func _prepare_rescue_step(battle: BattleController, actor: Unit) -> void:
+	if actor == null or battle.v2_rescue_controller == null:
+		return
+	var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
+	actor.grid_pos = rescue_pos + Vector2i.LEFT
+	battle.call("_update_unit_sprite_pos", actor, false)
+	battle.call("refresh_visibility_transaction", &"m112_visual_rescue")
+	var located: Dictionary = battle.call("_apply_v2_mission_event", &"scout_located", {"position": rescue_pos, "unit_id": actor.entity_id})
+	t.check(bool(located.get("success", false)), "M112 生产流程进入营救阶段")
+	battle.call("_render_v2_hud")
+
 func _prepare_attack_target(battle: BattleController, actor: Unit) -> Unit:
 	for raw_enemy in battle.enemy_units:
 		var enemy: Unit = raw_enemy
@@ -225,20 +219,6 @@ func _prepare_attack_target(battle: BattleController, actor: Unit) -> Unit:
 			if bool(preview.get("valid", false)):
 				return enemy
 	return null
-
-func _prepare_route_and_gantry(battle: BattleController, actor: Unit) -> void:
-	actor.grid_pos = Vector2i(8, 14)
-	battle.call("_update_unit_sprite_pos", actor, false)
-	battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": actor.grid_pos})
-	battle.call("_on_v2_route_selected", "cargo_breakthrough")
-	actor.grid_pos = Vector2i(12, 5)
-	battle.call("_update_unit_sprite_pos", actor, false)
-	battle.call("refresh_visibility_transaction", &"m112_visual_gantry")
-	var gantry_result := _commit_facility_action(battle, actor, "facility_gantry")
-	t.check(bool(gantry_result.get("success", false)), "M112 visual flow 正式打开吊桥")
-	# Each visual stage is an isolated still frame; refresh the actor budget so
-	# the next staged interaction can be shown without simulating enemy turns.
-	actor.begin_v2_turn()
 
 func _commit_facility_action(battle: BattleController, actor: Unit, facility_id: String) -> Dictionary:
 	var actions: Array = battle.v2_interaction_service.query_actions(actor, facility_id)
@@ -260,20 +240,12 @@ func _validate_stage(manager: Node, battle: BattleController) -> void:
 		t.check(presenter != null and _group_count(presenter, "v2_attackable_outline") == 1, "M112 combat 只描边一个合法敌方目标")
 		t.check(presenter != null and _group_count(presenter, "v2_attack_preview") == 1, "M112 combat 只显示一个查询支持的攻击预览")
 		t.check(presenter != null and _legacy_red_fill_count(presenter) == 0, "M112 combat 不绘制旧式全范围红色填充")
-	if stage == "route_split":
-		t.check(battle.v2_mission_flow.get_current_step_id() == "select_route", "M112 route_split 阶段显示路线选择状态")
-	if stage == "record_room":
-		t.check(bool(battle.v2_mission_flow.get_snapshot().get("optional_complete", false)), "M112 record_room 阶段记录奖励已登记")
-	if stage == "gantry_open":
-		var blockers: Array = battle.map_data.get("layers", {}).get("blocker", [])
-		t.check(blockers.size() > 5 and (blockers[5] as Array).size() > 14 and int((blockers[5] as Array)[14]) == 0, "M112 gantry_open 阶段吊桥格已打开")
+	if stage == "search":
+		t.check(battle.v2_mission_flow.get_current_step_id() == "find_scout", "M112 search 阶段显示找到侦察兵目标")
 	if stage == "rescue":
-		t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC", "M112 rescue 阶段目标切换为护送撤离")
-	if stage == "evac_intercept":
-		var mission_flags: Dictionary = battle.v2_mission_flow.get_snapshot().get("mission_flags", {})
-		t.check(bool(mission_flags.get("evac_intercept_started", false)), "M112 evac_intercept 阶段记录撤离反制")
+		t.check(battle.v2_mission_flow.get_current_step_id() == "rescue_scout", "M112 rescue 阶段显示营救目标")
 	if stage == "evac":
-		t.check(battle.v2_mission_flow.get_snapshot().get("evac_center", Vector2i(-1, -1)).x >= 0, "M112 evac 阶段显示撤离点")
+		t.check(battle.v2_mission_flow.get_current_step_id() == "evacuate_squad" and battle.v2_mission_flow.get_snapshot().get("evac_center", Vector2i(-1, -1)).x >= 0, "M112 evac 阶段显示全员撤离目标")
 	if stage == "dialogue":
 		var dialogue: Node = manager.get("_active_dialogue")
 		t.check(dialogue != null and is_instance_valid(dialogue) and dialogue.visible, "M112 dialogue 阶段显示对话层")
@@ -293,7 +265,7 @@ func _parse_user_args() -> void:
 			_explicit_output = true
 	if not visual_mode in ["normal", "grayscale", "deuteranopia_assist"]:
 		visual_mode = "normal"
-	if not stage in ["start", "combat", "route_split", "record_room", "gantry_open", "rescue", "evac_intercept", "evac", "dialogue", "result"]:
+	if not stage in ["start", "combat", "search", "rescue", "evac", "dialogue", "result"]:
 		stage = "start"
 
 func _group_count(node: Node, group_name: StringName) -> int:

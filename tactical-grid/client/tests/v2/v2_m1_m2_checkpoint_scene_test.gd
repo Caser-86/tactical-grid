@@ -20,9 +20,9 @@ func _run() -> void:
 		return
 
 	await _run_level(manager, "ch1_m1", [
-		{"id": "cp_start", "step": "rescue_scout", "flag": "gantry_lowered", "rescue": "scout"},
+		{"id": "cp_start", "step": "find_scout", "flag": "mission_started", "rescue": "scout"},
 		{"id": "cp_rescue", "step": "evacuate_squad", "flag": "scout_rescued", "rescue": "scout"},
-		{"id": "cp_pre_evac", "step": "evacuate_squad", "flag": "evac_route_opened", "rescue": ""},
+		{"id": "cp_pre_evac", "step": "evacuate_squad", "flag": "scout_rescued", "rescue": ""},
 	])
 	await _run_level(manager, "ch1_m2", [
 		{"id": "cp_start", "step": "rescue_sniper", "flag": "lockdown_cleared", "rescue": "sniper"},
@@ -68,9 +68,7 @@ func _run_level(manager: Node, level_id: String, checkpoints: Array) -> void:
 	await get_tree().process_frame
 func _apply_stage_before_checkpoint(battle: Node, level_id: String, checkpoint: Dictionary) -> void:
 	if level_id == "ch1_m1":
-		battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": Vector2i(8, 14)})
-		battle.call("_apply_v2_mission_event", &"route_selected", {"route_id": "cargo_breakthrough"})
-		battle.call("_apply_v2_mission_event", &"gantry_lowered", {"route_id": "cargo_breakthrough"})
+		battle.call("_apply_v2_mission_event", &"mission_started")
 	else:
 		battle.call("_apply_v2_mission_event", &"lockdown_cleared", {"route_id": "west_maintenance"})
 
@@ -81,6 +79,9 @@ func _apply_rescue_checkpoint(battle: Node, level_id: String, rescue_id: String)
 	t.check(rescued != null, level_id + " 创建检查点用营救队员")
 	if rescued == null:
 		return
+	if level_id == "ch1_m1":
+		var located: Dictionary = battle.call("_apply_v2_mission_event", &"scout_located", {"position": rescue_position, "unit_id": "player_%s" % rescue_id})
+		t.check(bool(located.get("success", false)), level_id + " 找到侦察兵后推进营救步骤")
 	battle.call("_register_v2_rescued_unit", rescued)
 	var result: Dictionary = battle.call("_apply_v2_mission_event", &"character_rescued", {
 		"character_id": rescue_id,

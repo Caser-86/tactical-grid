@@ -8,3 +8,4 @@ Task 6: complete (commits be85f0c..7495853, final focused review clean; report r
 Task 7: complete (commit fa8945a, tutorial 19/0, HUD scene 48/0, player E2E 78/0; report records shutdown and visual-matrix risks)
 Task 8: complete (commit 4b6b778, strategy 24/0, intent 21/0, occupancy 6/0, activation 25/0, encounter controller 33/0; report records stale legacy scene fixtures)
 Task 9: complete (intent presentation 11/0, HUD 13/0, encounter controller 33/0, visual snapshot 5/0, all 61 manifest script tests 0 failures; report records stale route_split visual fixture)
+Task 10: complete (production find -> rescue -> evacuate flow; production E2E 21/0, 23/0, 24/0; visual matrix 36/36; full V2 gate 78/0)

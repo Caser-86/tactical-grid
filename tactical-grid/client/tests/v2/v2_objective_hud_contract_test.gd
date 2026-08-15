@@ -135,22 +135,25 @@ func _assert_m1_player_facing_progress(hud: HUD, presenter: RefCounted) -> void:
 		and flow.get_current_guide_text().contains("流程 1/3"),
 		"M1 营救前 HUD 进度与玩家指南均为 1/3"
 	)
+	var located := flow.apply_event(&"scout_located", {"position": Vector2i(0, 0), "unit_id": "player_assault"})
+	t.check(bool(located.get("success", false)), "M1 进度断言可推进找到侦察兵事件")
 	var rescue := flow.apply_event(&"character_rescued", {"character_id": "scout", "new_unit": rescued_unit})
 	t.check(bool(rescue.get("success", false)), "M1 进度断言可推进真实营救事件")
 	t.check(
-		int(flow.call("get_objective_step_index")) == 1
-		and int(flow.call("get_display_objective_step_index")) == 1
-		and int(flow.call("get_display_objective_step_count")) == 3
-		and flow.get_current_guide_text().contains("流程 2/3"),
-		"M1 营救后 pre-evac HUD 进度与玩家指南均为 2/3"
-	)
-	var evac := flow.apply_event(&"evac_checked", {"character_id": "scout"})
-	t.check(bool(evac.get("success", false)), "M1 进度断言可推进真实撤离事件")
-	t.check(
-		int(flow.call("get_display_objective_step_index")) == 2
+		int(flow.call("get_objective_step_index")) == 2
+		and int(flow.call("get_display_objective_step_index")) == 2
 		and int(flow.call("get_display_objective_step_count")) == 3
 		and flow.get_current_guide_text().contains("流程 3/3"),
-		"M1 撤离前 HUD 进度与玩家指南均为 3/3"
+		"M1 营救后撤离 HUD 进度与玩家指南均为 3/3"
+	)
+	var evac := flow.apply_event(&"squad_evacuated", {"character_id": "scout"})
+	t.check(bool(evac.get("success", false)), "M1 进度断言可推进真实撤离事件")
+	t.check(
+		flow.is_victory()
+		and int(flow.call("get_display_objective_step_index")) == 2
+		and int(flow.call("get_display_objective_step_count")) == 3
+		and flow.get_current_guide_text().contains("任务完成"),
+		"M1 撤离后任务流进入完成态并保留 3/3 进度"
 	)
 	presenter.render({
 		"mission_id": "ch1_m1",
@@ -161,7 +164,7 @@ func _assert_m1_player_facing_progress(hud: HUD, presenter: RefCounted) -> void:
 		"phase": "玩家回合",
 	})
 	t.check(hud.objective_label.text.contains("3/3"), "M1 HUD 渲染器显示最终 3/3 进度")
-	t.check(_v2_guide_text(hud).contains("流程 3/3"), "M1 HUD 底栏渲染最终 3/3 指南")
+	t.check(_v2_guide_text(hud).contains("任务完成"), "M1 HUD 底栏渲染最终完成指南")
 	player.free()
 	rescued_unit.free()
 

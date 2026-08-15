@@ -77,21 +77,9 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 		if fixture_enemy != null:
 			fixture_enemy.weapon_damage = [0, 0]
 	battle.call("_select_unit", assault)
-	# Enter the real V2 route split and commit one of the two one-time choices.
-	assault.grid_pos = Vector2i(8, 14)
-	battle.call("_update_unit_sprite_pos", assault, false)
-	var entered_split: Dictionary = battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": assault.grid_pos})
-	t.check(bool(entered_split.get("success", false)) and battle.v2_mission_flow.get_current_step_id() == "select_route", route_id + " 进入路线分叉阶段")
-	var selected_route := "camera_maintenance" if route_id == "main_direct" else "cargo_breakthrough"
-	battle.call("_on_v2_route_selected", selected_route)
-	t.check(battle.v2_interaction_service.get_selected_route_id() == selected_route, route_id + " 通过正式路线服务选择正式路线")
-	if selected_route == "camera_maintenance":
-		t.check(battle.alert_state.get_front_state() == &"searching", route_id + " 维修路线进入搜索警戒")
-	else:
-		t.check(battle.alert_state.get_front_state() == &"hidden", route_id + " 货柜路线不额外提高警戒")
-
-	# The south console is now an optional observation action at the expanded
-	# map's authored location.
+	# Production M1 has one readable route: find the scout, rescue the scout,
+	# then bring the conscious squad to the evacuation zone. Camera access and
+	# the accident record remain optional side interactions, not route gates.
 	assault.grid_pos = Vector2i(7, 13)
 	battle.call("_update_unit_sprite_pos", assault, false)
 	battle.call("refresh_visibility_transaction", &"m112_camera_setup")
@@ -115,14 +103,12 @@ func _run_route(manager: Node, route_id: String, include_optional: bool, should_
 		t.check(bool(attack_result.get("success", false)), route_id + " 正式攻击事务成功")
 		t.check(int(attack_result.get("hp_after", target.current_hp)) == target.current_hp, route_id + " 攻击结果与单位生命同步")
 
-	await _end_turn_and_wait(battle)
-	assault.grid_pos = Vector2i(12, 5)
+	var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
+	assault.grid_pos = rescue_pos + Vector2i.LEFT
 	battle.call("_update_unit_sprite_pos", assault, false)
-	battle.call("refresh_visibility_transaction", &"m112_gantry_setup")
-	var gantry_result := _commit_facility_action(battle, assault, "facility_gantry")
-	t.check(bool(gantry_result.get("success", false)), route_id + " 通过正式吊机事务打开通路")
-	t.check(battle.v2_mission_flow.get_current_step_id() == "rescue_scout", route_id + " 吊机后目标切换为营救")
-
+	battle.call("refresh_visibility_transaction", &"m112_rescue_setup")
+	var located: Dictionary = battle.call("_apply_v2_mission_event", &"scout_located", {"position": rescue_pos, "unit_id": assault.entity_id})
+	t.check(bool(located.get("success", false)) and battle.v2_mission_flow.get_current_step_id() == "rescue_scout", route_id + " 靠近侦察标记后进入营救阶段")
 	assault.current_hp = 6
 	var rescue_result := await _rescue_through_formal_service(battle, assault)
 	t.check(bool(rescue_result.get("success", false)), route_id + " 通过正式营救事务救出侦察兵")

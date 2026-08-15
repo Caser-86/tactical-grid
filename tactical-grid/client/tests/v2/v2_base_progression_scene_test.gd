@@ -22,7 +22,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	t.check("回声失联" in fresh_base.get_node("Center/SituationPanel/Content/SituationTitle").text, "V2 fresh save 基地默认预览 M1")
 	var fresh_body := String(fresh_base.get_node("Center/SituationPanel/Content/SituationBody").text)
-	t.check("预计时长" in fresh_body and "20-25 分钟" in fresh_body, "V2 fresh save 基地显示预计任务时长")
+	t.check("预计时长" in fresh_body and "12-18 分钟" in fresh_body, "V2 fresh save 基地显示预计任务时长")
 	t.check("找到失联侦察兵并一起撤离" in fresh_body, "V2 fresh save 基地立即显示主目标而非等待数据")
 	fresh_base.queue_free()
 	await get_tree().process_frame

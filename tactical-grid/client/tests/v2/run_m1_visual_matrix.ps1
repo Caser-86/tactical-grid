@@ -9,7 +9,7 @@ $outputRoot = Join-Path $projectRoot '..\artifacts\v2\verification\m1-graybox\sc
 $null = New-Item -ItemType Directory -Force -Path $outputRoot
 $sizes = @('1280x720', '1920x1080')
 $modes = @('normal', 'grayscale', 'deuteranopia_assist')
-$stages = @('start', 'route_split', 'record_room', 'gantry_open', 'rescue', 'evac_intercept', 'result')
+$stages = @('start', 'combat', 'search', 'rescue', 'evac', 'result')
 
 if (-not (Test-Path -LiteralPath $GodotExe)) {
     throw "Godot executable not found: $GodotExe"
@@ -65,5 +65,5 @@ foreach ($size in $sizes) {
     }
 }
 
-Write-Host "M112 VISUAL MATRIX PASSED ($verified/$expected snapshots, 2 resolutions x 3 modes x 7 stages)"
+Write-Host "M112 VISUAL MATRIX PASSED ($verified/$expected snapshots, 2 resolutions x 3 modes x 6 production stages)"
 exit 0

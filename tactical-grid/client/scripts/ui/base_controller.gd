@@ -122,7 +122,7 @@ func _show_v2_mission_brief(mission: Dictionary) -> void:
 	for character_id in selected:
 		var data: Dictionary = _get_v2_character(character_id)
 		names.append(String(data.get("name", character_id)))
-	var duration: Array = mission.get("duration_minutes", [])
+	var duration: Array = mission.get("duration_minutes", mission.get("target_duration_minutes", []))
 	var duration_text := "%d-%d 分钟" % [int(duration[0]), int(duration[1])] if duration.size() >= 2 else "待评估"
 	situation_body.text = (
 		"主目标\n%s\n\n"

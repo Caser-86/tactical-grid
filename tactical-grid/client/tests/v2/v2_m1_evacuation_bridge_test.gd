@@ -25,7 +25,7 @@ func _run() -> void:
 
 func _run_m1_controller_flow(mission: Dictionary) -> void:
 	var m1_steps: Array = mission.get("objective_steps", [])
-	t.check(not m1_steps.is_empty() and String(m1_steps.back().get("complete_event", "")) == "mission_completed", "M1 shipped 终端阶段配置为 mission_completed")
+	t.check(not m1_steps.is_empty() and String(m1_steps.back().get("complete_event", "")) == "squad_evacuated", "M1 shipped 终端阶段配置为 squad_evacuated")
 	var map_result := MapLoader.load_map(StringName(String(mission.get("map_id", ""))))
 	t.check(bool(map_result.get("success", false)), "M1 使用 shipped map 数据")
 	if not bool(map_result.get("success", false)):
@@ -36,6 +36,8 @@ func _run_m1_controller_flow(mission: Dictionary) -> void:
 	var scout := _unit("player_scout", evac_center + Vector2i(-3, 0))
 	var battle := _build_battle(mission, map, [assault], [assault])
 	var flow: RefCounted = battle.v2_mission_flow
+	var located_result: Dictionary = flow.apply_event(&"scout_located", {"position": assault.grid_pos, "unit_id": assault.entity_id})
+	t.check(bool(located_result.get("success", false)), "M1 营救前先完成找到侦察兵阶段")
 	var rescue_result: Dictionary = flow.apply_event(&"character_rescued", {
 		"character_id": "scout",
 		"unit": scout,
@@ -48,14 +50,14 @@ func _run_m1_controller_flow(mission: Dictionary) -> void:
 	battle.selected_unit = assault
 	var not_ready_move: Dictionary = battle.request_move(evac_center)
 	t.check(bool(not_ready_move.get("success", false)) and bool(not_ready_move.get("committed", false)), "BattleController.request_move 提交 M1 首个撤离移动")
-	t.check(not flow.is_victory() and flow.get_current_step_id() == "escort_scout", "M1 准备不足时不推进撤离阶段")
-	t.check(not _has_event(flow, &"mission_completed"), "M1 准备不足时不提交 mission_completed")
+	t.check(not flow.is_victory() and flow.get_current_step_id() == "evacuate_squad", "M1 准备不足时不推进撤离阶段")
+	t.check(not _has_successful_event(flow, &"squad_evacuated"), "M1 准备不足时不提交 squad_evacuated")
 
 	battle.selected_unit = scout
 	var completed_move: Dictionary = battle.request_move(evac_center + Vector2i.UP)
 	t.check(bool(completed_move.get("success", false)) and bool(completed_move.get("committed", false)), "BattleController.request_move 提交准备完成的 M1 撤离移动")
 	t.check(flow.is_victory(), "真实 BattleController 撤离路径推进 V2MissionFlow victory")
-	t.check(_has_event(flow, &"mission_completed"), "真实 BattleController 路径提交配置化 mission_completed")
+	t.check(_has_event(flow, &"squad_evacuated"), "真实 BattleController 路径提交配置化 squad_evacuated")
 	t.check(battle.turn_manager.current_phase == TurnManagerScript.TurnPhase.BATTLE_OVER and battle.turn_manager.battle_over, "控制器胜利交接 TurnManager.BATTLE_OVER")
 	t.check(flow.get_snapshot().get("event_count", 0) == 7, "M1 移动/撤离/终端事件各只提交一次")
 
@@ -170,6 +172,12 @@ func _evac_center(map: Dictionary) -> Vector2i:
 func _has_event(flow: RefCounted, event_name: StringName) -> bool:
 	for event in flow.event_history:
 		if StringName(event.get("event", "")) == event_name:
+			return true
+	return false
+
+func _has_successful_event(flow: RefCounted, event_name: StringName) -> bool:
+	for event in flow.event_history:
+		if StringName(event.get("event", "")) == event_name and bool(event.get("success", true)):
 			return true
 	return false
 

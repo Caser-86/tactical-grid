@@ -40,28 +40,17 @@ func _run() -> void:
 		t.finish(get_tree())
 		return
 
-	# M1 rescue is intentionally gated behind the authored route and gantry
-	# stages; exercise those public transactions instead of bypassing the flow.
-	assault.grid_pos = Vector2i(8, 14)
-	battle.call("_update_unit_sprite_pos", assault, false)
-	battle.call("_apply_v2_mission_event", &"entered_route_split", {"position": assault.grid_pos})
-	battle.call("_on_v2_route_selected", "cargo_breakthrough")
-	assault.grid_pos = Vector2i(12, 5)
-	battle.call("_update_unit_sprite_pos", assault, false)
-	battle.call("refresh_visibility_transaction", &"rescue_gantry_setup")
-	var gantry_actions: Array = battle.v2_interaction_service.query_actions(assault, "facility_gantry")
-	t.check(not gantry_actions.is_empty(), "正式战斗中吊机提供营救前置操作")
-	if not gantry_actions.is_empty():
-		var gantry_action_id := String(gantry_actions[0].get("id", ""))
-		var gantry_result: Dictionary = battle.v2_interaction_service.commit_action(assault, "facility_gantry", gantry_action_id, battle.v2_interaction_service.get_state_revision())
-		if bool(gantry_result.get("success", false)):
-			battle.call("_apply_v2_interaction_result", gantry_result)
-			t.check(battle.v2_mission_flow.get_current_step_id() == "rescue_scout", "正式战斗中吊机后目标切换为营救")
-	assault.begin_v2_turn()
-
+	# Production M1 has no route-selection modal or gantry gate. Finding the
+	# captive is a spatial beat: once the player reaches an adjacent cell the
+	# rescue action becomes available.
 	var rescue_pos: Vector2i = battle.v2_rescue_controller.get_rescue_position(&"rescue_scout")
 	assault.grid_pos = rescue_pos + Vector2i.LEFT
+	battle.call("_update_unit_sprite_pos", assault, false)
 	battle.call("_update_visibility")
+	var located: Dictionary = battle.call("_apply_v2_mission_event", &"scout_located", {"position": rescue_pos, "unit_id": assault.entity_id})
+	t.check(bool(located.get("success", false)) and battle.v2_mission_flow.get_current_step_id() == "rescue_scout", "正式战斗中靠近标记后目标切换为营救")
+	assault.begin_v2_turn()
+
 	var captive: Dictionary = battle.v2_rescue_controller.get_captive(&"rescue_scout")
 	var captive_attack: Dictionary = battle.v2_action_service.query_action({"action": &"attack", "unit": assault, "target": captive})
 	t.check(not bool(captive_attack.get("valid", false)), "正式战斗中未营救对象不能成为攻击目标")
@@ -77,7 +66,7 @@ func _run() -> void:
 	var checkpoint: Dictionary = SaveManager.get_encounter_checkpoint(GameManager.current_save)
 	t.check(String(checkpoint.get("encounter_id", "")) == "cp_rescue", "营救后保存 cp_rescue 检查点")
 	t.check(bool(Checkpoint.validate(checkpoint).get("valid", false)), "营救检查点可被 V2 schema 验证")
-	t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC", "正式战斗目标切换为护送撤离")
+	t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC" and battle.v2_mission_flow.get_current_step_id() == "evacuate_squad", "正式战斗目标切换为撤离阶段")
 
 	await _cleanup_battle(battle)
 	t.check(not is_instance_valid(assault), "战斗退出后突击兵数据节点已释放")

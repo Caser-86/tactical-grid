@@ -183,17 +183,19 @@ static func select_scan_cell(enemy: Unit, context: Dictionary) -> Vector2i:
 		if raw is Dictionary:
 			var cell_value: Variant = raw.get("cell", raw.get("position", Vector2i(-1, -1)))
 			if cell_value is Vector2i:
-				candidates.append({"cell": cell_value, "priority": int(raw.get("priority", 0)), "key": String(raw.get("id", cell_value))})
+				var raw_id: Variant = raw.get("id", null)
+				var candidate_key := str(raw_id) if raw_id != null else str(cell_value)
+				candidates.append({"cell": cell_value, "priority": int(raw.get("priority", 0)), "key": candidate_key})
 	for cell_value in context.get("unobserved_cells", []):
 		if cell_value is Vector2i:
-			candidates.append({"cell": cell_value, "priority": 0, "key": String(cell_value)})
+			candidates.append({"cell": cell_value, "priority": 0, "key": str(cell_value)})
 	for candidate in candidates:
 		var cell: Vector2i = candidate["cell"]
 		if not is_in_bounds(cell, context) or is_blocked(cell, context):
 			continue
 		var priority := int(candidate.get("priority", 0))
 		var distance := enemy.grid_pos.distance_to(cell)
-		var key := String(candidate.get("key", cell))
+		var key := str(candidate.get("key", cell))
 		if priority > best_priority or (priority == best_priority and distance < best_distance) or (priority == best_priority and distance == best_distance and key < best_key):
 			best_cell = cell
 			best_priority = priority
