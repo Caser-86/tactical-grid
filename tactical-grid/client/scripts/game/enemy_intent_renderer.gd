@@ -16,6 +16,8 @@ const COLOR_MOVE := Color(0.96, 0.74, 0.22, 0.72)
 ## Overwatch cone color (cyan translucent).
 const COLOR_OVERWATCH := Color(0.20, 0.78, 0.92, 0.22)
 const COLOR_OVERWATCH_EDGE := Color(0.28, 0.86, 1.0, 0.62)
+const COLOR_PROTECT := Color(1.0, 0.82, 0.30, 0.82)
+const COLOR_TELEGRAPH := Color(1.0, 0.36, 0.28, 0.82)
 ## Stale intent color (grey, dimmed).
 const COLOR_STALE := Color(0.55, 0.58, 0.62, 0.50)
 ## Suppressed lethal color (blue tint, "unknown" marker).
@@ -143,6 +145,24 @@ func _draw_single_intent(origin_cell: Vector2i, intent: Dictionary) -> void:
 				var color := COLOR_SUPPRESSED
 				color.a *= stale_alpha
 				_draw_dashed_arrow(origin, target, color)
+		"protect":
+			var protect_pos = intent.get("target_pos", null)
+			if protect_pos is Vector2i and protect_pos.x >= 0:
+				var protect_target := _cell_to_world_center(protect_pos)
+				var protect_color := COLOR_PROTECT
+				protect_color.a *= stale_alpha
+				_draw_dashed_arrow(origin, protect_target, protect_color)
+				_draw_protect_marker(protect_target, protect_color)
+		"telegraph":
+			var telegraph_pos = intent.get("target_pos", null)
+			if telegraph_pos is Vector2i and telegraph_pos.x >= 0:
+				var telegraph_target := _cell_to_world_center(telegraph_pos)
+				var telegraph_color := COLOR_TELEGRAPH
+				telegraph_color.a *= stale_alpha
+				_draw_dashed_arrow(origin, telegraph_target, telegraph_color)
+				_draw_lethal_marker(origin, stale_alpha)
+		"guard":
+			_draw_guard_marker(origin, COLOR_PROTECT, stale_alpha)
 		_:
 			pass
 
@@ -234,3 +254,19 @@ func _draw_stale_tag(origin: Vector2, alpha: float) -> void:
 	var color := Color(0.65, 0.68, 0.72, 0.85 * alpha)
 	for i in range(3):
 		draw_circle(pos + Vector2((i - 1) * 4, 0), 1.6, color)
+
+func _draw_protect_marker(target: Vector2, color: Color) -> void:
+	draw_arc(target, _cell_size * 0.36, 0.0, TAU, 24, color, 2.5)
+	draw_line(target - Vector2(_cell_size * 0.18, 0), target + Vector2(_cell_size * 0.18, 0), color, 2.0)
+
+func _draw_guard_marker(origin: Vector2, color: Color, alpha: float) -> void:
+	var marker_color := color
+	marker_color.a *= alpha
+	var center := origin + Vector2(0, -_cell_size * 0.58)
+	var points := PackedVector2Array([
+		center + Vector2(0, -_cell_size * 0.16),
+		center + Vector2(_cell_size * 0.16, 0),
+		center + Vector2(0, _cell_size * 0.16),
+		center + Vector2(-_cell_size * 0.16, 0),
+	])
+	draw_colored_polygon(points, marker_color)

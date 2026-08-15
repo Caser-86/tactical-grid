@@ -8,6 +8,8 @@
     "attack_range": [1, 5],
     "damage": 1,
     "role": "巡逻、守点、直线射击",
+    "strategy": "sentry",
+    "intent_label": "封锁射界",
     "art_key": "sentry"
   },
   "drone": {
@@ -20,6 +22,8 @@
     "attack_range": [1, 3],
     "damage": 1,
     "role": "扫描并标记玩家",
+    "strategy": "drone",
+    "intent_label": "扫描标记",
     "art_key": "drone"
   },
   "sniper_sentry": {
@@ -43,6 +47,8 @@
     "damage": 2,
     "protect_reduction": 1,
     "role": "保护相邻敌人",
+    "strategy": "shield_guard",
+    "intent_label": "护卫链接",
     "art_key": "shield_guard"
   },
   "protocol_engineer": {

@@ -18,7 +18,7 @@ static func execute(intent: Dictionary, context: Dictionary) -> Dictionary:
 		&"move":
 			return _execute_move(intent, enemy, context, revision)
 		&"scan":
-			return _success(intent, enemy_id, revision, {"radius": int(intent.get("radius", 0))})
+			return _execute_scan(intent, enemy, context, revision)
 		&"telegraph":
 			return _execute_telegraph(intent, enemy, context, revision)
 		&"protect":
@@ -60,6 +60,21 @@ static func _execute_move(intent: Dictionary, enemy: Unit, context: Dictionary, 
 		return _fallback(enemy.entity_id, revision, &"occupied")
 	return _success(intent, enemy.entity_id, revision, {"target_cell": target_cell, "path": path})
 
+static func _execute_scan(intent: Dictionary, enemy: Unit, context: Dictionary, revision: int) -> Dictionary:
+	var target_cell: Variant = intent.get("target_cell", enemy.grid_pos)
+	if not target_cell is Vector2i:
+		return _fallback(enemy.entity_id, revision, &"invalid_scan_cell")
+	if _is_blocked(target_cell, context) or not _is_in_bounds(target_cell, context):
+		return _fallback(enemy.entity_id, revision, &"invalid_scan_cell")
+	var radius := int(intent.get("radius", 0))
+	if radius <= 0:
+		return _fallback(enemy.entity_id, revision, &"invalid_scan_radius")
+	return _success(intent, enemy.entity_id, revision, {
+		"target_cell": target_cell,
+		"radius": radius,
+		"damage": 0,
+	})
+
 static func _execute_telegraph(intent: Dictionary, enemy: Unit, context: Dictionary, revision: int) -> Dictionary:
 	var target_id: String = String(intent.get("target_id", ""))
 	var target: Unit = _find_unit(context.get("players", []), target_id)
@@ -75,7 +90,14 @@ static func _execute_protect(intent: Dictionary, enemy: Unit, context: Dictionar
 	var target: Unit = _find_unit(context.get("enemies", []), String(intent.get("target_id", "")))
 	if target == null or not target.is_alive or target == enemy:
 		return _fallback(enemy.entity_id, revision, &"invalid_protect_target")
-	return _success(intent, enemy.entity_id, revision, {"target_id": target.entity_id, "damage": 0})
+	if intent.has("target_cell") and intent.get("target_cell") != target.grid_pos:
+		return _fallback(enemy.entity_id, revision, &"stale_protect_target")
+	return _success(intent, enemy.entity_id, revision, {
+		"target_id": target.entity_id,
+		"target_cell": target.grid_pos,
+		"protect_reduction": maxi(0, int(intent.get("protect_reduction", 0))),
+		"damage": 0,
+	})
 
 static func _execute_operate(intent: Dictionary, enemy: Unit, context: Dictionary, revision: int) -> Dictionary:
 	var facility_id: String = String(intent.get("facility_id", ""))
@@ -91,6 +113,7 @@ static func _success(intent: Dictionary, enemy_id: String, revision: int, extra:
 		"type": intent.get("type", &"wait"),
 		"revision": revision,
 		"damage": maxi(0, int(intent.get("damage", 0))),
+		"fallback_reason": StringName(intent.get("fallback_reason", "")),
 	}
 	for key in extra:
 		result[key] = extra[key]
@@ -102,9 +125,15 @@ static func _fallback(enemy_id: String, revision: int, reason: StringName) -> Di
 		"enemy_id": enemy_id,
 		"type": &"guard",
 		"reason": reason,
+		"fallback_reason": reason,
 		"revision": revision,
+		"fallback_revision": revision + 1,
 		"damage": 0,
 	}
+
+static func _is_in_bounds(cell: Vector2i, context: Dictionary) -> bool:
+	var map_size: Vector2i = context.get("map_size", Vector2i(-1, -1))
+	return map_size.x < 0 or (cell.x >= 0 and cell.y >= 0 and cell.x < map_size.x and cell.y < map_size.y)
 
 static func _find_unit(raw_units: Variant, entity_id: String) -> Unit:
 	if not raw_units is Array:

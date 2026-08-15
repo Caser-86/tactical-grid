@@ -737,6 +737,31 @@ func run_v2_enemy_turn() -> void:
 		_refresh_v2_runtime_state()
 		turn_manager.end_enemy_turn()
 
+## V2 previews use the same strategy result that the enemy executor will
+## commit. The base controller keeps its V1 UtilityAI preview untouched.
+func _plan_enemy_intents() -> void:
+	if not _is_v2_battle():
+		super._plan_enemy_intents()
+		return
+	if not enemy_intent_state:
+		return
+	enemy_intent_state.clear()
+	var context := _build_v2_enemy_context()
+	for raw_enemy in enemy_units:
+		var enemy: Unit = raw_enemy
+		if enemy == null or not enemy.is_alive or enemy.current_ap <= 0:
+			continue
+		var intent: Dictionary = V2EnemyBrainScript.plan_intent(enemy, context)
+		var public_intent := intent.duplicate(true)
+		public_intent["type"] = String(intent.get("type", "guard"))
+		public_intent["target_pos"] = intent.get("target_cell", enemy.grid_pos)
+		var target := _find_v2_player(String(intent.get("target_id", "")))
+		public_intent["lethal"] = String(intent.get("type", "")) == "attack" and target != null and int(intent.get("damage", 0)) >= target.current_hp
+		enemy_intent_state.set_intent(enemy.entity_id, public_intent)
+	_enemy_intents_planned = true
+	_advance_v2_tutorial(&"enemy_intent_observed")
+	_refresh_enemy_intent_display()
+
 func _advance_v2_hazard_player_turn() -> Dictionary:
 	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("advance_player_turn"):
 		_v2_hazard_turn_state.clear()
@@ -1260,6 +1285,12 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 		&"scan":
 			if alert_state:
 				alert_state.apply_event(&"drone_scan_completed")
+			_log("侦察无人机扫描 %s，警戒等级更新" % String(result.get("target_cell", enemy.grid_pos)))
+		&"protect":
+			_log("盾卫保护 %s，减伤 %d" % [String(result.get("target_id", "")), int(result.get("protect_reduction", 0))])
+		&"guard":
+			if String(result.get("fallback_reason", "")) != "":
+				_log("%s 守住当前位置（%s）" % [enemy.unit_name, String(result.get("fallback_reason", ""))])
 	_reconcile_v2_unit_occupancy()
 	_refresh_v2_runtime_state()
 
@@ -1283,6 +1314,8 @@ func _build_v2_enemy_context() -> Dictionary:
 			"attack_range": data.get("attack_range", enemy.weapon_range),
 			"damage": int(data.get("damage", enemy.weapon_damage[0] if not enemy.weapon_damage.is_empty() else 0)),
 			"scan_radius": int(data.get("scan_radius", 3)),
+			"protect_reduction": int(data.get("protect_reduction", 0)),
+			"strategy": String(data.get("strategy", enemy.job)),
 		}
 	var blocked_cells: Array[Vector2i] = []
 	for y in range(map_height):
@@ -1296,6 +1329,42 @@ func _build_v2_enemy_context() -> Dictionary:
 			var facility: Dictionary = raw_facility.duplicate(true)
 			facility["position"] = Vector2i(int(facility.get("x", -1)), int(facility.get("y", -1)))
 			facilities.append(facility)
+	var scan_targets: Array = []
+	for facility in facilities:
+		if facility.get("position", Vector2i(-1, -1)) is Vector2i:
+			scan_targets.append({
+				"id": String(facility.get("id", "facility")),
+				"cell": facility["position"],
+				"priority": 20,
+			})
+	for raw_entity in map_data.get("entities", []):
+		if not raw_entity is Dictionary:
+			continue
+		var entity: Dictionary = raw_entity
+		var entity_type := String(entity.get("type", ""))
+		if entity_type not in ["objective", "evac", "facility_marker"]:
+			continue
+		var entity_cell := Vector2i(int(entity.get("x", -1)), int(entity.get("y", -1)))
+		if GridSystem.is_in_bounds(entity_cell, map_width, map_height):
+			scan_targets.append({
+				"id": String(entity.get("id", entity_type)),
+				"cell": entity_cell,
+				"priority": 15,
+			})
+	var unobserved_cells: Array[Vector2i] = []
+	if visibility_state != null and visibility_state.has_method("is_cell_observed"):
+		for y in range(map_height):
+			for x in range(map_width):
+				var cell := Vector2i(x, y)
+				if not visibility_state.is_cell_observed(cell) and not _is_blocked(cell):
+					unobserved_cells.append(cell)
+	var choke_cells: Array[Vector2i] = []
+	for raw_cell in map_data.get("choke_cells", []):
+		var choke_cell: Variant = raw_cell
+		if raw_cell is Dictionary:
+			choke_cell = Vector2i(int(raw_cell.get("x", -1)), int(raw_cell.get("y", -1)))
+		if choke_cell is Vector2i and GridSystem.is_in_bounds(choke_cell, map_width, map_height):
+			choke_cells.append(choke_cell)
 	return {
 		"state_revision": v2_action_service.get_state_revision() if v2_action_service else 0,
 		"turn": turn_manager.turn_number if turn_manager else 0,
@@ -1303,8 +1372,13 @@ func _build_v2_enemy_context() -> Dictionary:
 		"enemies": enemy_units,
 		"los_check": Callable(self, "_has_los_for_targeting"),
 		"blocked_cells": blocked_cells,
+		"map_size": Vector2i(map_width, map_height),
 		"enemy_profiles": profiles,
 		"facilities": facilities,
+		"scan_targets": scan_targets,
+		"unobserved_cells": unobserved_cells,
+		"choke_cells": choke_cells,
+		"allow_drone_attack_fallback": true,
 	}
 
 func _find_v2_player(entity_id: String) -> Unit:
