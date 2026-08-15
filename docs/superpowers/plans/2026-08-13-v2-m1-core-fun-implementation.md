@@ -1014,22 +1014,22 @@ Completed in commit `faf36c2` (`feat(v2): add M1 semantic audio and presentation
 - Event schema records mission/version/difficulty, timestamps, turns, actions, invalid clicks, cancels, pans, focus returns, damage, intent resolutions, inactivity, downed, retries, soft locks, completion
 - Human result is one of `approved`, `rejected`, `incomplete`; AI cannot set `approved`
 
-- [ ] **Step 1: Write failing recorder tests for the production fields**
+- [x] **Step 1: Write failing recorder tests for the production fields**
 
 Assert session start, first move/attack timestamps, action counters, 10-second inactivity event, camera recovery count, completion, and private local path. Ensure no screenshots or personal identifiers are recorded by default.
 
-- [ ] **Step 2: Run and verify missing fields fail**
+- [x] **Step 2: Run and verify missing fields fail**
 
 ```powershell
 & $godot --headless --path . --script res://tests/v2/v2_playtest_recorder_test.gd
 & $godot --headless --path . --script res://tests/v2/v2_playtest_integration_contract_test.gd
 ```
 
-- [ ] **Step 3: Implement the append-only local session schema**
+- [x] **Step 3: Implement the append-only local session schema**
 
 Keep runtime records out of Git. Export a sanitized summary into the acceptance document only after the owner run.
 
-- [ ] **Step 4: Re-run recorder and integration tests**
+- [x] **Step 4: Re-run recorder and integration tests**
 
 Expected: `Failed: 0`; normal game launches without `--v2-playtest-id` create no playtest file.
 
@@ -1042,6 +1042,8 @@ Use the release export task from Task 16, then launch:
 ```
 
 The owner plays from a clean V2 save without Godot or external instructions.
+
+Automated implementation is committed in `642049b`. Steps 5-6 remain open until the project owner plays the exported candidate; the acceptance document intentionally remains `incomplete`.
 
 - [ ] **Step 6: Fill the human acceptance document**
 
@@ -1069,7 +1071,7 @@ git commit -m "test(v2): add single-owner M1 acceptance telemetry"
 - Gate success line: `V2 RELEASE GATE PASSED`
 - Package identity: `Tactical Grid V2: Infiltration`, user directory `TacticalGrid_V2_Infiltration`, product line `v2_infiltration`
 
-- [ ] **Step 1: Ensure no V2 game or gate process is running**
+- [x] **Step 1: Ensure no V2 game or gate process is running**
 
 ```powershell
 Get-Process | Where-Object { $_.ProcessName -like 'TacticalGrid_V2_Infiltration*' -or $_.ProcessName -like 'Godot*' }
@@ -1077,7 +1079,7 @@ Get-Process | Where-Object { $_.ProcessName -like 'TacticalGrid_V2_Infiltration*
 
 Expected: no active V2 client and no competing gate. Stop only processes started for this task; do not kill unrelated Godot sessions without confirmation.
 
-- [ ] **Step 2: Run the M1 route and visual matrices**
+- [x] **Step 2: Run the M1 route and visual matrices**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m1_e2e_process_matrix.ps1
@@ -1086,7 +1088,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m1_visual_matrix.ps1
 
 Expected: every route/process exits `0`; accepted screenshots match production flow.
 
-- [ ] **Step 3: Run the complete V2 gate once**
+- [x] **Step 3: Run the complete V2 gate once**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
@@ -1094,11 +1096,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 
 Expected: final line `V2 RELEASE GATE PASSED`. Record assertion totals and every non-fatal warning category.
 
-- [ ] **Step 4: Diagnose any failure from the first failing item, not from the final summary**
+- [x] **Step 4: Diagnose any failure from the first failing item, not from the final summary**
 
 Reproduce that item in its isolated command and return to the task that owns the failing contract. Add the regression and correction to that task's existing commit boundary, rerun the isolated item, then resume this gate and rerun the complete gate once. Do not make source-code fixes inside Task 16 and do not loop the full gate while a focused failure is reproducible.
 
-- [ ] **Step 5: Export and verify the Windows candidate**
+- [x] **Step 5: Export and verify the Windows candidate**
 
 Run the isolated V2 build and package checks:
 
@@ -1110,11 +1112,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/v2_release_isolation_test
 
 Expected: EXE/PCK/version/cold-start and V2 isolation pass.
 
-- [ ] **Step 6: Update release evidence**
+- [x] **Step 6: Update release evidence**
 
 Record commit, gate totals, warning counts, package path, cold-start result, single-owner result, residual risk, and the explicit statement that one familiar human tester does not prove stranger first-time comprehension.
 
-- [ ] **Step 7: Commit release evidence**
+- [x] **Step 7: Commit release evidence**
 
 ```powershell
 git add tactical-grid/client/docs/v2_m1_m2_release_report.md tactical-grid/client/docs/v2_m1_single_owner_acceptance.md

@@ -7,25 +7,26 @@
 ## 构建与版本
 
 - 分支：`codex/ch1-infiltration-v2`
-- 源码自动化验证基线：`a1efb3c test(v2): prevent headless audio resource leaks`
+- 源码自动化验证基线：`642049b test(v2): add single-owner M1 acceptance telemetry`
 - Godot：4.7.1-stable
 - V2 入口：`res://scenes/v2_boot.tscn`
 - V2 用户目录：`TacticalGrid_V2_Infiltration`
 - Windows 包目录：`build/TacticalGrid_V2_Infiltration/`
-- 当前候选包：2026-08-10 基于 `a1efb3c` 重建；EXE `109080576` bytes，PCK `19519700` bytes。SHA-256 记录于未纳入 Git 的 `artifacts/v2/verification/h1/BUILD_ID.txt`。
+- 当前候选包：2026-08-15 基于 `642049b` 重建；EXE `109080576` bytes，PCK `44265268` bytes。SHA-256 记录于构建生成的 `build/TacticalGrid_V2_Infiltration/release_manifest.json`：EXE `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62`，PCK `928c3398b761a8de4c5662629417aae6975801a2e8f9a4f7acc060fe96249f31`。
 
 ## 已通过证据
 
 | 检查 | 命令/证据 | 结果 |
 |---|---|---|
-| V2 总闸门 | `tests/v2/run_v2_gate.ps1` | 75/75 项通过，1644/1644 断言通过；2026-08-10 进程隔离复测未发生 `save_0.tmp` 冲突 |
-| M1 路线 E2E | `tests/v2/run_m1_e2e_process_matrix.ps1` | `main_direct`、`optional_record`、`checkpoint_retry` 各在独立 Godot 进程运行，共 80/80 断言通过 |
-| M1 视觉矩阵 | `tests/v2/run_m1_visual_matrix.ps1` | 42/42 PNG 通过 |
+| V2 总闸门 | `tests/v2/run_v2_gate.ps1` | 83/83 项通过，2082/2082 断言通过；43 条非致命退出清理警告，16 类 |
+| M1 路线 E2E | `tests/v2/run_m1_e2e_process_matrix.ps1 -GodotExe <Godot>` | `main_direct`、`optional_record`、`checkpoint_retry` 各在独立 Godot 进程运行，共 68/68 断言通过 |
+| M1 视觉矩阵 | `tests/v2/run_m1_visual_matrix.ps1` | 36/36 PNG 通过，2 分辨率 x 3 显示模式 x 6 阶段 |
 | M2 视觉矩阵 | `tests/v2/run_m2_visual_matrix.ps1` | 54/54 PNG 通过 |
 | 结算页可见性 | M1/M2 两分辨率结果阶段断言 | 结算层可见、覆盖当前视口、奖励文本不与按钮重叠 |
-| Windows 构建 | `tools/build_windows.ps1` | 2026-08-10 基于 `a1efb3c` 重新导出成功 |
-| Windows 包校验 | `tests/verify_windows_package.ps1` | 当前候选包的 EXE、PCK、版本元数据和冷启动通过 |
-| V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前候选包的 V2 入口、用户目录、旧版文件残留和冷启动通过 |
+| Windows 构建 | `tools/build_windows.ps1 -GodotPath <Godot>` | 2026-08-15 基于 `642049b` 重新导出成功，退出码 0 |
+| Windows 包校验 | `tests/verify_windows_package.ps1` | 当前候选包的 EXE、PCK、版本元数据和冷启动通过，退出码 0 |
+| V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前候选包的 V2 入口、用户目录、旧版文件残留和冷启动通过，退出码 0 |
+| 单人验收遥测 | `v2_playtest_recorder_test.gd`、`v2_playtest_integration_contract_test.gd` | 42/0、10/0；OWNER 记录默认不含截图或个人标识，AI 不能写入 `approved` |
 | 首次试玩材料 | `docs/v2_first_time_playtest_form.json` | JSON 可解析，模板已准备 |
 | 基地 fresh save | `v2_base_progression_scene_test.tscn` | M1 默认预览、主目标和 20-25 分钟预计时长可读 |
 | V2 难度入口 | `v2_settings_contract_test.gd`、`v2_settings_scene_test.tscn` | 故事/标准两档可见、可保存，困难档不对 V2 开放 |
@@ -35,13 +36,13 @@
 
 ## 非致命残余
 
-总闸门报告了 76 条 Godot 退出清理警告，分布在 16 类消息。无头音频播放引用已通过独立契约测试消除；剩余问题来自部分战斗场景测试的 `ObjectDB`、`CanvasItem RID` 和脚本资源仍在使用。剩余测试清理警告没有造成断言失败，但仍应在 H3 前完成风险评估或收敛。
+总闸门报告了 43 条 Godot 退出清理警告，分布在 16 类消息。无头音频播放引用已通过独立契约测试消除；剩余问题来自部分战斗场景测试的 `ObjectDB`、`CanvasItem RID` 和脚本资源仍在使用。剩余测试清理警告没有造成断言失败，但仍应在发布前完成风险评估或收敛。
 
-### M1 E2E 进程隔离（2026-08-10）
+### M1 E2E 进程隔离（2026-08-15）
 
 - 门禁不再把三条 M1 E2E 路线放在同一个场景树内连续运行。`run_m1_e2e_process_matrix.ps1` 对每条路线单独启动 Godot，场景通过 `--v2-m1-e2e-route=<route>` 只执行请求路线。
 - 无参数启动 `v2_m1_e2e_test.tscn` 仍保留三路线聚合回归，便于本地调试；门禁清单只登记进程矩阵，避免跨路线对象生命周期相互影响。
-- 隔离后每条路线仍分别报告 `30-37 CanvasItem RID`、`64-78 ObjectDB` 退出警告。因此该重构已消除多路线共用运行时这一混杂因素，但未宣称已经修复单路线资源清理；后续应按独立路线继续定位。
+- 本轮三条路线分别报告 `12/14/7 CanvasItem RID`、`28/32/18 ObjectDB` 和各 `2 resources still in use`。因此该重构已消除多路线共用运行时这一混杂因素，但未宣称已经修复单路线资源清理；后续应按独立路线继续定位。
 
 ### NX-020 最小复现记录（2026-08-10）
 
@@ -56,7 +57,7 @@
 1. 三名未参与实现的玩家首次完成 M1 和 M2，并记录真实时长、目标理解、卡点和可选内容使用率。
 2. M1 中位时长达到 20–25 分钟，M2 中位时长达到 25–30 分钟，且无人 5 分钟内通关。
 3. 96 张视觉截图完成逐张人工审查。目前已完成自动矩阵，并人工复核路线、范围层、危险预警和 M1/M2 结算代表画面。
-4. 不打开 Godot 编辑器，从基于 `a1efb3c` 的 Windows 包完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
+4. 不打开 Godot 编辑器，从基于 `642049b` 的 Windows 包完整走通启动、基地、任务选择、失败重试、胜利结算、返回基地和退出。
 5. 剩余 70 条测试场景退出警告完成风险评估或修复，并把结论补回本报告。
 
 ## 本轮收口结果
@@ -73,7 +74,7 @@
 
 ## 下一条执行任务
 
-1. 执行 NX-020/NX-025，补齐 M1/M2 主目标、可选目标和撤离状态的地图断言。
-2. 对当前候选包完成启动、基地、进入 M1、退出的人工技术烟雾检查，然后冻结为 H1 试玩包。
-3. 使用 `v2_first_time_playtest_form.json` 组织 P01/P02/P03 的无指导 M1/M2 试玩，并将原始记录保存在未纳入 Git 的 `artifacts/v2/verification/h1/`。
-4. 根据真实卡点调整提示、路线后果和遭遇节奏，不用堆血量凑时长。
+1. 由项目负责人从当前候选包完成 OWNER 单人试玩，并填写 `tactical-grid/client/docs/v2_m1_single_owner_acceptance.md`；在此之前不得写入 `approved`。
+2. 组织 P01/P02/P03 的无指导 M1/M2 试玩，并将原始记录保存在未纳入 Git 的 `artifacts/v2/verification/h1/`。
+3. 根据真实卡点调整提示、路线后果和遭遇节奏，不用堆血量凑时长。
+4. 在发布前评估或收敛 43 条 Godot 退出清理警告，并把结论回填本报告。
