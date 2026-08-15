@@ -12,6 +12,7 @@ var _ended := 0
 var _next_unit := 0
 var _focused := 0
 var _network_requested := 0
+var _ability_requested := 0
 var _pointer_cancelled := 0
 var _inspect_cancelled := 0
 var _pan_delta := Vector2.ZERO
@@ -26,6 +27,7 @@ func _initialize() -> void:
 	router.next_unit_requested.connect(_on_next_unit)
 	router.focus_requested.connect(_on_focus)
 	router.network_overlay_requested.connect(_on_network)
+	router.ability_requested.connect(_on_ability)
 	router.pointer_cancel_requested.connect(_on_pointer_cancel)
 	router.camera_pan_requested.connect(_on_pan)
 	if router.has_signal("camera_inspect_cancel_requested"):
@@ -135,6 +137,13 @@ func _initialize() -> void:
 	t.check(router.handle_event(g_key, Callable()), "G 被消费")
 	t.check(_network_requested == 1, "G 请求网络覆盖")
 
+	var q_key := InputEventKey.new()
+	q_key.keycode = KEY_Q
+	q_key.physical_keycode = KEY_Q
+	q_key.pressed = true
+	t.check(router.handle_event(q_key, Callable()), "Q 被消费")
+	t.check(_ability_requested == 1, "Q 请求当前角色能力")
+
 	t.check(bool(router.set_state(V2BattleInputRouter.State.ENEMY_TURN).get("success", false)), "进入敌方回合")
 	t.check(not bool(router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED).get("success", true)), "敌方回合拒绝玩家预览")
 	t.check(_route(router, _mouse_button(MOUSE_BUTTON_LEFT, true, Vector2(160, 96)), func(_screen: Vector2): return Vector2i(4, 4), target_context), "敌方回合消费左键避免穿透")
@@ -172,6 +181,9 @@ func _on_focus() -> void:
 
 func _on_network() -> void:
 	_network_requested += 1
+
+func _on_ability() -> void:
+	_ability_requested += 1
 
 func _on_pointer_cancel() -> void:
 	_pointer_cancelled += 1

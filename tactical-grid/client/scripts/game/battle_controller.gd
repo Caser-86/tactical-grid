@@ -129,6 +129,12 @@ var v2_camera_navigation: RefCounted = null
 var _v2_camera_return_handled := false
 var v2_damage_signal_suppressed := false
 var v2_pending_move_preview: Dictionary = {}
+## V2 ability targeting stays on one simple Q entry instead of a permanent
+## action bar. The selected role supplies one active ability and this state
+## holds only the current target preview.
+var v2_pending_ability_id: StringName = &""
+var v2_pending_ability_preview: Dictionary = {}
+var v2_ability_target_cells: Array[Vector2i] = []
 ## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
 var v2_hover_attack_preview: Dictionary = {}
 var v2_locked_attack_preview: Dictionary = {}
@@ -668,6 +674,7 @@ func _init_subsystems() -> void:
 	v2_input_router.pointer_cancel_requested.connect(_on_v2_cancel_requested)
 	v2_input_router.end_turn_requested.connect(request_end_turn)
 	v2_input_router.next_unit_requested.connect(_on_next_unit)
+	v2_input_router.ability_requested.connect(_on_v2_ability_requested)
 	v2_input_router.camera_pan_requested.connect(_on_v2_camera_pan)
 	v2_input_router.camera_zoom_requested.connect(_on_v2_camera_zoom)
 	v2_input_router.focus_requested.connect(_on_v2_camera_focus)
@@ -732,6 +739,10 @@ func _setup_v2_services() -> void:
 	v2_rescue_controller.rescue_committed.connect(_on_v2_rescue_committed)
 	v2_rescue_controller.checkpoint_requested.connect(_on_v2_checkpoint_requested)
 	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
 	v2_hover_attack_preview.clear()
 	v2_locked_attack_preview.clear()
 	v2_locked_attack_target_id = ""
@@ -3355,6 +3366,9 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 	# chosen. Do not let a map click leak through and move the selected unit.
 	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
 		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.ABILITY_TARGETING:
+		_on_v2_ability_cell_clicked(cell)
+		return
 	# Heal any legacy/checkpoint overlap before resolving the clicked occupant.
 	# Otherwise _get_unit_at can select the wrong object and preserve the bad state.
 	_reconcile_v2_unit_occupancy()
@@ -3390,6 +3404,260 @@ func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
 			)
 			return
 	_dispatch_invalid_v2_context_action(cell, context, resolution)
+
+## V2 abilities use one keyboard entry and the same target-click language as
+## movement/attack. This keeps the player-facing operation model to Q + click
+## while the existing action service remains the only rules/commit owner.
+func _on_v2_ability_requested() -> void:
+	if not _is_v2_battle() or selected_unit == null or not is_instance_valid(selected_unit):
+		return
+	if selected_unit.team != "player":
+		return
+	if not selected_unit.can_act():
+		if hud:
+			hud.show_action_reason(&"action_unavailable")
+		_render_v2_hud()
+		return
+	var ability_id := _get_v2_selected_ability_id()
+	if ability_id.is_empty():
+		if hud:
+			hud.set_context_prompt("当前角色没有可用能力")
+		_render_v2_hud()
+		return
+	if selected_unit.v2_turn_state.get_cooldown(ability_id) > 0:
+		if hud:
+			hud.show_action_reason(&"on_cooldown")
+		_render_v2_hud()
+		return
+	var target_cells := _get_v2_ability_target_cells(ability_id)
+	if target_cells.is_empty():
+		if hud:
+			hud.set_context_prompt("当前没有可用的能力目标；请先移动或结束回合")
+		_render_v2_hud()
+		return
+	v2_pending_ability_id = ability_id
+	v2_ability_target_cells = target_cells
+	v2_pending_ability_preview.clear()
+	_clear_layer(attack_highlight)
+	for cell in target_cells:
+		_highlight_cell(attack_highlight, cell, _highlight_color("target", COLOR_TARGET))
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.ABILITY_TARGETING)
+	if hud:
+		hud.set_context_prompt("能力：%s · 点击金色目标格使用；Q 或右键取消" % _get_v2_ability_name(ability_id))
+	_record_v2_playtest_event(&"ability_targeting_started", {
+		"ability_id": String(ability_id),
+		"target_count": target_cells.size(),
+	})
+	_render_v2_hud()
+
+func _on_v2_ability_cell_clicked(cell: Vector2i) -> void:
+	if v2_pending_ability_id.is_empty():
+		return
+	if not v2_ability_target_cells.has(cell):
+		if hud:
+			hud.set_context_prompt("该格不是当前能力目标；请点击金色目标格，右键取消")
+		_render_v2_hud()
+		return
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	var preview := _query_v2_ability(cell)
+	if not bool(preview.get("valid", false)):
+		if hud:
+			hud.show_action_reason(preview.get("reason", &"invalid_target"))
+		_render_v2_hud()
+		return
+	v2_pending_ability_preview = preview.duplicate(true)
+	if hud:
+		hud.set_context_prompt(_describe_v2_ability_preview(preview) + " · 左键使用")
+	_render_v2_hud()
+	var result := v2_action_service.commit_action(preview) if v2_action_service else {"success": false, "reason": &"v2_action_service_unavailable"}
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", &"invalid_preview"))
+		v2_pending_ability_preview.clear()
+		_render_v2_hud()
+		return
+	_finalize_v2_ability(preview, result)
+
+func _on_v2_ability_hovered(cell: Vector2i) -> void:
+	if v2_pending_ability_id.is_empty() or not v2_ability_target_cells.has(cell):
+		_cancel_v2_preview(v2_pending_ability_preview)
+		v2_pending_ability_preview.clear()
+		if hud and not v2_pending_ability_id.is_empty():
+			hud.set_context_prompt("能力：%s · 点击金色目标格使用；Q 或右键取消" % _get_v2_ability_name(v2_pending_ability_id))
+		_render_v2_hud()
+		return
+	var preview := _query_v2_ability(cell)
+	if not bool(preview.get("valid", false)):
+		return
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview = preview.duplicate(true)
+	if hud:
+		hud.set_context_prompt(_describe_v2_ability_preview(preview) + " · 左键使用，右键取消")
+	_render_v2_hud()
+
+func _get_v2_selected_ability_id() -> StringName:
+	if selected_unit == null:
+		return &""
+	for raw_id in selected_unit.learned_skills:
+		var id := StringName(String(raw_id))
+		if not id.is_empty() and not _get_v2_ability_data(id).is_empty():
+			return id
+	return &""
+
+func _get_v2_ability_data(ability_id: StringName) -> Dictionary:
+	var data_node: Node = get_node_or_null("/root/V2Data")
+	if data_node != null and data_node.has_method("get_ability"):
+		return data_node.get_ability(ability_id)
+	return {}
+
+func _get_v2_ability_name(ability_id: StringName) -> String:
+	var data := _get_v2_ability_data(ability_id)
+	return String(data.get("name", ability_id))
+
+func get_v2_ability_hint() -> String:
+	if not _is_v2_battle() or selected_unit == null or not is_instance_valid(selected_unit):
+		return ""
+	var ability_id := _get_v2_selected_ability_id()
+	if ability_id.is_empty():
+		return ""
+	return "Q 使用%s" % _get_v2_ability_name(ability_id)
+
+func _get_v2_ability_target_cells(ability_id: StringName) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var candidates: Array[Vector2i] = []
+	match ability_id:
+		&"impact_advance":
+			for direction in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+				for distance in range(1, 4):
+					candidates.append(selected_unit.grid_pos + direction * distance)
+		&"area_scan":
+			for y in range(maxi(0, selected_unit.grid_pos.y - 3), mini(map_height, selected_unit.grid_pos.y + 4)):
+				for x in range(maxi(0, selected_unit.grid_pos.x - 3), mini(map_width, selected_unit.grid_pos.x + 4)):
+					var scan_cell := Vector2i(x, y)
+					if GridSystem.manhattan_distance(selected_unit.grid_pos, scan_cell) <= 3:
+						candidates.append(scan_cell)
+		&"interrupt_shot":
+			for raw_enemy in enemy_units:
+				var enemy: Unit = raw_enemy
+				if enemy != null and enemy.is_alive and (visibility_state == null or visibility_state.is_cell_observed(enemy.grid_pos)):
+					candidates.append(enemy.grid_pos)
+		&"barrier_projection":
+			for raw_ally in player_units:
+				var ally: Unit = raw_ally
+				if ally != null and ally.is_alive:
+					candidates.append(ally.grid_pos)
+	for cell in candidates:
+		if not cells.has(cell):
+			var preview := _query_v2_ability(cell, ability_id)
+			if bool(preview.get("valid", false)):
+				cells.append(cell)
+			_cancel_v2_preview(preview)
+	return cells
+
+func _query_v2_ability(cell: Vector2i, ability_id: StringName = &"") -> Dictionary:
+	if v2_action_service == null or selected_unit == null:
+		return {"valid": false, "reason": &"v2_action_service_unavailable"}
+	var resolved_id := ability_id if not ability_id.is_empty() else v2_pending_ability_id
+	var target_unit: Unit = _get_unit_at(cell)
+	var target_data: Dictionary = {"position": cell}
+	if resolved_id in [&"interrupt_shot", &"barrier_projection"]:
+		target_data["target_unit"] = target_unit
+	var context := {
+		"state_revision": v2_action_service.get_state_revision(),
+		"modules": _get_v2_equipped_modules(selected_unit),
+	}
+	if resolved_id == &"impact_advance":
+		context["position_valid"] = _is_v2_ability_destination_valid(cell)
+	return v2_action_service.query_action({
+		"action": &"ability",
+		"ability_id": resolved_id,
+		"unit": selected_unit,
+		"target_data": target_data,
+		"context": context,
+	})
+
+func _is_v2_ability_destination_valid(destination: Vector2i) -> bool:
+	if not GridSystem.is_in_bounds(destination, map_width, map_height):
+		return false
+	if _is_blocked(destination) or _is_occupied_by_other_unit(destination, selected_unit):
+		return false
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(destination):
+		return false
+	var delta := destination - selected_unit.grid_pos
+	var distance := absi(delta.x) + absi(delta.y)
+	if distance <= 0:
+		return false
+	var step := Vector2i(signi(delta.x), signi(delta.y))
+	var cursor := selected_unit.grid_pos + step
+	while cursor != destination:
+		if _is_blocked(cursor) or _is_occupied_by_other_unit(cursor, selected_unit):
+			return false
+		cursor += step
+	return true
+
+func _get_v2_equipped_modules(unit: Unit) -> Array:
+	if unit == null:
+		return []
+	var progress: Dictionary = GameManager.current_save.get("campaign_progress", {}) if GameManager.current_save is Dictionary else {}
+	var equipped: Variant = progress.get("equipped_modules", {})
+	if not equipped is Dictionary:
+		equipped = GameManager.current_save.get("equipped_modules", {}) if GameManager.current_save is Dictionary else {}
+	var module_id := String((equipped as Dictionary).get(unit.job, ""))
+	return [module_id] if not module_id.is_empty() else []
+
+func _describe_v2_ability_preview(preview: Dictionary) -> String:
+	var ability_id := StringName(String(preview.get("ability_id", v2_pending_ability_id)))
+	var text := "能力：%s" % _get_v2_ability_name(ability_id)
+	if preview.has("destination"):
+		text += " · 推进 %d 格" % int(preview.get("move_distance", 0))
+	if preview.has("reveal_radius"):
+		text += " · 揭示半径 %d" % int(preview.get("reveal_radius", 0))
+	if preview.has("damage"):
+		text += " · 伤害 %d" % int(preview.get("damage", 0))
+	if preview.has("shield"):
+		text += " · 护盾 +%d" % int(preview.get("shield", 0))
+	var target: Unit = preview.get("target_unit", null)
+	if target != null:
+		text += " · 目标 %s" % target.unit_name
+	return text
+
+func _finalize_v2_ability(preview: Dictionary, result: Dictionary) -> void:
+	var ability_id := StringName(String(preview.get("ability_id", v2_pending_ability_id)))
+	var target: Unit = preview.get("target_unit", null)
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	_clear_layer(attack_highlight)
+	if ability_id == &"area_scan" and visibility_state:
+		var center: Vector2i = preview.get("position", selected_unit.grid_pos)
+		var cells := VisionSystem.get_visible_cells(center, int(result.get("reveal_radius", preview.get("reveal_radius", 3))), map_width, map_height, _is_vision_blocking)
+		visibility_state.reveal_cells(cells)
+		_update_visibility()
+	elif ability_id == &"impact_advance":
+		_reconcile_v2_unit_occupancy()
+		_update_unit_sprite_pos(selected_unit, true)
+		_update_visibility()
+	elif target != null and ability_id == &"interrupt_shot":
+		if target.is_alive:
+			_update_unit_sprite_pos(target, true)
+		else:
+			_schedule_v2_dead_sprite_cleanup(target)
+			_update_visibility()
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	if hud:
+		hud.set_context_prompt("%s · 行动已消耗" % _describe_v2_ability_preview(preview))
+	_record_v2_playtest_event(&"ability_committed", {
+		"ability_id": String(ability_id),
+		"target_id": target.entity_id if target != null else "",
+		"result": result.duplicate(true),
+	})
+	_render_v2_hud()
 
 func _build_v2_context_action_context(_cell: Vector2i) -> Dictionary:
 	return {
@@ -3474,6 +3742,9 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 		return
 	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
 		v2_affordance_presenter.clear_preview()
+		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.ABILITY_TARGETING:
+		_on_v2_ability_hovered(cell)
 		return
 	var hovered_unit: Unit = _get_unit_at(cell)
 	if hovered_unit != null and hovered_unit.team != "player":
@@ -3795,6 +4066,11 @@ func _on_v2_cancel_requested() -> void:
 	v2_pending_interaction_facility_id = ""
 	_cancel_v2_preview(v2_pending_move_preview)
 	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	_clear_layer(attack_highlight)
 	_clear_v2_hover_preview()
 	_clear_v2_locked_attack()
 	if v2_affordance_presenter:
@@ -4584,6 +4860,10 @@ func cancel_current_preview() -> Dictionary:
 	_pending_action_kind = ""
 	_cancel_v2_preview(v2_pending_move_preview)
 	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
 	_clear_v2_hover_preview()
 	_clear_v2_locked_attack()
 	v2_pending_interaction_facility_id = ""

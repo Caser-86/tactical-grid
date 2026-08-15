@@ -1123,7 +1123,7 @@ Expected: EXE/PCK/version/cold-start and V2 isolation pass.
 
 Record commit, gate totals, warning counts, package path, cold-start result, single-owner result, residual risk, and the explicit statement that one familiar human tester does not prove stranger first-time comprehension.
 
-Current evidence: commit `dfba897`; gate `84/84` items and `2090/2090` assertions; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`; Windows package and V2 isolation both passed. The 43 non-fatal teardown warnings across 16 categories remain documented, and the owner continuation checkpoint is not public-release approval.
+Current evidence before the ability-entry commit: `dfba897`; gate `84/84` items and `2104/2104` assertions; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`; Windows package and V2 isolation both passed. The 43 non-fatal teardown warnings across 16 categories remain documented, and the owner continuation checkpoint is not public-release approval.
 
 - [x] **Step 7: Commit release evidence**
 
@@ -1162,9 +1162,62 @@ Do not create or execute the Stage 3 content-pipeline plan until all items below
 | Three public objectives with spatial route choice | Task 10 |
 | Three encounters, 7-8 enemies, 12-18 minute target | Tasks 2, 11, 15 |
 | Deterministic combat feedback and reliable death cleanup | Task 12 |
+| Four role abilities exposed through one readable Q target path | Task 17 |
 | Five-unit actual-scale art gate and four directions | Task 13 |
 | Legal, registered M1 VFX and audio cues | Task 14 |
 | Local telemetry and owner-only subjective acceptance | Task 15 |
 | Automated gate, Windows package, cold start, and V1/V2 isolation | Task 16 |
 
 The remaining Chapter One requirements for M2-M6, optional operations, modules, portraits, complete art/audio inventory, Boss, ending, accessibility, save migration, and release hardening remain scheduled in the master roadmap. They are deliberately not expanded into file-level tasks until M1 freezes the shared interfaces they depend on.
+
+---
+
+### Task 17: Expose Four Role Abilities Through One Simple Player Path
+
+**Owner:** Sol xhigh
+
+**Goal:** Make the four existing V2 active abilities usable in a real battle without adding a second toolbar mode or a confirmation maze. The player uses `Q` after selecting a unit, reads gold target cells and the hover preview, then uses one left click to commit or right-click/Q to cancel.
+
+**Files:**
+- Modify: `tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
+- Modify: `tactical-grid/client/scripts/v2/combat/v2_ability_rules.gd`
+- Modify: `tactical-grid/client/scripts/ui/hud.gd`
+- Modify: `tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd`
+- Modify: `tactical-grid/client/tests/v2/v2_input_router_test.gd`
+- Modify: `tactical-grid/client/tests/v2/v2_ability_rules_test.gd`
+- Modify: `tactical-grid/client/tests/v2/v2_player_turn_e2e_test.gd`
+- Modify: `tactical-grid/client/tests/v2/v2_playtest_runtime_wiring_test.gd`
+- Update: `tactical-grid/client/docs/v2_m1_m2_release_report.md`
+
+**Interfaces:**
+- `Q` emits `ability_requested` only from `UNIT_SELECTED`; in `ABILITY_TARGETING`, Q cancels.
+- The controller generates bounded semantic targets per ability rather than querying every map cell.
+- Targeting state uses the existing `ABILITY_TARGETING` router state and existing map click/hover signals.
+- Ability commits use `V2ActionService.query_action` and `commit_action`; no direct alternate rules path is created.
+- Ability telemetry records `ability_targeting_started` and `ability_committed` without storing screenshots or personal identifiers.
+- `_is_v2_battle()` remains the V1/V2 guard; V1 does not receive the Q ability signal.
+
+- [x] **Step 1: Add failing/contract coverage for the Q route and runtime wiring**
+
+  Verify Q consumption, ability target state, target click routing, ability telemetry, and V1 guard coverage.
+
+- [x] **Step 2: Implement bounded target generation and previews**
+
+  Use straight-line cells for assault, radius-limited cells for scout, visible alive enemies for sniper, and alive allies for heavy. Reject blocked or occupied impact-advance destinations before exposing them.
+
+- [x] **Step 3: Commit the real action through the existing V2 service**
+
+  Apply reveal, movement, damage, shield, cooldown, visual refresh, state reset, and readable HUD result through the existing service/result chain.
+
+- [x] **Step 4: Run focused and complete verification**
+
+  Evidence: input `52/0`, ability rules `22/0`, player-turn E2E `85/0`, runtime wiring `12/0`; full V2 gate `84/84` items and `2104/2104` assertions; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`. The gate still reports the known 43 non-fatal teardown warnings across 16 categories.
+
+- [ ] **Step 5: Rebuild the Windows candidate and update its manifest**
+
+  Run `tools/build_windows.ps1`, `tests/verify_windows_package.ps1`, and `tests/v2/v2_release_isolation_test.ps1` after the implementation commit. Record the new EXE/PCK hashes in the release report. This is required before calling the candidate package current.
+
+- [ ] **Step 6: Owner and first-player balance review**
+
+  Confirm the four abilities are discoverable, useful, and not mandatory for every encounter. This task does not close the human acceptance gate or public release gate.

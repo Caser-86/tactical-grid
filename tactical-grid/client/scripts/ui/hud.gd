@@ -702,6 +702,22 @@ func show_action_reason(reason: Variant) -> void:
 			text = "不能攻击友方单位"
 		"target_dead":
 			text = "目标已经失去战斗能力"
+		"on_cooldown":
+			text = "能力正在冷却"
+		"wrong_role":
+			text = "该角色不能使用这个能力"
+		"unknown_ability":
+			text = "当前角色没有可用能力"
+		"invalid_target", "target_invalid":
+			text = "这个目标不适合当前能力"
+		"same_team_required":
+			text = "屏障只能指定友方单位"
+		"target_out_of_range":
+			text = "友方目标超出屏障范围"
+		"not_straight_or_too_far":
+			text = "冲击推进只能沿直线前进三格以内"
+		"position_blocked":
+			text = "推进路线被障碍或单位占用"
 		"move_unavailable":
 			text = "本单位本回合已经移动过"
 		"blocked":

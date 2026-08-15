@@ -1029,6 +1029,9 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		checkpoint_id = String(v2_last_checkpoint.get("checkpoint_id", ""))
 	var phase_text := _get_v2_phase_text()
 	var ordinary_controls := "左键角色显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色 · Space结束我方回合（随后敌人行动）"
+	var ability_hint := get_v2_ability_hint()
+	if not ability_hint.is_empty():
+		ordinary_controls = "%s · %s" % [ordinary_controls, ability_hint]
 	var context_prompt := context_override
 	if context_prompt.is_empty() and hud != null:
 		context_prompt = hud.get_context_prompt_text()

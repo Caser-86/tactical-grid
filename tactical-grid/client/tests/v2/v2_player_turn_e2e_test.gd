@@ -92,6 +92,25 @@ func _run() -> void:
 		t.check(_group_count(battle.v2_affordance_presenter, "v2_path_line") == 1, "悬停蓝色移动格显示连续路线")
 		t.check(battle.hud.context_label.text.contains("左键移动"), "悬停蓝色移动格明确提示左键移动")
 
+	# 1b. Q opens the selected role's single active ability and the same map
+	# click commits it. Reset the temporary turn state so the rest of this E2E
+	# continues to exercise movement, attack, camera, and end-turn behavior.
+	var ability_target := _find_ability_target(battle, player, &"impact_advance")
+	t.check(ability_target.x >= 0, "V2 实战存在合法能力目标格")
+	if ability_target.x >= 0:
+		await _press_key(KEY_Q)
+		t.check(battle.v2_input_router.get_state_name() == "ability_targeting", "Q 进入能力目标选择")
+		t.check(battle.hud.get_context_prompt_text().contains("冲击推进") and battle.hud.get_context_prompt_text().contains("金色"), "能力目标提示说明能力名称和金色目标格")
+		await _move_mouse_to_cell(battle, ability_target)
+		t.check(battle.hud.get_context_prompt_text().contains("冲击推进"), "悬停能力目标显示结算预览")
+		await _click_left()
+		await get_tree().process_frame
+		t.check(player.grid_pos == ability_target, "Q 能力提交后角色沿合法直线推进")
+		t.check(not player.v2_turn_state.action_available, "Q 能力消耗行动预算")
+		t.check(battle.v2_input_router.get_state_name() == "unit_selected", "能力结算后恢复单位选择状态")
+	player.v2_turn_state.begin_turn()
+	battle.call("_refresh_selected_unit_affordances", player)
+
 	# M107 bridge: a completed camera observation changes the real battle front
 	# state and immediately reaches the V2 HUD snapshot.
 	t.check(battle.alert_state.get_front_state() == &"hidden", "M1 实战初始警戒为潜伏")
@@ -355,6 +374,14 @@ func _find_invalid_move_target(battle: BattleController, player: Unit) -> Vector
 			if not facility.is_empty():
 				continue
 			return cell
+	return Vector2i(-1, -1)
+
+func _find_ability_target(battle: BattleController, player: Unit, ability_id: StringName) -> Vector2i:
+	var raw_cells: Variant = battle.call("_get_v2_ability_target_cells", ability_id)
+	if raw_cells is Array:
+		for raw_cell in raw_cells:
+			if raw_cell is Vector2i and raw_cell != player.grid_pos:
+				return raw_cell
 	return Vector2i(-1, -1)
 
 func _prepare_adjacent_target(battle: BattleController, player: Unit, target: Unit) -> Vector2i:

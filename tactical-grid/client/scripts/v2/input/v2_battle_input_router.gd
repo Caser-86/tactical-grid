@@ -10,6 +10,7 @@ signal next_unit_requested()
 signal focus_requested()
 signal camera_inspect_cancel_requested()
 signal network_overlay_requested()
+signal ability_requested()
 signal camera_pan_requested(delta: Vector2)
 signal camera_zoom_requested(amount: int)
 
@@ -275,6 +276,12 @@ func _handle_key(event: InputEventKey) -> bool:
 		KEY_G:
 			network_overlay_requested.emit()
 			return true
+		KEY_Q:
+			if _state == State.UNIT_SELECTED:
+				ability_requested.emit()
+				return true
+			if _state == State.ABILITY_TARGETING:
+				return _handle_cancel()
 	return false
 
 func _event_matches_key(event: InputEventKey, key: Key) -> bool:

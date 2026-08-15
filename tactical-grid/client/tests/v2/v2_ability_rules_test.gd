@@ -27,6 +27,9 @@ func _initialize() -> void:
 	t.check(assault.v2_turn_state.get_cooldown(&"impact_advance") == 2 and not assault.can_act(), "突击能力消费行动并进入冷却")
 	var impact_again: Dictionary = V2AbilityRules.query(assault, &"impact_advance", {"position": Vector2i(5, 1)}, {"modules": ["assault_a"]})
 	t.check(not bool(impact_again.get("valid", true)) and impact_again.get("reason", &"") == &"on_cooldown", "突击能力冷却中拒绝")
+	var blocked_actor = _make_unit("blocked_assault", "assault", Vector2i(1, 1), 7)
+	var blocked_impact: Dictionary = V2AbilityRules.query(blocked_actor, &"impact_advance", {"position": Vector2i(4, 1)}, {"position_valid": false})
+	t.check(not bool(blocked_impact.get("valid", true)) and blocked_impact.get("reason", &"") == &"position_blocked", "冲击推进拒绝被障碍或单位占用的路线")
 
 	var scan: Dictionary = V2AbilityRules.query(scout, &"area_scan", {"position": Vector2i(4, 3)}, {
 		"state_revision": 1, "modules": ["scout_a"],
@@ -83,6 +86,7 @@ func _initialize() -> void:
 	enemy.queue_free()
 	ally.queue_free()
 	service_actor.queue_free()
+	blocked_actor.queue_free()
 	t.finish(self)
 
 func _make_unit(id: String, role: String, position: Vector2i, hp: int):

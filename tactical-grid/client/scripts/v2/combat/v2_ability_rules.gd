@@ -121,6 +121,8 @@ static func _query_impact_advance(actor: Unit, target_data: Dictionary, context:
 	var distance := absi(destination.x - actor.grid_pos.x) + absi(destination.y - actor.grid_pos.y)
 	if distance <= 0 or distance > 3 or (destination.x != actor.grid_pos.x and destination.y != actor.grid_pos.y):
 		return {"valid": false, "reason": &"not_straight_or_too_far"}
+	if context.has("position_valid") and not bool(context.get("position_valid", false)):
+		return {"valid": false, "reason": &"position_blocked"}
 	var modules: Array = _modules(context)
 	var result := {
 		"valid": true,
