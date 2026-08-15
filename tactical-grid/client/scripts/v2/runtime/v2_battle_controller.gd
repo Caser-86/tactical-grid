@@ -708,7 +708,15 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 func _run_enemy_turn() -> void:
 	await run_v2_enemy_turn()
 
+func _is_v2_m1_tutorial_safety_active() -> bool:
+	if not _is_v2_battle() or level_id != "ch1_m1" or v2_tutorial_flow == null:
+		return false
+	var player_turn := turn_manager.turn_number if turn_manager else 1
+	return v2_tutorial_flow.has_method("is_m1_safety_active") and bool(v2_tutorial_flow.is_m1_safety_active(player_turn))
+
 func _is_v2_enemy_turn_passive() -> bool:
+	if _is_v2_m1_tutorial_safety_active():
+		return false
 	return _is_v2_battle() and mission_objective_state != null and mission_objective_state.is_enemy_passive(turn_manager.turn_number if turn_manager else 1)
 
 func run_v2_enemy_turn() -> void:
@@ -743,7 +751,7 @@ func _advance_v2_hazard_player_turn() -> Dictionary:
 func _consume_v2_hazard_enemy_phase() -> Array:
 	if not _is_v2_battle() or v2_hazard_controller == null or not v2_hazard_controller.has_method("consume_enemy_phase_damage"):
 		return []
-	if _is_v2_enemy_turn_passive():
+	if _is_v2_m1_tutorial_safety_active() or _is_v2_enemy_turn_passive():
 		return []
 	var turn := turn_manager.turn_number if turn_manager else 1
 	var events: Array = v2_hazard_controller.consume_enemy_phase_damage(turn)
@@ -999,6 +1007,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 	if selected_unit and is_instance_valid(selected_unit) and selected_unit.team == "player":
 		budget["move"] = selected_unit.can_move()
 		budget["action"] = selected_unit.can_act()
+	var tutorial_hint: Dictionary = v2_tutorial_flow.get_hint() if v2_tutorial_flow != null and v2_tutorial_flow.has_method("get_hint") else {"visible": false}
 	return {
 		"mission_id": level_id,
 		"step_id": step_id,
@@ -1029,6 +1038,8 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		"interaction": "设施菜单：选择一个操作" if not v2_pending_interaction_facility_id.is_empty() else "",
 		"attack_preview": hud.get_attack_preview_text() if hud else "",
 		"visibility_summary": v2_visibility_summary.duplicate(true),
+		"tutorial_hint": tutorial_hint,
+		"m1_safe_tutorial_complete": v2_tutorial_flow.is_m1_safe_tutorial_complete() if v2_tutorial_flow != null and v2_tutorial_flow.has_method("is_m1_safe_tutorial_complete") else false,
 	}
 
 func _get_v2_phase_text() -> String:
@@ -1237,7 +1248,7 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 		&"attack":
 			var target := _find_v2_player(String(result.get("target_id", "")))
 			if target != null:
-				target.take_damage(int(result.get("damage", 0)))
+				target.take_damage(_v2_tutorial_safe_damage(enemy, target, int(result.get("damage", 0))))
 				_update_unit_sprite_pos(target, true)
 		&"move":
 			var target_cell: Variant = result.get("target_cell", Vector2i(-1, -1))
@@ -1251,6 +1262,14 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 				alert_state.apply_event(&"drone_scan_completed")
 	_reconcile_v2_unit_occupancy()
 	_refresh_v2_runtime_state()
+
+func _v2_tutorial_safe_damage(enemy: Unit, target: Unit, requested_damage: int) -> int:
+	var damage := maxi(0, requested_damage)
+	if not _is_v2_m1_tutorial_safety_active() or enemy == null or target == null:
+		return damage
+	if enemy.job != "sentry" or target.team != "player" or target.job != "assault":
+		return damage
+	return mini(damage, maxi(0, target.current_hp - 1))
 
 func _build_v2_enemy_context() -> Dictionary:
 	var profiles: Dictionary = {}

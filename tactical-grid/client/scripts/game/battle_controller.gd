@@ -116,6 +116,7 @@ var v2_mission_event_bridge: RefCounted = null
 var v2_rescue_controller: RefCounted = null
 var v2_encounter_activation: RefCounted = null
 var v2_tutorial_flow: RefCounted = null
+var _v2_auto_select_in_progress := false
 var v2_interaction_service: RefCounted = null
 var v2_affordance_presenter: V2AffordancePresenter = null
 var v2_action_preview: V2ActionPreview = null
@@ -514,15 +515,11 @@ func _show_context_hint(flag: String) -> void:
 func _show_v2_tutorial_step() -> void:
 	_dismiss_context_hint()
 	if v2_tutorial_flow == null or v2_tutorial_flow.get_visible_hint_count() <= 0:
+		_render_v2_hud()
 		return
-	_active_context_hint = TutorialHintScene.instantiate()
-	hud.add_child(_active_context_hint)
 	_active_context_flag = "v2_%s" % String(v2_tutorial_flow.current_step())
-	_active_context_hint.show_v2_context_hint(
-		v2_tutorial_flow.current_text(),
-		Callable(self, "_skip_v2_tutorial"),
-	)
 	_record_v2_playtest_event(&"hint_shown", {"hint_id": String(v2_tutorial_flow.current_step())})
+	_render_v2_hud()
 
 func _skip_v2_tutorial() -> void:
 	if v2_tutorial_flow:
@@ -553,6 +550,8 @@ func _advance_v2_tutorial(event_name: StringName, payload: Dictionary = {}) -> D
 	if not _is_v2_battle() or v2_tutorial_flow == null:
 		return {"advanced": false, "reason": &"v2_tutorial_unavailable"}
 	var result: Dictionary = v2_tutorial_flow.on_event(event_name, payload)
+	if bool(result.get("m1_safe_tutorial_complete", false)) and v2_mission_flow != null and v2_mission_flow.has_method("set_m1_safe_tutorial_complete"):
+		v2_mission_flow.set_m1_safe_tutorial_complete(true)
 	if bool(result.get("advanced", false)):
 		if v2_tutorial_flow.get_visible_hint_count() > 0:
 			_show_v2_tutorial_step()
@@ -690,7 +689,9 @@ func _setup_v2_services() -> void:
 	if _is_v2_battle() and String(v2_mission.get("id", level_id)) == "ch1_m1":
 		_configure_v2_m1_alert()
 		v2_tutorial_flow = V2TutorialFlowScript.new()
-		v2_tutorial_flow.setup()
+		v2_tutorial_flow.setup({
+			"safe_turns": int(v2_mission.get("tutorial_safety_turns", 3)),
+		})
 	var v2_map_result := V2MapLoaderScript.load_map(StringName(String(v2_mission.get("map_id", level_id))))
 	if not bool(v2_map_result.get("success", false)):
 		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
@@ -968,6 +969,8 @@ func _restore_v2_checkpoint() -> bool:
 			_log("V2 任务状态恢复失败，回退任务起点")
 			GameManager.clear_v2_encounter_checkpoint()
 			return false
+		if v2_tutorial_flow != null and v2_tutorial_flow.has_method("restore_m1_safe_tutorial_complete"):
+			v2_tutorial_flow.restore_m1_safe_tutorial_complete(v2_mission_flow.is_m1_safe_tutorial_complete() if v2_mission_flow.has_method("is_m1_safe_tutorial_complete") else false)
 	if v2_rescue_controller and v2_mission_flow:
 		var rescue_character_id := _get_v2_rescue_character_id()
 		if bool(v2_mission_flow.rescued_characters.get(String(rescue_character_id), false)):
@@ -3071,7 +3074,8 @@ func _select_unit(unit: Unit) -> void:
 	_refresh_selected_unit_affordances(unit)
 	if unit.team == "player":
 		_record_v2_playtest_event(&"unit_selected", {"unit_id": unit.entity_id})
-		_advance_v2_tutorial(&"unit_selected", {"unit_id": unit.entity_id})
+		if not _v2_auto_select_in_progress:
+			_advance_v2_tutorial(&"unit_selected", {"unit_id": unit.entity_id})
 	_render_v2_hud()
 
 ## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
@@ -3080,7 +3084,9 @@ func _auto_select_player_unit() -> void:
 		return
 	for unit in player_units:
 		if unit and unit.is_alive and unit.team == "player":
+			_v2_auto_select_in_progress = true
 			_select_unit(unit)
+			_v2_auto_select_in_progress = false
 			return
 
 func _deselect_unit() -> void:
@@ -3448,6 +3454,7 @@ func _on_v2_cell_hovered(cell: Vector2i) -> void:
 			if hud:
 				hud.show_attack_preview(hover_preview, hovered_unit, false)
 				hud.set_context_prompt("%s · 左键攻击" % hud.get_context_prompt_text())
+			_advance_v2_tutorial(&"attack_previewed", {"anchor_id": hovered_unit.entity_id})
 			_render_v2_hud()
 			return
 	_clear_v2_hover_preview()
@@ -3506,6 +3513,7 @@ func request_attack_preview(target: Unit, resolved_preview: Dictionary = {}) -> 
 		v2_affordance_presenter.show_attack_preview(_build_v2_attack_affordance(target, preview, true))
 	if hud:
 		hud.show_attack_preview(preview, target, true)
+	_advance_v2_tutorial(&"attack_previewed", {"anchor_id": target.entity_id})
 	_render_v2_hud()
 	return preview
 

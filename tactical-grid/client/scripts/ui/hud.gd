@@ -51,6 +51,10 @@ var _threat_label: Label = null
 var _v2_mission_card: Panel = null
 var _v2_mission_card_label: Label = null
 var _v2_camera_return_button: Button = null
+var _v2_tutorial_hint_panel: Panel = null
+var _v2_tutorial_hint_label: Label = null
+var _v2_tutorial_anchor_label: Label = null
+var _v2_tutorial_skip_button: Button = null
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -415,9 +419,12 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 	if ordinary_controls.is_empty():
 		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · Space结束回合"
 	var mission_card := _ensure_v2_mission_card()
+	var mission_location := route_hint if not route_hint.is_empty() else guide
+	if mission_location.is_empty():
+		mission_location = "目标地点：地图上的黄色“下一步”标记"
 	mission_card.text = "当前任务\n%s\n%s\n%s\n操作：左键队员看范围；左键蓝格移动；红色敌人攻击；Space结束回合" % [
 		objective,
-		route_hint if not route_hint.is_empty() else "目标地点：地图上的黄色“下一步”标记",
+		mission_location,
 		_v2_completion_hint(objective),
 	]
 	_v2_mission_card.visible = true
@@ -521,6 +528,76 @@ func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
 		v2_control_guide.clip_text = true
 		v2_control_guide.max_lines_visible = 4
 		v2_control_guide.add_theme_font_size_override("font_size", _v2_font_size_for(v2_control_guide.text, 12))
+
+## V2 教学提示是非模态的：只消费自身跳过按钮的点击，面板和文字不拦截地图。
+## 提示由 V2HudPresenter 在同一帧快照之后提交，保证显示与任务流状态一致。
+func render_v2_tutorial_hint(hint: Dictionary) -> void:
+	if not is_node_ready():
+		return
+	var panel := _ensure_v2_tutorial_hint_panel()
+	var visible := bool(hint.get("visible", false)) and not String(hint.get("text", "")).strip_edges().is_empty()
+	panel.visible = visible
+	if not visible:
+		return
+	_v2_tutorial_hint_label.text = String(hint.get("text", "")).strip_edges()
+	_v2_tutorial_anchor_label.text = "锚点：%s" % _v2_tutorial_anchor_text(String(hint.get("anchor_kind", "")))
+	_v2_tutorial_anchor_label.tooltip_text = "anchor_id: %s" % String(hint.get("anchor_id", ""))
+	_v2_tutorial_skip_button.visible = true
+
+func _ensure_v2_tutorial_hint_panel() -> Panel:
+	if _v2_tutorial_hint_panel != null and is_instance_valid(_v2_tutorial_hint_panel):
+		return _v2_tutorial_hint_panel
+	_v2_tutorial_hint_panel = Panel.new()
+	_v2_tutorial_hint_panel.name = "V2TutorialHint"
+	_v2_tutorial_hint_panel.position = Vector2(12, TOP_BAR_HEIGHT + 144)
+	_v2_tutorial_hint_panel.size = Vector2(430, 82)
+	_v2_tutorial_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.075, 0.10, 0.96), Color(0.18, 0.82, 0.92, 0.86)))
+	_v2_tutorial_hint_label = Label.new()
+	_v2_tutorial_hint_label.name = "HintText"
+	_v2_tutorial_hint_label.position = Vector2(12, 9)
+	_v2_tutorial_hint_label.size = Vector2(278, 31)
+	_v2_tutorial_hint_label.add_theme_font_size_override("font_size", 16)
+	_v2_tutorial_hint_label.add_theme_color_override("font_color", Color(0.82, 0.98, 1.0, 1.0))
+	_v2_tutorial_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_v2_tutorial_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_hint_label)
+	_v2_tutorial_anchor_label = Label.new()
+	_v2_tutorial_anchor_label.name = "AnchorText"
+	_v2_tutorial_anchor_label.position = Vector2(12, 47)
+	_v2_tutorial_anchor_label.size = Vector2(278, 22)
+	_v2_tutorial_anchor_label.add_theme_font_size_override("font_size", 12)
+	_v2_tutorial_anchor_label.add_theme_color_override("font_color", Color(0.62, 0.85, 0.90, 0.9))
+	_v2_tutorial_anchor_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_anchor_label)
+	_v2_tutorial_skip_button = Button.new()
+	_v2_tutorial_skip_button.name = "SkipButton"
+	_v2_tutorial_skip_button.text = "跳过教学"
+	_v2_tutorial_skip_button.position = Vector2(302, 22)
+	_v2_tutorial_skip_button.size = Vector2(112, 38)
+	_v2_tutorial_skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_v2_tutorial_skip_button.pressed.connect(_on_v2_tutorial_skip_pressed)
+	_style_button(_v2_tutorial_skip_button)
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_skip_button)
+	add_child(_v2_tutorial_hint_panel)
+	return _v2_tutorial_hint_panel
+
+func _v2_tutorial_anchor_text(kind: String) -> String:
+	match kind:
+		"unit":
+			return "当前队员"
+		"cell":
+			return "青色可移动格"
+		"enemy":
+			return "红框敌人"
+		"intent":
+			return "敌方行动箭头"
+		_:
+			return "当前操作"
+
+func _on_v2_tutorial_skip_pressed() -> void:
+	if _battle_controller != null and _battle_controller.has_method("_skip_v2_tutorial"):
+		_battle_controller.call("_skip_v2_tutorial")
 
 func _ensure_v2_control_guide() -> Label:
 	var guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label

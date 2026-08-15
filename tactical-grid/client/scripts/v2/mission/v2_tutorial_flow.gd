@@ -1,45 +1,64 @@
 extends RefCounted
 class_name V2TutorialFlow
 
-## M1 onboarding is a soft hint track. It explains the controls in a useful
-## order, but optional combat/observation hints never block the mission path.
+## M1 onboarding is a single non-modal hint at a time. The hint is anchored by
+## kind/id metadata so the presentation layer can keep it near the relevant
+## unit, cell, enemy, or intent without letting it consume map input.
 const STEPS: Array[StringName] = [
 	&"select",
 	&"move",
+	&"attack_preview",
 	&"attack",
 	&"intent",
-	&"camera",
-	&"evac",
 ]
 
 const COPY := {
-	&"select": "点击角色：蓝色可移动，红色可攻击",
-	&"move": "点击蓝色格移动；右键取消预览",
-	&"attack": "想攻击时点击红色敌人，悬停先看预计伤害",
-	&"intent": "敌人头顶箭头是下一步动作（可选观察）",
-	&"camera": "摄像头可揭示大片区域（可选操作）",
-	&"evac": "沿黄色下一步标记推进；撤离时带上所有存活队员",
+	&"select": "选择突击兵",
+	&"move": "点击青色格移动",
+	&"attack_preview": "悬停红框敌人查看伤害",
+	&"attack": "点击敌人发动攻击",
+	&"intent": "敌人的箭头表示下一步行动",
 }
 
 const EXPECTED_EVENTS := {
 	&"select": &"unit_selected",
 	&"move": &"unit_moved",
+	&"attack_preview": &"attack_previewed",
 	&"attack": &"attack_committed",
 	&"intent": &"enemy_intent_observed",
-	&"camera": &"camera_viewed",
-	&"evac": &"evac_completed",
 }
 
-const OPTIONAL_STEPS := [&"attack", &"intent", &"camera"]
+const DEFAULT_ANCHORS := {
+	&"select": {"kind": "unit", "id": "selected_unit"},
+	&"move": {"kind": "cell", "id": "reachable_cell"},
+	&"attack_preview": {"kind": "enemy", "id": "hovered_enemy"},
+	&"attack": {"kind": "enemy", "id": "locked_enemy"},
+	&"intent": {"kind": "intent", "id": "enemy_intent"},
+}
 
 var _step_index := 0
 var _skipped := false
 var _complete := false
+var _safe_tutorial_complete := false
+var _safe_turns := 3
+var _anchors: Dictionary = {}
+var _committed_attack_seen := false
+var _intent_seen := false
 
-func setup(_config: Dictionary = {}) -> void:
+func setup(config: Dictionary = {}) -> void:
 	_step_index = 0
 	_skipped = false
 	_complete = false
+	_safe_tutorial_complete = false
+	_safe_turns = maxi(1, int(config.get("safe_turns", 3)))
+	_committed_attack_seen = false
+	_intent_seen = false
+	_anchors = DEFAULT_ANCHORS.duplicate(true)
+	var configured_anchors: Variant = config.get("anchors", {})
+	if configured_anchors is Dictionary:
+		for step in (configured_anchors as Dictionary).keys():
+			if configured_anchors[step] is Dictionary:
+				_anchors[StringName(step)] = configured_anchors[step].duplicate(true)
 
 func current_step() -> StringName:
 	if _complete or _skipped:
@@ -48,6 +67,25 @@ func current_step() -> StringName:
 
 func current_text() -> String:
 	return String(COPY.get(current_step(), ""))
+
+func get_hint() -> Dictionary:
+	var step := current_step()
+	if step == &"":
+		return {
+			"visible": false,
+			"anchor_kind": "",
+			"anchor_id": "",
+			"text": "",
+			"step_id": "",
+		}
+	var anchor: Dictionary = _anchors.get(step, {}).duplicate(true)
+	return {
+		"visible": true,
+		"anchor_kind": String(anchor.get("kind", "")),
+		"anchor_id": String(anchor.get("id", "")),
+		"text": current_text(),
+		"step_id": String(step),
+	}
 
 func get_visible_hint_count() -> int:
 	return 0 if _complete or _skipped else 1
@@ -58,49 +96,54 @@ func is_complete() -> bool:
 func is_skipped() -> bool:
 	return _skipped
 
-## A matching event may complete a later hint: combat, intent and camera are
-## optional teaching, not gates in the actual mission. Evacuation always closes
-## the tutorial because it is the real end-of-mission action.
-func on_event(event_name: StringName, _payload: Dictionary = {}) -> Dictionary:
+func is_m1_safe_tutorial_complete() -> bool:
+	return _safe_tutorial_complete
+
+func restore_m1_safe_tutorial_complete(value: bool) -> void:
+	_safe_tutorial_complete = value
+	if value:
+		_complete = true
+		_step_index = STEPS.size()
+
+func is_m1_safety_active(player_turn: int) -> bool:
+	return not _skipped and not _safe_tutorial_complete and player_turn >= 1 and player_turn <= _safe_turns
+
+func set_anchor(step_id: StringName, anchor_kind: String, anchor_id: String) -> void:
+	if step_id == &"" or anchor_kind.is_empty() or anchor_id.is_empty():
+		return
+	_anchors[step_id] = {"kind": anchor_kind, "id": anchor_id}
+
+## A matching event advances at most one step. Attack and intent are also
+## tracked independently because together they close the M1 safety window.
+func on_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	if event_name == &"attack_committed":
+		_committed_attack_seen = true
+	if event_name == &"enemy_intent_observed":
+		_intent_seen = true
+	_safe_tutorial_complete = _committed_attack_seen and _intent_seen
 	if _complete or _skipped:
 		return {
 			"advanced": false,
 			"reason": &"tutorial_inactive",
 			"current_step": current_step(),
-		}
-	if event_name == &"evac_completed":
-		var completed_step := current_step()
-		_complete = true
-		return {
-			"advanced": true,
-			"completed_step": completed_step,
-			"dismiss_hint": true,
-			"show_hint": false,
-			"current_step": &"",
+			"m1_safe_tutorial_complete": _safe_tutorial_complete,
 		}
 	var current := current_step()
-	var expected_current: StringName = EXPECTED_EVENTS.get(current, &"")
-	# Selection and movement teach the two primary actions in order. Only the
-	# optional combat/observation hints may be reached by a later event.
-	if current not in OPTIONAL_STEPS and event_name != expected_current:
+	var expected: StringName = EXPECTED_EVENTS.get(current, &"")
+	if event_name != expected:
 		return {
 			"advanced": false,
 			"reason": &"wrong_step_event",
 			"current_step": current_step(),
+			"m1_safe_tutorial_complete": _safe_tutorial_complete,
 		}
-	var matching_index := -1
-	for index in range(_step_index, STEPS.size()):
-		if StringName(EXPECTED_EVENTS.get(STEPS[index], &"")) == event_name:
-			matching_index = index
-			break
-	if matching_index < 0:
-		return {
-			"advanced": false,
-			"reason": &"wrong_step_event",
-			"current_step": current_step(),
-		}
-	var completed_step := STEPS[matching_index]
-	_step_index = matching_index + 1
+	var completed_step := current
+	_step_index += 1
+	if payload.has("anchor_id") and _step_index < STEPS.size():
+		var next_step := STEPS[_step_index]
+		var next_anchor: Dictionary = _anchors.get(next_step, {}).duplicate(true)
+		next_anchor["id"] = String(payload.get("anchor_id", next_anchor.get("id", ""))) if next_anchor.get("kind", "") in ["enemy", "intent"] else next_anchor.get("id", "")
+		_anchors[next_step] = next_anchor
 	if _step_index >= STEPS.size():
 		_complete = true
 	return {
@@ -109,6 +152,7 @@ func on_event(event_name: StringName, _payload: Dictionary = {}) -> Dictionary:
 		"dismiss_hint": true,
 		"show_hint": not _complete,
 		"current_step": current_step(),
+		"m1_safe_tutorial_complete": _safe_tutorial_complete,
 	}
 
 func skip() -> Dictionary:
@@ -119,4 +163,5 @@ func skip() -> Dictionary:
 		"skipped": true,
 		"dismiss_hint": true,
 		"current_step": &"",
+		"m1_safe_tutorial_complete": _safe_tutorial_complete,
 	}

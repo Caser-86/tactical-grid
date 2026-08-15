@@ -17,3 +17,5 @@ func render(snapshot: Dictionary) -> void:
 	if _hud == null or not is_instance_valid(_hud):
 		return
 	_hud.call("render_v2_snapshot", last_snapshot)
+	var hint: Variant = last_snapshot.get("tutorial_hint", {})
+	_hud.call("render_v2_tutorial_hint", hint if hint is Dictionary else {})

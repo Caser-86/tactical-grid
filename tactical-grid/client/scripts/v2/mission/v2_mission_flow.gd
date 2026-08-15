@@ -40,6 +40,7 @@ var _objective_steps: Array[Dictionary] = []
 var _objective_step_index := 0
 var _completed_step_ids: Dictionary = {}
 var _mission_flags: Dictionary = {}
+var m1_safe_tutorial_complete := false
 
 func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, enemies: Array) -> void:
 	mission = mission_data.duplicate(true)
@@ -56,6 +57,7 @@ func setup(mission_data: Dictionary, locked_map: Dictionary, players: Array, ene
 	_positions.clear()
 	_completed_step_ids.clear()
 	_mission_flags.clear()
+	m1_safe_tutorial_complete = false
 	_objective_step_index = 0
 	_evac_center = Vector2i(-1, -1)
 	_evac_radius = 1
@@ -269,6 +271,13 @@ func is_in_evac(cell: Vector2i) -> bool:
 		return false
 	return abs(cell.x - _evac_center.x) + abs(cell.y - _evac_center.y) <= _evac_radius
 
+func set_m1_safe_tutorial_complete(value: bool) -> void:
+	m1_safe_tutorial_complete = value
+	_mission_flags["m1_safe_tutorial_complete"] = value
+
+func is_m1_safe_tutorial_complete() -> bool:
+	return m1_safe_tutorial_complete
+
 func get_snapshot() -> Dictionary:
 	return {
 		"state": get_state_name(),
@@ -280,6 +289,7 @@ func get_snapshot() -> Dictionary:
 		"guide_cell": get_current_guide_cell(),
 		"completed_step_ids": _completed_step_ids.duplicate(true),
 		"mission_flags": _mission_flags.duplicate(true),
+		"m1_safe_tutorial_complete": m1_safe_tutorial_complete,
 		"rescued_characters": rescued_characters.duplicate(true),
 		"optional_complete": optional_complete,
 		"optional_reward_flags": optional_reward_flags.duplicate(true),
@@ -306,6 +316,8 @@ func restore_snapshot(snapshot: Dictionary) -> Dictionary:
 	_objective_step_index = restored_index
 	_completed_step_ids = (snapshot.get("completed_step_ids", {}) as Dictionary).duplicate(true)
 	_mission_flags = (snapshot.get("mission_flags", {}) as Dictionary).duplicate(true)
+	m1_safe_tutorial_complete = bool(snapshot.get("m1_safe_tutorial_complete", _mission_flags.get("m1_safe_tutorial_complete", false)))
+	_mission_flags["m1_safe_tutorial_complete"] = m1_safe_tutorial_complete
 	rescued_characters = (snapshot.get("rescued_characters", {}) as Dictionary).duplicate(true)
 	optional_complete = bool(snapshot.get("optional_complete", false))
 	optional_reward_flags = (snapshot.get("optional_reward_flags", {}) as Dictionary).duplicate(true)

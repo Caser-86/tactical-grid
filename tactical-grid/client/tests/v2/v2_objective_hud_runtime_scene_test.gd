@@ -136,23 +136,39 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		await _cleanup_battle(battle)
 		return
 	t.check(battle.turn_manager.max_turns == 24, "V2 M1 使用独立 24 回合预算")
-	t.check(battle.mission_objective_state.is_enemy_passive(3) and not battle.mission_objective_state.is_enemy_passive(4), "V2 M1 前三回合敌人保持教学宽限")
-	t.check(bool(battle.call("_is_v2_enemy_turn_passive")), "V2 敌人回合实际读取前三回合安全教学")
+	t.check(battle.mission_objective_state.is_enemy_passive(3) and not battle.mission_objective_state.is_enemy_passive(4), "V2 M1 保留旧任务宽限配置供兼容读取")
+	t.check(bool(battle.call("_is_v2_m1_tutorial_safety_active")), "V2 M1 前三回合启用非阻塞安全教学窗口")
+	t.check(not bool(battle.call("_is_v2_enemy_turn_passive")), "V2 安全教学期敌人仍执行可观察意图")
+	t.check(not battle.turn_manager.input_locked, "V2 非模态教学不锁定地图输入")
+	var tutorial_hint: Dictionary = battle.v2_tutorial_flow.get_hint()
+	t.check(tutorial_hint.get("visible", false) and tutorial_hint.get("text", "") == "选择突击兵" and tutorial_hint.get("anchor_kind", "") == "unit", "V2 快照提供第一条单位锚定教学提示")
+	var tutorial_panel := battle.hud.get_node_or_null("V2TutorialHint") as Panel
+	t.check(tutorial_panel != null and tutorial_panel.visible and tutorial_panel.mouse_filter == Control.MOUSE_FILTER_IGNORE, "V2 HUD 显示非模态教学卡且不拦截地图")
 	battle.turn_manager.turn_number = 4
+	t.check(not bool(battle.call("_is_v2_m1_tutorial_safety_active")), "V2 第四回合关闭安全教学窗口")
 	t.check(not bool(battle.call("_is_v2_enemy_turn_passive")), "V2 第四回合恢复敌方行动")
 	battle.turn_manager.turn_number = 1
+	var sentry: Unit = null
+	for raw_enemy in battle.enemy_units:
+		var candidate: Unit = raw_enemy
+		if candidate != null and candidate.is_alive and candidate.job == "sentry":
+			sentry = candidate
+			break
+	var assault_for_safety: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
+	if sentry != null and assault_for_safety != null:
+		assault_for_safety.current_hp = 2
+		var safe_damage := int(battle.call("_v2_tutorial_safe_damage", sentry, assault_for_safety, 5))
+		t.check(safe_damage == 1, "V2 安全教学只允许哨兵把突击兵压到 1 HP")
+		assault_for_safety.current_hp = assault_for_safety.max_hp
 	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
-	t.check(String(initial.get("step_id", "")) == "search_route_split" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 5, "M1 路线分叉前真实 HUD 快照为 1/5")
-	t.check(initial.get("guide_cell", Vector2i(-1, -1)) == Vector2i(8, 14), "M1 快照提供当前目标坐标")
-	t.check(battle.hud.objective_label.text.contains("1/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/5"), "M1 路线分叉前真实 HUD 控件显示 1/5")
+	t.check(String(initial.get("step_id", "")) == "search_scout" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 3, "M1 正式营救流程真实 HUD 快照为 1/3")
+	t.check(String(initial.get("guide_text", "")).contains("青色侦察标记") and String(initial.get("guide_text", "")).contains("营救侦察兵"), "M1 快照提供明确营救目标与动作")
+	t.check(battle.hud.objective_label.text.contains("1/3") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/3"), "M1 正式营救流程真实 HUD 控件显示 1/3")
 	var mission_card := battle.hud.get_node_or_null("V2MissionCard") as Panel
-	t.check(mission_card != null and mission_card.visible and String(mission_card.get_node("MissionCardText").text).contains("黄色分叉标记"), "M1 HUD 显示持久任务卡和具体目的地")
+	t.check(mission_card != null and mission_card.visible and String(mission_card.get_node("MissionCardText").text).contains("青色侦察标记"), "M1 HUD 显示持久营救任务卡和具体目标")
 	var guidance := battle.get_node_or_null("V2ObjectiveGuidance") as Node2D
-	var beacon := guidance.get_node_or_null("V2ObjectiveBeacon") if guidance != null else null
-	t.check(beacon != null, "M1 地图显示下一步目标信标")
 	var initial_assault: Unit = battle.player_units[0] if not battle.player_units.is_empty() else null
-	var route_line := guidance.get_node_or_null("V2ObjectiveRoute") as Line2D if guidance != null else null
-	t.check(route_line != null and route_line.points.size() > 1 and initial_assault != null and route_line.points.size() <= initial_assault.move_points + 1, "M1 路线指引只显示本回合可达路径")
+	t.check(guidance != null, "M1 地图保留目标指引层供任务标记使用")
 	var assault: Unit = initial_assault
 	if assault != null and battle.v2_rescue_controller != null:
 		assault.grid_pos = Vector2i(8, 14)
@@ -179,7 +195,7 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		await get_tree().process_frame
 		t.check(bool(rescue.get("success", false)), "M1 真实营救事务成功")
 		var rescued_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
-		t.check(String(rescued_snapshot.get("step_id", "")) == "evacuate_squad" and int(rescued_snapshot.get("step_index", -1)) == 4 and int(rescued_snapshot.get("step_count", -1)) == 5, "M1 营救后撤离真实 HUD 快照为 5/5")
+		t.check(String(rescued_snapshot.get("step_id", "")) == "escort_scout" and int(rescued_snapshot.get("step_index", -1)) == 1 and int(rescued_snapshot.get("step_count", -1)) == 3, "M1 营救后撤离真实 HUD 快照为 2/3")
 		var evac_center: Vector2i = battle.v2_mission_flow.get_snapshot().get("evac_center", Vector2i(-1, -1))
 		assault.grid_pos = evac_center + Vector2i.LEFT
 		battle.call("_update_unit_sprite_pos", assault, false)
@@ -189,8 +205,8 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		await get_tree().process_frame
 		t.check(bool(evac_move.get("success", false)) and bool(evac_move.get("committed", false)), "M1 真实首名队员进入撤离区")
 		var pre_evac_snapshot: Dictionary = battle.v2_hud_presenter.last_snapshot
-		t.check(String(pre_evac_snapshot.get("checkpoint_id", "")) == "cp_rescue" and String(pre_evac_snapshot.get("step_id", "")) == "evacuate_squad", "M1 pre-evac 真实 HUD 快照保留撤离阶段和检查点")
-		t.check(battle.hud.objective_label.text.contains("5/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 5/5") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("检查点：cp_rescue"), "M1 pre-evac 真实 HUD 控件显示 5/5 与检查点")
+		t.check(String(pre_evac_snapshot.get("checkpoint_id", "")) == "cp_rescue" and String(pre_evac_snapshot.get("step_id", "")) == "escort_scout", "M1 首名队员进入撤离区后仍保留营救检查点")
+		t.check(battle.hud.objective_label.text.contains("2/3") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 2/3") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("检查点：cp_rescue"), "M1 首名队员进入撤离区后保留护送阶段与检查点")
 	await _cleanup_battle(battle)
 
 func _with_known_tutorials(save: Dictionary) -> Dictionary:
