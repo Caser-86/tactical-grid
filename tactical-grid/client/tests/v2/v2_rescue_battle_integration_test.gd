@@ -68,6 +68,54 @@ func _run() -> void:
 	t.check(bool(Checkpoint.validate(checkpoint).get("valid", false)), "营救检查点可被 V2 schema 验证")
 	t.check(String(battle.v2_mission_flow.get_state_name()) == "ESCORT_TO_EVAC" and battle.v2_mission_flow.get_current_step_id() == "evacuate_squad", "正式战斗目标切换为撤离阶段")
 
+	# Exercise the real V2 combat service after rescue. A downed enemy must
+	# release its cell in the committed result, cancel its public intent, and
+	# leave no second visual cleanup path behind.
+	var target_enemy: Unit = null
+	for raw_enemy in battle.enemy_units:
+		var candidate: Unit = raw_enemy
+		if candidate != null and candidate.is_alive:
+			target_enemy = candidate
+			break
+	t.check(target_enemy != null, "营救后仍有活动敌人可用于战斗反馈集成")
+	if target_enemy != null:
+		var attack_cell := assault.grid_pos + Vector2i.RIGHT
+		for candidate_cell in [
+			assault.grid_pos + Vector2i.RIGHT,
+			assault.grid_pos + Vector2i.LEFT,
+			assault.grid_pos + Vector2i.UP,
+			assault.grid_pos + Vector2i.DOWN,
+		]:
+			if GridSystem.is_in_bounds(candidate_cell, battle.map_width, battle.map_height) and MapLoader.is_passable(battle.map_data, candidate_cell.x, candidate_cell.y) and not bool(battle.call("_is_occupied_by_other_unit", candidate_cell, target_enemy)):
+				attack_cell = candidate_cell
+				break
+		target_enemy.grid_pos = attack_cell
+		target_enemy.max_hp = 1
+		target_enemy.current_hp = 1
+		target_enemy.max_shield = 0
+		target_enemy.current_shield = 0
+		target_enemy.is_alive = true
+		target_enemy.is_downed = false
+		assault.begin_v2_turn()
+		var attack_preview: Dictionary = battle.v2_action_service.query_action({
+			"action": &"attack",
+			"unit": assault,
+			"target": target_enemy,
+			"context": {"has_los": true, "distance": 1, "cover": "none"},
+		})
+		t.check(bool(attack_preview.get("valid", false)), "营救后正式战斗攻击预览有效")
+		if bool(attack_preview.get("valid", false)):
+			battle.enemy_intent_state.set_intent(target_enemy.entity_id, {"type": "attack", "target_pos": assault.grid_pos})
+			var attack_result: Dictionary = battle.v2_action_service.commit_action(attack_preview)
+			t.check(bool(attack_result.get("success", false)) and bool(attack_result.get("occupancy_released", false)), "倒地提交结果明确返回占位已释放")
+			battle.set("selected_unit", assault)
+			battle.set("v2_locked_attack_preview", attack_preview)
+			battle.set("v2_locked_attack_target_id", target_enemy.entity_id)
+			battle.call("_finalize_v2_attack", target_enemy, attack_result)
+			t.check(battle.enemy_intent_state.get_intent(target_enemy.entity_id).is_empty(), "倒地后正式战斗移除敌人旧意图")
+			await get_tree().create_timer(0.75).timeout
+			t.check(battle.call("_get_unit_sprite", target_enemy) == null, "重复倒地信号不会留下敌人精灵")
+
 	await _cleanup_battle(battle)
 	t.check(not is_instance_valid(assault), "战斗退出后突击兵数据节点已释放")
 	t.check(not is_instance_valid(scout), "战斗退出后营救侦察兵数据节点已释放")

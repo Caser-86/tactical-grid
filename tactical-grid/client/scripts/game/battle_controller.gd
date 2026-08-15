@@ -3576,8 +3576,17 @@ func _query_v2_attack_preview(target: Unit) -> Dictionary:
 
 func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 	var committed_preview := v2_locked_attack_preview.duplicate(true)
+	var presentation_result := result.duplicate(true)
+	if target and not target.is_alive:
+		presentation_result["occupancy_released"] = true
+		if enemy_intent_state:
+			var previous_intent := enemy_intent_state.get_intent(target.entity_id)
+			if not previous_intent.is_empty():
+				enemy_intent_state.remove_intent(target.entity_id)
+				presentation_result["intent_changed"] = true
+				_refresh_enemy_intent_display()
 	if v2_damage_presenter:
-		var events: Array[Dictionary] = v2_damage_presenter.build_events(committed_preview, result)
+		var events: Array[Dictionary] = v2_damage_presenter.build_events(committed_preview, presentation_result)
 		var attacker_sprite := _get_unit_sprite(selected_unit)
 		var target_sprite := _get_unit_sprite(target)
 		for event in events:
@@ -3601,7 +3610,7 @@ func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
 		hud.set_context_prompt("攻击结算：%s 受到 %d 点伤害，HP %d/%d" % [
 		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
 		])
-	last_player_attack_result = result.duplicate(true)
+	last_player_attack_result = presentation_result.duplicate(true)
 	_record_v2_playtest_event(&"attack_committed", {
 		"target_id": target.entity_id if target else "",
 		"damage": int(result.get("hp_damage", result.get("damage", 0))),
@@ -3662,6 +3671,9 @@ func _schedule_v2_dead_sprite_cleanup(unit: Unit) -> void:
 	var sprite := _get_unit_sprite(unit)
 	if sprite == null:
 		return
+	if bool(sprite.get_meta("v2_dead_cleanup_scheduled", false)):
+		return
+	sprite.set_meta("v2_dead_cleanup_scheduled", true)
 	# Do not leave a defeated enemy visible while its death feedback is running.
 	# Keep the node briefly for the presenter, but remove it from the scene's
 	# visible unit roster immediately and finalize by stable entity ID.

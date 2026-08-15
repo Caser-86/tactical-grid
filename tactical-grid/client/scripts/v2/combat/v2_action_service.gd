@@ -268,10 +268,12 @@ func _commit_attack(preview: Dictionary) -> Dictionary:
 	target.current_shield = int(preview.get("shield_after", target.current_shield))
 	target.current_hp = maxi(0, int(preview.get("hp_after", target.current_hp)))
 	target.unit_damaged.emit(target, final_damage)
+	var occupancy_released := false
 	if target.current_hp <= 0:
 		target.current_hp = 0
 		target.is_alive = false
 		target.is_downed = true
+		occupancy_released = true
 		target.unit_died.emit(target)
 	return {
 		"success": true,
@@ -280,6 +282,9 @@ func _commit_attack(preview: Dictionary) -> Dictionary:
 		"target_id": target.entity_id,
 		"damage": final_damage,
 		"hp_damage": hp_damage,
+		"hp_after": target.current_hp,
+		"shield_after": target.current_shield,
+		"occupancy_released": occupancy_released,
 		"event": {"type": &"damage_applied", "amount": final_damage},
 	}
 

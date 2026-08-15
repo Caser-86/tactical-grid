@@ -25,6 +25,12 @@ func build_events(preview: Dictionary, result: Dictionary) -> Array[Dictionary]:
 		"text": "",
 	})
 	events.append({
+		"type": &"projectile_or_trace",
+		"from": _cell_value(preview.get("attacker_pos", attacker.grid_pos if attacker else Vector2i.ZERO)),
+		"to": _cell_value(preview.get("target_pos", target.grid_pos if target else Vector2i.ZERO)),
+		"text": "",
+	})
+	events.append({
 		"type": &"hp_prestrip",
 		"hp_before": hp_before,
 		"hp_after": hp_after,
@@ -56,13 +62,21 @@ func build_events(preview: Dictionary, result: Dictionary) -> Array[Dictionary]:
 		"type": &"damage_number",
 		"amount": hp_damage,
 		"final_damage": final_damage,
-		"text": str(hp_damage),
+		"text": "-%d" % hp_damage,
 		"display_text": "-%d" % hp_damage,
 	})
+	if bool(result.get("intent_changed", preview.get("intent_changed", false))):
+		events.append({
+			"type": &"intent_changed",
+			"cancelled": true,
+			"entity_id": target.entity_id if target else "",
+			"text": "意图取消",
+		})
 	if hp_after <= 0 or (target != null and not target.is_alive):
 		events.append({
 			"type": &"unit_downed",
 			"target": target,
+			"occupancy_released": bool(result.get("occupancy_released", true)),
 			"text": "倒地",
 		})
 	events.append({
@@ -92,6 +106,11 @@ func play_attack(events: Array[Dictionary], reduce_motion: bool) -> void:
 			&"hp_prestrip":
 				if target_sprite and target_sprite.has_method("show_hp_prestrip"):
 					target_sprite.show_hp_prestrip(int(event.get("hp_before", 0)), int(event.get("hp_after", 0)))
+			&"projectile_or_trace":
+				# The world-space trace is rendered by BattleController so it can use
+				# the camera's cell transform. Keep this semantic event in the same
+				# deterministic sequence for tests and alternate presenters.
+				pass
 			&"reduction":
 				_show_feedback(target_sprite, String(event.get("text", "")), Color(1.0, 0.76, 0.30))
 			&"shield_absorb":
@@ -100,6 +119,8 @@ func play_attack(events: Array[Dictionary], reduce_motion: bool) -> void:
 				if target_sprite and target_sprite.has_method("play_state"):
 					target_sprite.play_state(&"hit", Vector2.LEFT, 0.10 if reduce_motion else -1.0)
 				_show_feedback(target_sprite, String(event.get("display_text", event.get("text", ""))), Color(1.0, 0.38, 0.28))
+			&"intent_changed":
+				_show_feedback(target_sprite, String(event.get("text", "意图取消")), Color(0.42, 0.92, 1.0))
 			&"unit_downed":
 				if target_sprite and target_sprite.has_method("play_death"):
 					target_sprite.play_death(0.18 if reduce_motion else -1.0)
@@ -107,3 +128,12 @@ func play_attack(events: Array[Dictionary], reduce_motion: bool) -> void:
 func _show_feedback(sprite: Node, text: String, color: Color) -> void:
 	if sprite and sprite.has_method("show_combat_feedback") and text != "":
 		sprite.show_combat_feedback(text, color)
+
+func _cell_value(value: Variant) -> Vector2i:
+	if value is Vector2i:
+		return value
+	if value is Vector2:
+		return Vector2i(roundi(value.x), roundi(value.y))
+	if value is Array and value.size() >= 2:
+		return Vector2i(int(value[0]), int(value[1]))
+	return Vector2i.ZERO
