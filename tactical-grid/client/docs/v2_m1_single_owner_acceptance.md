@@ -6,6 +6,10 @@
 
 This document is the human acceptance record for the V2 M1 candidate. Automated tests may validate contracts and record telemetry, but only the project owner may choose `approved` or `rejected` after playing the exported build. Until that happens, the result remains `incomplete`.
 
+## Owner Checkpoint
+
+On 2026-08-15 the project owner reported that the exported candidate was playable enough to continue development. This is a continuation checkpoint, not a public-release approval: no detailed run duration, per-check result, or defect list was supplied, so the checklist below remains available for the later multi-player H1 gate.
+
 ## Candidate
 
 - Mission: `ch1_m1`
