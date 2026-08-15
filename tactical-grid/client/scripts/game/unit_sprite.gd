@@ -336,7 +336,10 @@ func _draw_role_accent(radius: int) -> void:
 		return
 	var accent := _get_role_accent()
 	var marker_center := Vector2(radius * 0.62, -radius * 0.62)
-	draw_circle(marker_center, 6.0, Color(0.015, 0.025, 0.035, 0.92))
+	# The marker is deliberately larger than the optional text badge. At the
+	# small map scale the silhouette remains readable even when text is hidden.
+	draw_circle(marker_center, 9.0, Color(0.015, 0.025, 0.035, 0.96))
+	draw_arc(marker_center, 10.5, 0.0, TAU, 20, accent, 2.0)
 	match String(unit.job):
 		"assault":
 			draw_colored_polygon(PackedVector2Array([
@@ -378,7 +381,6 @@ func _draw_role_accent(radius: int) -> void:
 			]), accent)
 		_:
 			draw_circle(marker_center, 3.5, accent)
-	draw_arc(Vector2.ZERO, radius + 3, -0.85, 0.15, 10, accent, 2.5)
 	var badge := _get_role_badge()
 	if not badge.is_empty():
 		var badge_rect := Rect2(Vector2(-radius - 7, -radius - 26), Vector2(18, 18))

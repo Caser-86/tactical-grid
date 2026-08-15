@@ -6,6 +6,7 @@ const V2RuntimeMapLoader = preload("res://scripts/v2/content/v2_map_loader.gd")
 const V2HazardControllerScript = preload("res://scripts/v2/mission/v2_hazard_controller.gd")
 const PathfindingScript = preload("res://scripts/core/pathfinding.gd")
 const V2ContextActionResolverScript = preload("res://scripts/v2/input/v2_context_action_resolver.gd")
+const V2IntentPresenterScript = preload("res://scripts/v2/presentation/v2_intent_presenter.gd")
 
 var v2_hazard_controller: RefCounted = null
 var _v2_hazard_turn_state: Dictionary = {}
@@ -757,6 +758,7 @@ func _plan_enemy_intents() -> void:
 		public_intent["target_pos"] = intent.get("target_cell", enemy.grid_pos)
 		var target := _find_v2_player(String(intent.get("target_id", "")))
 		public_intent["lethal"] = String(intent.get("type", "")) == "attack" and target != null and int(intent.get("damage", 0)) >= target.current_hp
+		public_intent["presentation"] = V2IntentPresenterScript.build(intent)
 		enemy_intent_state.set_intent(enemy.entity_id, public_intent)
 	_enemy_intents_planned = true
 	_advance_v2_tutorial(&"enemy_intent_observed")
@@ -1033,6 +1035,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		budget["move"] = selected_unit.can_move()
 		budget["action"] = selected_unit.can_act()
 	var tutorial_hint: Dictionary = v2_tutorial_flow.get_hint() if v2_tutorial_flow != null and v2_tutorial_flow.has_method("get_hint") else {"visible": false}
+	var public_enemy_intents: Dictionary = enemy_intent_state.get_public_intents() if enemy_intent_state != null else {}
 	return {
 		"mission_id": level_id,
 		"step_id": step_id,
@@ -1063,6 +1066,7 @@ func _build_v2_hud_snapshot(context_override: String = "") -> Dictionary:
 		"interaction": "设施菜单：选择一个操作" if not v2_pending_interaction_facility_id.is_empty() else "",
 		"attack_preview": hud.get_attack_preview_text() if hud else "",
 		"visibility_summary": v2_visibility_summary.duplicate(true),
+		"enemy_intents": public_enemy_intents,
 		"tutorial_hint": tutorial_hint,
 		"m1_safe_tutorial_complete": v2_tutorial_flow.is_m1_safe_tutorial_complete() if v2_tutorial_flow != null and v2_tutorial_flow.has_method("is_m1_safe_tutorial_complete") else false,
 	}
