@@ -61,6 +61,7 @@
     "res://tests/v2/v2_audio_headless_contract_test.gd",
     "res://tests/v2/v2_result_presentation_test.gd",
     "res://tests/v2/v2_playtest_recorder_test.gd",
+    "res://tests/v2/v2_playtest_runtime_wiring_test.gd",
     "res://tests/v2/v2_playtest_integration_contract_test.gd"
   ],
   "scene_tests": [

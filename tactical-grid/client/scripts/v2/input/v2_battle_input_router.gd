@@ -55,7 +55,10 @@ func set_state(next_state: State) -> Dictionary:
 	return {"success": true, "previous_state": previous, "state": _state}
 
 func get_state_name() -> String:
-	match _state:
+	return get_state_name_for(_state)
+
+func get_state_name_for(state: State) -> String:
+	match state:
 		State.FREE_SELECT:
 			return "free_select"
 		State.UNIT_SELECTED:

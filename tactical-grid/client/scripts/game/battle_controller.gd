@@ -3464,6 +3464,7 @@ func _dispatch_invalid_v2_context_action(cell: Vector2i, context: Dictionary, re
 	_present_v2_context_action_failure(StringName(resolution.get("reason", &"invalid")))
 
 func _present_v2_context_action_failure(reason: StringName) -> void:
+	_record_v2_playtest_event(&"invalid_click", {"reason": String(reason)})
 	if hud:
 		hud.show_action_reason(reason)
 	_render_v2_hud()
@@ -3787,6 +3788,8 @@ func _on_v2_cancel_requested() -> void:
 		return_to_v2_camera_player()
 		return
 	var previous_state := v2_input_router.get_last_cancelled_state() if v2_input_router else V2BattleInputRouter.State.FREE_SELECT
+	var previous_state_name := v2_input_router.get_state_name_for(previous_state) if v2_input_router else "free_select"
+	_record_v2_playtest_event(&"action_cancelled", {"state": previous_state_name})
 	if hud:
 		hud.hide_action_picker()
 	v2_pending_interaction_facility_id = ""
@@ -3813,6 +3816,10 @@ func _on_v2_camera_pan(delta: Vector2) -> void:
 	if camera:
 		camera.clear_follow_target()
 		camera.pan_by_screen_delta(delta)
+	_record_v2_playtest_event(&"camera_pan", {
+		"delta_x": delta.x,
+		"delta_y": delta.y,
+	})
 
 func _on_v2_camera_zoom(amount: int) -> void:
 	if camera:
@@ -3827,6 +3834,10 @@ func _on_v2_camera_focus() -> void:
 	var focus_unit := get_v2_camera_focus_unit()
 	if focus_unit != null:
 		camera.focus_cell(focus_unit.grid_pos)
+		_record_v2_playtest_event(&"camera_focus_returned", {
+			"unit_id": focus_unit.entity_id,
+			"method": "shortcut",
+		})
 
 func _on_v2_camera_inspect_cancel_requested() -> void:
 	if is_v2_camera_inspecting():
@@ -3848,6 +3859,12 @@ func return_to_v2_camera_player() -> Dictionary:
 		return {"success": false, "reason": &"camera_navigation_unavailable"}
 	var result: Dictionary = v2_camera_navigation.focus_player(_get_v2_live_player_cell())
 	_apply_v2_camera_navigation_result(result)
+	if bool(result.get("success", false)):
+		var focus_cell: Vector2i = result.get("focus_cell", Vector2i.ZERO)
+		_record_v2_playtest_event(&"camera_focus_returned", {
+			"method": "camera_return",
+			"cell": [focus_cell.x, focus_cell.y],
+		})
 	return result
 
 func _get_v2_live_player_cell() -> Vector2i:
@@ -4988,6 +5005,12 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 		hud.update_unit_info(unit)
 
 func _on_unit_died(unit: Unit) -> void:
+	if _is_v2_battle() and unit != null:
+		_record_v2_playtest_event(&"unit_downed", {
+			"unit_id": unit.entity_id,
+			"team": unit.team,
+			"unit_role": unit.job,
+		})
 	if _is_v2_battle() and visibility_state and unit != null:
 		# Death is not loss of sight: remove the remembered enemy so the fog
 		# renderer cannot replace the corpse with a last-known ghost.
@@ -5016,7 +5039,14 @@ func _on_unit_died(unit: Unit) -> void:
 		_log("Boss 已被击杀！")
 		hud.update_objective(_get_objective_text())
 
-func _on_unit_damaged(unit: Unit, _amount: int) -> void:
+func _on_unit_damaged(unit: Unit, amount: int) -> void:
+	if _is_v2_battle() and unit != null:
+		_record_v2_playtest_event(&"damage_resolved", {
+			"unit_id": unit.entity_id,
+			"team": unit.team,
+			"amount": maxi(0, amount),
+			"remaining_hp": unit.current_hp,
+		})
 	if _is_v2_battle() and v2_damage_signal_suppressed:
 		return
 	_update_unit_sprite_pos(unit)

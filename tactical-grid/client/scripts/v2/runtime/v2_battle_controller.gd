@@ -486,6 +486,10 @@ func _restore_v2_checkpoint() -> bool:
 	_advance_v2_hazard_player_turn()
 	_refresh_v2_runtime_state()
 	_v2_restore_failure.clear()
+	_record_v2_playtest_event(&"retry_started", {
+		"checkpoint_id": v2_last_checkpoint_id,
+		"turn": turn_manager.turn_number if turn_manager else 0,
+	})
 	return true
 
 func _rollback_staged_v2_rescue_units(staged_units: Array) -> void:
@@ -1316,6 +1320,12 @@ func _execute_v2_enemy_action(enemy: Unit) -> void:
 				_log("%s 守住当前位置（%s）" % [enemy.unit_name, String(result.get("fallback_reason", ""))])
 	_reconcile_v2_unit_occupancy()
 	_refresh_v2_runtime_state()
+	_record_v2_playtest_event(&"intent_resolved", {
+		"enemy_id": enemy.entity_id,
+		"intent": String(result.get("type", "wait")),
+		"target_id": String(result.get("target_id", "")),
+		"turn": turn_manager.turn_number if turn_manager else 0,
+	})
 
 func _v2_tutorial_safe_damage(enemy: Unit, target: Unit, requested_damage: int) -> int:
 	var damage := maxi(0, requested_damage)
