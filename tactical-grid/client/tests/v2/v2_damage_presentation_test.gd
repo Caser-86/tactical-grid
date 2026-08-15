@@ -2,6 +2,7 @@ extends SceneTree
 
 const Runner = preload("res://tests/v2/test_runner.gd")
 const PresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
+const IntentPresenterScript = preload("res://scripts/v2/presentation/v2_intent_presenter.gd")
 const UnitScript = preload("res://scripts/game/unit.gd")
 
 var t := Runner.new()
@@ -23,10 +24,12 @@ func _initialize() -> void:
 		"cover_reduction": 1,
 		"armor_reduction": 0,
 		"shield_absorb": 0,
+		"attack_sfx_cue": &"assault_shot",
 		"context": {"cover": "half"},
 	}
 	var covered_events: Array[Dictionary] = presenter.build_events(covered_preview, {"damage": 2, "hp_damage": 2})
 	t.check(_event_types(covered_events) == ["attack_started", "projectile_or_trace", "hp_prestrip", "reduction", "damage_number", "attack_finished"], "掩体攻击的反馈顺序固定")
+	t.check(_event(covered_events, &"attack_started").get("audio_cue", &"") == &"assault_shot", "攻击开始事件携带攻击者语义音效")
 	var trace := _event(covered_events, &"projectile_or_trace")
 	t.check(trace.get("from", Vector2i(-1, -1)) == attacker.grid_pos and trace.get("to", Vector2i(-1, -1)) == target.grid_pos, "攻击射线在扣血前携带真实起点和终点")
 	t.check(_event_text(covered_events, &"reduction").contains("掩体 -1"), "反馈显示掩体减伤来源")
@@ -40,6 +43,7 @@ func _initialize() -> void:
 	var shield_events: Array[Dictionary] = presenter.build_events(shield_preview, {"damage": 3, "hp_damage": 0})
 	t.check(&"shield_absorb" in _event_types(shield_events), "反馈单独显示护盾吸收")
 	t.check(_event_text(shield_events, &"shield_absorb").contains("护盾 -3"), "反馈显示护盾吸收数值")
+	t.check(_event(shield_events, &"shield_absorb").get("audio_cue", &"") == &"shield_absorb", "护盾吸收事件携带语义音效")
 
 	target.is_alive = false
 	var down_preview := covered_preview.duplicate(true)
@@ -53,7 +57,13 @@ func _initialize() -> void:
 	t.check(bool(intent_change.get("cancelled", false)), "倒地时意图明确标记为已取消")
 	var down_event := _event(down_events, &"unit_downed")
 	t.check(bool(down_event.get("occupancy_released", false)), "倒地完成在攻击结束前释放占位")
+	t.check(down_event.get("audio_cue", &"") == &"downed", "倒地事件携带语义音效")
 	t.check(_event_count(down_events, &"unit_downed") == 1, "一次攻击只发出一次倒地事件")
+
+	var scan_affordance: Dictionary = IntentPresenterScript.build({"type": "scan"})
+	t.check(scan_affordance.get("audio_cue", &"") == &"drone_scan", "扫描意图携带无人机扫描语义音效")
+	var protect_affordance: Dictionary = IntentPresenterScript.build({"type": "protect"})
+	t.check(protect_affordance.get("audio_cue", &"") == &"shield_protect", "保护意图携带护盾保护语义音效")
 	presenter.play_attack(covered_events, true)
 	t.check(presenter.last_played_events.size() == covered_events.size(), "表现层按事件序列播放")
 	t.check(presenter.last_reduce_motion, "减少动态设置被传入表现层")

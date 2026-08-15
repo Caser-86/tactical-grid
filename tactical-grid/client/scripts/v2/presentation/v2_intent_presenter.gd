@@ -18,6 +18,7 @@ static func build(intent: Dictionary) -> Dictionary:
 	var color_role := "guard"
 	var icon_key := "guard"
 	var pulse := false
+	var audio_cue: StringName = &""
 
 	match intent_type:
 		"attack":
@@ -38,11 +39,13 @@ static func build(intent: Dictionary) -> Dictionary:
 			color_role = "scan"
 			icon_key = "scan"
 			pulse = true
+			audio_cue = &"drone_scan"
 		"protect":
 			shape = "link"
 			color_role = "protect"
 			icon_key = "shield"
 			pulse = true
+			audio_cue = &"shield_protect"
 		"guard":
 			shape = "guard"
 			color_role = "guard"
@@ -70,4 +73,5 @@ static func build(intent: Dictionary) -> Dictionary:
 		"damage_text": "伤害 %d" % damage if damage > 0 and intent_type in ["attack", "telegraph"] else "",
 		"icon_key": icon_key,
 		"pulse": pulse,
+		"audio_cue": audio_cue,
 	}

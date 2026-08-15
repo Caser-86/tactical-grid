@@ -36,6 +36,35 @@ This baseline records the authored data sources introduced by F03. No external a
 
 V1 源图集仍仅作为制作参考。V2 战斗场景不直接叠加整张 source/styleboard，而是使用已处理的运行时组件，以保持格子尺寸、透明度、迷雾和层级顺序可验证。
 
+## M1 Audio And Presentation Cues
+
+| Resource | Kind | Source | License | Runtime path |
+|---|---|---|---|---|
+| `assault_shot`, `scout_shot`, `sentry_shot` | combat audio | Reuses project-owned procedural `sfx_combat_smg`, `sfx_combat_pistol`, and `sfx_combat_sniper` | project-owned procedural audio; no third-party content | `res://assets/audio/sfx/` |
+| `drone_scan` | intent audio | Reuses project-owned procedural `sfx_network_scan` | project-owned procedural audio; no third-party content | `res://assets/audio/sfx/sfx_network_scan.wav` |
+| `hit`, `downed` | combat audio | Reuses project-owned procedural `sfx_hit_flesh` and `sfx_unit_down` | project-owned procedural audio; no third-party content | `res://assets/audio/sfx/` |
+| `shield_protect` | intent audio | PowerShell procedural PCM WAV, 22050 Hz mono 16-bit, 460 Hz, 0.24 s | project-owned generated audio; no third-party content | `res://assets/audio/sfx/sfx_v2_shield_protect.wav` |
+| `shield_absorb` | combat audio | PowerShell procedural PCM WAV, 22050 Hz mono 16-bit, 300 Hz, 0.18 s | project-owned generated audio; no third-party content | `res://assets/audio/sfx/sfx_v2_shield_absorb.wav` |
+| `objective_update` | mission feedback audio | PowerShell procedural PCM WAV, 22050 Hz mono 16-bit, 760 Hz, 0.20 s | project-owned generated audio; no third-party content | `res://assets/audio/sfx/sfx_v2_objective_update.wav` |
+| `rescue` | mission feedback audio | PowerShell procedural PCM WAV, 22050 Hz mono 16-bit, 580 Hz, 0.38 s | project-owned generated audio; no third-party content | `res://assets/audio/sfx/sfx_v2_rescue.wav` |
+| `evac` | mission feedback audio | PowerShell procedural PCM WAV, 22050 Hz mono 16-bit, 440 Hz, 0.48 s | project-owned generated audio; no third-party content | `res://assets/audio/sfx/sfx_v2_evac.wav` |
+
+The semantic map is owned by `scripts/game/audio_manager.gd`; presenters request cue IDs and never hard-code asset paths. Existing V1 helper methods retain their original paths. Headless playback remains a no-op while resource registration is still verified.
+
+## M1 Procedural Presentation Cues
+
+| Cue | Runtime implementation | V1 impact |
+|---|---|---|
+| muzzle / trace / hit | Existing V2 world-space attack trace and approved effect catalog textures | none |
+| scan cone pulse | Existing `TacticalEffect` scan pulse and V2 intent presentation | none |
+| shield link / protect pulse | Existing intent link plus V2 `TacticalEffect` protect pulse | none |
+| shield absorb | V2 `TacticalEffect` absorb ring/spark plus cyan numeric feedback | none |
+| objective update | V2 objective status transition spawns a short spatial pulse | none |
+| rescue | V2 rescue commit spawns a cyan-green rising signal at the rescued cell | none |
+| evac | V2 evacuation commit reuses the green evacuation pillar and plays the semantic cue | none |
+
+These presentation cues are procedural runtime effects, not placeholder raster assets. No external art, sound, font, or third-party file was introduced.
+
 处理记录：20 张方向源图均为单角色 PNG，不使用源图集或外部下载素材。处理脚本对已有 alpha 的图像保留主体透明度；对生成器烘入的近黑/近白背景，只处理边缘连通区域，避免按颜色全图抠除装甲高光。随后使用高质量双三次缩放，不改变主体颜色；四角透明度、128x128 尺寸、运行时方向选帧和可见主体边界由 `v2_unit_art_distinction_test.gd` 检查。
 
 Processing record for `rescue_beacon_128.png`: source image was generated as a single cyber-industrial rescue capsule, edge-connected white background was removed with a flood-fill alpha pass, the visible object was tightly cropped, and the result was downsampled to 128x128 RGBA PNG. The original generated source remains outside the repository in the Codex generated-image cache.

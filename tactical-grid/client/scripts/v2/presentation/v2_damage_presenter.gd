@@ -17,11 +17,13 @@ func build_events(preview: Dictionary, result: Dictionary) -> Array[Dictionary]:
 	var final_damage := int(result.get("damage", preview.get("final_damage", 0)))
 	var hp_damage := int(result.get("hp_damage", preview.get("hp_damage", 0)))
 	var shield_absorb := int(preview.get("shield_absorb", 0))
+	var attack_sfx_cue := StringName(String(preview.get("attack_sfx_cue", _attack_sfx_cue_for(attacker))))
 
 	events.append({
 		"type": &"attack_started",
 		"attacker": attacker,
 		"target": target,
+		"audio_cue": attack_sfx_cue,
 		"text": "",
 	})
 	events.append({
@@ -56,12 +58,14 @@ func build_events(preview: Dictionary, result: Dictionary) -> Array[Dictionary]:
 		events.append({
 			"type": &"shield_absorb",
 			"amount": shield_absorb,
+			"audio_cue": &"shield_absorb",
 			"text": "护盾 -%d" % shield_absorb,
 		})
 	events.append({
 		"type": &"damage_number",
 		"amount": hp_damage,
 		"final_damage": final_damage,
+		"audio_cue": &"hit",
 		"text": "-%d" % hp_damage,
 		"display_text": "-%d" % hp_damage,
 	})
@@ -76,6 +80,7 @@ func build_events(preview: Dictionary, result: Dictionary) -> Array[Dictionary]:
 		events.append({
 			"type": &"unit_downed",
 			"target": target,
+			"audio_cue": &"downed",
 			"occupancy_released": bool(result.get("occupancy_released", true)),
 			"text": "倒地",
 		})
@@ -94,6 +99,7 @@ func play_attack(events: Array[Dictionary], reduce_motion: bool) -> void:
 		var event_type := StringName(String(event.get("type", "")))
 		var attacker_sprite: Node = event.get("attacker_sprite", null) as Node
 		var target_sprite: Node = event.get("target_sprite", null) as Node
+		_play_semantic_sfx(StringName(String(event.get("audio_cue", ""))))
 		match event_type:
 			&"attack_started":
 				if attacker_sprite and attacker_sprite.has_method("play_state"):
@@ -128,6 +134,29 @@ func play_attack(events: Array[Dictionary], reduce_motion: bool) -> void:
 func _show_feedback(sprite: Node, text: String, color: Color) -> void:
 	if sprite and sprite.has_method("show_combat_feedback") and text != "":
 		sprite.show_combat_feedback(text, color)
+
+func _play_semantic_sfx(cue_id: StringName) -> void:
+	if cue_id == &"":
+		return
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	var audio := tree.root.get_node_or_null("AudioManager")
+	if audio and audio.has_method("play_semantic_sfx"):
+		audio.play_semantic_sfx(cue_id)
+
+func _attack_sfx_cue_for(attacker: Unit) -> StringName:
+	if attacker == null:
+		return &"assault_shot"
+	match attacker.job:
+		"scout":
+			return &"scout_shot"
+		"sentry", "sniper", "shield_guard", "sniper_sentry":
+			return &"sentry_shot"
+		"drone", "attack_drone":
+			return &"drone_scan"
+		_:
+			return &"assault_shot"
 
 func _cell_value(value: Variant) -> Vector2i:
 	if value is Vector2i:

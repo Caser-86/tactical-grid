@@ -924,7 +924,7 @@ Each direction is a separately composed view with the same armor, equipment, col
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m1_visual_matrix.ps1
 ```
 
-- [ ] **Step 10: Commit source record, runtime assets, catalog, tests, and approval evidence separately**
+- [x] **Step 10: Commit source record, runtime assets, catalog, tests, and approval evidence separately**
 
 ```powershell
 git commit -m "art(v2): add approved M1 unit identity samples"
@@ -956,27 +956,27 @@ git commit -m "feat(v2): integrate four-direction M1 unit art"
 - Required M1 cues: assault shot, scout shot, sentry shot, drone scan, shield protect, hit, shield absorb, downed, objective update, rescue, evac
 - Required M1 visual cues: muzzle/trace, hit, scan cone pulse, shield link/pulse, rescue, evac
 
-- [ ] **Step 1: Inventory existing legal assets before generating replacements**
+- [x] **Step 1: Inventory existing legal assets before generating replacements**
 
 Record keep/replace decision for every required cue. Reuse assets that are licensed, technically valid, and visibly/audibly distinct.
 
-- [ ] **Step 2: Create only missing source cues**
+- [x] **Step 2: Create only missing source cues**
 
 Reuse `sfx_combat_smg`, `sfx_combat_pistol`, `sfx_combat_sniper`, `sfx_network_scan`, `sfx_hit_flesh`, and `sfx_unit_down`. Extend `tools/generate_chapter1_audio.ps1` with the five exact V2 cue files listed above, keeping the existing project-owned procedural PCM WAV approach. Do not imitate identifiable commercial-game audio. Record generator parameters and runtime paths in `resource_manifest.md`. M1 muzzle, trace, hit, scan, shield, rescue, and evac visuals remain presenter-driven in this task; raster source generation is deferred unless an actual-scene review produces a separately approved art brief.
 
-- [ ] **Step 3: Normalize and validate**
+- [x] **Step 3: Normalize and validate**
 
 Trim silence, normalize loudness, convert to the project's accepted format, confirm no clipping, and ensure repeated enemy-turn playback does not overlap indefinitely.
 
-- [ ] **Step 4: Add failing cue-registration and sequence tests**
+- [x] **Step 4: Add failing cue-registration and sequence tests**
 
 Require every M1 semantic event to resolve to one cue and reduced-motion/mute settings to preserve logic while suppressing optional motion/audio.
 
-- [ ] **Step 5: Integrate through semantic events**
+- [x] **Step 5: Integrate through semantic events**
 
 Presenters request cue IDs; they do not hard-code file paths. Audio settings continue through existing buses.
 
-- [ ] **Step 6: Run headless, presentation, settings, and visual tests**
+- [x] **Step 6: Run headless, presentation, settings, and visual tests**
 
 ```powershell
 & $godot --headless --path . --script res://tests/v2/v2_audio_headless_contract_test.gd
@@ -984,6 +984,8 @@ Presenters request cue IDs; they do not hard-code file paths. Audio settings con
 & $godot --headless --path . res://tests/v2/v2_settings_runtime_test.tscn
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_m1_visual_matrix.ps1
 ```
+
+Evidence: the five new WAV files validate as 22050 Hz, mono, 16-bit PCM with no clipping; the focused audio contract passed 21/0, damage presentation passed 19/0, settings runtime passed 3/0, player-turn E2E passed 78/0, the evacuation bridge passed 30/0 with no `SCRIPT ERROR`, M1 visual matrix passed 36/36, M2 visual matrix passed 54/54, and the full V2 gate passed 83/83 items with 2053/0 assertions. The gate still reports only the known non-fatal Godot teardown diagnostics.
 
 - [ ] **Step 7: Commit**
 

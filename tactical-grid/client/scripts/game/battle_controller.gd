@@ -12,6 +12,7 @@ const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_af
 const V2ActionPreviewScript = preload("res://scripts/v2/presentation/v2_action_preview.gd")
 const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
 const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
+const V2IntentPresentationScript = preload("res://scripts/v2/presentation/v2_intent_presenter.gd")
 const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
 const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
 const V2MissionEventBridgeScript = preload("res://scripts/v2/mission/v2_mission_event_bridge.gd")
@@ -135,6 +136,7 @@ var v2_locked_attack_target_id: String = ""
 var v2_pending_interaction_facility_id: String = ""
 var v2_last_checkpoint: Dictionary = {}
 var v2_last_checkpoint_id: String = ""
+var _v2_last_objective_status := ""
 var v2_rescue_marker: Node2D = null
 var _v2_units_rendered := false
 var v2_visibility_summary: Dictionary = {}
@@ -377,7 +379,17 @@ func _sync_objective_state_from_mos() -> void:
 
 ## mos 目标文本更新回调：刷新 HUD
 func _on_objective_updated(_text: String) -> void:
-	hud.update_objective(mission_objective_state.get_status_text())
+	var status := mission_objective_state.get_status_text()
+	if _is_v2_battle() and status != _v2_last_objective_status:
+		_v2_last_objective_status = status
+		AudioManager.sfx_objective_update()
+		var feedback_cell := selected_unit.grid_pos if selected_unit else Vector2i(-1, -1)
+		if feedback_cell.x < 0 and v2_mission_flow and v2_mission_flow.has_method("get_current_guide_cell"):
+			feedback_cell = v2_mission_flow.get_current_guide_cell()
+		if feedback_cell.x >= 0:
+			_spawn_effect("objective_update", feedback_cell)
+	if hud:
+		hud.update_objective(status)
 
 ## 退出场景树时释放未挂载的单位节点，避免资源泄漏
 func _exit_tree() -> void:
@@ -865,6 +877,10 @@ func _register_v2_rescued_unit(unit: Unit) -> void:
 func _on_v2_rescue_committed(result: Dictionary) -> void:
 	var character_id := String(result.get("character_id", "scout"))
 	var rescue_event := StringName("%s_rescued" % character_id)
+	AudioManager.sfx_rescue()
+	var rescue_position: Vector2i = result.get("position", Vector2i(-1, -1))
+	if rescue_position.x >= 0:
+		_spawn_effect("rescue", rescue_position)
 	_record_v2_playtest_event(rescue_event, {"character_id": character_id})
 	_update_v2_encounters([rescue_event])
 	if has_method("_update_v2_evac_marker"):
@@ -2571,6 +2587,10 @@ func _apply_v2_mission_event(event_name: StringName, payload: Dictionary = {}) -
 	if v2_mission_event_bridge == null:
 		v2_mission_event_bridge = V2MissionEventBridgeScript.new()
 	var result: Dictionary = v2_mission_event_bridge.apply_event(v2_mission_flow, event_name, payload)
+	if event_name in [&"evac_checked", &"squad_evacuated"] and bool(result.get("success", false)):
+		AudioManager.sfx_evac()
+		if selected_unit and selected_unit.grid_pos.x >= 0:
+			_spawn_effect("evac", selected_unit.grid_pos)
 	if event_name == &"evac_checked" and bool(result.get("victory", false)):
 		_advance_v2_tutorial(&"evac_completed")
 	if hud:
@@ -4586,6 +4606,11 @@ func _plan_enemy_intents() -> void:
 		if intent.is_empty():
 			intent = {"type": "wait"}
 		enemy_intent_state.set_intent(enemy.entity_id, intent)
+		if _is_v2_battle():
+			var intent_presentation := V2IntentPresentationScript.build(intent)
+			var intent_audio_cue: StringName = intent_presentation.get("audio_cue", &"")
+			if intent_audio_cue != &"":
+				AudioManager.play_semantic_sfx(intent_audio_cue)
 	_enemy_intents_planned = true
 	_advance_v2_tutorial(&"enemy_intent_observed")
 
@@ -5001,13 +5026,16 @@ func _on_unit_damaged(unit: Unit, _amount: int) -> void:
 	if unit == boss_unit and boss_unit and boss_unit.is_alive:
 		_check_boss_phase_transition(unit)
 
-func _spawn_effect(kind: String, grid_pos: Vector2i) -> void:
+func _spawn_effect(kind: String, grid_pos: Vector2i) -> bool:
+	if effect_layer == null or not is_instance_valid(effect_layer):
+		return false
 	var effect := TacticalEffect.new()
 	effect.position = _get_cell_center(grid_pos)
 	effect.setup(kind)
 	effect_layer.add_child(effect)
-	if kind == "explosion":
+	if kind == "explosion" and camera != null and is_instance_valid(camera):
 		camera.play_event_feedback(&"explosion", effect.position)
+	return true
 
 func _check_victory_instant() -> void:
 	if _check_victory():

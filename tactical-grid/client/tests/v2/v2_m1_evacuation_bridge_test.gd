@@ -131,6 +131,7 @@ func _run_m2_terminal_regression(mission: Dictionary) -> void:
 	t.check(bool(result.get("success", false)) and bool(result.get("committed", false)), "M2 通过 BattleController 移动触发 ready evac_checked")
 	t.check(flow.is_victory(), "M2 ready evac_checked 直接完成任务")
 	t.check(not _has_event(flow, &"mission_completed"), "M2 不合成额外 mission_completed 事件")
+	t.check(battle.call("_spawn_effect", "evac", evac_center) == false, "无特效层的控制器安全跳过撤离表现")
 	_dispose_battle(battle)
 
 func _build_battle(mission: Dictionary, map: Dictionary, players: Array, turn_players: Array) -> BattleController:
