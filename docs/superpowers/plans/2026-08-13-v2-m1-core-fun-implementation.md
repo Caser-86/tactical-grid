@@ -1006,6 +1006,11 @@ Completed in commit `faf36c2` (`feat(v2): add M1 semantic audio and presentation
 - Modify: `tactical-grid/client/scripts/v2/mission/v2_playtest_recorder.gd`
 - Modify: `tactical-grid/client/tests/v2/v2_playtest_recorder_test.gd`
 - Modify: `tactical-grid/client/tests/v2/v2_playtest_integration_contract_test.gd`
+- Modify: `tactical-grid/client/scripts/game/battle_controller.gd`
+- Modify: `tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd`
+- Modify: `tactical-grid/client/scripts/v2/runtime/v2_battle_controller.gd`
+- Create: `tactical-grid/client/tests/v2/v2_playtest_runtime_wiring_test.gd`
+- Modify: `tactical-grid/client/tests/v2/gate_manifest.json`
 - Create: `tactical-grid/client/docs/v2_m1_single_owner_acceptance.md`
 - Create runtime-only output: `user://playtests/m1/OWNER.json`
 
@@ -1033,6 +1038,8 @@ Keep runtime records out of Git. Export a sanitized summary into the acceptance 
 
 Expected: `Failed: 0`; normal game launches without `--v2-playtest-id` create no playtest file.
 
+Runtime wiring was then added and verified in isolation: `v2_playtest_runtime_wiring_test.gd` passed `8/0`, and the complete V2 gate includes this contract. The implementation is committed in `dfba897`.
+
 - [ ] **Step 5: Build and launch the M1 candidate for the owner**
 
 Use the release export task from Task 16, then launch:
@@ -1043,7 +1050,7 @@ Use the release export task from Task 16, then launch:
 
 The owner plays from a clean V2 save without Godot or external instructions.
 
-Automated implementation is committed in `642049b`. Steps 5-6 remain open until the project owner plays the exported candidate; the acceptance document intentionally remains `incomplete`.
+The recorder implementation is committed in `642049b`; runtime event wiring and the regression contract are committed in `dfba897`. Steps 5-6 remain open until the project owner supplies a detailed human run; the acceptance document intentionally remains `incomplete`.
 
 - [ ] **Step 6: Fill the human acceptance document**
 
@@ -1115,6 +1122,8 @@ Expected: EXE/PCK/version/cold-start and V2 isolation pass.
 - [x] **Step 6: Update release evidence**
 
 Record commit, gate totals, warning counts, package path, cold-start result, single-owner result, residual risk, and the explicit statement that one familiar human tester does not prove stranger first-time comprehension.
+
+Current evidence: commit `dfba897`; gate `84/84` items and `2090/2090` assertions; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`; Windows package and V2 isolation both passed. The 43 non-fatal teardown warnings across 16 categories remain documented, and the owner continuation checkpoint is not public-release approval.
 
 - [x] **Step 7: Commit release evidence**
 
