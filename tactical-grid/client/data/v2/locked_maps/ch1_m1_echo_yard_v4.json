@@ -7,6 +7,7 @@
     "width": 26,
     "height": 18
   },
+  "optional_record_round_trip_turns": 2,
   "route_split_cells": [[8, 14], [10, 11], [12, 13]],
   "theme": "echo_yard",
   "environment": {
@@ -2874,15 +2875,6 @@
       "id": "m1_sentry_south"
     },
     {
-      "enemy_id": "drone",
-      "y": 14,
-      "x": 8,
-      "team": "enemy",
-      "type": "spawn_enemy",
-      "active_on_start": true,
-      "id": "m1_drone_south"
-    },
-    {
       "enemy_id": "sentry",
       "y": 12,
       "x": 9,
@@ -2902,48 +2894,12 @@
     },
     {
       "enemy_id": "sentry",
-      "y": 13,
-      "x": 12,
-      "team": "enemy",
-      "type": "spawn_enemy",
-      "active_on_start": false,
-      "id": "m1_sentry_cargo"
-    },
-    {
-      "enemy_id": "sentry",
-      "y": 5,
-      "x": 5,
-      "team": "enemy",
-      "type": "spawn_enemy",
-      "active_on_start": false,
-      "id": "m1_sentry_record"
-    },
-    {
-      "enemy_id": "protocol_engineer",
-      "y": 6,
-      "x": 3,
-      "team": "enemy",
-      "type": "spawn_enemy",
-      "active_on_start": false,
-      "id": "m1_engineer_record"
-    },
-    {
-      "enemy_id": "sentry",
       "y": 8,
       "x": 17,
       "team": "enemy",
       "type": "spawn_enemy",
       "active_on_start": false,
       "id": "m1_sentry_rescue"
-    },
-    {
-      "enemy_id": "shield_guard",
-      "y": 7,
-      "x": 15,
-      "team": "enemy",
-      "type": "spawn_enemy",
-      "active_on_start": false,
-      "id": "m1_shield_rescue"
     },
     {
       "enemy_id": "drone",
@@ -2955,31 +2911,39 @@
       "id": "m1_drone_rescue"
     },
     {
-      "enemy_id": "sniper_sentry",
+      "enemy_id": "shield_guard",
       "y": 4,
       "x": 21,
       "team": "enemy",
       "type": "spawn_enemy",
       "active_on_start": false,
-      "id": "m1_sniper_evac_a"
+      "id": "m1_shield_evac"
     },
     {
-      "enemy_id": "sniper_sentry",
+      "enemy_id": "sentry",
+      "y": 5,
+      "x": 21,
+      "team": "enemy",
+      "type": "spawn_enemy",
+      "active_on_start": false,
+      "id": "m1_sentry_evac"
+    },
+    {
+      "enemy_id": "drone",
       "y": 6,
       "x": 22,
       "team": "enemy",
       "type": "spawn_enemy",
       "active_on_start": false,
-      "id": "m1_sniper_evac_b"
+      "id": "m1_drone_evac"
     }
   ],
   "encounters": [
     {
-      "name": "南侧货运坪",
+      "name": "教学哨戒",
       "active_cap": 3,
       "active_enemy_ids": [
-        "m1_sentry_south",
-        "m1_drone_south"
+        "m1_sentry_south"
       ],
       "trigger": "start",
       "trigger_cells": [
@@ -2992,74 +2956,20 @@
           16
         ]
       ],
-      "active_count": 2,
-      "id": "m1_e01_start"
+      "active_count": 1,
+      "id": "m1_e01_tutorial",
+      "max_gap_turns": 0
     },
     {
-      "name": "路线巡逻",
+      "name": "救援路线交战",
       "active_cap": 3,
       "active_enemy_ids": [
         "m1_sentry_route",
         "m1_drone_route",
-        "m1_sentry_cargo"
-      ],
-      "trigger": "route_selected",
-      "trigger_cells": [
-        [
-          8,
-          14
-        ],
-        [
-          10,
-          11
-        ],
-        [
-          12,
-          13
-        ]
-      ],
-      "active_count": 3,
-      "id": "m1_e02_route"
-    },
-    {
-      "active_count": 2,
-      "center": [
-        4,
-        5
-      ],
-      "trigger": "enter_record_radius",
-      "active_cap": 3,
-      "active_enemy_ids": [
-        "m1_sentry_record",
-        "m1_engineer_record"
-      ],
-      "id": "m1_e03_record",
-      "radius": 3,
-      "name": "事故记录室",
-      "trigger_cells": [
-        [
-          4,
-          5
-        ]
-      ],
-      "deactivate_on_trigger": ["m1_sentry_route", "m1_drone_route", "m1_sentry_cargo"]
-    },
-    {
-      "active_count": 3,
-      "center": [
-        16,
-        8
-      ],
-      "trigger": "enter_rescue_radius",
-      "active_cap": 3,
-      "active_enemy_ids": [
         "m1_sentry_rescue",
-        "m1_shield_rescue",
         "m1_drone_rescue"
       ],
-      "id": "m1_e04_rescue",
-      "radius": 4,
-      "name": "侦察兵隔离区",
+      "trigger": "enter_rescue_radius",
       "trigger_cells": [
         [
           15,
@@ -3073,16 +2983,24 @@
           17,
           8
         ]
-      ]
+      ],
+      "active_count": 3,
+      "id": "m1_e02_rescue_routes",
+      "center": [16, 8],
+      "radius": 4,
+      "max_gap_turns": 2
     },
     {
-      "name": "撤离拦截",
+      "name": "撤离防线",
+      "active_count": 3,
+      "center": [21, 4],
+      "trigger": "pre_evac",
       "active_cap": 3,
       "active_enemy_ids": [
-        "m1_sniper_evac_a",
-        "m1_sniper_evac_b"
+        "m1_shield_evac",
+        "m1_sentry_evac",
+        "m1_drone_evac"
       ],
-      "trigger": "pre_evac",
       "trigger_cells": [
         [
           20,
@@ -3097,8 +3015,9 @@
           4
         ]
       ],
-      "active_count": 2,
-      "id": "m1_e05_evac"
+      "deactivate_on_trigger": ["m1_sentry_route", "m1_drone_route", "m1_sentry_rescue", "m1_drone_rescue"],
+      "max_gap_turns": 2,
+      "id": "m1_e03_evac_guard"
     }
   ],
   "checkpoints": [
@@ -3106,21 +3025,21 @@
       "x": 3,
       "id": "cp_start",
       "y": 16,
-      "next_encounter_id": "m1_e02_route",
-      "encounter_id": "m1_e01_start"
+      "next_encounter_id": "m1_e02_rescue_routes",
+      "encounter_id": "m1_e01_tutorial"
     },
     {
       "x": 16,
       "id": "cp_rescue",
       "y": 8,
-      "next_encounter_id": "m1_e05_evac",
-      "encounter_id": "m1_e04_rescue"
+      "next_encounter_id": "m1_e03_evac_guard",
+      "encounter_id": "m1_e02_rescue_routes"
     },
     {
       "x": 20,
       "id": "cp_pre_evac",
       "y": 4,
-      "encounter_id": "m1_e05_evac"
+      "encounter_id": "m1_e03_evac_guard"
     }
   ],
   "facilities": [
@@ -3161,8 +3080,7 @@
       "x": 4,
       "action_id": "upload_incident_record",
       "type": "record",
-    "id": "facility_record",
-    "requires_encounter_clear": "m1_e03_record"
+      "id": "facility_record"
     },
     {
       "name": "吊机控制台",
@@ -3281,45 +3199,29 @@
   "activation_schedule": [
     {
       "active_ids": [
-        "m1_sentry_south",
-        "m1_drone_south"
+        "m1_sentry_south"
       ],
       "stage": "start",
-      "active_count": 2
+      "active_count": 1
     },
     {
       "active_ids": [
         "m1_sentry_route",
         "m1_drone_route",
-        "m1_sentry_cargo"
-      ],
-      "stage": "route",
-      "active_count": 3
-    },
-    {
-      "active_ids": [
-        "m1_sentry_record",
-        "m1_engineer_record"
-      ],
-      "stage": "record",
-      "active_count": 2
-    },
-    {
-      "active_ids": [
         "m1_sentry_rescue",
-        "m1_shield_rescue",
         "m1_drone_rescue"
       ],
-      "stage": "rescue",
+      "stage": "rescue_routes",
       "active_count": 3
     },
     {
       "active_ids": [
-        "m1_sniper_evac_a",
-        "m1_sniper_evac_b"
+        "m1_shield_evac",
+        "m1_sentry_evac",
+        "m1_drone_evac"
       ],
-      "stage": "pre_evac",
-      "active_count": 2
+      "stage": "evac_guard",
+      "active_count": 3
     }
   ],
   "route_changes": {

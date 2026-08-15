@@ -162,7 +162,7 @@ func _assert_m1_rescue_and_pre_evac(manager: Node) -> void:
 		assault_for_safety.current_hp = assault_for_safety.max_hp
 	var initial: Dictionary = battle.v2_hud_presenter.last_snapshot
 	t.check(String(initial.get("step_id", "")) == "find_scout" and int(initial.get("step_index", -1)) == 0 and int(initial.get("step_count", -1)) == 3, "M1 正式营救流程真实 HUD 快照为 1/3")
-	t.check(String(initial.get("guide_text", "")).contains("青色侦察标记") and String(initial.get("guide_text", "")).contains("靠近"), "M1 快照提供明确搜索目标与动作")
+	t.check(String(initial.get("guide_text", "")).contains("青色侦察标记") and String(initial.get("guide_text", "")).contains("站到标记旁一格"), "M1 快照提供明确搜索目标与动作")
 	t.check(battle.hud.objective_label.text.contains("1/3") and battle.hud.get_node("BottomBar/V2DirectControlGuide").text.contains("流程 1/3"), "M1 正式营救流程真实 HUD 控件显示 1/3")
 	var mission_card := battle.hud.get_node_or_null("V2MissionCard") as Panel
 	t.check(mission_card != null and mission_card.visible and String(mission_card.get_node("MissionCardText").text).contains("青色侦察标记"), "M1 HUD 显示持久营救任务卡和具体目标")

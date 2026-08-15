@@ -56,9 +56,8 @@ func _initialize() -> void:
 	visibility.update_visibility([], [])
 	t.check(not visibility.is_cell_observed(Vector2i(16, 8)), "摄像头关闭后区域不再保持观察")
 
-	var record_locked: Array = service.query_actions(scout, "facility_record")
-	t.check(not bool(record_locked[0].get("enabled", true)), "记录室清场前保持锁定")
-	service.mark_encounter_cleared("m1_e03_record")
+	var record_preview: Array = service.query_actions(scout, "facility_record")
+	t.check(bool(record_preview[0].get("enabled", false)), "事故记录作为可选短支线直接可用")
 	var record_actions: Array = service.query_actions(scout, "facility_record")
 	t.check(record_actions.size() == 1, "事故记录点只提供一个具体操作")
 	t.check(record_actions[0].get("id", "") == "upload_incident_record", "事故记录使用稳定动作 ID")

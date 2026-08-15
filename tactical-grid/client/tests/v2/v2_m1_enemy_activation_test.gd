@@ -16,27 +16,29 @@ func _initialize() -> void:
 		return
 	var activation := Activation.new()
 	activation.setup(loaded.get("data", {}))
-	t.check(activation.get_total_enemy_ids().size() == 12, "M1 总敌人数固定为十二名")
+	t.check(activation.get_total_enemy_ids().size() == 8, "M1 总敌人数固定为八名")
 	var start: Dictionary = activation.update([Vector2i(3, 16)], [])
-	t.check(start.get("active_count", 0) == 2, "开场只激活南区两名敌人")
+	t.check(start.get("active_count", 0) == 1, "开场只激活一名教学哨兵")
 	t.check(activation.get_active_enemy_ids().has("m1_sentry_south"), "开场激活南区哨兵")
-	t.check(activation.get_active_enemy_ids().has("m1_drone_south"), "开场激活南区无人机")
 	t.check(not activation.get_active_enemy_ids().has("m1_sentry_rescue"), "营救区敌人开场不激活")
 
 	for enemy_id in start.get("active_ids", []):
 		activation.mark_enemy_defeated(String(enemy_id))
-	var route: Dictionary = activation.update([Vector2i(8, 14)], [{"event": "route_selected"}])
-	t.check(route.get("active_count", 0) <= 3, "路线分叉同时最多三名敌人")
-	t.check(activation.get_active_enemy_ids().has("m1_sentry_route"), "路线分叉激活路线哨兵")
-	t.check(activation.get_active_enemy_ids().has("m1_drone_route"), "路线分叉激活路线无人机")
-	t.check(activation.get_active_enemy_ids().has("m1_sentry_cargo"), "路线分叉激活货柜哨兵")
-	for enemy_id in route.get("active_ids", []):
-		activation.mark_enemy_defeated(String(enemy_id))
-	var record: Dictionary = activation.update([Vector2i(4, 5)], [])
-	t.check(record.get("active_count", 0) <= 3, "进入记录路线同时最多三名敌人")
-	t.check(record.get("active_count", 0) == 2, "记录路线激活两名职责不同的敌人")
-	t.check(activation.get_active_enemy_ids().has("m1_sentry_record"), "记录路线激活记录哨兵")
-	t.check(activation.get_active_enemy_ids().has("m1_engineer_record"), "记录路线激活协议工程师")
+	var route: Dictionary = activation.update([Vector2i(15, 8)], [])
+	t.check(route.get("active_count", 0) <= 3, "营救路线同时最多三名敌人")
+	t.check(activation.get_active_enemy_ids().has("m1_sentry_route") or activation.get_waiting_enemy_ids().has("m1_sentry_route"), "营救路线包含路线哨兵")
+	t.check(activation.get_active_enemy_ids().has("m1_drone_route"), "营救路线激活路线无人机")
+	t.check(activation.get_active_enemy_ids().has("m1_sentry_rescue") or activation.get_waiting_enemy_ids().has("m1_sentry_rescue"), "营救路线包含营救哨兵")
+	t.check(activation.get_active_enemy_ids().has("m1_drone_rescue") or activation.get_waiting_enemy_ids().has("m1_drone_rescue"), "营救路线包含营救无人机")
+	t.check(activation.get_waiting_enemy_ids().size() == 1, "超过同时上限的营救敌人排队而非叠在同一格")
+	var rescue_ids := ["m1_sentry_route", "m1_drone_route", "m1_sentry_rescue", "m1_drone_rescue"]
+	for _i in range(3):
+		for enemy_id in activation.get_active_enemy_ids():
+			if rescue_ids.has(String(enemy_id)):
+				activation.mark_enemy_defeated(String(enemy_id))
+		activation.update([Vector2i(15, 8)], [])
+	for enemy_id in rescue_ids:
+		t.check(activation.get_defeated_enemy_ids().has(enemy_id), "营救路线敌人可按顺序清除：%s" % enemy_id)
 
 	var rescue_activation := Activation.new()
 	rescue_activation.setup(loaded.get("data", {}))
@@ -45,10 +47,9 @@ func _initialize() -> void:
 		rescue_activation.mark_enemy_defeated(String(enemy_id))
 	var rescue: Dictionary = rescue_activation.update([Vector2i(15, 8)], [])
 	t.check(rescue.get("active_count", 0) <= 3, "进入营救区同时最多三名敌人")
-	t.check(rescue_activation.get_active_enemy_ids().has("m1_sentry_rescue"), "进入营救区激活营救哨兵")
-	t.check(rescue_activation.get_active_enemy_ids().has("m1_drone_rescue"), "进入营救区激活营救无人机")
-	t.check(rescue_activation.get_active_enemy_ids().has("m1_shield_rescue"), "进入营救区激活营救盾卫")
-	t.check(not rescue_activation.get_active_enemy_ids().has("m1_sentry_record"), "未进入记录路线不激活记录哨兵")
+	t.check(rescue_activation.get_active_enemy_ids().has("m1_sentry_route") or rescue_activation.get_waiting_enemy_ids().has("m1_sentry_route"), "进入营救区包含路线哨兵")
+	t.check(rescue_activation.get_active_enemy_ids().has("m1_drone_route"), "进入营救区激活路线无人机")
+	t.check(not rescue_activation.get_active_enemy_ids().has("m1_shield_evac"), "撤离防线敌人不会提前激活")
 
 	var fresh := Activation.new()
 	fresh.setup(loaded.get("data", {}))
@@ -56,12 +57,15 @@ func _initialize() -> void:
 	for enemy_id in fresh_start.get("active_ids", []):
 		fresh.mark_enemy_defeated(String(enemy_id))
 	fresh.update([Vector2i(15, 8)], [])
-	for enemy_id in fresh.get_active_enemy_ids():
-		fresh.mark_enemy_defeated(String(enemy_id))
+	for _i in range(4):
+		for enemy_id in fresh.get_active_enemy_ids():
+			fresh.mark_enemy_defeated(String(enemy_id))
+		fresh.update([Vector2i(15, 8)], [])
 	var evac: Dictionary = fresh.update([Vector2i(20, 4)], [{"event": "pre_evac"}])
 	t.check(evac.get("active_count", 0) <= 3, "撤离前同时最多三名敌人")
-	t.check(fresh.get_active_enemy_ids().has("m1_sniper_evac_a"), "撤离前激活第一名拦截狙击哨兵")
-	t.check(fresh.get_active_enemy_ids().has("m1_sniper_evac_b"), "撤离前激活第二名拦截狙击哨兵")
+	t.check(fresh.get_active_enemy_ids().has("m1_shield_evac"), "撤离前激活盾卫")
+	t.check(fresh.get_active_enemy_ids().has("m1_sentry_evac"), "撤离前激活撤离哨兵")
+	t.check(fresh.get_active_enemy_ids().has("m1_drone_evac"), "撤离前激活撤离无人机")
 
 	var sentry := _make_enemy("sentry", "sentry_test", Vector2i(8, 12))
 	var player := _make_player("player_test", Vector2i(8, 13))

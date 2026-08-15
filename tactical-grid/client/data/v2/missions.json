@@ -13,6 +13,10 @@
     "enemy_total": 8,
     "encounter_count": 3,
     "active_cap": 3,
+    "production_encounters": ["m1_e01_tutorial", "m1_e02_rescue_routes", "m1_e03_evac_guard"],
+    "production_enemy_classes": ["sentry", "drone", "shield_guard"],
+    "production_route_policy": "direct_no_choice",
+    "optional_record_round_trip_turns": 2,
     "max_turns": 24,
     "enemy_passive_turns": 3,
     "tutorial_safety_turns": 3,
@@ -21,8 +25,8 @@
     "tutorial_steps": ["select", "move", "attack", "intent", "camera", "evac"],
     "dialogue_ids": ["ch1_m1_brief", "ch1_m1_intro", "ch1_m1_route", "ch1_m1_gantry", "ch1_m1_rescue", "ch1_m1_intercept", "ch1_m1_record", "ch1_m1_outro"],
     "objective_steps": [
-      {"id": "find_scout", "objective_text": "找到失联侦察兵", "guide_text": "沿黄色路线前往青色侦察标记；靠近后会进入营救阶段。", "complete_event": "scout_located", "checkpoint_id": "cp_start", "guide_cell": [13, 7], "required_flags": []},
-      {"id": "rescue_scout", "objective_text": "救出侦察兵", "guide_text": "接近侦察兵并清除身边威胁，然后点击侦察标记营救。", "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "guide_cell": [13, 7], "required_flags": ["scout_located"]},
+      {"id": "find_scout", "objective_text": "找到失联侦察兵", "guide_text": "前往地图中央的青色侦察标记；站到标记旁一格即可进入营救阶段。", "complete_event": "scout_located", "checkpoint_id": "cp_start", "guide_cell": [16, 8], "required_flags": []},
+      {"id": "rescue_scout", "objective_text": "救出侦察兵", "guide_text": "先清除标记周围的威胁，再点击青色侦察标记执行营救。", "complete_event": "character_rescued", "checkpoint_id": "cp_rescue", "guide_cell": [16, 8], "required_flags": ["scout_located"]},
       {"id": "evacuate_squad", "objective_text": "带小队撤离", "guide_text": "沿绿色路线让所有清醒队员进入右上方绿色撤离区。", "complete_event": "squad_evacuated", "checkpoint_id": "cp_pre_evac", "guide_cell": [23, 2], "required_flags": ["scout_rescued"]}
     ],
     "expanded_objective_steps": [

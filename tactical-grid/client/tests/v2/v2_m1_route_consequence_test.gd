@@ -47,11 +47,9 @@ func _initialize() -> void:
 
 	var record_actor := _make_unit("record_actor", Vector2i(4, 5))
 	var record_before: Array = camera_service.query_actions(record_actor, "facility_record")
-	t.check(not bool(record_before[0].get("enabled", true)), "记录室敌人未清理前不可上传")
-	t.check(record_before[0].get("reason", "") == "先清理记录室敌人", "记录室锁定原因清晰")
-	camera_service.mark_encounter_cleared("m1_e03_record")
+	t.check(bool(record_before[0].get("enabled", false)), "记录室作为可选支线可直接上传")
 	var record_after: Array = camera_service.query_actions(record_actor, "facility_record")
-	t.check(bool(record_after[0].get("enabled", false)), "记录室清场后开放")
+	t.check(bool(record_after[0].get("enabled", false)), "记录室保持可操作")
 	var flow := Flow.new()
 	flow.setup({"id": "ch1_m1", "rescue_character": "scout"}, map, [], [])
 	var reward_service := _make_service(map, flow)

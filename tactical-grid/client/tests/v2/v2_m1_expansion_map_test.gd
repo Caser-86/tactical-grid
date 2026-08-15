@@ -20,11 +20,17 @@ func _initialize() -> void:
 	var size: Dictionary = map.get("size", {})
 	t.check(String(map.get("map_id", "")) == "ch1_m1_echo_yard_v4", "canonical map ID is v4")
 	t.check(int(size.get("width", 0)) == 26 and int(size.get("height", 0)) == 18, "expanded map is 26x18")
-	t.check(_enemy_ids(map).size() == 12, "expanded map has twelve fixed enemies")
-	t.check((map.get("encounters", []) as Array).size() == 5, "expanded map has five encounters")
+	t.check(_enemy_ids(map).size() == 8, "production map has eight fixed enemies")
+	t.check((map.get("encounters", []) as Array).size() == 3, "production map has three encounters")
 	t.check((map.get("main_routes", []) as Array).size() >= 2, "expanded map has at least two main routes")
 	t.check(_has_id(map.get("facilities", []), "facility_record"), "optional record facility exists")
 	t.check(_has_id(map.get("facilities", []), "facility_gantry"), "gantry facility exists")
+	var record := _find_by_id(map.get("facilities", []), "facility_record")
+	t.check(String(record.get("requires_encounter_clear", "")).is_empty(), "record remains optional in production")
+	t.check(int(map.get("optional_record_round_trip_turns", 99)) <= 2, "record detour remains a short optional loop")
+	for entity in map.get("entities", []):
+		if entity is Dictionary and String(entity.get("type", "")) == "route_choice":
+			t.check(false, "production map does not place route-choice entities")
 	for id in ["cp_start", "cp_rescue", "cp_pre_evac"]:
 		t.check(_has_id(map.get("checkpoints", []), id), "checkpoint exists: %s" % id)
 	for layer_name in ["base_terrain", "blocker", "vision", "height", "cover"]:
@@ -69,6 +75,12 @@ func _has_id(records: Array, id: String) -> bool:
 		if record is Dictionary and String(record.get("id", "")) == id:
 			return true
 	return false
+
+func _find_by_id(records: Array, id: String) -> Dictionary:
+	for record in records:
+		if record is Dictionary and String(record.get("id", "")) == id:
+			return record
+	return {}
 
 func _layer_matches(layer: Variant, width: int, height: int) -> bool:
 	if not layer is Array or (layer as Array).size() != height:
