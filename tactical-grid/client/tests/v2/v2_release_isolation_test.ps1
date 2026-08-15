@@ -31,6 +31,8 @@ Assert-Condition (Test-Path -LiteralPath $pckPath -PathType Leaf) "missing V2 re
 foreach ($legacyName in @('TacticalGrid.exe', 'TacticalGrid.pck', 'TacticalGrid.console.exe', 'TacticalGrid_V2_Infiltration.console.exe')) {
     Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $buildRoot $legacyName))) "legacy/development file remains: $legacyName"
 }
+$temporaryExportFiles = @(Get-ChildItem -LiteralPath $buildRoot -Filter '*.TMP' -File -ErrorAction SilentlyContinue)
+Assert-Condition ($temporaryExportFiles.Count -eq 0) "stale export temporary files remain: $($temporaryExportFiles.Name -join ', ')"
 
 Assert-Condition (Test-Path -LiteralPath $GodotPath -PathType Leaf) "Godot executable not found: $GodotPath"
 $psi = New-Object System.Diagnostics.ProcessStartInfo

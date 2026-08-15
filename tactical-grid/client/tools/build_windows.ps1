@@ -40,6 +40,16 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
+function Remove-StaleExportTemporaryFiles {
+	Get-ChildItem -LiteralPath $outputDirectory -Filter '*.TMP' -File -ErrorAction SilentlyContinue |
+		Remove-Item -Force
+}
+
+# Godot/Windows can leave replacement files behind when an earlier export is
+# interrupted or the executable is still open. Never carry those files into a
+# V2 release directory.
+Remove-StaleExportTemporaryFiles
+
 # A clean checkout can need one pass to create generated font/audio import
 # metadata and a second pass to settle dependent theme resources before export.
 for ($importPass = 1; $importPass -le 2; $importPass++) {
@@ -51,6 +61,7 @@ for ($importPass = 1; $importPass -le 2; $importPass++) {
 & $GodotPath --headless --path $projectRoot --export-release 'Windows Desktop x64' $OutputPath
 if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE." }
 if (-not (Test-Path -LiteralPath $OutputPath)) { throw "Expected export was not created: $OutputPath" }
+Remove-StaleExportTemporaryFiles
 
 $artifact = Get-Item -LiteralPath $OutputPath
 Write-Host "Windows release created: $($artifact.FullName) ($([Math]::Round($artifact.Length / 1MB, 2)) MB)"
