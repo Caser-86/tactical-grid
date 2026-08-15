@@ -36,4 +36,4 @@ Task 14 adds the missing M1 semantic audio cues and connects them to the V2 comb
 
 ## Remaining Gate
 
-Task 14 has passed its functional and visual gates. It becomes repository-complete after the audio/integration commit is created without staging the user-owned `levels.json` or the existing untracked playtest-blocker specification.
+Task 14 passed its functional and visual gates and was implemented in commit `faf36c2`. The remaining documentation-only closeout is intentionally separate from the implementation commit; neither commit stages the user-owned `levels.json` or the existing untracked playtest-blocker specification.

@@ -241,7 +241,7 @@ Expected: all synthetic gesture cases report `Failed: 0`; no cell click or cance
 
 Expected: process exits `0`; movement/attack input still works after pan and focus.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add tactical-grid/client/scripts/v2/input/v2_battle_input_router.gd tactical-grid/client/scripts/v2/runtime/v2_camera_focus.gd tactical-grid/client/scripts/game/battle_camera_controller.gd tactical-grid/client/project.godot tactical-grid/client/tests/v2/v2_camera_input_test.gd tactical-grid/client/tests/v2/v2_input_router_test.gd
@@ -993,6 +993,8 @@ Evidence: the five new WAV files validate as 22050 Hz, mono, 16-bit PCM with no 
 git commit -m "audio(v2): add distinct M1 tactical cues"
 git commit -m "feat(v2): integrate M1 combat and objective effects"
 ```
+
+Completed in commit `faf36c2` (`feat(v2): add M1 semantic audio and presentation cues`). The implementation and evidence records were committed without staging the user-owned `levels.json` or the existing untracked playtest-blocker specification.
 
 ---
 
