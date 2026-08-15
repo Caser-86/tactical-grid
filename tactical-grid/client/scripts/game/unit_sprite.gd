@@ -117,6 +117,10 @@ func _refresh_art_texture() -> void:
 		art_sprite.texture = null
 		return
 	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else unit.v2_art_key if not unit.v2_art_key.is_empty() else StringName(unit.job)
+	if unit.boss_art_key.is_empty() and not unit.v2_art_key.is_empty():
+		var directional_key := StringName("%s_south" % String(unit.v2_art_key))
+		if catalog.call("has_texture", &"unit", directional_key):
+			key = directional_key
 	if not catalog.call("has_texture", &"unit", key):
 		key = StringName(unit.job)
 	if not catalog.call("has_texture", &"unit", key):

@@ -77,6 +77,7 @@
     "res://tests/v2/v2_settings_runtime_test.tscn",
     "res://tests/v2/v2_m1_visual_snapshot.tscn",
     "res://tests/v2/v2_m2_visual_snapshot.tscn",
+    "res://tests/v2/v2_unit_art_sample_snapshot.tscn",
     "res://tests/v2/v2_encounter_controller_regression_test.tscn",
     "res://tests/v2/v2_hazard_runtime_scene_test.tscn",
     "res://tests/v2/v2_objective_hud_runtime_scene_test.tscn"

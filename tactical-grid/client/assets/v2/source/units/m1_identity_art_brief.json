@@ -1,0 +1,48 @@
+{
+  "id": "m1_identity_art_sample",
+  "generated_at": "2026-08-15",
+  "source_method": "OpenAI ImageGen, one isolated subject per image",
+  "camera": "south-facing three-quarter top-down",
+  "canvas": [128, 128],
+  "anchor": {
+    "kind": "bottom_center",
+    "runtime_margin_px": 6,
+    "hover_units_use_same_lower_bound": true
+  },
+  "lighting": "cool upper-left key with restrained rim light",
+  "background": "true alpha; no UI, text, frame, watermark, or extra objects",
+  "palette": {
+    "base": "dark graphite industrial sci-fi",
+    "player_accents": ["cyan", "lime"],
+    "enemy_accents": ["warning red", "orange", "cyan sensor light"]
+  },
+  "units": {
+    "v2_assault": {
+      "team": "player",
+      "requirements": ["medium-wide shoulders", "compact short rifle", "large cyan forearm plates", "forward athletic stance"]
+    },
+    "v2_scout": {
+      "team": "player",
+      "requirements": ["lowest human posture", "compact suppressed carbine", "asymmetric antenna backpack", "large lime leg panels"]
+    },
+    "v2_sentry": {
+      "team": "enemy",
+      "requirements": ["upright rigid body", "long rifle", "large red shoulder plates", "circular red optical visor"]
+    },
+    "v2_drone": {
+      "team": "enemy",
+      "requirements": ["wide horizontal disc silhouette", "large cyan scan lens", "side fins", "no humanoid torso"]
+    },
+    "v2_shield_guard": {
+      "team": "enemy",
+      "requirements": ["widest grounded silhouette", "dominant hexagonal riot shield", "large orange armor fields", "narrow amber visor"]
+    }
+  },
+  "processing": {
+    "tool": "tools/process_v2_unit_art.ps1",
+    "alpha_cutoff": 8,
+    "subject_box": 112,
+    "padding_px": 4,
+    "runtime_output": "assets/v2/units/<unit>_south_128.png"
+  }
+}

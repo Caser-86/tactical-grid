@@ -868,7 +868,7 @@ git commit -m "feat(v2): make combat outcomes immediate and readable"
 - Runtime canvas: 128x128 transparent PNG, consistent feet/hover anchor and lighting
 - Catalog key format: `<unit_id>_<direction>`
 
-- [ ] **Step 1: Measure the runtime slot and write the art brief**
+- [x] **Step 1: Measure the runtime slot and write the art brief**
 
 `m1_identity_art_brief.json` records canvas, visible subject bounds, anchor, light direction, camera angle, palette, and silhouette requirements. Use these identity requirements:
 
@@ -880,23 +880,23 @@ Drone: wide horizontal wing/disc silhouette, white-purple scan emitter, no human
 Shield guard: widest ground silhouette, dominant hexagonal shield, large orange armor fields.
 ```
 
-- [ ] **Step 2: Generate one south-facing source sample for each unit**
+- [x] **Step 2: Generate one south-facing source sample for each unit**
 
 Use ImageGen with the brief and existing approved V2 unit images as style references. Generate one isolated subject per image on a transparent background when supported, otherwise on the brief's single edge-connected chroma background for deterministic removal. Do not ask ImageGen to create a sprite sheet or UI labels.
 
-- [ ] **Step 3: Process samples deterministically**
+- [x] **Step 3: Process samples deterministically**
 
 Normalize to 128x128, remove only edge-connected background, inspect alpha, align anchors, and generate `m1_identity_contact_sheet.png` at actual 100% and 75% display scales on representative Echo Yard terrain. Record source as `AI-generated with OpenAI ImageGen`, generation date, prompt brief path, processing command, and modifications in `resource_manifest.md`.
 
-- [ ] **Step 4: Add failing actual-image distinction checks**
+- [x] **Step 4: Add failing actual-image distinction checks**
 
 Tests must check all five runtime files, alpha, dimensions, non-empty bounds, minimum visible-subject area, and unique catalog keys. The snapshot scene renders actual scale, 75% scale, grayscale, and color-assist rows.
 
-- [ ] **Step 5: Integrate samples into the M1-only catalog mapping**
+- [x] **Step 5: Integrate samples into the M1-only catalog mapping**
 
 Do not overwrite V1 assets or the current directionless V2 fallback files. M1 resolves approved files such as `v2_assault_south_128.png` through V2 catalog keys; missing directions continue using the current `v2_assault_128.png`-style fallback until Step 8.
 
-- [ ] **Step 6: Generate and inspect the snapshot**
+- [x] **Step 6: Generate and inspect the snapshot**
 
 ```powershell
 & $godot --headless --path . --script res://tests/v2/v2_unit_art_distinction_test.gd
@@ -905,7 +905,7 @@ Do not overwrite V1 assets or the current directionless V2 fallback files. M1 re
 
 Project owner approves only if each type can be named at actual and 75% scale without reading badges.
 
-- [ ] **Step 7: Revise rejected samples before direction expansion**
+- [x] **Step 7: Revise rejected samples before direction expansion**
 
 If recognition fails, enlarge silhouette features or accent areas. Do not solve recognition by adding text, thicker team circles, or higher source resolution alone.
 

@@ -29,7 +29,12 @@ This baseline records the authored data sources introduced by F03. No external a
 | 狙击哨兵和盾卫角色图 | enemy art | 现有项目自有的第一章生成式运行时单位图，通过 V2 职责 ID 映射 | project-owned generated art; no third-party content | `res://assets/generated/chapter1/runtime/units/sentry_sniper_96.png`, `res://assets/generated/chapter1/runtime/units/shield_bot_64.png` |
 | V2 玩家 token 图集和四张运行时角色图 | player art | 2026-08-06 使用 OpenAI image generation 生成；项目裁切、连通背景移除并处理为 128x128 RGBA PNG | project-owned generated art; no third-party content | `res://assets/v2/source/v2_player_token_sheet_2026-08-06.png`, `res://assets/v2/units/v2_{assault,scout,sniper,heavy}_128.png` |
 | V2 敌方 token 图集和四张运行时角色图 | enemy art | 2026-08-06 使用 OpenAI image generation 生成；项目裁切、连通背景移除并处理为 128x128 RGBA PNG | project-owned generated art; no third-party content | `res://assets/v2/source/v2_enemy_token_sheet_2026-08-06.png`, `res://assets/v2/units/v2_{sentry,drone,shield_guard,sniper_sentry}_128.png` |
+| M1 五类南向角色身份样本源图 | player/enemy art source | 2026-08-15 使用 OpenAI ImageGen 按 `res://assets/v2/source/units/m1_identity_art_brief.json` 分别生成单角色透明 PNG；无外部素材 | project-owned generated art; no third-party content | `res://assets/v2/source/units/player/`, `res://assets/v2/source/units/enemy/` |
+| M1 五类南向运行时角色图 | player/enemy art | 2026-08-15 使用 `tools/process_v2_unit_art.ps1` 去除低透明度边缘雾、裁切透明边界、缩放至 112px 主体框并放置到 128x128 透明画布，底部统一保留 6px 锚点边距 | project-owned generated art; no third-party content | `res://assets/v2/units/v2_{assault,scout,sentry,drone,shield_guard}_south_128.png` |
+| M1 角色身份样本验收图 | review artifact | 2026-08-15 使用 Godot `v2_unit_art_sample_snapshot.tscn`，复用真实 Echo Yard 地面和上述运行时图生成；仅用于验收，不在战斗运行时加载 | project-owned generated art composition; no third-party content | `res://assets/v2/source/units/m1_identity_contact_sheet.png` |
 
 V1 源图集仍仅作为制作参考。V2 战斗场景不直接叠加整张 source/styleboard，而是使用已处理的运行时组件，以保持格子尺寸、透明度、迷雾和层级顺序可验证。
+
+处理记录：五张南向源图均为单角色透明 PNG，不使用源图集或外部下载素材。处理脚本只清理 alpha 小于 8 的近透明雾边，使用高质量双三次缩放，不改变主体颜色；四角透明度、128x128 尺寸、可见主体边界和最小可见面积由 `v2_unit_art_distinction_test.gd` 检查。北/东/西方向帧尚未进入运行时，待南向小尺寸验收通过后按同一身份规格制作。
 
 Processing record for `rescue_beacon_128.png`: source image was generated as a single cyber-industrial rescue capsule, edge-connected white background was removed with a flood-fill alpha pass, the visible object was tightly cropped, and the result was downsampled to 128x128 RGBA PNG. The original generated source remains outside the repository in the Codex generated-image cache.
