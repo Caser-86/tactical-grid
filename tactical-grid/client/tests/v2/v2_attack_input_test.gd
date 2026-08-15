@@ -26,6 +26,7 @@ func _initialize() -> void:
 	var target: Unit = first_battle.get("target")
 	var battle: Node = first_battle.get("battle")
 	var hud: HUD = first_battle.get("hud")
+	var first_presenter: V2AffordancePresenter = first_battle.get("presenter")
 	t.check(_has_property(battle, "v2_context_action_resolver"), "V2 攻击输入通过上下文行动解析器路由")
 
 	battle.call("_on_v2_cell_hovered", target.grid_pos)
@@ -33,6 +34,7 @@ func _initialize() -> void:
 	battle.call("_on_v2_cell_left_clicked", target.grid_pos)
 	t.check(target.current_hp == 4, "单击敌人立即提交攻击")
 	t.check(not attacker.v2_turn_state.action_available, "攻击提交消费行动预算")
+	t.check(_group_count(first_presenter, "v2_move_overlay") > 0 and _group_count(first_presenter, "v2_attackable_outline") == 0, "行动用尽后仍保留可移动提示并清除攻击目标")
 	t.check(battle.v2_locked_attack_preview.is_empty() and battle.v2_input_router.get_state_name() == "unit_selected", "单击攻击后清除锁定状态")
 	var repeat: Dictionary = battle.call("request_attack_preview", target)
 	t.check(not bool(repeat.get("valid", true)) and repeat.get("reason", &"") == &"action_unavailable", "已攻击单位不能再次攻击")
@@ -49,6 +51,13 @@ func _initialize() -> void:
 	var hover_a: Unit = hover_battle_data.get("target")
 	var hover_b: Unit = hover_battle_data.get("target_b")
 	_set_v2_game_line()
+	var preview_for_a: Dictionary = hover_battle.v2_action_service.query_action({
+		"action": &"attack",
+		"unit": hover_battle_data.get("attacker"),
+		"target": hover_a,
+	})
+	var mismatched_target_result: Dictionary = hover_battle.call("request_attack_preview", hover_b, preview_for_a)
+	t.check(not bool(mismatched_target_result.get("valid", true)) and mismatched_target_result.get("reason", &"") == &"target_mismatch", "上下文攻击预览目标不一致时拒绝锁定")
 	hover_battle.call("_on_v2_cell_hovered", hover_a.grid_pos)
 	t.check(hover_hud.get_attack_preview_text().contains("悬停预览") and hover_hud.get_attack_preview_text().contains("7 → 4"), "悬停显示临时攻击预览")
 	t.check(_group_count(hover_presenter, "v2_attack_focus") == 1, "悬停显示临时目标焦点")

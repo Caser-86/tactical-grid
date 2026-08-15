@@ -3209,6 +3209,15 @@ func request_move(cell: Vector2i, resolved_preview: Dictionary = {}) -> Dictiona
 			"unit": selected_unit,
 			"target": cell,
 		})
+	else:
+		var resolved_validation := _validate_v2_resolved_move_preview(cell, preview)
+		if not bool(resolved_validation.get("valid", false)):
+			_cancel_v2_preview(preview)
+			var resolved_reason: StringName = resolved_validation.get("reason", &"invalid_move")
+			if hud:
+				hud.set_context_prompt(_v2_move_failure_prompt(resolved_reason))
+			_render_v2_hud()
+			return {"success": false, "committed": false, "reason": resolved_reason, "preview": preview}
 	if not bool(preview.get("valid", false)):
 		var reason: StringName = preview.get("reason", &"invalid_move")
 		if hud:
@@ -3269,7 +3278,6 @@ func _finalize_v2_move(result: Dictionary) -> void:
 	_reconcile_v2_unit_occupancy()
 	if selected_unit:
 		_update_unit_sprite_pos(selected_unit, true)
-		_refresh_selected_unit_affordances(selected_unit)
 		if hud:
 			hud.update_unit_info(selected_unit)
 	refresh_visibility_transaction(&"unit_moved")
@@ -3289,6 +3297,8 @@ func _finalize_v2_move(result: Dictionary) -> void:
 				call("_prepare_v2_m2_evac")
 			_apply_v2_mission_event(&"evac_checked")
 	_update_v2_encounters([])
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
 	_advance_v2_tutorial(&"unit_moved", {
 		"unit_id": selected_unit.entity_id if selected_unit else "",
 		"position": selected_unit.grid_pos if selected_unit else Vector2i(-1, -1),
@@ -3469,7 +3479,16 @@ func request_attack_preview(target: Unit, resolved_preview: Dictionary = {}) -> 
 		return {"valid": false, "success": false, "reason": &"no_selected_unit"}
 	if target == null or not is_instance_valid(target):
 		return {"valid": false, "success": false, "reason": &"invalid_target"}
-	var preview: Dictionary = resolved_preview if not resolved_preview.is_empty() else _query_v2_attack_preview(target)
+	var from_context_click := not resolved_preview.is_empty()
+	var preview: Dictionary = resolved_preview if from_context_click else _query_v2_attack_preview(target)
+	if from_context_click:
+		var resolved_validation := _validate_v2_resolved_attack_preview(target, preview)
+		if not bool(resolved_validation.get("valid", false)):
+			_cancel_v2_preview(preview)
+			var resolved_reason: StringName = resolved_validation.get("reason", &"invalid_attack")
+			if hud:
+				hud.show_action_reason(resolved_reason)
+			return {"valid": false, "success": false, "reason": resolved_reason}
 	if not bool(preview.get("valid", false)):
 		preview["success"] = false
 		if hud:
@@ -3678,6 +3697,22 @@ func _build_v2_attack_affordance(target: Unit, query: Dictionary, locked: bool) 
 	var preview := _get_v2_action_preview().build_attack(selected_unit, target, query)
 	preview["locked"] = locked
 	return preview
+
+func _validate_v2_resolved_move_preview(cell: Vector2i, preview: Dictionary) -> Dictionary:
+	if preview.get("unit", null) != selected_unit:
+		return {"valid": false, "reason": &"preview_unit_mismatch"}
+	if preview.get("from", selected_unit.grid_pos) != selected_unit.grid_pos:
+		return {"valid": false, "reason": &"stale_preview"}
+	if StringName(String(preview.get("action", &"move"))) != &"move":
+		return {"valid": false, "reason": &"invalid_move_preview"}
+	return _get_v2_action_preview().build_move(selected_unit, cell, preview)
+
+func _validate_v2_resolved_attack_preview(target: Unit, preview: Dictionary) -> Dictionary:
+	if preview.get("unit", null) != selected_unit:
+		return {"valid": false, "reason": &"preview_unit_mismatch"}
+	if StringName(String(preview.get("action", &"attack"))) != &"attack":
+		return {"valid": false, "reason": &"invalid_attack_preview"}
+	return _get_v2_action_preview().build_attack(selected_unit, target, preview)
 
 func _cancel_v2_preview(preview: Dictionary) -> void:
 	if v2_action_service and not preview.is_empty():
@@ -3961,6 +3996,10 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 		return
 	var can_attack := unit.can_act() if _is_v2_battle() else unit.current_ap > 0
 	if not can_attack:
+		if _is_v2_battle() and v2_affordance_presenter:
+			v2_affordance_presenter.clear_transient()
+			v2_affordance_presenter.show_reachable(reachable_cells if unit.can_move() else [])
+			v2_affordance_presenter.show_attackable([])
 		if hud:
 			if _is_v2_battle():
 				if unit.can_move():

@@ -77,6 +77,20 @@ func _initialize() -> void:
 	var repeat_result: Dictionary = battle.call("request_move", Vector2i(3, 1))
 	t.check(not bool(repeat_result.get("success", true)) and repeat_result.get("reason", &"") == &"move_unavailable", "重复移动返回明确预算错误")
 
+	var guarded_unit: Unit = _make_unit("player_guarded", Vector2i(1, 1), 5)
+	var guarded_service := V2ActionService.new()
+	guarded_service.setup(_make_map(), [guarded_unit], [])
+	battle.set("v2_action_service", guarded_service)
+	battle.set("selected_unit", guarded_unit)
+	var preview_for_other_cell: Dictionary = guarded_service.query_action({
+		"action": &"move",
+		"unit": guarded_unit,
+		"target": Vector2i(2, 1),
+	})
+	var mismatched_result: Dictionary = battle.call("request_move", Vector2i(3, 1), preview_for_other_cell)
+	t.check(not bool(mismatched_result.get("success", true)) and mismatched_result.get("reason", &"") == &"destination_mismatch", "上下文移动预览目标不一致时拒绝提交")
+	t.check(guarded_unit.grid_pos == Vector2i(1, 1) and guarded_unit.v2_turn_state.move_available, "拒绝错位移动预览不改变单位状态")
+
 	var reserve_unit: Unit = _make_unit("player_reserve", Vector2i(1, 1), 5)
 	var pending_enemy: Unit = _make_unit("enemy_pending", Vector2i(2, 1), 3)
 	pending_enemy.team = "enemy"
@@ -131,6 +145,7 @@ func _initialize() -> void:
 	live_unit.free()
 	live_enemy.free()
 	dangerous_unit.free()
+	guarded_unit.free()
 	t.finish(self)
 
 func _make_unit(id: String, position: Vector2i, move_points: int) -> Unit:
