@@ -61,14 +61,16 @@ func show_move_preview(preview: Dictionary) -> void:
 	_draw_path_route(route_path)
 
 func show_attack_preview(preview: Dictionary) -> void:
+	var locked := bool(preview.get("locked", false))
+	if locked:
+		clear_attack_focus()
 	clear_transient()
 	if not bool(preview.get("valid", false)):
 		return
 	var target: Unit = preview.get("target") as Unit
 	if target == null or not is_instance_valid(target):
 		return
-	var locked := bool(preview.get("locked", false))
-	var panel := _add_target_outline(target.grid_pos, ATTACK_BORDER if locked else ATTACK_HOVER, &"v2_attack_preview", true, locked)
+	var panel := _add_target_outline(target.grid_pos, ATTACK_BORDER if locked else ATTACK_HOVER, &"v2_attack_preview", not locked, locked)
 	panel.add_to_group("v2_attack_focus")
 	panel.set_meta("v2_target_id", String(target.entity_id))
 	panel.set_meta("v2_damage", int(preview.get("damage", 0)))
@@ -105,7 +107,9 @@ func show_attack_focus(cell: Vector2i, locked: bool) -> void:
 	panel.set_meta("v2_focus_locked", locked)
 
 func clear_attack_focus() -> void:
-	_clear_group(&"v2_attack_focus")
+	for child in get_children():
+		if bool(child.get_meta("v2_focus_locked", false)):
+			child.free()
 
 func clear_temporary_attack_focus() -> void:
 	for child in get_children():
@@ -202,7 +206,7 @@ func _add_attack_numbers(cell: Vector2i, damage: int, hp_after: int, locked: boo
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.z_index = 12
 	label.add_to_group("v2_attack_preview_numbers")
-	label.set_meta("v2_transient", true)
+	label.set_meta("v2_transient", not locked)
 	label.set_meta("v2_focus_locked", locked)
 	add_child(label)
 
@@ -220,7 +224,7 @@ func _add_intent_change_cue(cell: Vector2i, locked: bool) -> void:
 	style.set_border_width_all(2)
 	cue.add_theme_stylebox_override("panel", style)
 	cue.add_to_group("v2_intent_change_cue")
-	cue.set_meta("v2_transient", true)
+	cue.set_meta("v2_transient", not locked)
 	cue.set_meta("v2_focus_locked", locked)
 	add_child(cue)
 

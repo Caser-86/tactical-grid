@@ -3680,6 +3680,8 @@ func _clear_v2_locked_attack() -> void:
 	_cancel_v2_preview(v2_locked_attack_preview)
 	v2_locked_attack_preview.clear()
 	v2_locked_attack_target_id = ""
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_attack_focus()
 	if hud:
 		hud.clear_attack_preview()
 

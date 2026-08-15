@@ -72,6 +72,7 @@ func _initialize() -> void:
 	t.check(hover_hud.get_attack_preview_text().contains("enemy_hover_b"), "锁定 A 时悬停 B 只显示 B 的临时预览")
 	hover_battle.call("_on_v2_cell_hovered", Vector2i(0, 0))
 	t.check(hover_hud.get_attack_preview_text().contains("enemy_hover_a") and hover_hud.get_attack_preview_text().contains("已锁定"), "离开 B 后恢复 A 的锁定卡片")
+	t.check(_group_count(hover_presenter, "v2_attack_preview") == 1 and _group_count(hover_presenter, "v2_attack_preview_numbers") == 1, "离开 B 后恢复 A 的锁定战场预览")
 	var committed_a: Dictionary = hover_battle.call("confirm_locked_attack", hover_a)
 	t.check(bool(committed_a.get("success", false)) and hover_a.current_hp == 4 and hover_b.current_hp == 7, "确认锁定 A 不会误伤 B")
 
