@@ -65,7 +65,12 @@ function Register-Result {
         }
     }
 
-    $passed = $ExitCode -eq 0 -and ($failedAssertions -lt 0 -or $failedAssertions -eq 0)
+    $hasAssertionResult = $passedAssertions -ge 0 -and $failedAssertions -ge 0
+    $requiresAssertions = $Kind -eq 'Godot script' -or $Kind -eq 'Godot scene'
+    $passed = $ExitCode -eq 0
+    if ($requiresAssertions -and (-not $hasAssertionResult -or $failedAssertions -ne 0)) {
+        $passed = $false
+    }
     $gateResults.Add([pscustomobject]@{
         Kind = $Kind
         Path = $Path
