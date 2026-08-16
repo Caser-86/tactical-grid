@@ -1123,7 +1123,7 @@ Expected: EXE/PCK/version/cold-start and V2 isolation pass.
 
 Record commit, gate totals, warning counts, package path, cold-start result, single-owner result, residual risk, and the explicit statement that one familiar human tester does not prove stranger first-time comprehension.
 
-Current evidence: `ae5ca19`; gate `84/84` items and `2122/2122` assertions with `Warnings: 0`; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`; Windows package and V2 isolation both passed. The owner continuation checkpoint is not public-release approval.
+Current evidence: `e96d980`; gate `85/85` items and `2126/2126` assertions with `Warnings: 0`; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`; Windows package and V2 isolation both passed. The owner continuation checkpoint is not public-release approval.
 
 - [x] **Step 7: Commit release evidence**
 
@@ -1212,11 +1212,11 @@ The remaining Chapter One requirements for M2-M6, optional operations, modules, 
 
 - [x] **Step 4: Run focused and complete verification**
 
-  Evidence: input `52/0`, ability rules `22/0`, player-turn E2E `85/0`, runtime wiring `12/0`; full V2 gate `84/84` items and `2122/2122` assertions with `Warnings: 0`; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`.
+  Evidence: input `52/0`, ability rules `22/0`, player-turn E2E `85/0`, runtime wiring `12/0`; full V2 gate `85/85` items and `2126/2126` assertions with `Warnings: 0`; M1 E2E `68/68`; M1 visual `36/36`; M2 visual `54/54`.
 
 - [x] **Step 5: Rebuild the Windows candidate and update its manifest**
 
-  Run `tools/build_windows.ps1`, `tests/verify_windows_package.ps1`, and `tests/v2/v2_release_isolation_test.ps1` after the implementation commit. The current candidate is based on `ae5ca19`; EXE SHA-256 is `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62` and PCK SHA-256 is `4296ed3ce33466801f239757199ec2418a492bf62e244676c257e5675c9c5734`.
+  Run `tools/build_windows.ps1`, `tests/verify_windows_package.ps1`, and `tests/v2/v2_release_isolation_test.ps1` after the implementation commit. The current candidate is based on `e96d980`; EXE SHA-256 is `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62` and PCK SHA-256 is `4296ed3ce33466801f239757199ec2418a492bf62e244676c257e5675c9c5734`.
 
 - [ ] **Step 6: Owner and first-player balance review**
 

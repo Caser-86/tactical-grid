@@ -7,24 +7,25 @@
 ## 构建与版本
 
 - 分支：`codex/ch1-infiltration-v2`
-- 源码自动化验证基线：`ae5ca19 fix(v2): close runtime and fixture teardown leaks`
+- 源码自动化验证基线：`e96d980 test(v2): require assertion output from Godot gate items`
 - Godot：4.7.1-stable
 - V2 入口：`res://scenes/v2_boot.tscn`
 - V2 用户目录：`TacticalGrid_V2_Infiltration`
 - Windows 包目录：`build/TacticalGrid_V2_Infiltration/`
-- 当前候选包：本轮基于 `ae5ca19` 重建；EXE `109080576` bytes，PCK `44301316` bytes。SHA-256 记录于构建生成的 `build/TacticalGrid_V2_Infiltration/release_manifest.json`：EXE `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62`，PCK `4296ed3ce33466801f239757199ec2418a492bf62e244676c257e5675c9c5734`。
+- 当前候选包：本轮基于 `e96d980` 重建；EXE `109080576` bytes，PCK `44301316` bytes。SHA-256 记录于构建生成的 `build/TacticalGrid_V2_Infiltration/release_manifest.json`：EXE `41385b33ed2f43f0f4cbb1781ebd4873f931c5763a07d6e46b31f723d43b1d62`，PCK `4296ed3ce33466801f239757199ec2418a492bf62e244676c257e5675c9c5734`。
 
 ## 已通过证据
 
 | 检查 | 命令/证据 | 结果 |
 |---|---|---|
-| V2 总闸门 | `tests/v2/run_v2_gate.ps1` | 84/84 项通过，2122/2122 断言通过；Warnings: 0 |
+| V2 总闸门 | `tests/v2/run_v2_gate.ps1` | 85/85 项通过，2126/2126 断言通过；Warnings: 0 |
+| V2 门禁结果解析契约 | `tests/v2/v2_gate_runner_contract_test.gd` | Godot 脚本/场景若缺少 `Passed/Failed` 断言结果，不能仅凭退出码 0 被误判为通过 |
 | M1 路线 E2E | `tests/v2/run_m1_e2e_process_matrix.ps1 -GodotExe <Godot>` | `main_direct`、`optional_record`、`checkpoint_retry` 各在独立 Godot 进程运行，共 68/68 断言通过 |
 | M1 视觉矩阵 | `tests/v2/run_m1_visual_matrix.ps1` | 36/36 PNG 通过，2 分辨率 x 3 显示模式 x 6 阶段 |
 | M2 视觉矩阵 | `tests/v2/run_m2_visual_matrix.ps1` | 54/54 PNG 通过 |
 | V2 四职业能力入口 | `v2_input_router_test.gd`、`v2_ability_rules_test.gd`、`v2_player_turn_e2e_test.tscn`、`v2_playtest_runtime_wiring_test.gd` | Q 键进入能力目标选择，金色目标格和悬停预览可见，左键提交、右键/Q 取消；输入 52/0、规则 22/0、实战 85/0、接线 12/0 |
 | 结算页可见性 | M1/M2 两分辨率结果阶段断言 | 结算层可见、覆盖当前视口、奖励文本不与按钮重叠 |
-| Windows 构建 | `tools/build_windows.ps1 -GodotPath <Godot>` | 本轮基于 `ae5ca19` 重新导出成功，退出码 0；构建脚本会清理旧导出 `*.TMP` |
+| Windows 构建 | `tools/build_windows.ps1 -GodotPath <Godot>` | 本轮基于 `e96d980` 重新导出成功，退出码 0；构建脚本会清理旧导出 `*.TMP` |
 | Windows 包校验 | `tests/verify_windows_package.ps1` | 当前候选包的 EXE、PCK、版本元数据和冷启动通过，退出码 0 |
 | V2 隔离校验 | `tests/v2/v2_release_isolation_test.ps1` | 当前候选包的 V2 入口、用户目录、旧版文件残留和冷启动通过，退出码 0 |
 | 单人验收遥测 | `v2_playtest_recorder_test.gd`、`v2_playtest_integration_contract_test.gd`、`v2_playtest_runtime_wiring_test.gd` | 42/0、10/0、8/0；运行时已接入无效点击、取消、镜头、伤害、倒地、敌方意图和重试事件；OWNER 记录默认不含截图或个人标识，AI 不能写入 `approved` |
@@ -74,7 +75,7 @@
 10. 项目负责人已完成当前 Windows 候选包试玩，并确认可以继续开发；由于未提供逐项时长和首次玩家样本，本报告仍不把该结果视为公开发布签核。
 11. 本轮将四职业的已有能力接入统一的 `Q -> 金色目标格 -> 悬停预览 -> 左键提交` 路径：突击兵冲击推进、侦察兵区域扫描、狙击手截断射击、重装兵屏障投射；能力规则仍由 V2 行动服务统一查询和提交，V1 输入路径没有接入该信号。
 12. 项目负责人试玩确认当前候选包已能继续试玩；这属于继续开发检查点，不等同于首次玩家理解度或公开发布签核。
-13. V2 运行时服务、幽灵占位和测试 fixture 的所有权释放已收口；完整门禁复测为 84/84 项、2122/2122 断言、Warnings: 0。
+13. V2 运行时服务、幽灵占位和测试 fixture 的所有权释放已收口；完整门禁复测为 85/85 项、2126/2126 断言、Warnings: 0。
 
 ## 下一条执行任务
 

@@ -44,7 +44,7 @@ V1/V2 隔离证据包括专用 `TacticalGrid_V2_Infiltration` 用户目录、`v2
 pwsh -NoProfile -ExecutionPolicy Bypass -File tests/v2/run_v2_gate.ps1
 ```
 
-runner 会为 manifest 中每一项输出显式 `PASS`/`FAIL`、退出码和 `Passed`/`Failed` 断言计数；失败项不会阻止后续项执行。Godot teardown 的 ObjectDB/resource 输出和 V1 save-recovery 输出会列在 `Warnings (non-fatal)`，但仍保留原始文本；任何非零退出码或失败断言都会使门最终退出 `1`。
+runner 会为 manifest 中每一项输出显式 `PASS`/`FAIL`、退出码和 `Passed`/`Failed` 断言计数；Godot 脚本/场景缺少断言结果时也会判为失败，不能只凭退出码 `0` 放行。失败项不会阻止后续项执行。Godot teardown 的 ObjectDB/resource 输出和 V1 save-recovery 输出会列在 `Warnings (non-fatal)`，但仍保留原始文本；任何非零退出码、缺少断言结果或失败断言都会使门最终退出 `1`。
 
 ## M113 首次玩家记录
 
