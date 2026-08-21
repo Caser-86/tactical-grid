@@ -3,6 +3,8 @@
 extends Control
 class_name MissionResult
 
+const V2ResultPresentationScript = preload("res://scripts/v2/presentation/v2_result_presentation.gd")
+
 @onready var title_label = $Panel/TitleLabel
 @onready var stars_container = $Panel/StarsContainer
 @onready var turns_label = $Panel/StatsLabel/TurnsValue
@@ -29,6 +31,7 @@ func _ready() -> void:
 ## 显示结算结果
 func show_result(data: Dictionary) -> void:
 	var is_victory = data.get("result", "defeat") == "victory"
+	var is_v2 := String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
 
 	if is_victory:
 		title_label.text = "任务完成"
@@ -37,16 +40,21 @@ func show_result(data: Dictionary) -> void:
 		title_label.text = "任务失败"
 		title_label.modulate = Color.RED
 		# CH1-080: 失败页明确说明最近失败原因
-		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")))
+		var reason_text := _get_defeat_reason_text(String(data.get("defeat_reason", "")), is_v2, data)
 		var reason_label := Label.new()
 		reason_label.text = reason_text
 		reason_label.add_theme_font_size_override("font_size", 18)
 		reason_label.modulate = Color("f4b45a")
 		reason_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		loot_container.add_child(reason_label)
 
-	# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
-	_show_badges(data)
+	# V2 uses clear mission feedback instead of the V1 star/rating panel.
+	if is_v2:
+		_show_v2_summary(data)
+	else:
+		# 显示任务徽章（替代星级，保留整数 rating 字段用于存档）
+		_show_badges(data)
 
 	# 显示统计
 	turns_label.text = "回合数  %s" % str(data.get("turns", 0))
@@ -57,6 +65,8 @@ func show_result(data: Dictionary) -> void:
 
 	# 显示奖励
 	var rewards = data.get("rewards", {})
+	credit_label.visible = not is_v2
+	exp_label.visible = not is_v2
 	credit_label.text = "信用点  +%s" % str(rewards.get("credit", 0))
 	exp_label.text = "经验值  +%s" % str(rewards.get("exp", 0))
 	intel_label.text = "情报  +%s" % str(rewards.get("intel", 0))
@@ -70,7 +80,7 @@ func show_result(data: Dictionary) -> void:
 
 	# 显示掉落物品
 	# Task 3: optional resource reward
-	if int(data.get("optional_credit", 0)) > 0:
+	if not is_v2 and int(data.get("optional_credit", 0)) > 0:
 		var opt_label = Label.new()
 		opt_label.text = "optional resource  +%d credit" % int(data.get("optional_credit", 0))
 		opt_label.modulate = Color.GOLD
@@ -83,7 +93,7 @@ func show_result(data: Dictionary) -> void:
 		loot_container.add_child(loot_label)
 
 	# 首通新机制与职业解锁必须在结算页明确反馈给玩家。
-	var new_unlocks: Array = data.get("new_unlocks", [])
+	var new_unlocks: Array = [] if is_v2 else data.get("new_unlocks", [])
 	if not new_unlocks.is_empty():
 		var unlock_header := Label.new()
 		unlock_header.text = "新解锁"
@@ -101,7 +111,68 @@ func show_result(data: Dictionary) -> void:
 	retry_button.modulate = Color("f4b45a") if not is_victory else Color.WHITE
 	# "从遭遇重试"仅在失败且有遭遇检查点时显示（不在 zone_a 失败）
 	var has_checkpoint: bool = bool(data.get("has_encounter_checkpoint", false))
+	if is_v2:
+		has_checkpoint = not GameManager.get_v2_encounter_checkpoint().is_empty()
 	encounter_retry_button.visible = not is_victory and has_checkpoint
+	if is_v2:
+		encounter_retry_button.text = "从检查点重试"
+		retry_button.text = "重新开始任务"
+		base_button.text = "返回基地"
+
+func _show_v2_summary(data: Dictionary) -> void:
+	# V2 adds rescue and module feedback; reserve a dedicated lower band so
+	# those lines never collide with the result actions at small resolutions.
+	var panel: Control = $Panel
+	panel.offset_top = -340.0
+	panel.offset_bottom = 340.0
+	$Panel/LootContainer.offset_top = 350.0
+	$Panel/LootContainer.offset_bottom = 540.0
+	$Panel/Buttons.offset_top = 560.0
+	$Panel/Buttons.offset_bottom = 620.0
+	stars_container.visible = false
+	var header := Label.new()
+	header.text = "行动回顾"
+	header.modulate = Color("6dd6e5")
+	header.add_theme_font_size_override("font_size", 19)
+	loot_container.add_child(header)
+	var primary := Label.new()
+	primary.text = "主目标：%s" % ("已完成" if data.get("result", "defeat") == "victory" else "未完成")
+	primary.modulate = Color("7ee68a") if data.get("result", "defeat") == "victory" else Color("f4b45a")
+	loot_container.add_child(primary)
+	var repository: Node = get_node_or_null("/root/V2Data")
+	var summary: Dictionary = V2ResultPresentationScript.build_summary(data, repository)
+	var completion_guide := Label.new()
+	completion_guide.text = "通关回顾：%s" % String(summary.get("completion_guide", ""))
+	completion_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	completion_guide.modulate = Color("b8d7dc")
+	loot_container.add_child(completion_guide)
+	var phase_line := String(summary.get("phase_line", ""))
+	if not phase_line.is_empty():
+		var phase_label := Label.new()
+		phase_label.text = phase_line
+		phase_label.modulate = Color("f4b45a") if data.get("result", "defeat") != "victory" else Color("b8d7dc")
+		loot_container.add_child(phase_label)
+	var next_action := String(summary.get("next_action", ""))
+	if not next_action.is_empty():
+		var next_label := Label.new()
+		next_label.text = next_action
+		next_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		next_label.modulate = Color("b8d7dc")
+		loot_container.add_child(next_label)
+	var optional := Label.new()
+	optional.text = String(summary.get("optional_line", "可选目标：未完成"))
+	optional.modulate = Color("7ee68a") if bool(data.get("optional_record", false)) else Color("9aa9ad")
+	loot_container.add_child(optional)
+	for rescued_text in summary.get("rescued_lines", []):
+		var rescued_label := Label.new()
+		rescued_label.text = "新队员：%s" % String(rescued_text)
+		rescued_label.modulate = Color("6dd6e5")
+		loot_container.add_child(rescued_label)
+	for module_name in summary.get("module_lines", []):
+		var module_label := Label.new()
+		module_label.text = "新模块：%s" % String(module_name)
+		module_label.modulate = Color("f4b45a")
+		loot_container.add_child(module_label)
 
 func _apply_visual_theme() -> void:
 	var panel_style := StyleBoxFlat.new()
@@ -202,6 +273,9 @@ func _format_time(seconds: int) -> String:
 	return "%d:%02d" % [m, s]
 
 func _on_retry() -> void:
+	if String(GameManager.current_save.get("game_line", "")) == "v2_infiltration":
+		GameManager.restart_v2_mission(GameManager.current_level_id)
+		return
 	GameManager.go_to_battle(GameManager.current_level_id)
 
 ## CH1-080: 从遭遇检查点重试（当前为重开关卡，完整状态恢复见 CH1-020）
@@ -218,8 +292,32 @@ func _on_next() -> void:
 	else:
 		GameManager.go_to_base()
 
+## Stable contract consumed by V2 retry tests and future result-screen variants.
+func get_failure_actions(has_checkpoint: bool) -> Array[StringName]:
+	var actions: Array[StringName] = []
+	if has_checkpoint:
+		actions.append(&"retry_checkpoint")
+	actions.append(&"restart_mission")
+	actions.append(&"return_base")
+	return actions
+
 ## CH1-080: 失败原因文案
-func _get_defeat_reason_text(reason: String) -> String:
+func _get_defeat_reason_text(reason: String, is_v2: bool = false, data: Dictionary = {}) -> String:
+	if is_v2:
+		var rescued: Array = data.get("rescued", [])
+		var survived := int(data.get("units_survived", 0))
+		var total := int(data.get("units_total", 0))
+		var phase := String(data.get("mission_step_text", ""))
+		if phase.is_empty():
+			phase = "营救前推进" if rescued.is_empty() else "营救后撤离"
+		var next_action := "先沿黄色“下一步”标记推进，完成吊桥操作后再营救侦察兵。" if rescued.is_empty() else "把所有当前存活队员带入绿色撤离区。"
+		match reason:
+			"turn_limit":
+				return "失败原因：回合上限耗尽。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
+			"all_units_down":
+				return "失败原因：队员全部失能。当前阶段：%s。下一步：%s 可利用掩体；Space 只会结束我方回合并让敌人行动，不会停止敌人。" % [phase, next_action]
+			_:
+				return "失败原因：未完成必做流程。当前阶段：%s。下一步：%s 当前存活 %d/%d。" % [phase, next_action, survived, total]
 	match reason:
 		"all_units_down":
 			return "失败原因：全队阵亡。注意利用掩体和网络节点减少伤害。"

@@ -42,7 +42,9 @@ const HINT_COPY := {
 
 var _flag: String = ""
 var _on_closed: Callable = Callable()
+var _on_context_skip: Callable = Callable()
 var _skip_remaining: bool = false
+var _context_skip_button: Button = null
 
 ## 获取教程文案；未知 flag 返回空字符串
 static func get_hint_copy(flag: String) -> String:
@@ -64,6 +66,9 @@ func is_skip_requested() -> bool:
 func show_hint(flag: String, on_closed: Callable = Callable()) -> void:
 	_flag = flag
 	_on_closed = on_closed
+	_on_context_skip = Callable()
+	if _context_skip_button:
+		_context_skip_button.visible = false
 	# 未知 flag 或已读：直接回调，不显示 UI
 	if get_hint_copy(flag) == "" or is_known(flag):
 		_close()
@@ -81,15 +86,36 @@ func show_context_hint(flag: String) -> void:
 	var copy := get_hint_copy(flag)
 	if copy == "" or is_known(flag):
 		return
+	_on_context_skip = Callable()
+	if _context_skip_button:
+		_context_skip_button.visible = false
 	_context_label.text = copy
 	_background.visible = false
 	_modal_panel.visible = false
 	_context_panel.visible = true
 	show()
 
+## V2 uses a short, state-machine-owned hint instead of the V1 flag copy.
+## The callback only dismisses onboarding; it never changes gameplay rules.
+func show_v2_context_hint(text: String, on_skip: Callable = Callable()) -> void:
+	if text.is_empty():
+		return
+	_flag = ""
+	_on_closed = Callable()
+	_on_context_skip = on_skip
+	_context_label.text = text
+	_background.visible = false
+	_modal_panel.visible = false
+	_context_panel.visible = true
+	if _context_skip_button:
+		_context_skip_button.visible = true
+	show()
+
 ## CH1-030: 隐藏上下文教学提示
 func dismiss_context_hint() -> void:
 	_context_panel.visible = false
+	if _context_skip_button:
+		_context_skip_button.visible = false
 	if is_inside_tree():
 		hide()
 
@@ -99,8 +125,11 @@ func is_context_hint_active() -> bool:
 
 func _ready() -> void:
 	hide()
+	_context_skip_button = get_node_or_null("ContextPanel/SkipContextButton") as Button
 	_continue_button.pressed.connect(_on_continue)
 	_skip_button.pressed.connect(_on_skip)
+	if _context_skip_button:
+		_context_skip_button.pressed.connect(_on_context_skip_pressed)
 
 func _on_continue() -> void:
 	mark_known(_flag)
@@ -111,11 +140,21 @@ func _on_skip() -> void:
 	_skip_remaining = true
 	_close()
 
+func _on_context_skip_pressed() -> void:
+	_skip_remaining = true
+	dismiss_context_hint()
+	var callback := _on_context_skip
+	_on_context_skip = Callable()
+	if callback.is_valid():
+		callback.call()
+
 ## 关闭提示并恢复回调
 func _close() -> void:
 	if is_inside_tree():
 		hide()
 		_context_panel.visible = false
+	if _context_skip_button:
+		_context_skip_button.visible = false
 	hint_closed.emit(_flag)
 	if _on_closed.is_valid():
 		_on_closed.call()

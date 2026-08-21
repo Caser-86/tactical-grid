@@ -1,0 +1,22 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] 首先教学选择
+  [PASS] 选择提示同时解释移动和攻击颜色
+  [PASS] 一次只显示一条提示
+  [PASS] 未选择不能跳过步骤
+  [PASS] 完成选择后推进
+  [PASS] 第二步教学移动
+  [PASS] 移动提示说明可移动格和取消方式
+  [PASS] 完成移动后推进到后续提示
+  [PASS] 移动后进入攻击提示而非阻塞主线
+  [PASS] 主线撤离事件可直接完成软引导
+  [PASS] 主线完成后教学结束
+  [PASS] 教学完成后没有残留提示
+  [PASS] 摄像头教学可选且不会要求先攻击或观察敌人
+  [PASS] 可选教学之后仍可直接结束
+  [PASS] 跳过教学返回明确状态
+  [PASS] 跳过只关闭教学状态
+  [PASS] 跳过后不再显示提示
+  [PASS] 跳过后行为规则不被教学状态改写
+Passed: 18
+Failed: 0

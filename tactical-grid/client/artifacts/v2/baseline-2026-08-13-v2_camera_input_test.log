@@ -1,0 +1,13 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] 中键拖动改变镜头位置
+  [PASS] 滚轮向上放大镜头
+  [PASS] 滚轮向下缩小且不超过边界
+  [PASS] Home 聚焦格子后仍受地图边界约束
+  [PASS] 输入路由器转发中键拖动增量
+  [PASS] 输入路由器转发滚轮缩放
+  [PASS] Home 聚焦不改变战术状态
+  [PASS] 取消选中后 Home 仍回到存活玩家
+  [PASS] 有选中玩家时 Home 优先回到当前玩家
+Passed: 9
+Failed: 0

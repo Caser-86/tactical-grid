@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/v2/v2_player_turn_e2e_test.gd" id="1"]
+
+[node name="V2PlayerTurnE2E" type="Node"]
+process_mode = 3
+script = ExtResource("1")

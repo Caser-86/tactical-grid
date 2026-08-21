@@ -18,6 +18,25 @@ var current_bgm: String = ""
 var battle_music_layer: int = -1
 var audio_cache: Dictionary = {}
 
+## V2 semantic cues keep gameplay events independent from concrete filenames.
+## Existing V1 helpers continue to call their original project-owned assets.
+const SEMANTIC_SFX: Dictionary = {
+	&"assault_shot": &"sfx_combat_smg",
+	&"scout_shot": &"sfx_combat_pistol",
+	&"sentry_shot": &"sfx_combat_sniper",
+	&"drone_scan": &"sfx_network_scan",
+	&"shield_protect": &"sfx_v2_shield_protect",
+	&"hit": &"sfx_hit_flesh",
+	&"shield_absorb": &"sfx_v2_shield_absorb",
+	&"downed": &"sfx_unit_down",
+	&"objective_update": &"sfx_v2_objective_update",
+	&"rescue": &"sfx_v2_rescue",
+	&"evac": &"sfx_v2_evac",
+}
+
+func _is_headless_runtime() -> bool:
+	return DisplayServer.get_name() == "headless"
+
 func _ready() -> void:
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.name = "BGMPlayer"
@@ -44,6 +63,22 @@ func _ready() -> void:
 
 	_load_settings()
 	bgm_player.finished.connect(_restart_bgm)
+
+func _exit_tree() -> void:
+	# Autoload shutdown must release active playback before Godot clears resources.
+	for player in [bgm_player, sfx_player, ambient_player]:
+		_release_player(player)
+	for player in _sfx_pool:
+		_release_player(player)
+	audio_cache.clear()
+	current_bgm = ""
+	battle_music_layer = -1
+
+func _release_player(player: AudioStreamPlayer) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	player.stop()
+	player.stream = null
 
 func _load_settings() -> void:
 	var file = FileAccess.open("user://settings.json", FileAccess.READ)
@@ -74,6 +109,10 @@ func _set_bus_volume(bus_name: StringName, volume: float) -> void:
 
 ## 播放 BGM
 func play_bgm(bgm_id: String) -> void:
+	# Headless scene tests do not have an audio device. Avoid creating decoded
+	# playback streams that Godot cannot release before the test process exits.
+	if _is_headless_runtime():
+		return
 	if bgm_id == current_bgm:
 		return
 	current_bgm = bgm_id
@@ -94,11 +133,16 @@ func _restart_bgm() -> void:
 ## 停止 BGM
 func stop_bgm() -> void:
 	bgm_player.stop()
+	# Release the stream as well as playback so temporary battle scenes and
+	# headless verification runs do not retain decoded BGM resources.
+	bgm_player.stream = null
 	current_bgm = ""
 	battle_music_layer = -1
 
 ## 播放音效
 func play_sfx(sfx_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
 		sfx_player.stream = stream
@@ -106,12 +150,26 @@ func play_sfx(sfx_id: String) -> void:
 
 ## AUDIO-01: Play SFX through the polyphonic pool so concurrent sounds do not interrupt each other.
 func play_sfx_pooled(sfx_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("sfx", sfx_id)
 	if stream:
 		var player: AudioStreamPlayer = _sfx_pool[_sfx_pool_index]
 		player.stream = stream
 		player.play()
 		_sfx_pool_index = (_sfx_pool_index + 1) % SFX_POOL_SIZE
+
+## Return the concrete project-owned cue for a gameplay semantic event.
+func get_semantic_sfx_id(cue_id: StringName) -> StringName:
+	return SEMANTIC_SFX.get(cue_id, cue_id)
+
+## Contract used by headless tests and presentation layers without loading audio.
+func has_semantic_sfx(cue_id: StringName) -> bool:
+	return _audio_file_exists("sfx", String(get_semantic_sfx_id(cue_id)))
+
+## Play a semantic cue through the polyphonic pool. Headless mode remains a no-op.
+func play_semantic_sfx(cue_id: StringName) -> void:
+	play_sfx_pooled(String(get_semantic_sfx_id(cue_id)))
 
 ## AUDIO-01: Network and alert SFX
 func sfx_network_scan() -> void:
@@ -140,6 +198,8 @@ func sfx_beacon_delay() -> void:
 
 ## 播放环境音
 func play_ambient(ambient_id: String) -> void:
+	if _is_headless_runtime():
+		return
 	var stream = _load_audio("ambient", ambient_id)
 	if stream:
 		ambient_player.stream = stream
@@ -148,6 +208,7 @@ func play_ambient(ambient_id: String) -> void:
 ## 停止环境音
 func stop_ambient() -> void:
 	ambient_player.stop()
+	ambient_player.stream = null
 
 ## 加载音频文件
 func _load_audio(category: String, audio_id: String) -> AudioStream:
@@ -155,16 +216,24 @@ func _load_audio(category: String, audio_id: String) -> AudioStream:
 	if audio_cache.has(cache_key):
 		return audio_cache[cache_key]
 
-	var path = "res://assets/audio/" + category + "/" + audio_id + ".ogg"
-	if not FileAccess.file_exists(path):
-		path = "res://assets/audio/" + category + "/" + audio_id + ".wav"
-		if not FileAccess.file_exists(path):
-			return null
+	var path := _audio_file_path(category, audio_id)
+	if path.is_empty():
+		return null
 
 	var stream = load(path)
 	if stream:
 		audio_cache[cache_key] = stream
 	return stream
+
+func _audio_file_exists(category: String, audio_id: String) -> bool:
+	return not _audio_file_path(category, audio_id).is_empty()
+
+func _audio_file_path(category: String, audio_id: String) -> String:
+	var ogg_path := "res://assets/audio/%s/%s.ogg" % [category, audio_id]
+	if FileAccess.file_exists(ogg_path):
+		return ogg_path
+	var wav_path := "res://assets/audio/%s/%s.wav" % [category, audio_id]
+	return wav_path if FileAccess.file_exists(wav_path) else ""
 
 ## 设置音量
 func set_bgm_volume(volume: float) -> void:
@@ -191,6 +260,21 @@ func sfx_move() -> void:
 
 func sfx_attack(weapon_type: String = "pistol") -> void:
 	play_sfx("sfx_combat_" + weapon_type)
+
+func sfx_shield_protect() -> void:
+	play_semantic_sfx(&"shield_protect")
+
+func sfx_shield_absorb() -> void:
+	play_semantic_sfx(&"shield_absorb")
+
+func sfx_objective_update() -> void:
+	play_semantic_sfx(&"objective_update")
+
+func sfx_rescue() -> void:
+	play_semantic_sfx(&"rescue")
+
+func sfx_evac() -> void:
+	play_semantic_sfx(&"evac")
 
 ## 将现有武器 special 映射为可审核的听觉轮廓。
 func get_weapon_sfx_profile(weapon_special: String) -> String:

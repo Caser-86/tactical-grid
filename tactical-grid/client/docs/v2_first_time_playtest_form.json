@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "status": "NOT_EXECUTED",
+  "build_commit": "",
+  "test_conditions": {
+    "mode": "standard",
+    "resolution": "1280x720",
+    "v2_new_save": true,
+    "godot_editor_open": false,
+    "developer_overlay_visible": false,
+    "oral_guidance_given": false
+  },
+  "participants": [
+    {
+      "id": "P01",
+      "m1": {
+        "start_time_utc": "",
+        "end_time_utc": "",
+        "duration_minutes": null,
+        "turns": null,
+        "encounters_seen": null,
+        "facilities_used": [],
+        "optional_rooms_entered": [],
+        "first_lost_location": "",
+        "failure_reasons": [],
+        "result": "NOT_RECORDED",
+        "understood_primary_goal": null,
+        "understood_evacuation_condition": null,
+        "understood_movement_range": null,
+        "understood_attack_range": null,
+        "understood_enemy_intent": null,
+        "used_optional_content": null,
+        "used_sniper_or_rescued_character_ability": null,
+        "stuck_events": [],
+        "technical_interventions": [],
+        "player_quotes": []
+      },
+      "m2": {
+        "start_time_utc": "",
+        "end_time_utc": "",
+        "duration_minutes": null,
+        "turns": null,
+        "route_selected": "",
+        "hazard_warning_understood": null,
+        "sniper_rescued": null,
+        "sniper_ability_used": null,
+        "cooling_room_entered": null,
+        "optional_content_used": null,
+        "understood_primary_goal": null,
+        "understood_evacuation_condition": null,
+        "failure_reasons": [],
+        "result": "NOT_RECORDED",
+        "stuck_events": [],
+        "technical_interventions": [],
+        "player_quotes": []
+      },
+      "post_session_answers": {
+        "main_goal_in_own_words": "",
+        "evacuation_in_own_words": "",
+        "most_unclear_step": "",
+        "would_continue_to_next_mission": "",
+        "would_play_again": ""
+      }
+    },
+    {
+      "id": "P02",
+      "m1": {},
+      "m2": {},
+      "post_session_answers": {}
+    },
+    {
+      "id": "P03",
+      "m1": {},
+      "m2": {},
+      "post_session_answers": {}
+    }
+  ],
+  "hard_gate": {
+    "m1_median_minutes_target": "20-25",
+    "m2_median_minutes_target": "25-30",
+    "no_player_completes_either_mission_under_minutes": 5,
+    "all_players_can_repeat_goal_and_evacuation": null,
+    "at_least_two_players_use_optional_content": null,
+    "no_known_stability_issue": null,
+    "decision": "NOT_READY"
+  }
+}

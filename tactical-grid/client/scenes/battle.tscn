@@ -27,6 +27,8 @@ script = ExtResource("9")
 
 [node name="AttackHighlightLayer" type="Node2D" parent="."]
 
+[node name="V2AffordanceLayer" type="Node2D" parent="."]
+
 [node name="UnitLayer" type="Node2D" parent="."]
 
 [node name="EffectLayer" type="Node2D" parent="."]
@@ -89,6 +91,30 @@ offset_top = 10.0
 offset_right = 240.0
 offset_bottom = 300.0
 text = "单位信息"
+
+[node name="V2ActionBudgetLabel" type="Label" parent="HUD/RightPanel"]
+visible = false
+layout_mode = 1
+offset_left = 10.0
+offset_top = 222.0
+offset_right = 240.0
+offset_bottom = 258.0
+theme_override_colors/font_color = Color(0.45, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 13
+text = "行动预算"
+autowrap_mode = 2
+
+[node name="V2ActionHintLabel" type="Label" parent="HUD/RightPanel"]
+visible = false
+layout_mode = 1
+offset_left = 10.0
+offset_top = 260.0
+offset_right = 240.0
+offset_bottom = 306.0
+theme_override_colors/font_color = Color(0.72, 0.84, 0.88, 0.95)
+theme_override_font_sizes/font_size = 12
+text = ""
+autowrap_mode = 2
 
 [node name="BottomBar" type="Panel" parent="HUD"]
 layout_mode = 1

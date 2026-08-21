@@ -1,0 +1,58 @@
+{
+  "assault_a": {
+    "id": "assault_a",
+    "name": "延伸冲击",
+    "character_id": "assault",
+    "effect": {"push_distance_bonus": 1},
+    "unlock": {"mission": "base", "event": "start"}
+  },
+  "assault_b": {
+    "id": "assault_b",
+    "name": "冲击护盾",
+    "character_id": "assault",
+    "effect": {"shield_after_push": 1},
+    "unlock": {"mission": "ch1_m2", "event": "optional_complete"}
+  },
+  "scout_a": {
+    "id": "scout_a",
+    "name": "扩展扫描",
+    "character_id": "scout",
+    "effect": {"scan_radius_bonus": 1},
+    "unlock": {"mission": "ch1_m1", "event": "scout_rescued"}
+  },
+  "scout_b": {
+    "id": "scout_b",
+    "name": "静默扫描",
+    "character_id": "scout",
+    "effect": {"scan_disable_camera": 1},
+    "unlock": {"mission": "ch1_m1", "event": "optional_complete"}
+  },
+  "sniper_a": {
+    "id": "sniper_a",
+    "name": "深穿截断",
+    "character_id": "sniper",
+    "effect": {"interrupt_damage_bonus": 1},
+    "unlock": {"mission": "ch1_m2", "event": "sniper_rescued"}
+  },
+  "sniper_b": {
+    "id": "sniper_b",
+    "name": "追踪标记",
+    "character_id": "sniper",
+    "effect": {"mark_after_interrupt": 1},
+    "unlock": {"mission": "ch1_m3", "event": "optional_complete"}
+  },
+  "heavy_a": {
+    "id": "heavy_a",
+    "name": "加固屏障",
+    "character_id": "heavy",
+    "effect": {"barrier_shield_bonus": 1},
+    "unlock": {"mission": "ch1_m3", "event": "heavy_rescued"}
+  },
+  "heavy_b": {
+    "id": "heavy_b",
+    "name": "延展屏障",
+    "character_id": "heavy",
+    "effect": {"barrier_ally_range": 2},
+    "unlock": {"mission": "ch1_m4", "event": "optional_complete"}
+  }
+}

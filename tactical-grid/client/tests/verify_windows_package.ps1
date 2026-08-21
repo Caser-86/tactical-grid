@@ -1,5 +1,5 @@
 param(
-    [string]$BuildDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build')
+    [string]$BuildDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\TacticalGrid_V2_Infiltration')
 )
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -17,9 +17,9 @@ foreach ($doc in $requiredDocs) {
     }
 }
 
-$exePath = Join-Path $BuildDirectory 'TacticalGrid.exe'
-$pckPath = Join-Path $BuildDirectory 'TacticalGrid.pck'
-$consoleWrapper = Join-Path $BuildDirectory 'TacticalGrid.console.exe'
+$exePath = Join-Path $BuildDirectory 'TacticalGrid_V2_Infiltration.exe'
+$pckPath = Join-Path $BuildDirectory 'TacticalGrid_V2_Infiltration.pck'
+$consoleWrapper = Join-Path $BuildDirectory 'TacticalGrid_V2_Infiltration.console.exe'
 
 if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
     throw "Missing Windows executable: $exePath"
@@ -41,14 +41,14 @@ if ($pck.Length -lt 5MB) {
 }
 
 $version = $exe.VersionInfo
-if ($version.ProductName -ne 'Tactical Grid') {
-    throw "Unexpected ProductName: $($version.ProductName)"
+if ($version.ProductName -ne 'Tactical Grid V2: Infiltration') {
+	throw "Unexpected ProductName: $($version.ProductName)"
 }
-if ($version.ProductVersion -ne '1.0.0.0') {
-    throw "Unexpected ProductVersion: $($version.ProductVersion)"
+if ($version.ProductVersion -ne '2.0.0.0') {
+	throw "Unexpected ProductVersion: $($version.ProductVersion)"
 }
-if ($version.FileDescription -ne 'Turn-Based Tactical Strategy') {
-    throw "Unexpected FileDescription: $($version.FileDescription)"
+if ($version.FileDescription -ne 'V2 Infiltration Tactical Adventure') {
+	throw "Unexpected FileDescription: $($version.FileDescription)"
 }
 
 $manifest = [ordered]@{

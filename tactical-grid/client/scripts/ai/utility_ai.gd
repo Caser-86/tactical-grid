@@ -50,7 +50,7 @@ static func decide_action(
 			break
 	var nearest_player = _find_nearest_player(enemy, player_units)
 	if nearest_player:
-		var best_move = _find_best_move_position(enemy, nearest_player, map_data)
+		var best_move = _find_best_move_position(enemy, nearest_player, map_data, player_units, enemies)
 		if best_move:
 			var move_score = 30.0
 			if has_attack_option:
@@ -63,7 +63,7 @@ static func decide_action(
 
 	# 3. 评估寻找掩体
 	if enemy.current_hp < enemy.max_hp * 0.5:
-		var cover_pos = _find_best_cover(enemy, player_units, map_data)
+		var cover_pos = _find_best_cover(enemy, player_units, map_data, enemies)
 		if cover_pos:
 			actions.append({
 				"type": "move_to_cover",
@@ -121,7 +121,9 @@ static func _find_nearest_player(enemy: Node, players: Array) -> Node:
 static func _find_best_move_position(
 	enemy: Node,
 	target: Node,
-	map_data: Dictionary
+	map_data: Dictionary,
+	players: Array,
+	enemies: Array
 ) -> Vector2i:
 	var cost_func = func(pos):
 		var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
@@ -134,7 +136,7 @@ static func _find_best_move_position(
 			_: return 1
 
 	var blocked_func = func(pos):
-		return not MapLoader.is_passable(map_data, pos.x, pos.y)
+		return not MapLoader.is_passable(map_data, pos.x, pos.y) or _occupied_by_other_unit(pos, enemy, players, enemies)
 
 	var reachable = Pathfinding.get_reachable_cells(
 		enemy.grid_pos,
@@ -169,7 +171,8 @@ static func _find_best_move_position(
 static func _find_best_cover(
 	enemy: Node,
 	players: Array,
-	map_data: Dictionary
+	map_data: Dictionary,
+	enemies: Array
 ) -> Vector2i:
 	var cost_func = func(pos):
 		var terrain = MapLoader.get_terrain_at(map_data, pos.x, pos.y)
@@ -182,7 +185,7 @@ static func _find_best_cover(
 			_: return 1
 
 	var blocked_func = func(pos):
-		return not MapLoader.is_passable(map_data, pos.x, pos.y)
+		return not MapLoader.is_passable(map_data, pos.x, pos.y) or _occupied_by_other_unit(pos, enemy, players, enemies)
 
 	var reachable = Pathfinding.get_reachable_cells(
 		enemy.grid_pos,
@@ -217,3 +220,12 @@ static func _find_best_cover(
 			best_pos = cell
 
 	return best_pos if best_cover_score > 0 else Vector2i(-1, -1)
+
+static func _occupied_by_other_unit(pos: Vector2i, moving_unit: Node, players: Array, enemies: Array) -> bool:
+	for raw_unit in players + enemies:
+		var unit: Node = raw_unit
+		if unit == null or unit == moving_unit or not unit.is_alive:
+			continue
+		if unit.grid_pos == pos:
+			return true
+	return false

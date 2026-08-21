@@ -1,0 +1,83 @@
+{
+  "map_id": "v2_hazard_runtime_fixture",
+  "schema_version": 3,
+  "mission_id": "ch1_m1",
+  "seed": 9004,
+  "size": {"width": 8, "height": 8},
+  "theme": "hazard_fixture",
+  "environment": {"kit": "echo_yard", "decorations": []},
+  "mission_type": "rescue_extract",
+  "primary_objective_id": "fixture_primary",
+  "layers": {
+    "base_terrain": [
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]
+    ],
+    "blocker": [
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]
+    ],
+    "vision": [
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]
+    ],
+    "height": [
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]
+    ],
+    "cover": [
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]
+    ]
+  },
+  "entities": [
+    {"id":"spawn_assault", "type":"spawn_player", "x":1, "y":1, "team":"player", "character_id":"assault"},
+    {"id":"fixture_primary", "type":"objective_primary", "x":4, "y":4, "team":"neutral", "character_id":"scout", "state":"captive"},
+    {"id":"fixture_evac", "type":"evac", "x":7, "y":7, "radius":0, "state":"open"},
+    {"id":"fixture_hazard_console", "type":"facility_marker", "x":1, "y":2, "facility_type":"power"}
+  ],
+  "encounters": [],
+  "checkpoints": [],
+  "facilities": [
+    {"id":"facility_hazard_shutdown", "type":"power", "x":1, "y":2, "entity_id":"fixture_hazard_console", "name":"危险区控制台", "action_id":"overload", "camera_zone_id":"fixture_hazard_zone", "reveal_center":[1,1], "reveal_radius":1}
+  ],
+  "hazards": [
+    {"id":"runtime_vent", "cells":[{"x":1,"y":1}], "warning_turn":1, "damage_turn":2, "cycle_length":0, "damage":2, "close_action_id":"overload"},
+    {"id":"restore_vent", "cells":[{"x":2,"y":1}], "warning_turn":3, "damage_turn":4, "cycle_length":0, "damage":3, "close_action_id":"close_restore_vent"}
+  ],
+  "main_routes": [
+    {"id":"fixture_route", "name":"Fixture Route", "required_ids":["spawn_assault","fixture_primary","fixture_evac"], "cells":[[1,1],[2,2],[4,4],[7,7]]}
+  ],
+  "route_hint": "沿测试路线前进",
+  "activation_schedule": []
+}

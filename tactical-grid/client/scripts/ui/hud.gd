@@ -7,6 +7,8 @@ class_name HUD
 @onready var phase_label = $TopBar/PhaseLabel
 @onready var objective_label = $TopBar/ObjectiveLabel
 @onready var unit_info_label = $RightPanel/UnitInfoLabel
+@onready var action_budget_label = $RightPanel/V2ActionBudgetLabel
+@onready var action_hint_label = $RightPanel/V2ActionHintLabel
 @onready var move_button = $BottomBar/ActionBar/MoveButton
 @onready var attack_button = $BottomBar/ActionBar/AttackButton
 @onready var skill_button = $BottomBar/ActionBar/SkillButton
@@ -34,12 +36,25 @@ var _action_picker_callback: Callable = Callable()
 enum ContextState { NONE, UNIT_SELECTED, MOVE_PREVIEW, ATTACK_PREVIEW, FACILITY_PREVIEW }
 var _context_state: ContextState = ContextState.NONE
 var _context_prompt: Label = null
+## V2 使用统一名称暴露当前操作提示，避免测试和其他表现层依赖内部节点名。
+var context_label: Label = null
+var _pending_v2_snapshot: Dictionary = {}
+var _v2_hud_active := false
+## V2: 当前攻击预览卡片文本。单独保留，便于输入测试和结果回显使用同一份数据。
+var _attack_preview_text: String = ""
 ## CODE-P2-02: 警报显示标签和网络覆盖层
 var _alert_label: Label = null
 var _network_overlay: Control = null
 var _network_overlay_visible: bool = false
 ## CH1-050: 敌方意图威胁摘要标签，显示在警报标签下方。
 var _threat_label: Label = null
+var _v2_mission_card: Panel = null
+var _v2_mission_card_label: Label = null
+var _v2_camera_return_button: Button = null
+var _v2_tutorial_hint_panel: Panel = null
+var _v2_tutorial_hint_label: Label = null
+var _v2_tutorial_anchor_label: Label = null
+var _v2_tutorial_skip_button: Button = null
 
 func _ready() -> void:
 	_apply_visual_theme()
@@ -63,6 +78,7 @@ func _ready() -> void:
 	_context_prompt.offset_bottom = -60.0
 	_context_prompt.visible = false
 	add_child(_context_prompt)
+	context_label = _context_prompt
 	set_context_state(ContextState.NONE)
 	# CODE-P2-02: Alert display label (top bar second row)
 	_alert_label = Label.new()
@@ -104,6 +120,29 @@ func _ready() -> void:
 	_threat_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_threat_label.visible = false
 	$RightPanel.add_child(_threat_label)
+	if not _pending_v2_snapshot.is_empty():
+		render_v2_snapshot(_pending_v2_snapshot)
+
+func _ensure_v2_mission_card() -> Label:
+	if _v2_mission_card_label != null and is_instance_valid(_v2_mission_card_label):
+		return _v2_mission_card_label
+	_v2_mission_card = Panel.new()
+	_v2_mission_card.name = "V2MissionCard"
+	_v2_mission_card.position = Vector2(12, TOP_BAR_HEIGHT + 8)
+	_v2_mission_card.size = Vector2(430, 128)
+	_v2_mission_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_mission_card.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.055, 0.075, 0.94), Color(1.0, 0.72, 0.18, 0.82)))
+	_v2_mission_card_label = Label.new()
+	_v2_mission_card_label.name = "MissionCardText"
+	_v2_mission_card_label.position = Vector2(12, 8)
+	_v2_mission_card_label.size = Vector2(406, 112)
+	_v2_mission_card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_v2_mission_card_label.add_theme_font_size_override("font_size", 13)
+	_v2_mission_card_label.add_theme_color_override("font_color", Color(0.92, 0.96, 0.96, 0.98))
+	_v2_mission_card_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_mission_card.add_child(_v2_mission_card_label)
+	add_child(_v2_mission_card)
+	return _v2_mission_card_label
 
 ## 将默认控件转换为高对比的战术 HUD，不改变任何输入或战斗规则。
 func _apply_visual_theme() -> void:
@@ -172,6 +211,8 @@ func update_turn_display(turn: int, phase: int) -> void:
 			phase_label.text = "..."
 
 func update_unit_info(unit: Node) -> void:
+	if unit_info_label == null:
+		return
 	if not unit or not unit.is_alive:
 		unit_info_label.text = ""
 		set_action_buttons_visible(false)
@@ -244,7 +285,7 @@ func set_context_state(state: ContextState) -> void:
 		ContextState.ATTACK_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
-				_context_prompt.text = "点击敌人查看攻击结果，再次点击确认，右键取消"
+				_context_prompt.text = "悬停敌人查看伤害，点击一次攻击，右键取消"
 		ContextState.FACILITY_PREVIEW:
 			if _context_prompt:
 				_context_prompt.visible = true
@@ -255,6 +296,445 @@ func set_context_prompt(text: String) -> void:
 	if _context_prompt:
 		_context_prompt.text = text
 		_context_prompt.visible = true
+
+func set_v2_camera_return_visible(visible: bool) -> void:
+	var button := _ensure_v2_camera_return_button()
+	if button != null:
+		button.visible = visible
+
+func _ensure_v2_camera_return_button() -> Button:
+	if _v2_camera_return_button != null and is_instance_valid(_v2_camera_return_button):
+		return _v2_camera_return_button
+	_v2_camera_return_button = Button.new()
+	_v2_camera_return_button.name = "V2CameraReturnButton"
+	_v2_camera_return_button.text = "返回队员 [F]"
+	_v2_camera_return_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_v2_camera_return_button.offset_left = -190.0
+	_v2_camera_return_button.offset_top = TOP_BAR_HEIGHT + 10.0
+	_v2_camera_return_button.offset_right = -14.0
+	_v2_camera_return_button.offset_bottom = TOP_BAR_HEIGHT + 42.0
+	_v2_camera_return_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_v2_camera_return_button.visible = false
+	_v2_camera_return_button.pressed.connect(_on_v2_camera_return_pressed)
+	_style_button(_v2_camera_return_button)
+	add_child(_v2_camera_return_button)
+	return _v2_camera_return_button
+
+func _on_v2_camera_return_pressed() -> void:
+	if _battle_controller != null and _battle_controller.has_method("return_to_v2_camera_player"):
+		_battle_controller.call("return_to_v2_camera_player")
+
+## V2: 以一个快照驱动整块战斗 HUD，保证目标、预算和下一步后果不会互相覆盖。
+## 该入口只改变 V2 显示状态，V1 仍使用原有的 update_* 方法。
+func render_v2_snapshot(snapshot: Dictionary) -> void:
+	if not is_node_ready() or context_label == null:
+		_pending_v2_snapshot = snapshot.duplicate(true)
+		return
+	_v2_hud_active = true
+	_pending_v2_snapshot.clear()
+	if _is_canonical_v2_snapshot(snapshot):
+		_render_canonical_v2_snapshot(snapshot)
+		return
+
+	var objective := String(snapshot.get("primary_objective", ""))
+	if objective != "":
+		objective_label.text = objective
+
+	var phase := String(snapshot.get("phase", "玩家回合"))
+	var state := String(snapshot.get("state", "free_select"))
+	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if state != "" else phase
+	phase_label.modulate = Color.CYAN if phase.contains("玩家") else Color.RED if phase.contains("敌人") else Color.GOLD
+
+	var alert := String(snapshot.get("alert", ""))
+	var next_consequence := String(snapshot.get("next_consequence", ""))
+	var visibility_summary: Dictionary = snapshot.get("visibility_summary", {})
+	if _alert_label:
+		var alert_text := "警戒：%s" % alert if alert != "" else ""
+		if next_consequence != "":
+			alert_text += " | 下一步：%s" % next_consequence
+		var newly_observed_cells := int(visibility_summary.get("newly_observed_cells", 0))
+		var newly_revealed_enemies := int(visibility_summary.get("newly_revealed_enemies", 0))
+		if newly_observed_cells > 0:
+			alert_text += " | 视野 +%d格" % newly_observed_cells
+		if newly_revealed_enemies > 0:
+			alert_text += " | 发现敌人 %d" % newly_revealed_enemies
+		_alert_label.text = alert_text
+		_alert_label.visible = alert_text != ""
+
+	var selected: Node = snapshot.get("selected", null) as Node
+	var selected_valid := selected != null and is_instance_valid(selected) and bool(selected.get("is_alive"))
+	$RightPanel.visible = selected_valid
+	if selected_valid:
+		update_unit_info(selected)
+	else:
+		unit_info_label.text = ""
+
+	# V2 直接地图交互不显示常驻移动/攻击/技能按钮，玩家从地图高亮和提示中行动。
+	set_action_buttons_visible(false)
+	var budget: Dictionary = snapshot.get("action_budget", {})
+	if action_budget_label:
+		action_budget_label.visible = selected_valid
+		if selected_valid:
+			action_budget_label.text = "行动预算\n移动 %s   行动 %s" % [
+				"可用" if bool(budget.get("move", false)) else "已用",
+				"可用" if bool(budget.get("action", false)) else "已用",
+			]
+	var ability := String(snapshot.get("ability", ""))
+	var interaction := String(snapshot.get("interaction", ""))
+	var side_hint := ability if ability != "" else interaction
+	if side_hint == "":
+		side_hint = "蓝格移动 · 红色敌人攻击\n右键取消 · 中键拖动地图"
+	if action_hint_label:
+		action_hint_label.text = side_hint
+		action_hint_label.visible = selected_valid
+
+	var prompt := String(snapshot.get("context_prompt", ""))
+	var attack_preview: Variant = snapshot.get("attack_preview", "")
+	if prompt == "" and attack_preview is String:
+		prompt = String(attack_preview)
+	context_label.text = prompt if prompt != "" else "选择一个单位开始行动"
+	context_label.visible = true
+
+	# Keep the mission's next required step visible even when a contextual
+	# action prompt changes. V2 supplies a short guide; V1 keeps its original
+	# control summary untouched.
+	var mission_guide := String(snapshot.get("mission_guide", ""))
+	var shortcut_hint := get_node_or_null("BottomBar/ShortcutHint") as Label
+	if shortcut_hint != null and mission_guide != "":
+		shortcut_hint.text = "%s\n右键取消预览 · Esc取消选择 · 中键拖动地图 · Home回到角色\nSpace结束回合" % mission_guide
+	var v2_control_guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+	if v2_control_guide != null and mission_guide != "":
+		v2_control_guide.text = "%s\n左键队员显示范围 · 蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择\n中键拖动地图 · Home回到角色 · Space结束回合" % mission_guide
+
+func _is_canonical_v2_snapshot(snapshot: Dictionary) -> bool:
+	return snapshot.has("mission_id") or snapshot.has("objective_text") or snapshot.has("step_id") or snapshot.has("guide_text") or snapshot.has("route_hint") or snapshot.has("hazard_warning") or snapshot.has("checkpoint_id") or snapshot.has("status") or snapshot.has("outcome_text") or snapshot.has("ordinary_controls")
+
+func _render_canonical_v2_snapshot(snapshot: Dictionary) -> void:
+	var objective := String(snapshot.get("objective_text", "")).strip_edges()
+	var guide := String(snapshot.get("guide_text", "")).strip_edges()
+	var route_hint := String(snapshot.get("route_hint", "")).strip_edges()
+	var hazard_warning := String(snapshot.get("hazard_warning", "")).strip_edges()
+	var checkpoint_id := String(snapshot.get("checkpoint_id", "")).strip_edges()
+	var ordinary_controls := String(snapshot.get("ordinary_controls", "")).strip_edges()
+	if ordinary_controls.is_empty():
+		ordinary_controls = "蓝格移动 · 红色敌人攻击 · 右键取消预览 · Esc取消选择 · Space结束回合"
+	var mission_card := _ensure_v2_mission_card()
+	var mission_location := route_hint if not route_hint.is_empty() else guide
+	if mission_location.is_empty():
+		mission_location = "目标地点：地图上的黄色“下一步”标记"
+	mission_card.text = "当前任务\n%s\n%s\n%s\n操作：左键队员看范围；左键蓝格移动；红色敌人攻击；Space结束回合" % [
+		objective,
+		mission_location,
+		_v2_completion_hint(objective),
+	]
+	_v2_mission_card.visible = true
+
+	var step_count := maxi(0, int(snapshot.get("step_count", 0)))
+	var step_index := maxi(0, int(snapshot.get("step_index", 0)))
+	var progress := "%d/%d" % [mini(step_index + 1, step_count), step_count] if step_count > 0 else ""
+	var status := String(snapshot.get("status", "")).to_lower()
+	var outcome := String(snapshot.get("outcome_text", "")).strip_edges()
+	var alert_name := String(snapshot.get("alert", "")).strip_edges()
+	if status == "failure" and outcome.is_empty():
+		outcome = "任务失败"
+	elif status == "victory" and outcome.is_empty():
+		outcome = "任务完成"
+
+	if not outcome.is_empty() and status in ["failure", "victory"]:
+		objective_label.text = outcome
+	else:
+		objective_label.text = _join_v2_parts([progress, objective], " · ")
+		if objective_label.text.is_empty():
+			objective_label.text = "等待任务状态"
+	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_label.clip_text = true
+	objective_label.max_lines_visible = 2
+	objective_label.add_theme_font_size_override("font_size", _v2_font_size_for(objective_label.text, 18))
+
+	var has_turn := snapshot.has("turn") or snapshot.has("current_turn")
+	var turn_value := int(snapshot.get("turn", snapshot.get("current_turn", 0)))
+	# Never retain a restored turn when a later canonical snapshot omits it.
+	turn_label.text = "回合 %d" % turn_value if has_turn and turn_value > 0 else "回合 -"
+	var phase := String(snapshot.get("phase", snapshot.get("current_phase", ""))).strip_edges()
+	var state := String(snapshot.get("state", "")).strip_edges()
+	phase_label.text = "%s · %s" % [phase, _v2_state_label(state)] if not phase.is_empty() and not state.is_empty() else phase
+	phase_label.modulate = Color.CYAN if phase.contains("玩家") else Color.RED if phase.contains("敌人") else Color.GOLD if phase.contains("结束") else Color.WHITE
+
+	# The alert line is a non-modal priority channel. Lower-priority details
+	# remain visible in the bounded bottom guidance label below.
+	var priority_text := ""
+	if not outcome.is_empty() and status in ["failure", "victory"]:
+		priority_text = outcome
+	elif not alert_name.is_empty() and alert_name not in ["平静", "潜伏"]:
+		priority_text = "警戒：%s · %s" % [alert_name, objective] if not objective.is_empty() else "警戒：%s" % alert_name
+	elif not objective.is_empty():
+		priority_text = objective
+	elif not hazard_warning.is_empty():
+		priority_text = hazard_warning
+	elif not route_hint.is_empty():
+		priority_text = route_hint
+	else:
+		priority_text = ordinary_controls
+	if _alert_label:
+		_alert_label.text = priority_text
+		_alert_label.visible = not priority_text.is_empty()
+		_alert_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_alert_label.clip_text = true
+		_alert_label.max_lines_visible = 2
+		_alert_label.add_theme_font_size_override("font_size", _v2_font_size_for(priority_text, 12))
+
+	var selected: Node = snapshot.get("selected", null) as Node
+	var selected_valid := selected != null and is_instance_valid(selected) and bool(selected.get("is_alive"))
+	$RightPanel.visible = selected_valid
+	if selected_valid:
+		update_unit_info(selected)
+	else:
+		unit_info_label.text = ""
+	set_action_buttons_visible(false)
+	var budget: Dictionary = snapshot.get("action_budget", {})
+	if action_budget_label:
+		action_budget_label.visible = selected_valid
+		if selected_valid:
+			action_budget_label.text = "行动预算\n移动 %s   行动 %s" % [
+				"可用" if bool(budget.get("move", false)) else "已用",
+				"可用" if bool(budget.get("action", false)) else "已用",
+			]
+	var prompt := String(snapshot.get("context_prompt", "")).strip_edges()
+	if prompt.is_empty():
+		prompt = ordinary_controls
+	context_label.text = prompt
+	context_label.visible = not prompt.is_empty()
+	context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	context_label.clip_text = true
+	context_label.max_lines_visible = 2
+	context_label.position = Vector2(-260, -104)
+	context_label.size = Vector2(520, 42)
+	context_label.add_theme_font_size_override("font_size", _v2_font_size_for(prompt, 14))
+
+	var guidance_lines: Array[String] = []
+	if not guide.is_empty():
+		guidance_lines.append("行动：%s" % guide)
+	if not route_hint.is_empty():
+		guidance_lines.append("路线：%s" % route_hint)
+	if not hazard_warning.is_empty():
+		guidance_lines.append("危险：%s" % hazard_warning)
+	if not checkpoint_id.is_empty():
+		guidance_lines.append("检查点：%s" % checkpoint_id)
+	guidance_lines.append("操作：%s" % ordinary_controls)
+	var v2_control_guide := _ensure_v2_control_guide()
+	if v2_control_guide:
+		v2_control_guide.text = "\n".join(guidance_lines)
+		v2_control_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v2_control_guide.clip_text = true
+		v2_control_guide.max_lines_visible = 4
+		v2_control_guide.add_theme_font_size_override("font_size", _v2_font_size_for(v2_control_guide.text, 12))
+
+## V2 教学提示是非模态的：只消费自身跳过按钮的点击，面板和文字不拦截地图。
+## 提示由 V2HudPresenter 在同一帧快照之后提交，保证显示与任务流状态一致。
+func render_v2_tutorial_hint(hint: Dictionary) -> void:
+	if not is_node_ready():
+		return
+	var panel := _ensure_v2_tutorial_hint_panel()
+	var visible := bool(hint.get("visible", false)) and not String(hint.get("text", "")).strip_edges().is_empty()
+	panel.visible = visible
+	if not visible:
+		return
+	_v2_tutorial_hint_label.text = String(hint.get("text", "")).strip_edges()
+	_v2_tutorial_anchor_label.text = "锚点：%s" % _v2_tutorial_anchor_text(String(hint.get("anchor_kind", "")))
+	_v2_tutorial_anchor_label.tooltip_text = "anchor_id: %s" % String(hint.get("anchor_id", ""))
+	_v2_tutorial_skip_button.visible = true
+
+func _ensure_v2_tutorial_hint_panel() -> Panel:
+	if _v2_tutorial_hint_panel != null and is_instance_valid(_v2_tutorial_hint_panel):
+		return _v2_tutorial_hint_panel
+	_v2_tutorial_hint_panel = Panel.new()
+	_v2_tutorial_hint_panel.name = "V2TutorialHint"
+	_v2_tutorial_hint_panel.position = Vector2(12, TOP_BAR_HEIGHT + 144)
+	_v2_tutorial_hint_panel.size = Vector2(430, 82)
+	_v2_tutorial_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.075, 0.10, 0.96), Color(0.18, 0.82, 0.92, 0.86)))
+	_v2_tutorial_hint_label = Label.new()
+	_v2_tutorial_hint_label.name = "HintText"
+	_v2_tutorial_hint_label.position = Vector2(12, 9)
+	_v2_tutorial_hint_label.size = Vector2(278, 31)
+	_v2_tutorial_hint_label.add_theme_font_size_override("font_size", 16)
+	_v2_tutorial_hint_label.add_theme_color_override("font_color", Color(0.82, 0.98, 1.0, 1.0))
+	_v2_tutorial_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_v2_tutorial_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_hint_label)
+	_v2_tutorial_anchor_label = Label.new()
+	_v2_tutorial_anchor_label.name = "AnchorText"
+	_v2_tutorial_anchor_label.position = Vector2(12, 47)
+	_v2_tutorial_anchor_label.size = Vector2(278, 22)
+	_v2_tutorial_anchor_label.add_theme_font_size_override("font_size", 12)
+	_v2_tutorial_anchor_label.add_theme_color_override("font_color", Color(0.62, 0.85, 0.90, 0.9))
+	_v2_tutorial_anchor_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_anchor_label)
+	_v2_tutorial_skip_button = Button.new()
+	_v2_tutorial_skip_button.name = "SkipButton"
+	_v2_tutorial_skip_button.text = "跳过教学"
+	_v2_tutorial_skip_button.position = Vector2(302, 22)
+	_v2_tutorial_skip_button.size = Vector2(112, 38)
+	_v2_tutorial_skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_v2_tutorial_skip_button.pressed.connect(_on_v2_tutorial_skip_pressed)
+	_style_button(_v2_tutorial_skip_button)
+	_v2_tutorial_hint_panel.add_child(_v2_tutorial_skip_button)
+	add_child(_v2_tutorial_hint_panel)
+	return _v2_tutorial_hint_panel
+
+func _v2_tutorial_anchor_text(kind: String) -> String:
+	match kind:
+		"unit":
+			return "当前队员"
+		"cell":
+			return "青色可移动格"
+		"enemy":
+			return "红框敌人"
+		"intent":
+			return "敌方行动箭头"
+		_:
+			return "当前操作"
+
+func _on_v2_tutorial_skip_pressed() -> void:
+	if _battle_controller != null and _battle_controller.has_method("_skip_v2_tutorial"):
+		_battle_controller.call("_skip_v2_tutorial")
+
+func _ensure_v2_control_guide() -> Label:
+	var guide := get_node_or_null("BottomBar/V2DirectControlGuide") as Label
+	if guide != null:
+		return guide
+	var bottom_bar := get_node_or_null("BottomBar") as Control
+	if bottom_bar == null:
+		return null
+	guide = Label.new()
+	guide.name = "V2DirectControlGuide"
+	guide.position = Vector2(14, 6)
+	guide.size = Vector2(510, 54)
+	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_bar.add_child(guide)
+	return guide
+
+func _join_v2_parts(parts: Array, separator: String) -> String:
+	var non_empty: Array[String] = []
+	for raw_part in parts:
+		var part := String(raw_part).strip_edges()
+		if not part.is_empty():
+			non_empty.append(part)
+	return separator.join(non_empty)
+
+func _v2_font_size_for(text: String, default_size: int) -> int:
+	if text.length() > 100:
+		return maxi(10, default_size - 4)
+	if text.length() > 52:
+		return maxi(11, default_size - 2)
+	return default_size
+
+func _v2_state_label(state: String) -> String:
+	match state:
+		"free_select":
+			return "选择单位"
+		"unit_selected":
+			return "已选中"
+		"attack_locked":
+			return "攻击已锁定"
+		"ability_targeting":
+			return "选择技能目标"
+		"interaction_menu":
+			return "选择设施操作"
+		"enemy_turn":
+			return "敌人行动"
+		"paused":
+			return "已暂停"
+		_:
+			return state
+
+func _v2_completion_hint(objective: String) -> String:
+	if objective.contains("路线分叉"):
+		return "完成：走到黄色分叉标记，随后选择一条路线"
+	if objective.contains("选择推进"):
+		return "完成：点击任意一条路线按钮"
+	if objective.contains("吊桥"):
+		return "完成：靠近吊机后点击设施并选择放下吊桥"
+	if objective.contains("营救"):
+		return "完成：靠近青色标记后点击营救"
+	if objective.contains("撤离"):
+		return "完成：所有当前存活队员进入绿色撤离区（营救后会增加可操作队员）"
+	return "完成：按地图黄色标记和顶部目标推进"
+
+## V2: 显示确定性攻击预览，不展示旧版随机命中率字段。
+func show_attack_preview(preview: Dictionary, target: Unit, locked: bool = true) -> void:
+	if target == null:
+		return
+	var hp_before := int(preview.get("hp_before", target.current_hp))
+	var hp_after := int(preview.get("hp_after", target.current_hp))
+	var shield_before := int(preview.get("shield_before", target.current_shield))
+	var shield_after := int(preview.get("shield_after", target.current_shield))
+	var damage := int(preview.get("hp_damage", maxi(0, hp_before - hp_after)))
+	var mode := "已锁定" if locked else "悬停预览"
+	var text := "%s %s：伤害 %d · HP %d → %d" % [mode, target.unit_name, damage, hp_before, hp_after]
+	if shield_before != shield_after:
+		text += " · 护盾 %d → %d" % [shield_before, shield_after]
+	text += " · %s" % ("再次点击确认" if locked else "点击攻击")
+	_attack_preview_text = text
+	set_context_prompt(text)
+
+func get_attack_preview_text() -> String:
+	return _attack_preview_text
+
+func clear_attack_preview() -> void:
+	_attack_preview_text = ""
+
+## V2: 将服务层错误转换为玩家可理解的操作反馈。
+func show_action_reason(reason: Variant) -> void:
+	var text := "无法执行该操作"
+	match String(reason):
+		"action_unavailable":
+			text = "本单位本回合已经攻击过"
+		"out_of_range":
+			text = "目标超出攻击范围"
+		"no_line_of_sight":
+			text = "目标被墙体或掩体遮挡"
+		"full_cover":
+			text = "目标处于完全掩体后，无法从当前位置攻击"
+		"stale_preview":
+			text = "目标状态已变化，请重新选择目标"
+		"same_team":
+			text = "不能攻击友方单位"
+		"target_dead":
+			text = "目标已经失去战斗能力"
+		"on_cooldown":
+			text = "能力正在冷却"
+		"wrong_role":
+			text = "该角色不能使用这个能力"
+		"unknown_ability":
+			text = "当前角色没有可用能力"
+		"invalid_target", "target_invalid":
+			text = "这个目标不适合当前能力"
+		"same_team_required":
+			text = "屏障只能指定友方单位"
+		"target_out_of_range":
+			text = "友方目标超出屏障范围"
+		"not_straight_or_too_far":
+			text = "冲击推进只能沿直线前进三格以内"
+		"position_blocked":
+			text = "推进路线被障碍或单位占用"
+		"move_unavailable":
+			text = "本单位本回合已经移动过"
+		"blocked":
+			text = "目标格不可通行"
+		"move_too_far":
+			text = "目标格超出移动范围"
+		"rescue_locked_until_objective":
+			text = "请先完成顶部任务提示中的前置目标"
+		"required_flags_unsatisfied":
+			text = "请先完成营救前置目标"
+		"rescue_too_far":
+			text = "请站在营救标记相邻格，再点击营救标记"
+		"rescue_unavailable":
+			text = "当前营救目标不可用"
+		"already_rescued":
+			text = "该队员已经加入小队"
+	set_context_prompt(text)
 
 func get_context_prompt_text() -> String:
 	return _context_prompt.text if _context_prompt else ""
@@ -354,9 +834,28 @@ func show_action_picker(title: String, items: Array, on_selected: Callable) -> v
 		var vp_size = get_viewport().get_visible_rect().size
 		popup.position = Vector2i(int((vp_size.x - popup.size.x) * 0.5), int(vp_size.y - popup.size.y - 90))
 
+## V2: 设施交互复用同一张选择卡，但把结果、持续时间和警戒影响写进描述。
+func show_interaction_actions(facility_name: String, actions: Array, on_selected: Callable) -> void:
+	var items: Array = []
+	for action in actions:
+		var duration := int(action.get("duration_turns", -1))
+		var duration_text := "持续%d回合" % duration if duration > 0 else "持续到任务结束"
+		var alert_text := "会提高警戒" if bool(action.get("raises_alert", false)) else "不提高警戒"
+		items.append({
+			"id": String(action.get("id", "")),
+			"name": "%s（1行动）" % String(action.get("label", "操作")),
+			"description": "结果：%s · %s · %s" % [String(action.get("consequence", "")), duration_text, alert_text],
+			"disabled": not bool(action.get("enabled", false)),
+			"disabled_reason": String(action.get("reason", "不可用")),
+		})
+	show_action_picker("交互：%s" % facility_name, items, on_selected)
+
 ## 隐藏行动选择面板
 func hide_action_picker() -> void:
 	if _action_picker != null and is_instance_valid(_action_picker):
+		# Hide immediately before queue_free so a just-completed facility click
+		# cannot leave a one-frame modal window intercepting the next map click.
+		_action_picker.hide()
 		_action_picker.queue_free()
 	_action_picker = null
 	_action_picker_callback = Callable()

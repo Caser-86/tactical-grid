@@ -107,10 +107,14 @@ static func get_reachable_cells(
 				continue
 
 			var new_cost = current.cost + cost
+			# Only cells that can actually be reached this turn belong in the
+			# result. Keeping over-budget fringe cells here made the UI draw a
+			# route that the action service correctly rejected.
+			if new_cost > move_points:
+				continue
 			if not distances.has(neighbor) or new_cost < distances[neighbor]:
 				distances[neighbor] = new_cost
-				if new_cost <= move_points:
-					queue.append({pos = neighbor, cost = new_cost})
+				queue.append({pos = neighbor, cost = new_cost})
 
 	return distances
 

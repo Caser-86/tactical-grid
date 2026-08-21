@@ -11,6 +11,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
+$projectConfig = Get-Content (Join-Path $projectRoot 'project.godot') -Raw
+if ($projectConfig -notmatch 'run/main_scene="res://scenes/v2_boot\.tscn"' -or
+	$projectConfig -notmatch 'config/custom_user_dir_name="TacticalGrid_V2_Infiltration"') {
+	throw 'This build script only builds the isolated V2 product line.'
+}
+
 if ([string]::IsNullOrWhiteSpace($GodotPath)) {
     $godotCommand = Get-Command godot -ErrorAction SilentlyContinue
     if ($godotCommand) {
@@ -28,11 +34,21 @@ if ([string]::IsNullOrWhiteSpace($GodotPath) -or -not (Test-Path -LiteralPath $G
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $projectRoot 'build\TacticalGrid.exe'
+	$OutputPath = Join-Path $projectRoot 'build\TacticalGrid_V2_Infiltration\TacticalGrid_V2_Infiltration.exe'
 }
 
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+
+function Remove-StaleExportTemporaryFiles {
+	Get-ChildItem -LiteralPath $outputDirectory -Filter '*.TMP' -File -ErrorAction SilentlyContinue |
+		Remove-Item -Force
+}
+
+# Godot/Windows can leave replacement files behind when an earlier export is
+# interrupted or the executable is still open. Never carry those files into a
+# V2 release directory.
+Remove-StaleExportTemporaryFiles
 
 # A clean checkout can need one pass to create generated font/audio import
 # metadata and a second pass to settle dependent theme resources before export.
@@ -45,6 +61,7 @@ for ($importPass = 1; $importPass -le 2; $importPass++) {
 & $GodotPath --headless --path $projectRoot --export-release 'Windows Desktop x64' $OutputPath
 if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE." }
 if (-not (Test-Path -LiteralPath $OutputPath)) { throw "Expected export was not created: $OutputPath" }
+Remove-StaleExportTemporaryFiles
 
 $artifact = Get-Item -LiteralPath $OutputPath
 Write-Host "Windows release created: $($artifact.FullName) ($([Math]::Round($artifact.Length / 1MB, 2)) MB)"

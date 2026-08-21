@@ -1,0 +1,16 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] V2 存在独立结算文案呈现器
+  [PASS] V2 结算测试加载正式数据仓库
+  [PASS] M1 结算按实际队伍说明撤离条件
+  [PASS] M1 结算不再写死两名存活队员
+  [PASS] M1 模块名称按数据本地化
+  [PASS] M2 使用本关专属通关回顾
+  [PASS] M2 不复用 M1 侦察兵文案
+  [PASS] M2 模块名称按数据本地化
+  [PASS] M2 结算显示本关可选目标而非事故记录
+  [PASS] V2 失败结算不宣称临时营救角色已加入基地
+  [PASS] V2 失败结算不宣称未持久化模块已解锁
+  [PASS] V2 失败结算显示当前任务阶段
+Passed: 12
+Failed: 0

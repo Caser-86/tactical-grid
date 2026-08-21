@@ -8,7 +8,10 @@ const LARGE_FONT_SIZE := 20
 func apply_settings(settings: Dictionary) -> void:
 	var ui_theme := load(UI_THEME_PATH) as Theme
 	if ui_theme:
-		ui_theme.default_font_size = LARGE_FONT_SIZE if settings.get("large_text", false) else DEFAULT_FONT_SIZE
+		var scale := float(settings.get("ui_scale", 1.0))
+		if bool(settings.get("large_text", false)):
+			scale = maxf(scale, 1.25)
+		ui_theme.default_font_size = int(round(DEFAULT_FONT_SIZE * scale))
 
 func get_effect_duration(base_duration: float) -> float:
 	if GameManager.get_settings().get("reduce_motion", false):
@@ -17,13 +20,19 @@ func get_effect_duration(base_duration: float) -> float:
 	return base_duration
 
 func get_highlight_color(role: String, fallback: Color) -> Color:
-	var mode := String(GameManager.get_settings().get("colorblind_mode", "none"))
-	if mode == "none":
+	var settings := GameManager.get_settings()
+	var mode := String(settings.get("visual_mode", ""))
+	if mode == "":
+		mode = String(settings.get("colorblind_mode", "none"))
+	if mode == "normal" or mode == "none":
 		return fallback
+	if mode == "grayscale":
+		var luminance := fallback.r * 0.2126 + fallback.g * 0.7152 + fallback.b * 0.0722
+		return Color(luminance, luminance, luminance, fallback.a)
 
 	var alpha: float = fallback.a
 	match mode:
-		"protanopia", "deuteranopia":
+		"protanopia", "deuteranopia", "deuteranopia_assist":
 			match role:
 				"attack": return Color(1.0, 0.72, 0.10, alpha)
 				"move", "ally": return Color(0.10, 0.62, 1.0, alpha)

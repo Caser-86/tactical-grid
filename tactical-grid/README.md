@@ -1,8 +1,8 @@
-# Tactical Grid 项目模块
+# Tactical Grid V2 项目模块
 
 本目录是纯 Godot 4.7.1 离线单机项目。正式关卡只读取 `client/data/locked_maps/`，运行、测试和导出均不依赖 Node、服务器、账号或网络。
 
-当前真实状态见 [PROJECT_STATUS.md](PROJECT_STATUS.md)，唯一执行入口见 [PROJECT_TAKEOVER_ROADMAP.md](../docs/PROJECT_TAKEOVER_ROADMAP.md)。
+V2 当前状态见 [PROJECT_STATUS_V2.md](PROJECT_STATUS_V2.md)，唯一执行入口见 [V2 版本说明](../docs/v2/README.md)。根目录的 `PROJECT_STATUS.md` 和 `docs/PROJECT_TAKEOVER_ROADMAP.md` 属于 V1 历史基线，不属于 V2 执行范围。
 
 ## 环境
 

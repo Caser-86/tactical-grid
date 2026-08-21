@@ -102,7 +102,13 @@ $sfx = @(
     @('sfx/sfx_mission_victory.wav', 523.25, 0.60),
     @('sfx/sfx_mission_defeat.wav', 98.0, 0.60),
     @('sfx/sfx_level_up.wav', 784.0, 0.42),
-    @('sfx/sfx_item_pickup.wav', 1046.5, 0.20)
+    @('sfx/sfx_item_pickup.wav', 1046.5, 0.20),
+    # V2 M1 semantic cues are original procedural tones, not external recordings.
+    @('sfx/sfx_v2_shield_protect.wav', 460.0, 0.24),
+    @('sfx/sfx_v2_shield_absorb.wav', 300.0, 0.18),
+    @('sfx/sfx_v2_objective_update.wav', 760.0, 0.20),
+    @('sfx/sfx_v2_rescue.wav', 580.0, 0.38),
+    @('sfx/sfx_v2_evac.wav', 440.0, 0.48)
 )
 foreach ($effect in $sfx) { Write-Wav $effect[0] $effect[1] $effect[2] $false }
 

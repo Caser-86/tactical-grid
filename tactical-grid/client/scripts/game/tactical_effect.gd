@@ -18,6 +18,10 @@ func setup(kind: String) -> void:
 		"selection": duration = 0.30
 		"scan": duration = 0.45
 		"upload": duration = 0.60
+		"shield_protect": duration = 0.62
+		"shield_absorb": duration = 0.40
+		"objective_update": duration = 0.42
+		"rescue": duration = 0.82
 		"evac": duration = 0.70
 	duration = AccessibilitySettings.get_effect_duration(duration)
 	queue_redraw()
@@ -94,6 +98,30 @@ func _draw() -> void:
 				var a := (1.0 - offset) * fade
 				draw_circle(Vector2((i - 1) * 5.0, y), 3.0, Color(0.2, 0.94, 1.0, a))
 			draw_arc(Vector2(0, -14.0 - progress * 6.0), 8.0 + progress * 4.0, 0, TAU, 16, Color(0.64, 1.0, 1.0, fade), 2.0)
+		"shield_protect":
+			# V2 M1: a readable cyan link pulse for the shield guard's protect intent.
+			var radius := 10.0 + progress * 24.0
+			draw_arc(Vector2.ZERO, radius, 0, TAU, 24, Color(0.25, 0.86, 1.0, fade), 3.0)
+			for i in range(4):
+				var angle := TAU * float(i) / 4.0 + progress * 0.6
+				var direction := Vector2(cos(angle), sin(angle))
+				draw_line(direction * 5.0, direction * (radius * 0.82), Color(0.68, 0.98, 1.0, fade * 0.8), 2.0)
+		"shield_absorb":
+			# V2 M1: a compact ring-and-spark impact when damage is absorbed.
+			var absorb_radius := 8.0 + progress * 18.0
+			draw_arc(Vector2.ZERO, absorb_radius, 0, TAU, 20, Color(0.25, 0.92, 1.0, fade), 3.0)
+			_draw_impact(Color(0.72, 1.0, 1.0, fade), absorb_radius, 6, 2.0)
+		"objective_update":
+			# V2 M1: short cyan beacon pulse keeps objective transitions spatial.
+			var objective_radius := 8.0 + progress * 26.0
+			draw_arc(Vector2.ZERO, objective_radius, 0, TAU, 24, Color(0.20, 0.94, 1.0, fade), 3.0)
+			draw_circle(Vector2.ZERO, 4.0 + (1.0 - progress) * 4.0, Color(0.66, 1.0, 1.0, fade * 0.7))
+		"rescue":
+			# V2 M1: rising cyan-green rescue signal, distinct from the evac pillar.
+			var rescue_height := 18.0 + progress * 42.0
+			draw_line(Vector2.ZERO, Vector2(0, -rescue_height), Color(0.30, 1.0, 0.84, fade), 4.0)
+			draw_arc(Vector2(0, -rescue_height), 10.0 + progress * 8.0, 0, TAU, 20, Color(0.54, 1.0, 0.92, fade), 2.5)
+			draw_arc(Vector2.ZERO, 8.0 + progress * 14.0, 0, TAU, 20, Color(0.24, 0.86, 1.0, fade * 0.75), 2.0)
 		"evac":
 			# CH1-090: Green pillar to signal successful extraction.
 			var h := 16.0 + progress * 36.0

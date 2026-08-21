@@ -3,6 +3,9 @@
 extends Control
 class_name CharacterPanel
 
+const V2SquadSelectionScript = preload("res://scripts/v2/mission/v2_squad_selection.gd")
+const V2ModuleLoadoutScript = preload("res://scripts/v2/mission/v2_module_loadout.gd")
+
 @onready var portrait: TextureRect = $Panel/MainContainer/LeftContainer/Portrait
 @onready var name_label = $Panel/MainContainer/LeftContainer/NameLabel
 @onready var job_label = $Panel/MainContainer/LeftContainer/JobLabel
@@ -32,6 +35,8 @@ class_name CharacterPanel
 var current_character: Dictionary = {}
 var current_char_index: int = -1
 var current_tab: int = 0  # 0=属性, 1=装备, 2=技能
+var v2_mode := false
+var v2_character_ids: Array[String] = []
 
 const STAT_NAMES = {
 	"str": "力量", "agi": "敏捷", "int": "智力",
@@ -69,6 +74,17 @@ func _ready() -> void:
 
 ## 打开面板并显示指定角色
 func open_panel(char_index: int = 0) -> void:
+	if _is_v2_panel():
+		v2_mode = true
+		v2_character_ids = V2SquadSelectionScript.get_available_characters(GameManager.current_save)
+		if v2_character_ids.is_empty():
+			_show_empty()
+			show()
+			return
+		char_index = clampi(char_index, 0, v2_character_ids.size() - 1)
+		show_v2_character(char_index)
+		show()
+		return
 	var roster = GameManager.get_roster()
 	if roster.is_empty():
 		_show_empty()
@@ -77,6 +93,18 @@ func open_panel(char_index: int = 0) -> void:
 	char_index = clampi(char_index, 0, roster.size() - 1)
 	show_character(char_index)
 	show()
+
+func _is_v2_panel() -> bool:
+	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
+
+func show_v2_character(char_index: int) -> void:
+	if char_index < 0 or char_index >= v2_character_ids.size():
+		return
+	current_char_index = char_index
+	var character_id := v2_character_ids[char_index]
+	var repository: Node = get_node_or_null("/root/V2Data")
+	current_character = repository.get_character(StringName(character_id)) if repository else {"id": character_id}
+	_update_display()
 
 ## 显示空状态
 func _show_empty() -> void:
@@ -107,6 +135,9 @@ func show_character(char_index: int) -> void:
 ## 更新整个面板
 func _update_display() -> void:
 	if current_character.is_empty():
+		return
+	if v2_mode:
+		_update_v2_display()
 		return
 
 	# 基本信息
@@ -139,8 +170,87 @@ func _update_display() -> void:
 	_update_skill_tree()
 	_apply_tab_visibility()
 
+func _update_v2_display() -> void:
+	var character_id := String(current_character.get("id", v2_character_ids[current_char_index] if current_char_index >= 0 else ""))
+	var character_name := String(current_character.get("name", character_id))
+	name_label.text = character_name
+	job_label.text = "%s · %s" % [character_name, String(current_character.get("role", "可选队员"))]
+	level_label.text = "V2 角色档案 · %s" % character_id.to_upper()
+	_update_portrait()
+	var max_hp := int(current_character.get("hp", 1))
+	hp_bar.max_value = max_hp
+	hp_bar.value = max_hp
+	hp_label.text = "%d/%d" % [max_hp, max_hp]
+	ap_label.text = "行动: 1"
+	move_label.text = "移动: %d" % int(current_character.get("move", 0))
+	vision_label.text = "视野: %d" % int(current_character.get("vision", 0))
+	prev_char_btn.disabled = current_char_index <= 0
+	next_char_btn.disabled = current_char_index >= v2_character_ids.size() - 1
+	current_tab = 1
+	$Panel/TabContainer/StatTab.visible = false
+	$Panel/TabContainer/SkillTab.visible = false
+	$Panel/TabContainer/EquipTab.text = "模块"
+	_update_v2_module_list(character_id)
+	_apply_tab_visibility()
+
+func _update_v2_module_list(character_id: String) -> void:
+	for child in equipment_container.get_children():
+		child.queue_free()
+	for child in inventory_container.get_children():
+		child.queue_free()
+	var equipped := String(V2ModuleLoadoutScript.get_equipped(GameManager.current_save, StringName(character_id)))
+	var equipped_label := Label.new()
+	equipped_label.text = "当前模块  ·  %s" % (_get_v2_module_name(equipped) if not equipped.is_empty() else "未装备")
+	equipped_label.modulate = Color("6dd6e5")
+	equipment_container.add_child(equipped_label)
+	var ability := String(current_character.get("ability_id", ""))
+	var passive := String(current_character.get("passive_id", ""))
+	var identity := Label.new()
+	identity.text = "被动：%s\n主动：%s" % [passive, ability]
+	identity.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	identity.modulate = Color("d7ebef")
+	equipment_container.add_child(identity)
+	var title := Label.new()
+	title.text = "已解锁模块"
+	title.modulate = Color("f3a44a")
+	inventory_container.add_child(title)
+	var modules: Array[String] = V2ModuleLoadoutScript.get_available_modules(GameManager.current_save, StringName(character_id))
+	if modules.is_empty():
+		var empty := Label.new()
+		empty.text = "尚无可用模块"
+		empty.modulate = Color.GRAY
+		inventory_container.add_child(empty)
+		return
+	for module_id in modules:
+		var row := HBoxContainer.new()
+		var module_label := Label.new()
+		module_label.text = _get_v2_module_name(module_id)
+		module_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(module_label)
+		var equip_button := Button.new()
+		equip_button.text = "已装备" if module_id == equipped else "装备"
+		equip_button.disabled = module_id == equipped
+		equip_button.pressed.connect(_on_v2_module_equip.bind(character_id, module_id))
+		row.add_child(equip_button)
+		inventory_container.add_child(row)
+
+func _get_v2_module_name(module_id: String) -> String:
+	if module_id.is_empty():
+		return "未装备"
+	var repository: Node = get_node_or_null("/root/V2Data")
+	if repository and repository.has_method("get_module"):
+		var data: Dictionary = repository.get_module(StringName(module_id))
+		return "%s  [%s]" % [String(data.get("name", module_id)), module_id]
+	return module_id
+
+func _on_v2_module_equip(character_id: String, module_id: String) -> void:
+	var result: Dictionary = V2ModuleLoadoutScript.equip(GameManager.current_save, StringName(character_id), StringName(module_id))
+	if bool(result.get("success", false)):
+		GameManager.save_current_v2()
+		show_v2_character(current_char_index)
+
 func _update_portrait() -> void:
-	var job: StringName = StringName(current_character.get("job", "assault"))
+	var job: StringName = StringName(current_character.get("id", current_character.get("job", "assault"))) if v2_mode else StringName(current_character.get("job", "assault"))
 	var texture: Texture2D = ArtCatalog.get_texture(&"unit", job)
 	if texture == null:
 		texture = ArtCatalog.get_texture(&"unit", &"assault")
@@ -442,6 +552,11 @@ func _build_skill_row(skill_id: String, skill: Dictionary, is_learned: bool, can
 
 ## 应用当前 Tab 显示
 func _apply_tab_visibility() -> void:
+	if v2_mode:
+		stat_section.visible = false
+		equip_section.visible = true
+		skill_section.visible = false
+		return
 	stat_section.visible = (current_tab == 0)
 	equip_section.visible = (current_tab == 1)
 	skill_section.visible = (current_tab == 2)
@@ -478,19 +593,33 @@ func _on_learn_skill(skill_id: String) -> void:
 
 func _on_prev_char() -> void:
 	if current_char_index > 0:
-		show_character(current_char_index - 1)
+		if v2_mode:
+			show_v2_character(current_char_index - 1)
+		else:
+			show_character(current_char_index - 1)
 
 func _on_next_char() -> void:
+	if v2_mode:
+		if current_char_index < v2_character_ids.size() - 1:
+			show_v2_character(current_char_index + 1)
+		return
 	var roster = GameManager.get_roster()
 	if current_char_index < roster.size() - 1:
 		show_character(current_char_index + 1)
 
 func _on_tab_changed(tab: int) -> void:
+	if v2_mode:
+		current_tab = 1
+		_apply_tab_visibility()
+		return
 	current_tab = tab
 	_apply_tab_visibility()
 
 func _on_inventory_changed() -> void:
 	if is_visible_in_tree() and current_char_index >= 0:
+		if v2_mode:
+			show_v2_character(current_char_index)
+			return
 		current_character = GameManager.get_roster()[current_char_index]
 		_update_display()
 

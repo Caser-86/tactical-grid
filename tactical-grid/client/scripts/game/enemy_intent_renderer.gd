@@ -16,6 +16,8 @@ const COLOR_MOVE := Color(0.96, 0.74, 0.22, 0.72)
 ## Overwatch cone color (cyan translucent).
 const COLOR_OVERWATCH := Color(0.20, 0.78, 0.92, 0.22)
 const COLOR_OVERWATCH_EDGE := Color(0.28, 0.86, 1.0, 0.62)
+const COLOR_PROTECT := Color(1.0, 0.82, 0.30, 0.82)
+const COLOR_TELEGRAPH := Color(1.0, 0.36, 0.28, 0.82)
 ## Stale intent color (grey, dimmed).
 const COLOR_STALE := Color(0.55, 0.58, 0.62, 0.50)
 ## Suppressed lethal color (blue tint, "unknown" marker).
@@ -100,6 +102,11 @@ func _get_enemy_cell(entity_id: String) -> Vector2i:
 
 func _draw_single_intent(origin_cell: Vector2i, intent: Dictionary) -> void:
 	var itype: String = String(intent.get("type", "wait"))
+	var presentation: Dictionary = {}
+	var raw_presentation: Variant = intent.get("presentation", {})
+	if raw_presentation is Dictionary:
+		presentation = raw_presentation
+	var shape := String(presentation.get("shape", ""))
 	var is_lethal: bool = bool(intent.get("lethal", false))
 	var is_stale: bool = bool(intent.get("stale", false))
 	var is_suppressed: bool = bool(intent.get("suppressed", false))
@@ -111,40 +118,79 @@ func _draw_single_intent(origin_cell: Vector2i, intent: Dictionary) -> void:
 	if is_stale:
 		stale_alpha = 0.55
 
-	match itype:
-		"attack":
-			var target_pos = intent.get("target_pos", null)
-			if target_pos is Vector2i and target_pos.x >= 0:
-				var target := _cell_to_world_center(target_pos)
-				var color := COLOR_ATTACK if not is_lethal else COLOR_ATTACK_LETHAL
-				if is_suppressed:
-					color = COLOR_SUPPRESSED
+	# V2 semantic shapes take precedence over the legacy type switch. The
+	# legacy path remains intact for V1 and for older checkpoints without the
+	# presentation payload.
+	if shape == "cone":
+		var scan_pos: Variant = intent.get("target_pos", null)
+		if scan_pos is Vector2i and scan_pos.x >= 0:
+			var scan_target := _cell_to_world_center(scan_pos)
+			var scan_color := COLOR_OVERWATCH_EDGE
+			scan_color.a *= stale_alpha
+			_draw_scan_cone(origin, scan_target, scan_color)
+	elif shape == "link":
+		var link_pos: Variant = intent.get("target_pos", null)
+		if link_pos is Vector2i and link_pos.x >= 0:
+			var link_target := _cell_to_world_center(link_pos)
+			var link_color := COLOR_PROTECT
+			link_color.a *= stale_alpha
+			_draw_dashed_arrow(origin, link_target, link_color)
+			_draw_protect_marker(link_target, link_color)
+	elif shape == "guard":
+		_draw_guard_marker(origin, COLOR_PROTECT, stale_alpha)
+	else:
+		match itype:
+			"attack":
+				var target_pos = intent.get("target_pos", null)
+				if target_pos is Vector2i and target_pos.x >= 0:
+					var target := _cell_to_world_center(target_pos)
+					var color := COLOR_ATTACK if not is_lethal else COLOR_ATTACK_LETHAL
+					if is_suppressed:
+						color = COLOR_SUPPRESSED
+					color.a *= stale_alpha
+					_draw_attack_arrow(origin, target, color, is_lethal and not is_suppressed)
+				# Lethal marker above the enemy even if target is missing.
+				if is_lethal and not is_suppressed:
+					_draw_lethal_marker(origin, stale_alpha)
+			"move", "move_to_cover":
+				var target_pos = intent.get("target_pos", null)
+				if target_pos is Vector2i and target_pos.x >= 0:
+					var target := _cell_to_world_center(target_pos)
+					var color := COLOR_MOVE
+					color.a *= stale_alpha
+					_draw_dashed_arrow(origin, target, color)
+			"overwatch":
+				# Draw a small overwatch triangle marker above the enemy.
+				var color := COLOR_OVERWATCH_EDGE
 				color.a *= stale_alpha
-				_draw_attack_arrow(origin, target, color, is_lethal and not is_suppressed)
-			# Lethal marker above the enemy even if target is missing.
-			if is_lethal and not is_suppressed:
-				_draw_lethal_marker(origin, stale_alpha)
-		"move", "move_to_cover":
-			var target_pos = intent.get("target_pos", null)
-			if target_pos is Vector2i and target_pos.x >= 0:
-				var target := _cell_to_world_center(target_pos)
-				var color := COLOR_MOVE
-				color.a *= stale_alpha
-				_draw_dashed_arrow(origin, target, color)
-		"overwatch":
-			# Draw a small overwatch triangle marker above the enemy.
-			var color := COLOR_OVERWATCH_EDGE
-			color.a *= stale_alpha
-			_draw_overwatch_marker(origin, color)
-		"scan":
-			var target_pos = intent.get("target_pos", null)
-			if target_pos is Vector2i and target_pos.x >= 0:
-				var target := _cell_to_world_center(target_pos)
-				var color := COLOR_SUPPRESSED
-				color.a *= stale_alpha
-				_draw_dashed_arrow(origin, target, color)
-		_:
-			pass
+				_draw_overwatch_marker(origin, color)
+			"scan":
+				var target_pos = intent.get("target_pos", null)
+				if target_pos is Vector2i and target_pos.x >= 0:
+					var target := _cell_to_world_center(target_pos)
+					var color := COLOR_SUPPRESSED
+					color.a *= stale_alpha
+					_draw_dashed_arrow(origin, target, color)
+			"protect":
+				var protect_pos = intent.get("target_pos", null)
+				if protect_pos is Vector2i and protect_pos.x >= 0:
+					var protect_target := _cell_to_world_center(protect_pos)
+					var protect_color := COLOR_PROTECT
+					protect_color.a *= stale_alpha
+					_draw_dashed_arrow(origin, protect_target, protect_color)
+					_draw_protect_marker(protect_target, protect_color)
+			"telegraph":
+				var telegraph_pos = intent.get("target_pos", null)
+				if telegraph_pos is Vector2i and telegraph_pos.x >= 0:
+					var telegraph_target := _cell_to_world_center(telegraph_pos)
+					var telegraph_color := COLOR_TELEGRAPH
+					telegraph_color.a *= stale_alpha
+					_draw_dashed_arrow(origin, telegraph_target, telegraph_color)
+					_draw_lethal_marker(origin, stale_alpha)
+			"guard":
+				_draw_guard_marker(origin, COLOR_PROTECT, stale_alpha)
+			_:
+				pass
 
 	# Stale tag drawn below the enemy so the player can tell which intents
 	# are outdated even when the type is the same.
@@ -234,3 +280,34 @@ func _draw_stale_tag(origin: Vector2, alpha: float) -> void:
 	var color := Color(0.65, 0.68, 0.72, 0.85 * alpha)
 	for i in range(3):
 		draw_circle(pos + Vector2((i - 1) * 4, 0), 1.6, color)
+
+func _draw_protect_marker(target: Vector2, color: Color) -> void:
+	draw_arc(target, _cell_size * 0.36, 0.0, TAU, 24, color, 2.5)
+	draw_line(target - Vector2(_cell_size * 0.18, 0), target + Vector2(_cell_size * 0.18, 0), color, 2.0)
+
+func _draw_guard_marker(origin: Vector2, color: Color, alpha: float) -> void:
+	var marker_color := color
+	marker_color.a *= alpha
+	var center := origin + Vector2(0, -_cell_size * 0.58)
+	var points := PackedVector2Array([
+		center + Vector2(0, -_cell_size * 0.16),
+		center + Vector2(_cell_size * 0.16, 0),
+		center + Vector2(0, _cell_size * 0.16),
+		center + Vector2(-_cell_size * 0.16, 0),
+	])
+	draw_colored_polygon(points, marker_color)
+
+func _draw_scan_cone(origin: Vector2, target: Vector2, color: Color) -> void:
+	var direction := (target - origin).normalized()
+	if direction.length_squared() < 0.001:
+		return
+	var cone_length := maxf(_cell_size * 1.5, origin.distance_to(target))
+	var half_angle := deg_to_rad(28.0)
+	var left := origin + direction.rotated(-half_angle) * cone_length
+	var right := origin + direction.rotated(half_angle) * cone_length
+	var fill := color
+	fill.a *= 0.18
+	draw_colored_polygon(PackedVector2Array([origin, left, right]), fill)
+	draw_line(origin, left, color, 2.0)
+	draw_line(origin, right, color, 2.0)
+	draw_arc(origin + direction * cone_length, _cell_size * 0.18, 0.0, TAU, 20, color, 2.0)

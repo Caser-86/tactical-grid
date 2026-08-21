@@ -1,0 +1,48 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  [PASS] V2 角色美术目录自动加载
+  [PASS] V2 独立角色图存在：v2_assault
+  [PASS] V2 角色图统一为 128×128：v2_assault
+  [PASS] V2 角色图带透明背景：v2_assault
+  [PASS] V2 角色图不回退到 V1 路径：v2_assault
+  [PASS] V2 独立角色图存在：v2_scout
+  [PASS] V2 角色图统一为 128×128：v2_scout
+  [PASS] V2 角色图带透明背景：v2_scout
+  [PASS] V2 角色图不回退到 V1 路径：v2_scout
+  [PASS] V2 独立角色图存在：v2_sniper
+  [PASS] V2 角色图统一为 128×128：v2_sniper
+  [PASS] V2 角色图带透明背景：v2_sniper
+  [PASS] V2 角色图不回退到 V1 路径：v2_sniper
+  [PASS] V2 独立角色图存在：v2_heavy
+  [PASS] V2 角色图统一为 128×128：v2_heavy
+  [PASS] V2 角色图带透明背景：v2_heavy
+  [PASS] V2 角色图不回退到 V1 路径：v2_heavy
+  [PASS] V2 独立角色图存在：v2_sentry
+  [PASS] V2 角色图统一为 128×128：v2_sentry
+  [PASS] V2 角色图带透明背景：v2_sentry
+  [PASS] V2 角色图不回退到 V1 路径：v2_sentry
+  [PASS] V2 独立角色图存在：v2_drone
+  [PASS] V2 角色图统一为 128×128：v2_drone
+  [PASS] V2 角色图带透明背景：v2_drone
+  [PASS] V2 角色图不回退到 V1 路径：v2_drone
+  [PASS] V2 独立角色图存在：v2_shield_guard
+  [PASS] V2 角色图统一为 128×128：v2_shield_guard
+  [PASS] V2 角色图带透明背景：v2_shield_guard
+  [PASS] V2 角色图不回退到 V1 路径：v2_shield_guard
+  [PASS] V2 独立角色图存在：v2_sniper_sentry
+  [PASS] V2 角色图统一为 128×128：v2_sniper_sentry
+  [PASS] V2 角色图带透明背景：v2_sniper_sentry
+  [PASS] V2 角色图不回退到 V1 路径：v2_sniper_sentry
+  [PASS] V2 扩展敌人角色图存在：v2_protocol_engineer
+  [PASS] V2 扩展敌人复用已验证资源：v2_protocol_engineer
+  [PASS] V2 扩展敌人角色图存在：v2_hunter
+  [PASS] V2 扩展敌人复用已验证资源：v2_hunter
+  [PASS] 敌方原型有可读徽章：sentry
+  [PASS] 敌方原型有可读徽章：drone
+  [PASS] 敌方原型有可读徽章：sniper_sentry
+  [PASS] 敌方原型有可读徽章：shield_guard
+  [PASS] 敌方原型有可读徽章：protocol_engineer
+  [PASS] 敌方原型有可读徽章：hunter
+  [PASS] 六类敌人徽章全部区分
+Passed: 44
+Failed: 0

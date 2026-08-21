@@ -6,6 +6,7 @@ extends Control
 @onready var master_slider = $Panel/ScrollContainer/VBoxContainer/MasterSlider
 @onready var music_slider = $Panel/ScrollContainer/VBoxContainer/MusicSlider
 @onready var sfx_slider = $Panel/ScrollContainer/VBoxContainer/SFXSlider
+@onready var difficulty_label = $Panel/ScrollContainer/VBoxContainer/DifficultyLabel
 @onready var difficulty_option = $Panel/ScrollContainer/VBoxContainer/DifficultyOption
 @onready var large_text_check = $Panel/ScrollContainer/VBoxContainer/LargeTextCheck
 @onready var reduce_motion_check = $Panel/ScrollContainer/VBoxContainer/ReduceMotionCheck
@@ -13,6 +14,13 @@ extends Control
 @onready var subtitle_speed_slider = $Panel/ScrollContainer/VBoxContainer/SubtitleSpeedSlider
 @onready var keybinding_button = $Panel/ScrollContainer/VBoxContainer/KeybindingButton
 @onready var back_button = $Panel/ScrollContainer/VBoxContainer/BackButton
+@onready var ui_scale_label = $Panel/ScrollContainer/VBoxContainer/UIScaleLabel
+@onready var ui_scale_option = $Panel/ScrollContainer/VBoxContainer/UIScaleOption
+@onready var visual_mode_label = $Panel/ScrollContainer/VBoxContainer/VisualModeLabel
+@onready var visual_mode_option = $Panel/ScrollContainer/VBoxContainer/VisualModeOption
+@onready var pan_speed_label = $Panel/ScrollContainer/VBoxContainer/PanSpeedLabel
+@onready var pan_speed_slider = $Panel/ScrollContainer/VBoxContainer/PanSpeedSlider
+@onready var screen_shake_check = $Panel/ScrollContainer/VBoxContainer/ScreenShakeCheck
 @onready var resolution_confirm_panel = $ResolutionConfirmPanel
 @onready var resolution_confirm_label = $ResolutionConfirmPanel/VBoxContainer/Message
 @onready var resolution_keep_button = $ResolutionConfirmPanel/VBoxContainer/Buttons/KeepButton
@@ -32,11 +40,13 @@ var _pending_binding_action := ""
 var _pending_resolution := ""
 var _previous_resolution := ""
 var _resolution_seconds_remaining := 0
+var _difficulty_ids: Array[String] = []
 
 const BINDING_LABELS := {
 	"pause": "暂停/返回",
 	"end_turn": "结束回合",
 	"next_unit": "下一个单位",
+	"focus_unit": "聚焦选中单位",
 	"toggle_overview": "概览",
 	"toggle_network": "切换网络",
 }
@@ -44,6 +54,11 @@ const BINDING_LABELS := {
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.SETTINGS
 	_settings = GameManager.get_settings().duplicate(true)
+	if _is_v2_settings():
+		_settings = V2VisualMode.normalize(_settings)
+	else:
+		InputBindings.ensure_settings(_settings)
+	InputBindings.apply_settings(_settings)
 	_setup_ui()
 	back_button.pressed.connect(_on_back)
 	keybinding_button.pressed.connect(_open_keybinding_dialog)
@@ -76,16 +91,22 @@ func _setup_ui() -> void:
 
 	# 难度
 	difficulty_option.clear()
-	for d in DIFFICULTIES:
-		difficulty_option.add_item(d)
+	_difficulty_ids.clear()
+	_difficulty_ids.append_array(["story", "standard"] if _is_v2_settings() else DIFFICULTIES)
+	var difficulty_labels := ["故事", "标准"] if _is_v2_settings() else DIFFICULTIES
+	for label in difficulty_labels:
+		difficulty_option.add_item(label)
 	var diff = _settings.get("difficulty", "standard")
-	var diff_index = DIFFICULTIES.find(diff)
+	var diff_index = _difficulty_ids.find(diff)
 	difficulty_option.selected = diff_index if diff_index >= 0 else 1
 	difficulty_option.item_selected.connect(_on_difficulty_changed)
+	difficulty_label.visible = true
+	difficulty_option.visible = true
 
 	# 可访问性：大字体
 	large_text_check.button_pressed = _settings.get("large_text", false)
 	large_text_check.toggled.connect(_on_large_text_changed)
+	large_text_check.visible = not _is_v2_settings()
 
 	# 可访问性：减少动态效果
 	reduce_motion_check.button_pressed = _settings.get("reduce_motion", false)
@@ -99,13 +120,46 @@ func _setup_ui() -> void:
 	var cb_index = COLORBLIND_MODES.find(cb_mode)
 	colorblind_option.selected = cb_index if cb_index >= 0 else 0
 	colorblind_option.item_selected.connect(_on_colorblind_changed)
+	$Panel/ScrollContainer/VBoxContainer/ColorblindLabel.visible = not _is_v2_settings()
+	colorblind_option.visible = not _is_v2_settings()
 
 	# 可访问性：字幕/文字速度
 	subtitle_speed_slider.value = _settings.get("subtitle_speed", 1.0)
 	subtitle_speed_slider.value_changed.connect(_on_subtitle_speed_changed)
+	_setup_v2_options()
+
+func _is_v2_settings() -> bool:
+	return GameManager.is_v2_runtime()
+
+func _setup_v2_options() -> void:
+	var visible := _is_v2_settings()
+	for control in [ui_scale_label, ui_scale_option, visual_mode_label, visual_mode_option, pan_speed_label, pan_speed_slider, screen_shake_check]:
+		control.visible = visible
+	if not visible:
+		return
+	ui_scale_option.clear()
+	for label in ["100%", "125%", "150%"]:
+		ui_scale_option.add_item(label)
+	var scale_index := V2VisualMode.UI_SCALES.find(float(_settings.get("ui_scale", 1.0)))
+	ui_scale_option.selected = scale_index if scale_index >= 0 else 0
+	ui_scale_option.item_selected.connect(_on_ui_scale_changed)
+	visual_mode_option.clear()
+	for label in ["普通", "灰度高对比", "红绿区分辅助"]:
+		visual_mode_option.add_item(label)
+	var mode_index := V2VisualMode.VISUAL_MODES.find(StringName(String(_settings.get("visual_mode", "normal"))))
+	visual_mode_option.selected = mode_index if mode_index >= 0 else 0
+	visual_mode_option.item_selected.connect(_on_visual_mode_changed)
+	pan_speed_slider.value = float(_settings.get("pan_speed", 1.0))
+	pan_speed_slider.value_changed.connect(_on_pan_speed_changed)
+	screen_shake_check.button_pressed = bool(_settings.get("screen_shake", true))
+	screen_shake_check.toggled.connect(_on_screen_shake_changed)
 
 func _apply() -> void:
+	if _is_v2_settings():
+		_settings = V2VisualMode.normalize(_settings)
 	GameManager.update_settings(_settings)
+	if _is_v2_settings():
+		return
 	_apply_display()
 	_apply_audio()
 	_apply_accessibility()
@@ -159,7 +213,9 @@ func _on_sfx_changed(value: float) -> void:
 	_apply()
 
 func _on_difficulty_changed(index: int) -> void:
-	_settings["difficulty"] = DIFFICULTIES[index]
+	if index < 0 or index >= _difficulty_ids.size():
+		return
+	_settings["difficulty"] = _difficulty_ids[index]
 	_apply()
 
 func _on_large_text_changed(enabled: bool) -> void:
@@ -176,6 +232,22 @@ func _on_colorblind_changed(index: int) -> void:
 
 func _on_subtitle_speed_changed(value: float) -> void:
 	_settings["subtitle_speed"] = value
+	_apply()
+
+func _on_ui_scale_changed(index: int) -> void:
+	_settings["ui_scale"] = V2VisualMode.UI_SCALES[index]
+	_apply()
+
+func _on_visual_mode_changed(index: int) -> void:
+	_settings["visual_mode"] = String(V2VisualMode.VISUAL_MODES[index])
+	_apply()
+
+func _on_pan_speed_changed(value: float) -> void:
+	_settings["pan_speed"] = value
+	_apply()
+
+func _on_screen_shake_changed(enabled: bool) -> void:
+	_settings["screen_shake"] = enabled
 	_apply()
 
 func _on_back() -> void:
@@ -249,7 +321,7 @@ func _open_keybinding_dialog() -> void:
 	help.text = "选择一项后按下新按键。Esc 取消当前修改。"
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(help)
-	for action in InputBindings.ACTIONS:
+	for action in _binding_actions():
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(0, 38)
 		button.pressed.connect(_begin_rebind.bind(action, button))
@@ -280,6 +352,12 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	var binding := {"keycode": event.keycode, "physical_keycode": event.physical_keycode}
+	var conflict := InputBindings.find_conflict(_pending_binding_action, binding, _binding_actions())
+	if conflict != "":
+		_binding_buttons[_pending_binding_action].text = "%s：冲突，已被%s占用" % [BINDING_LABELS[_pending_binding_action], BINDING_LABELS.get(conflict, conflict)]
+		_pending_binding_action = ""
+		get_viewport().set_input_as_handled()
+		return
 	_settings["keybindings"][_pending_binding_action] = binding
 	InputBindings.set_binding(_pending_binding_action, binding)
 	_pending_binding_action = ""
@@ -291,6 +369,9 @@ func _restore_default_bindings() -> void:
 	_settings["keybindings"] = InputBindings.restore_defaults()
 	_apply()
 	_refresh_binding_buttons()
+
+func _binding_actions() -> Array:
+	return InputBindings.V2_ACTIONS if _is_v2_settings() else InputBindings.ACTIONS
 
 func _refresh_binding_buttons() -> void:
 	for action in _binding_buttons:

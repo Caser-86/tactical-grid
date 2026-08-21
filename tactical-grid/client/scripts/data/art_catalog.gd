@@ -3,6 +3,7 @@
 extends Node
 
 const ROOT := "res://assets/generated/chapter1/runtime/"
+const V2_UNIT_ROOT := "res://assets/v2/units/"
 const ENVIRONMENT_ROOT := ROOT + "environment/"
 const ENVIRONMENT_COMPONENTS := {
 	&"echo_yard": {
@@ -172,6 +173,36 @@ const PATHS := {
 		&"toxic": ROOT + "tiles/toxic_64.png",
 	},
 	&"unit": {
+		&"v2_assault": V2_UNIT_ROOT + "v2_assault_128.png",
+		&"v2_scout": V2_UNIT_ROOT + "v2_scout_128.png",
+		&"v2_sniper": V2_UNIT_ROOT + "v2_sniper_128.png",
+		&"v2_heavy": V2_UNIT_ROOT + "v2_heavy_128.png",
+		&"v2_sentry": V2_UNIT_ROOT + "v2_sentry_128.png",
+		&"v2_drone": V2_UNIT_ROOT + "v2_drone_128.png",
+		&"v2_shield_guard": V2_UNIT_ROOT + "v2_shield_guard_128.png",
+		&"v2_sniper_sentry": V2_UNIT_ROOT + "v2_sniper_sentry_128.png",
+		&"v2_assault_south": V2_UNIT_ROOT + "v2_assault_south_128.png",
+		&"v2_assault_north": V2_UNIT_ROOT + "v2_assault_north_128.png",
+		&"v2_assault_east": V2_UNIT_ROOT + "v2_assault_east_128.png",
+		&"v2_assault_west": V2_UNIT_ROOT + "v2_assault_west_128.png",
+		&"v2_scout_south": V2_UNIT_ROOT + "v2_scout_south_128.png",
+		&"v2_scout_north": V2_UNIT_ROOT + "v2_scout_north_128.png",
+		&"v2_scout_east": V2_UNIT_ROOT + "v2_scout_east_128.png",
+		&"v2_scout_west": V2_UNIT_ROOT + "v2_scout_west_128.png",
+		&"v2_sentry_south": V2_UNIT_ROOT + "v2_sentry_south_128.png",
+		&"v2_sentry_north": V2_UNIT_ROOT + "v2_sentry_north_128.png",
+		&"v2_sentry_east": V2_UNIT_ROOT + "v2_sentry_east_128.png",
+		&"v2_sentry_west": V2_UNIT_ROOT + "v2_sentry_west_128.png",
+		&"v2_drone_south": V2_UNIT_ROOT + "v2_drone_south_128.png",
+		&"v2_drone_north": V2_UNIT_ROOT + "v2_drone_north_128.png",
+		&"v2_drone_east": V2_UNIT_ROOT + "v2_drone_east_128.png",
+		&"v2_drone_west": V2_UNIT_ROOT + "v2_drone_west_128.png",
+		&"v2_shield_guard_south": V2_UNIT_ROOT + "v2_shield_guard_south_128.png",
+		&"v2_shield_guard_north": V2_UNIT_ROOT + "v2_shield_guard_north_128.png",
+		&"v2_shield_guard_east": V2_UNIT_ROOT + "v2_shield_guard_east_128.png",
+		&"v2_shield_guard_west": V2_UNIT_ROOT + "v2_shield_guard_west_128.png",
+		&"v2_protocol_engineer": ROOT + "units/protocol_engineer_96.png",
+		&"v2_hunter": ROOT + "units/hunter_96.png",
 		&"assault": ROOT + "units/assault_96.png",
 		&"sniper": ROOT + "units/sniper_96.png",
 		&"heavy": ROOT + "units/heavy_96.png",
@@ -187,8 +218,10 @@ const PATHS := {
 		&"sentry_basic": ROOT + "units/sentry_basic_96.png",
 		&"sentry_elite": ROOT + "units/cyber_guard_64.png",
 		&"sentry_sniper": ROOT + "units/sentry_sniper_96.png",
+		&"sniper_sentry": ROOT + "units/sentry_sniper_96.png",
 		&"sniper_elite": ROOT + "units/cyber_guard_64.png",
 		&"shield_bot": ROOT + "units/shield_bot_64.png",
+		&"shield_guard": ROOT + "units/shield_bot_64.png",
 		&"shield_maestro": ROOT + "units/shield_bot_64.png",
 		&"heavy_gunner": ROOT + "units/heavy_gunner_64.png",
 		&"assault_mech": ROOT + "units/heavy_gunner_64.png",
@@ -216,6 +249,7 @@ const PATHS := {
 		&"terminal": ROOT + "objectives/terminal_64.png",
 		&"evac": ROOT + "objectives/evac_64.png",
 		&"reactor_target": ROOT + "objectives/reactor_target_64.png",
+		&"rescue_beacon": ROOT + "objectives/rescue_beacon_128.png",
 	},
 	&"network_node": {
 		&"camera": ROOT + "network_icons/camera_64.png",

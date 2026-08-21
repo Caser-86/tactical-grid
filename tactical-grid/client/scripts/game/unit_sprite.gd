@@ -16,6 +16,8 @@ var unit: Node
 var selected := false
 var hover := false
 var current_state: StringName = &"idle"
+## V2-only directional art state. V1 keeps its existing single-texture mapping.
+var facing_direction: StringName = &"south"
 var art_sprite: Sprite2D
 
 ## CH1-040: 是否为最后已知位置幽灵标记。幽灵不显示实时生命/AP，只显示半透明轮廓与"?"不确定标记。
@@ -26,6 +28,9 @@ var ghost_uncertain := true
 var _state_tween: Tween
 var _idle_elapsed := 0.0
 var _base_art_scale := Vector2.ONE
+var _combat_feedback_texts: Array[String] = []
+var _hp_preview_ratio := -1.0
+var _hp_preview_tween: Tween
 
 func _ready() -> void:
 	_ensure_art_sprite()
@@ -33,7 +38,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not art_sprite or current_state != &"idle":
 		return
-	if GameManager.get_settings().get("reduce_motion", false):
+	var game_manager := _get_runtime_node("GameManager")
+	if game_manager != null and game_manager.has_method("get_settings") and game_manager.call("get_settings").get("reduce_motion", false):
 		art_sprite.position = Vector2.ZERO
 		art_sprite.rotation = 0.0
 		return
@@ -108,10 +114,18 @@ func _refresh_art_texture() -> void:
 	if not unit:
 		art_sprite.texture = null
 		return
-	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else StringName(unit.job)
-	if not ArtCatalog.has_texture(&"unit", key):
+	var catalog := _get_runtime_node("ArtCatalog")
+	if catalog == null:
+		art_sprite.texture = null
+		return
+	var key: StringName = unit.boss_art_key if not unit.boss_art_key.is_empty() else unit.v2_art_key if not unit.v2_art_key.is_empty() else StringName(unit.job)
+	if unit.boss_art_key.is_empty() and not unit.v2_art_key.is_empty():
+		key = _resolve_v2_directional_key(catalog, unit.v2_art_key)
+	if not catalog.call("has_texture", &"unit", key):
+		key = StringName(unit.job)
+	if not catalog.call("has_texture", &"unit", key):
 		key = &"cyber_guard" if unit.team == "enemy" else &"assault"
-	art_sprite.texture = ArtCatalog.get_texture(&"unit", key)
+	art_sprite.texture = catalog.call("get_texture", &"unit", key)
 	if art_sprite.texture:
 		var texture_size := art_sprite.texture.get_size()
 		var longest_side := maxf(texture_size.x, texture_size.y)
@@ -122,12 +136,47 @@ func _refresh_art_texture() -> void:
 		_base_art_scale = Vector2.ONE
 	_reset_art_transform()
 
+func _resolve_v2_directional_key(catalog: Node, base_key: StringName) -> StringName:
+	var directional_key := StringName("%s_%s" % [String(base_key), String(facing_direction)])
+	if catalog.call("has_texture", &"unit", directional_key):
+		return directional_key
+	var south_key := StringName("%s_south" % String(base_key))
+	if catalog.call("has_texture", &"unit", south_key):
+		return south_key
+	return base_key
+
+func set_facing_direction(direction: StringName) -> void:
+	if direction not in [&"north", &"east", &"south", &"west"]:
+		return
+	facing_direction = direction
+	if unit != null and unit.boss_art_key.is_empty() and not unit.v2_art_key.is_empty():
+		_refresh_art_texture()
+
+func set_facing_direction_from_vector(direction: Vector2) -> void:
+	if direction.length_squared() <= 0.01:
+		return
+	if absf(direction.x) >= absf(direction.y):
+		set_facing_direction(&"east" if direction.x > 0.0 else &"west")
+	else:
+		set_facing_direction(&"south" if direction.y > 0.0 else &"north")
+
+func get_facing_direction() -> StringName:
+	return facing_direction
+
 func _is_boss_unit() -> bool:
 	return unit != null and not unit.boss_art_key.is_empty()
 
 func _get_normal_art_max_size() -> float:
-	if unit != null and unit.job == "heavy":
-		return HEAVY_ART_MAX_SIZE
+	if unit != null:
+		if unit.job == "heavy":
+			return HEAVY_ART_MAX_SIZE
+		if unit.team == "enemy":
+			match String(unit.job):
+				"drone": return 58.0
+				"shield_guard", "sniper_sentry": return 84.0
+				"protocol_engineer": return 72.0
+				"hunter": return 78.0
+				_: return 70.0
 	return ART_MAX_SIZE
 
 func get_rendered_art_size() -> float:
@@ -156,8 +205,10 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
 
 	_begin_state(state)
 	var state_direction := direction.normalized() if direction.length_squared() > 0.01 else Vector2.RIGHT
+	if state == &"attack":
+		set_facing_direction_from_vector(state_direction)
 	var base_duration := duration_override if duration_override > 0.0 else _default_state_duration(state)
-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
+	var duration := _get_effect_duration(base_duration)
 
 	match state:
 		&"attack":
@@ -184,21 +235,34 @@ func play_state(state: StringName, direction: Vector2 = Vector2.RIGHT, duration_
 
 func play_move_to(target_position: Vector2, duration_override: float = -1.0) -> void:
 	_begin_state(&"move")
+	set_facing_direction_from_vector(target_position - position)
 	if unit:
 		z_index = 100 + unit.grid_pos.y
 	var distance := position.distance_to(target_position)
 	var base_duration := duration_override if duration_override > 0.0 else clampf(distance / 420.0, 0.14, 0.42)
-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
+	var duration := _get_effect_duration(base_duration)
 	art_sprite.rotation = 0.045
 	_state_tween = create_tween()
 	_state_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_state_tween.tween_property(self, "position", target_position, duration)
 	_state_tween.finished.connect(_return_to_idle)
 
+## Snap visual state after an authoritative position correction.
+## Reconciliation must cancel any in-flight movement tween, otherwise the old
+## tween can move a corrected enemy back onto a player unit a few frames later.
+func snap_to(target_position: Vector2) -> void:
+	if _state_tween and _state_tween.is_valid():
+		_state_tween.kill()
+	position = target_position
+	current_state = &"idle"
+	if unit:
+		z_index = 100 + unit.grid_pos.y
+	_reset_art_transform()
+
 func play_death(duration_override: float = -1.0) -> void:
 	_begin_state(&"death")
 	var base_duration := duration_override if duration_override > 0.0 else 0.55
-	var duration := AccessibilitySettings.get_effect_duration(base_duration)
+	var duration := _get_effect_duration(base_duration)
 	_state_tween = create_tween()
 	_state_tween.set_parallel(true)
 	_state_tween.tween_property(art_sprite, "rotation", 0.72, duration)
@@ -227,12 +291,70 @@ func _reset_art_transform() -> void:
 	art_sprite.modulate = Color.WHITE
 	modulate = Color.WHITE
 
+## 显示一次可读的战斗结果文本，并在短动画后自动清理。
+## 文本记录保留到下一次 clear_combat_feedback，便于表现合同读取已显示内容。
+func show_combat_feedback(text: String, color: Color = Color.WHITE) -> void:
+	if text == "":
+		return
+	_combat_feedback_texts.append(text)
+	var label := Label.new()
+	label.name = "CombatFeedback"
+	label.text = text
+	label.position = Vector2(-28, -42 - _combat_feedback_texts.size() * 14)
+	label.z_index = 20
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.02, 0.03, 0.04, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	add_child(label)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position", label.position + Vector2(0, -18), 0.32)
+	tween.tween_property(label, "modulate", Color(1, 1, 1, 0), 0.32).set_delay(0.16)
+	tween.chain().tween_callback(label.queue_free)
+
+func get_combat_feedback_texts() -> Array[String]:
+	return _combat_feedback_texts.duplicate()
+
+func clear_combat_feedback() -> void:
+	_combat_feedback_texts.clear()
+
+## 在 0.16 秒内从旧生命值过渡到提交后的生命值。
+func show_hp_prestrip(hp_before: int, hp_after: int) -> void:
+	if not unit:
+		return
+	if _hp_preview_tween and _hp_preview_tween.is_valid():
+		_hp_preview_tween.kill()
+	_hp_preview_ratio = clampf(float(hp_before) / float(maxi(1, unit.max_hp)), 0.0, 1.0)
+	var target_ratio := clampf(float(hp_after) / float(maxi(1, unit.max_hp)), 0.0, 1.0)
+	queue_redraw()
+	_hp_preview_tween = create_tween()
+	_hp_preview_tween.tween_property(self, "_hp_preview_ratio", target_ratio, 0.16)
+	_hp_preview_tween.tween_callback(clear_hp_prestrip)
+
+func clear_hp_prestrip() -> void:
+	_hp_preview_ratio = -1.0
+	queue_redraw()
+
 func _default_state_duration(state: StringName) -> float:
 	match state:
 		&"attack": return 0.24
 		&"hit": return 0.30
 		&"skill": return 0.42
 		_: return 0.20
+
+func _get_runtime_node(node_name: String) -> Node:
+	var main_loop := Engine.get_main_loop()
+	if main_loop is SceneTree:
+		return (main_loop as SceneTree).root.get_node_or_null(node_name)
+	return null
+
+func _get_effect_duration(base_duration: float) -> float:
+	var settings := _get_runtime_node("AccessibilitySettings")
+	if settings != null and settings.has_method("get_effect_duration"):
+		return float(settings.call("get_effect_duration", base_duration))
+	return base_duration
 
 func _get_unit_color() -> Color:
 	if unit.team == "player":
@@ -248,7 +370,10 @@ func _draw_role_accent(radius: int) -> void:
 		return
 	var accent := _get_role_accent()
 	var marker_center := Vector2(radius * 0.62, -radius * 0.62)
-	draw_circle(marker_center, 6.0, Color(0.015, 0.025, 0.035, 0.92))
+	# The marker is deliberately larger than the optional text badge. At the
+	# small map scale the silhouette remains readable even when text is hidden.
+	draw_circle(marker_center, 9.0, Color(0.015, 0.025, 0.035, 0.96))
+	draw_arc(marker_center, 10.5, 0.0, TAU, 20, accent, 2.0)
 	match String(unit.job):
 		"assault":
 			draw_colored_polygon(PackedVector2Array([
@@ -264,9 +389,38 @@ func _draw_role_accent(radius: int) -> void:
 			draw_circle(marker_center + Vector2(3, -2), 1.5, accent)
 		"heavy":
 			draw_rect(Rect2(marker_center - Vector2(4, 3), Vector2(8, 6)), accent, true)
+		"sentry":
+			draw_colored_polygon(PackedVector2Array([
+				marker_center + Vector2(0, -5), marker_center + Vector2(5, 4), marker_center + Vector2(-5, 4),
+			]), accent)
+		"drone":
+			draw_colored_polygon(PackedVector2Array([
+				marker_center + Vector2(0, -5), marker_center + Vector2(5, 0), marker_center + Vector2(0, 5), marker_center + Vector2(-5, 0),
+			]), accent)
+			draw_line(marker_center + Vector2(-5, 0), marker_center + Vector2(5, 0), Color.WHITE, 1.5)
+		"sniper_sentry":
+			draw_arc(marker_center, 4.0, 0, TAU, 16, accent, 2.0)
+			draw_line(marker_center + Vector2(-6, 0), marker_center + Vector2(6, 0), accent, 1.5)
+			draw_line(marker_center + Vector2(0, -6), marker_center + Vector2(0, 6), accent, 1.5)
+		"shield_guard":
+			draw_colored_polygon(PackedVector2Array([
+				marker_center + Vector2(0, -5), marker_center + Vector2(5, -2), marker_center + Vector2(4, 4), marker_center + Vector2(0, 6), marker_center + Vector2(-4, 4), marker_center + Vector2(-5, -2),
+			]), accent)
+		"protocol_engineer":
+			draw_rect(Rect2(marker_center - Vector2(4, 4), Vector2(8, 8)), accent, false, 2.0)
+			draw_line(marker_center + Vector2(-3, 3), marker_center + Vector2(4, -4), accent, 2.0)
+		"hunter":
+			draw_colored_polygon(PackedVector2Array([
+				marker_center + Vector2(0, -6), marker_center + Vector2(3, -2), marker_center + Vector2(6, 0), marker_center + Vector2(3, 2), marker_center + Vector2(0, 6), marker_center + Vector2(-3, 2), marker_center + Vector2(-6, 0), marker_center + Vector2(-3, -2),
+			]), accent)
 		_:
 			draw_circle(marker_center, 3.5, accent)
-	draw_arc(Vector2.ZERO, radius + 3, -0.85, 0.15, 10, accent, 2.5)
+	var badge := _get_role_badge()
+	if not badge.is_empty():
+		var badge_rect := Rect2(Vector2(-radius - 7, -radius - 26), Vector2(18, 18))
+		draw_rect(badge_rect, Color(0.02, 0.03, 0.04, 0.94), true)
+		draw_rect(badge_rect, accent, false, 2.0)
+		draw_string(ThemeDB.fallback_font, badge_rect.position + Vector2(2, 14), badge, HORIZONTAL_ALIGNMENT_CENTER, 14, 12, Color.WHITE)
 
 func _get_role_accent() -> Color:
 	match String(unit.job):
@@ -274,11 +428,27 @@ func _get_role_accent() -> Color:
 		"scout": return Color("55e7ff")
 		"sniper": return Color("c7a0ff")
 		"heavy": return Color("ffd35a")
-		"protocol_engineer": return Color("b46cff")
+		"sentry": return Color("ff614d")
+		"drone": return Color("4fe7ff")
+		"sniper_sentry": return Color("d18cff")
+		"shield_guard": return Color("ffd35a")
+		"protocol_engineer": return Color("ff9a42")
 		"hunter": return Color("ff5f9e")
 		"sentry_basic", "sentry_sniper": return Color("ff694f")
 		"drone_scout", "drone_assault": return Color("ff9b45")
 		_: return _get_unit_color().lightened(0.22)
+
+func _get_role_badge() -> String:
+	if unit == null or unit.team != "enemy":
+		return ""
+	match String(unit.job):
+		"sentry": return "哨"
+		"drone": return "机"
+		"sniper_sentry": return "狙"
+		"shield_guard": return "盾"
+		"protocol_engineer": return "工"
+		"hunter": return "猎"
+		_: return "敌"
 
 func _draw_tactical_silhouette(team_color: Color) -> void:
 	var body_color := Color(0.075, 0.10, 0.13) if unit.team == "player" else Color(0.17, 0.055, 0.045)
@@ -303,6 +473,13 @@ func _draw_hp_bar(radius: int) -> void:
 	var hp_ratio := float(unit.current_hp) / float(maxi(1, unit.max_hp))
 	var hp_color := GameTheme.get_hp_color(unit.current_hp, unit.max_hp)
 	draw_rect(Rect2(-bar_width / 2.0, bar_y, bar_width * hp_ratio, bar_height), hp_color, true)
+	# V2: 短暂叠加提交前的生命条，随后收缩到真实值。
+	if _hp_preview_ratio >= 0.0:
+		draw_rect(
+			Rect2(-bar_width / 2.0, bar_y, bar_width * _hp_preview_ratio, bar_height),
+			Color(1.0, 0.72, 0.24, 0.88),
+			true
+		)
 	draw_rect(Rect2(-bar_width / 2.0, bar_y, bar_width, bar_height), Color(1, 1, 1, 0.72), false, 1)
 
 func _draw_shield_bar(radius: int) -> void:

@@ -6,6 +6,24 @@ class_name BattleController
 const CELL_SIZE = 64
 const MAP_VISUAL_MARGIN = 40
 const TutorialHintScene = preload("res://scenes/tutorial_hint.tscn")
+const V2ActionServiceScript = preload("res://scripts/v2/combat/v2_action_service.gd")
+const V2InteractionServiceScript = preload("res://scripts/v2/interaction/v2_interaction_service.gd")
+const V2AffordancePresenterScript = preload("res://scripts/v2/presentation/v2_affordance_presenter.gd")
+const V2ActionPreviewScript = preload("res://scripts/v2/presentation/v2_action_preview.gd")
+const V2HudPresenterScript = preload("res://scripts/v2/presentation/v2_hud_presenter.gd")
+const V2DamagePresenterScript = preload("res://scripts/v2/presentation/v2_damage_presenter.gd")
+const V2IntentPresentationScript = preload("res://scripts/v2/presentation/v2_intent_presenter.gd")
+const V2BattleInputRouterScript = preload("res://scripts/v2/input/v2_battle_input_router.gd")
+const V2MissionFlowScript = preload("res://scripts/v2/mission/v2_mission_flow.gd")
+const V2MissionEventBridgeScript = preload("res://scripts/v2/mission/v2_mission_event_bridge.gd")
+const V2RescueControllerScript = preload("res://scripts/v2/mission/v2_rescue_controller.gd")
+const V2EncounterActivationScript = preload("res://scripts/v2/mission/v2_encounter_activation.gd")
+const V2TutorialFlowScript = preload("res://scripts/v2/mission/v2_tutorial_flow.gd")
+const V2CheckpointAdapterScript = preload("res://scripts/v2/mission/v2_checkpoint_adapter.gd")
+const V2MapLoaderScript = preload("res://scripts/v2/content/v2_map_loader.gd")
+const V2PlaytestRecorderScript = preload("res://scripts/v2/mission/v2_playtest_recorder.gd")
+const V2CameraFocusScript = preload("res://scripts/v2/runtime/v2_camera_focus.gd")
+const V2CameraNavigationScript = preload("res://scripts/v2/runtime/v2_camera_navigation.gd")
 
 ## CH1-030: 上下文教程 flag 期望的动作类型映射（玩家完成对应动作后推进提示）
 ## CH1-080: M1 只教学选择/移动/攻击/观察/接管/结束回合六项
@@ -37,6 +55,7 @@ var _active_context_flag: String = ""
 @onready var move_highlight: Node2D = $MoveHighlightLayer
 @onready var path_preview_layer: Node2D = $PathPreviewLayer
 @onready var attack_highlight: Node2D = $AttackHighlightLayer
+@onready var v2_affordance_layer: Node2D = $V2AffordanceLayer
 @onready var unit_layer: Node2D = $UnitLayer
 @onready var effect_layer: Node2D = $EffectLayer
 @onready var hud: HUD = $HUD
@@ -69,6 +88,7 @@ var selected_unit: Unit = null
 var selected_action: String = ""  # "", "move", "attack", "skill", "item", "targeting"
 var reachable_cells: Dictionary = {}
 var attack_targets: Array = []
+var v2_attack_range_cells: Array[Vector2i] = []
 ## 直接点击敌人时的二次确认目标，避免误触立即结算攻击。
 var attack_preview_target: Unit = null
 var attack_preview_data: Dictionary = {}
@@ -90,6 +110,44 @@ var mission_objective_state: MissionObjectiveState
 var visibility_state: VisibilityState
 var enemy_intent_state: EnemyIntentState
 var enemy_planner: EnemyPlanner
+## V2 P1 服务槽位。正式输入仍使用旧 ActionSystem，P2 逐合同切换。
+var v2_action_service: V2ActionService = null
+var v2_mission_flow: RefCounted = null
+var v2_mission_event_bridge: RefCounted = null
+var v2_rescue_controller: RefCounted = null
+var v2_encounter_activation: RefCounted = null
+var v2_tutorial_flow: RefCounted = null
+var _v2_auto_select_in_progress := false
+var v2_interaction_service: RefCounted = null
+var v2_affordance_presenter: V2AffordancePresenter = null
+var v2_action_preview: V2ActionPreview = null
+var v2_hud_presenter: RefCounted = null
+var v2_damage_presenter: RefCounted = null
+var v2_input_router: V2BattleInputRouter = null
+var v2_context_action_resolver: RefCounted = null
+var v2_camera_navigation: RefCounted = null
+var _v2_camera_return_handled := false
+var v2_damage_signal_suppressed := false
+var v2_pending_move_preview: Dictionary = {}
+## V2 ability targeting stays on one simple Q entry instead of a permanent
+## action bar. The selected role supplies one active ability and this state
+## holds only the current target preview.
+var v2_pending_ability_id: StringName = &""
+var v2_pending_ability_preview: Dictionary = {}
+var v2_ability_target_cells: Array[Vector2i] = []
+## V2 攻击采用预览优先：悬停预览与已锁定预览分开管理。
+var v2_hover_attack_preview: Dictionary = {}
+var v2_locked_attack_preview: Dictionary = {}
+var v2_locked_attack_target_id: String = ""
+var v2_pending_interaction_facility_id: String = ""
+var v2_last_checkpoint: Dictionary = {}
+var v2_last_checkpoint_id: String = ""
+var _v2_last_objective_status := ""
+var v2_rescue_marker: Node2D = null
+var _v2_units_rendered := false
+var v2_visibility_summary: Dictionary = {}
+## M113: opt-in only. Normal game launches never create a playtest file.
+var v2_playtest_recorder: RefCounted = null
 ## CODE-P2-02: Tactical network and alert state
 var tactical_network_state: TacticalNetworkState
 ## 网络节点精灵（覆盖层显示时可见）
@@ -242,10 +300,15 @@ func _ready() -> void:
 	_setup_visibility_renderer()
 	_setup_enemy_intent_renderer()
 	_spawn_units()
+	_setup_v2_services()
+	_setup_v2_affordance_presenter()
+	_setup_v2_hud_presenter()
+	_setup_v2_damage_presenter()
 	_setup_objective_state()
 	_setup_victory_conditions()
 	_init_telemetry()
 	_render_map()
+	_render_v2_rescue_marker()
 	_configure_viewport_layout()
 	get_viewport().size_changed.connect(_configure_viewport_layout)
 	_render_units()
@@ -255,6 +318,10 @@ func _ready() -> void:
 ## CH1-040: 创建并挂载 VisibilityRenderer，置于 EvacZoneLayer 与 MoveHighlightLayer 之间。
 ## 雾层遮挡地形与撤离区，但不遮挡玩家高亮、单位与特效。
 func _setup_visibility_renderer() -> void:
+	# VisibilityState needs map dimensions before camera zones or same-frame
+	# movement updates can be merged; without setup, bounds checks silently fail.
+	if visibility_state:
+		visibility_state.setup(map_width, map_height)
 	visibility_renderer = VisibilityRenderer.new()
 	visibility_renderer.name = "VisibilityRenderer"
 	# Fog must cover unexplored environment props, while UnitSprite/FX keep their
@@ -264,7 +331,9 @@ func _setup_visibility_renderer() -> void:
 	# 插入到 MoveHighlightLayer 当前位置，使雾层位于 EvacZoneLayer 与 MoveHighlightLayer 之间。
 	if move_highlight:
 		move_child(visibility_renderer, move_highlight.get_index())
-	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE))
+	# V2 keeps the fog rules but uses a readable dark silhouette for unexplored
+	# terrain. V1 keeps the original opaque fog presentation.
+	visibility_renderer.setup(visibility_state, map_width, map_height, float(CELL_SIZE), _is_v2_battle())
 
 
 ## CH1-050: 创建并挂载 EnemyIntentRenderer，位于单位层之上，绘制观察到的敌人意图
@@ -316,13 +385,24 @@ func _sync_objective_state_from_mos() -> void:
 
 ## mos 目标文本更新回调：刷新 HUD
 func _on_objective_updated(_text: String) -> void:
-	hud.update_objective(mission_objective_state.get_status_text())
+	var status := mission_objective_state.get_status_text()
+	if _is_v2_battle() and status != _v2_last_objective_status:
+		_v2_last_objective_status = status
+		AudioManager.sfx_objective_update()
+		var feedback_cell := selected_unit.grid_pos if selected_unit else Vector2i(-1, -1)
+		if feedback_cell.x < 0 and v2_mission_flow and v2_mission_flow.has_method("get_current_guide_cell"):
+			feedback_cell = v2_mission_flow.get_current_guide_cell()
+		if feedback_cell.x >= 0:
+			_spawn_effect("objective_update", feedback_cell)
+	if hud:
+		hud.update_objective(status)
 
 ## 退出场景树时释放未挂载的单位节点，避免资源泄漏
 func _exit_tree() -> void:
 	# 取消任何进行中的目标选择，避免信号回调悬空
 	if targeting_controller and targeting_controller.is_active:
 		targeting_controller.cancel()
+	_finish_v2_playtest(false, {"ended_by": "scene_exit"})
 	_cleanup_units()
 
 ## 释放所有单位节点（player_units 和 enemy_units 中的 Unit 实例）
@@ -338,6 +418,7 @@ func _cleanup_units() -> void:
 			unit.free()
 	player_units.clear()
 	enemy_units.clear()
+	_v2_units_rendered = false
 	# CH1-040: 清理最后已知位置幽灵标记及其临时 Unit 占位
 	for ghost in _last_known_ghosts.values():
 		if ghost and is_instance_valid(ghost):
@@ -348,6 +429,18 @@ func _cleanup_units() -> void:
 	_last_known_ghosts.clear()
 	_camera_zone_cells.clear()
 	_dismiss_context_hint()
+	# Release V2 RefCounted mission state before temporary battle scenes are freed.
+	v2_mission_flow = null
+	v2_mission_event_bridge = null
+	v2_rescue_controller = null
+	v2_encounter_activation = null
+	v2_tutorial_flow = null
+	v2_visibility_summary.clear()
+	v2_last_checkpoint.clear()
+	v2_last_checkpoint_id = ""
+	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
+		v2_rescue_marker.free()
+	v2_rescue_marker = null
 	selected_unit = null
 	boss_unit = null
 	boss_data.clear()
@@ -410,6 +503,9 @@ func _on_tutorial_hint_closed() -> void:
 
 ## CH1-030: 战斗开始后启动上下文教学提示序列（伴随式、非阻断）
 func _begin_context_tutorials() -> void:
+	if _is_v2_battle() and v2_tutorial_flow != null:
+		_show_v2_tutorial_step()
+		return
 	_context_hint_queue.clear()
 	for f in level_config.get("context_tutorial_flags", []):
 		_context_hint_queue.append(String(f))
@@ -433,6 +529,22 @@ func _show_context_hint(flag: String) -> void:
 	_active_context_flag = flag
 	_active_context_hint.show_context_hint(flag)
 
+## V2 M1 uses the compact six-step flow instead of the V1 flag queue.
+func _show_v2_tutorial_step() -> void:
+	_dismiss_context_hint()
+	if v2_tutorial_flow == null or v2_tutorial_flow.get_visible_hint_count() <= 0:
+		_render_v2_hud()
+		return
+	_active_context_flag = "v2_%s" % String(v2_tutorial_flow.current_step())
+	_record_v2_playtest_event(&"hint_shown", {"hint_id": String(v2_tutorial_flow.current_step())})
+	_render_v2_hud()
+
+func _skip_v2_tutorial() -> void:
+	if v2_tutorial_flow:
+		v2_tutorial_flow.skip()
+	_dismiss_context_hint()
+	_render_v2_hud()
+
 ## CH1-030: 清理当前上下文提示实例
 func _dismiss_context_hint() -> void:
 	if _active_context_hint != null and is_instance_valid(_active_context_hint):
@@ -443,12 +555,65 @@ func _dismiss_context_hint() -> void:
 ## CH1-030: 玩家完成动作后推进上下文提示
 ## action_type: "move" / "attack" / "interact" / "network" / "end_turn"
 func _advance_context_hint(action_type: String) -> void:
+	if _is_v2_battle() and v2_tutorial_flow != null:
+		return
 	if _active_context_flag == "":
 		return
 	var expected: String = String(CONTEXT_HINT_ACTION.get(_active_context_flag, ""))
 	if expected == "" or expected == action_type:
 		TutorialHint.mark_known(_active_context_flag)
 		_show_next_context_hint()
+
+func _advance_v2_tutorial(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	if not _is_v2_battle() or v2_tutorial_flow == null:
+		return {"advanced": false, "reason": &"v2_tutorial_unavailable"}
+	var result: Dictionary = v2_tutorial_flow.on_event(event_name, payload)
+	if bool(result.get("m1_safe_tutorial_complete", false)) and v2_mission_flow != null and v2_mission_flow.has_method("set_m1_safe_tutorial_complete"):
+		v2_mission_flow.set_m1_safe_tutorial_complete(true)
+	if bool(result.get("advanced", false)):
+		if v2_tutorial_flow.get_visible_hint_count() > 0:
+			_show_v2_tutorial_step()
+		else:
+			_dismiss_context_hint()
+		_render_v2_hud()
+	return result
+
+## M113: enable recording only when a tester explicitly supplies an anonymous
+## QA flag. This keeps normal player sessions local and telemetry-free.
+func _configure_v2_playtest_recorder(args: Array = []) -> Dictionary:
+	v2_playtest_recorder = null
+	if not _is_v2_battle() or level_id != "ch1_m1":
+		return {"success": false, "enabled": false, "error": "playtest_not_available"}
+	var actual_args := args
+	if actual_args.is_empty():
+		actual_args = OS.get_cmdline_args()
+	var recorder: RefCounted = V2PlaytestRecorderScript.new()
+	var difficulty := String(GameManager.get_settings().get("difficulty", "standard"))
+	var result: Dictionary = recorder.start_from_cmdline(actual_args, difficulty)
+	if bool(result.get("enabled", false)):
+		v2_playtest_recorder = recorder
+	return result
+
+func _record_v2_playtest_event(event_type: StringName, payload: Dictionary = {}) -> void:
+	if v2_playtest_recorder == null:
+		return
+	v2_playtest_recorder.record(event_type, payload)
+
+func _finish_v2_playtest(victory: bool, result: Dictionary = {}) -> void:
+	if v2_playtest_recorder == null:
+		return
+	var event_type: StringName = &"mission_completed" if victory else &"mission_failed"
+	_record_v2_playtest_event(event_type, {
+		"result": "victory" if victory else "defeat",
+		"turns": int(result.get("turns", turn_manager.turn_number if turn_manager else 0)),
+		"reason": String(result.get("defeat_reason", result.get("reason", ""))),
+	})
+	v2_playtest_recorder.finish({
+		"completed": victory,
+		"result": "victory" if victory else "defeat",
+		"turns": int(result.get("turns", turn_manager.turn_number if turn_manager else 0)),
+	})
+	v2_playtest_recorder = null
 
 func _init_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -495,6 +660,455 @@ func _init_subsystems() -> void:
 	tactical_network_state.alert_requested.connect(_on_network_alert_requested)
 	tactical_network_state.network_operation_performed.connect(_on_network_operation)
 	action_system.set_tactical_network_state(tactical_network_state)
+
+	# V2 P1 只创建依赖槽位，不切换 V1 正式输入路径。
+	v2_action_service = V2ActionServiceScript.new()
+	v2_mission_flow = V2MissionFlowScript.new()
+	v2_mission_event_bridge = V2MissionEventBridgeScript.new()
+	v2_interaction_service = V2InteractionServiceScript.new()
+	v2_input_router = V2BattleInputRouterScript.new()
+	add_child(v2_input_router)
+	v2_input_router.cell_left_clicked.connect(_on_v2_cell_left_clicked)
+	v2_input_router.cell_hovered.connect(_on_v2_cell_hovered)
+	v2_input_router.cancel_requested.connect(_on_v2_cancel_requested)
+	v2_input_router.pointer_cancel_requested.connect(_on_v2_cancel_requested)
+	v2_input_router.end_turn_requested.connect(request_end_turn)
+	v2_input_router.next_unit_requested.connect(_on_next_unit)
+	v2_input_router.ability_requested.connect(_on_v2_ability_requested)
+	v2_input_router.camera_pan_requested.connect(_on_v2_camera_pan)
+	v2_input_router.camera_zoom_requested.connect(_on_v2_camera_zoom)
+	v2_input_router.focus_requested.connect(_on_v2_camera_focus)
+	v2_input_router.camera_inspect_cancel_requested.connect(_on_v2_camera_inspect_cancel_requested)
+	v2_input_router.network_overlay_requested.connect(_on_toggle_network)
+
+func _setup_v2_services() -> void:
+	if v2_action_service == null:
+		return
+	if _is_v2_battle():
+		v2_camera_navigation = V2CameraNavigationScript.new()
+	# V2 uses one move budget and one action budget for every live combat unit.
+	# Enable this before TurnManager starts the first player phase so the first
+	# real click can query and commit an action without a legacy AP fallback.
+	for raw_unit in player_units + enemy_units:
+		var unit: Unit = raw_unit
+		if unit and not unit.v2_turn_mode_enabled:
+			unit.enable_v2_turn_mode()
+	v2_action_service.setup(map_data, player_units, enemy_units)
+	var v2_mission: Dictionary = {"id": level_id, "map_id": level_id, "rescue_character": "scout"}
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data and v2_data.has_method("get_mission"):
+		var loaded_mission: Dictionary = v2_data.get_mission(StringName(level_id))
+		if not loaded_mission.is_empty():
+			v2_mission = loaded_mission
+	# The V2 M1 expansion is opt-in at runtime. Legacy mission-flow fixtures and
+	# V1 never receive this flag, so their stable two/three-step contracts remain
+	# unchanged while the shipped V2 mission uses its five-stage flow.
+	if _is_v2_battle() and String(v2_mission.get("flow_mode", "")) == "expanded_m1":
+		v2_mission["expanded_flow"] = true
+	if _is_v2_battle() and String(v2_mission.get("id", level_id)) == "ch1_m1":
+		_configure_v2_m1_alert()
+		v2_tutorial_flow = V2TutorialFlowScript.new()
+		v2_tutorial_flow.setup({
+			"safe_turns": int(v2_mission.get("tutorial_safety_turns", 3)),
+		})
+	var v2_map_result := V2MapLoaderScript.load_map(StringName(String(v2_mission.get("map_id", level_id))))
+	if not bool(v2_map_result.get("success", false)):
+		v2_map_result = V2MapLoaderScript.load_map(StringName(level_id))
+	var v2_map: Dictionary = v2_map_result.get("data", {}) if bool(v2_map_result.get("success", false)) else {}
+	if _is_v2_battle() and not v2_map.is_empty():
+		_setup_v2_enemy_roster(v2_map)
+		v2_action_service.setup(v2_map, player_units, enemy_units)
+		if enemy_planner:
+			enemy_planner.setup(v2_map)
+	v2_mission_flow.setup(v2_mission, v2_map, player_units, enemy_units)
+	v2_mission_flow.apply_event(&"mission_started")
+	if _is_v2_battle() and not v2_map.is_empty():
+		v2_encounter_activation = V2EncounterActivationScript.new()
+		v2_encounter_activation.setup(v2_map)
+		_update_v2_encounters([])
+	v2_rescue_controller = V2RescueControllerScript.new()
+	v2_rescue_controller.setup(
+		v2_map,
+		player_units,
+		enemy_units,
+		v2_action_service,
+		v2_mission_flow,
+		Callable(self, "_create_v2_rescue_unit"),
+		Callable(self, "_register_v2_rescued_unit"),
+	)
+	v2_rescue_controller.rescue_committed.connect(_on_v2_rescue_committed)
+	v2_rescue_controller.checkpoint_requested.connect(_on_v2_checkpoint_requested)
+	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	v2_hover_attack_preview.clear()
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
+	v2_pending_interaction_facility_id = ""
+	var interaction_map: Dictionary = v2_map if not v2_map.is_empty() else map_data
+	v2_interaction_service.setup(interaction_map, tactical_network_state, visibility_state, alert_state, v2_mission_flow)
+	if camera:
+		camera.set_input_router_mode(_is_v2_battle())
+	if hud and _is_v2_battle():
+		hud.set_v2_camera_return_visible(false)
+
+## M1 intentionally has one readable front escalation: hidden -> searching.
+## Story difficulty grants one ignored recognition event; standard does not.
+func _configure_v2_m1_alert() -> void:
+	if not alert_state:
+		return
+	var difficulty := String(GameManager.get_settings().get("difficulty", "standard"))
+	alert_state.setup({
+		"front_stage_cap": AlertState.LEVEL_SUSPICIOUS,
+		"allowed_events": ["camera_identified_player", "drone_scan_completed"],
+		"decay_enabled": false,
+		"story_grace_events": 1 if difficulty == "story" else 0,
+	})
+
+## Replace the V1 enemy templates with all six V2 M1 stable entities. Inactive
+## entities remain as non-alive nodes so save identity stays stable, while the
+## encounter service decides when they become part of the live battle.
+func _setup_v2_enemy_roster(v2_map: Dictionary) -> void:
+	for raw_enemy in enemy_units:
+		if raw_enemy is Unit and is_instance_valid(raw_enemy):
+			(raw_enemy as Unit).free()
+	enemy_units.clear()
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data == null or not v2_data.has_method("get_enemy"):
+		return
+	for raw_entity in v2_map.get("entities", []):
+		if not raw_entity is Dictionary or String(raw_entity.get("type", "")) != "spawn_enemy":
+			continue
+		var entity: Dictionary = raw_entity
+		var enemy_id := String(entity.get("enemy_id", ""))
+		var entity_id := String(entity.get("id", ""))
+		var enemy_data: Dictionary = v2_data.get_enemy(StringName(enemy_id))
+		if enemy_data.is_empty() or entity_id.is_empty():
+			continue
+		var unit := GameData.create_v2_enemy_unit(enemy_data)
+		unit.entity_id = entity_id
+		unit.grid_pos = Vector2i(int(entity.get("x", -1)), int(entity.get("y", -1)))
+		unit.height = MapLoader.get_height_at(v2_map, unit.grid_pos.x, unit.grid_pos.y)
+		unit.is_alive = false
+		unit.is_downed = false
+		enemy_units.append(unit)
+
+func _get_v2_player_positions() -> Array:
+	var positions: Array = []
+	for unit in player_units:
+		if unit and unit.is_alive:
+			positions.append(unit.grid_pos)
+	return positions
+
+## Apply only activation deltas to the live Unit/Sprite/visibility owners.
+func _update_v2_encounters(mission_events: Array) -> Dictionary:
+	if not _is_v2_battle() or v2_encounter_activation == null:
+		return {"success": false, "reason": &"encounter_activation_unavailable"}
+	var result: Dictionary = v2_encounter_activation.update(_get_v2_player_positions(), mission_events)
+	for raw_id in result.get("deactivated_ids", []):
+		_set_v2_enemy_active(String(raw_id), false)
+	for raw_id in result.get("activated_ids", []):
+		_set_v2_enemy_active(String(raw_id), true)
+	if not result.get("activated_ids", []).is_empty() or not result.get("deactivated_ids", []).is_empty():
+		if action_system:
+			action_system.set_units(player_units, enemy_units)
+		if v2_action_service:
+			v2_action_service.refresh_units(player_units, enemy_units)
+		_refresh_enemy_sprite_visibility()
+		_refresh_enemy_intent_display()
+		_update_visibility()
+	_reconcile_v2_unit_occupancy()
+	return result
+
+func _set_v2_enemy_active(entity_id: String, active: bool) -> void:
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit == null or unit.entity_id != entity_id:
+			continue
+		if active:
+			# A defeated enemy remains in the stable roster for saves and mission
+			# telemetry, but an encounter transition must never resurrect it.
+			if not unit.is_alive and unit.is_downed:
+				return
+			if not unit.is_alive:
+				unit.is_alive = true
+				unit.is_downed = false
+				unit.current_hp = unit.max_hp
+			if _v2_units_rendered and _get_unit_sprite(unit) == null:
+				_create_unit_sprite(unit)
+		else:
+			# Inactive-but-never-engaged enemies use is_downed=false. Preserve the
+			# downed marker when an already defeated enemy leaves an encounter.
+			if unit.is_alive:
+				unit.is_alive = false
+				unit.is_downed = false
+			var sprite := _get_unit_sprite(unit)
+			if sprite:
+				_remove_v2_enemy_sprite(sprite)
+		return
+
+## Create rescued characters from the V2 data contract, never from V1 job data.
+func _create_v2_rescue_unit(character_id: StringName, entity_id: String, position: Vector2i) -> Unit:
+	var v2_data: Node = get_node_or_null("/root/V2Data")
+	if v2_data == null or not v2_data.has_method("get_character"):
+		return null
+	var character_data: Dictionary = v2_data.get_character(character_id)
+	if character_data.is_empty():
+		return null
+	var unit := GameData.create_v2_player_unit(character_data)
+	unit.entity_id = entity_id
+	unit.grid_pos = position
+	unit.height = MapLoader.get_height_at(map_data, position.x, position.y)
+	return unit
+
+## Register a same-mission rescue in every runtime owner that can observe units.
+func _register_v2_rescued_unit(unit: Unit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	unit.enable_v2_turn_mode()
+	if not player_units.has(unit):
+		player_units.append(unit)
+	if turn_manager:
+		turn_manager.register_player_unit(unit)
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service and v2_action_service.has_method("refresh_units"):
+		v2_action_service.refresh_units(player_units, enemy_units)
+	if _get_unit_sprite(unit) == null:
+		_create_unit_sprite(unit)
+	_update_visibility()
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	if hud:
+		hud.update_unit_info(selected_unit)
+	_render_v2_hud()
+
+func _on_v2_rescue_committed(result: Dictionary) -> void:
+	var character_id := String(result.get("character_id", "scout"))
+	var rescue_event := StringName("%s_rescued" % character_id)
+	AudioManager.sfx_rescue()
+	var rescue_position: Vector2i = result.get("position", Vector2i(-1, -1))
+	if rescue_position.x >= 0:
+		_spawn_effect("rescue", rescue_position)
+	_record_v2_playtest_event(rescue_event, {"character_id": character_id})
+	_update_v2_encounters([rescue_event])
+	if has_method("_update_v2_evac_marker"):
+		call("_update_v2_evac_marker")
+	if hud:
+		var recovered_hp := int(result.get("recovered_hp", 0))
+		var rescued_name := "狙击手" if character_id == "sniper" else "侦察兵"
+		if recovered_hp > 0:
+			hud.set_context_prompt("营救成功：%s已加入小队，恢复 %d HP。" % [rescued_name, recovered_hp])
+		else:
+			hud.set_context_prompt("营救成功：%s已加入小队。" % rescued_name)
+		hud.update_objective(_get_objective_text())
+	_advance_context_hint("interact")
+	_render_v2_rescue_marker()
+	_render_v2_hud()
+	if _is_v2_battle() and level_id == "ch1_m1":
+		GameManager.play_dialogue("ch1_m1_rescue")
+
+func _on_v2_checkpoint_requested(checkpoint_id: StringName, _result: Dictionary) -> void:
+	_save_v2_checkpoint(checkpoint_id)
+	# The rescue signal renders before this checkpoint signal is emitted. Refresh
+	# once more so the player-facing HUD cannot show a stale checkpoint.
+	if _is_v2_battle():
+		_render_v2_hud()
+
+## Persist the rescue checkpoint through the V2 save identity while retaining
+## the shared checkpoint schema used by retry and restore tests.
+func _save_v2_checkpoint(checkpoint_id: StringName) -> bool:
+	if not _is_v2_battle() or GameManager.current_save.is_empty():
+		return false
+	var snapshot := V2CheckpointAdapterScript.capture({
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(checkpoint_id),
+		"checkpoint_id": String(checkpoint_id),
+		"turn": turn_manager.turn_number if turn_manager else 0,
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+		"alert_state": alert_state.serialize() if alert_state else {},
+		"visibility_state": visibility_state.serialize() if visibility_state else {},
+		"facilities": v2_mission_flow.map_data.get("facilities", []) if v2_mission_flow else [],
+		"mission_flow": v2_mission_flow.get_snapshot() if v2_mission_flow else {},
+		"enemy_intents": {},
+		"turn_state": {"phase": turn_manager.current_phase if turn_manager else 0},
+		"extra": {"checkpoint_id": String(checkpoint_id)},
+	})
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点无效：%s" % "; ".join(validation.get("errors", [])))
+		return false
+	if not GameManager.set_v2_encounter_checkpoint(snapshot):
+		_log("V2 检查点写入失败：%s" % checkpoint_id)
+		return false
+	v2_last_checkpoint = snapshot
+	v2_last_checkpoint_id = String(checkpoint_id)
+	return true
+
+## Restore a pending V2 checkpoint after TurnManager has initialized the first
+## player phase. Invalid snapshots are discarded and safely fall back to cp_start.
+func _restore_v2_checkpoint() -> bool:
+	var snapshot: Dictionary = GameManager.consume_v2_checkpoint_request()
+	if snapshot.is_empty():
+		return false
+	var validation: Dictionary = V2CheckpointAdapterScript.validate(snapshot)
+	if not bool(validation.get("valid", false)):
+		_log("V2 检查点校验失败，回退任务起点：%s" % "; ".join(validation.get("errors", [])))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	var player_ids: Dictionary = {}
+	for unit in player_units:
+		if unit:
+			player_ids[unit.entity_id] = true
+	for raw_unit in snapshot.get("player_units", []):
+		if not raw_unit is Dictionary:
+			continue
+		var data: Dictionary = raw_unit
+		var entity_id := String(data.get("entity_id", ""))
+		if entity_id.is_empty() or player_ids.has(entity_id):
+			continue
+		var position_data: Dictionary = data.get("grid_pos", {})
+		var character_id := StringName(String(data.get("job", _get_v2_rescue_character_id())))
+		var rescued := _create_v2_rescue_unit(character_id, entity_id, Vector2i(int(position_data.get("x", 0)), int(position_data.get("y", 0))))
+		if rescued == null:
+			_log("V2 检查点缺少可恢复角色：%s" % entity_id)
+			GameManager.clear_v2_encounter_checkpoint()
+			return false
+		player_units.append(rescued)
+		player_ids[entity_id] = true
+		if turn_manager:
+			turn_manager.register_player_unit(rescued)
+	var context := {
+		"game_line": "v2_infiltration",
+		"level_id": level_id,
+		"encounter_id": String(snapshot.get("encounter_id", "")),
+		"player_units": player_units,
+		"enemy_units": enemy_units,
+	}
+	var restored: Dictionary = V2CheckpointAdapterScript.restore(snapshot, context)
+	if not bool(restored.get("success", false)):
+		_log("V2 检查点恢复失败，回退任务起点：%s" % String(restored.get("reason", "unknown")))
+		GameManager.clear_v2_encounter_checkpoint()
+		return false
+	if v2_mission_flow:
+		var flow_restore: Dictionary = v2_mission_flow.restore_snapshot(snapshot.get("mission_flow", {}))
+		if not bool(flow_restore.get("success", false)):
+			_log("V2 任务状态恢复失败，回退任务起点")
+			GameManager.clear_v2_encounter_checkpoint()
+			return false
+		if v2_tutorial_flow != null and v2_tutorial_flow.has_method("restore_m1_safe_tutorial_complete"):
+			v2_tutorial_flow.restore_m1_safe_tutorial_complete(v2_mission_flow.is_m1_safe_tutorial_complete() if v2_mission_flow.has_method("is_m1_safe_tutorial_complete") else false)
+	if v2_rescue_controller and v2_mission_flow:
+		var rescue_character_id := _get_v2_rescue_character_id()
+		if bool(v2_mission_flow.rescued_characters.get(String(rescue_character_id), false)):
+			v2_rescue_controller.restore_rescued_state(_get_v2_rescue_entity_id())
+	if alert_state:
+		alert_state.deserialize(snapshot.get("alert_state", {}))
+	if visibility_state and snapshot.get("visibility_state", {}) is Dictionary:
+		visibility_state.deserialize(snapshot.get("visibility_state", {}))
+	if action_system:
+		action_system.set_units(player_units, enemy_units)
+	if v2_action_service:
+		v2_action_service.refresh_units(player_units, enemy_units)
+	if turn_manager:
+		turn_manager.turn_number = maxi(1, int(snapshot.get("turn", 1)))
+		turn_manager.current_phase = TurnManager.TurnPhase.PLAYER_ACTION
+		turn_manager.battle_over = false
+	current_encounter_id = String(snapshot.get("encounter_id", "zone_a"))
+	v2_last_checkpoint = snapshot.duplicate(true)
+	v2_last_checkpoint_id = String(snapshot.get("checkpoint_id", ""))
+	_sync_v2_enemy_sprites_after_restore()
+	_update_visibility()
+	return true
+
+func _sync_v2_enemy_sprites_after_restore() -> void:
+	if not _v2_units_rendered or unit_layer == null:
+		return
+	for unit in enemy_units:
+		var sprite := _get_unit_sprite(unit)
+		if unit.is_alive and sprite == null:
+			_create_unit_sprite(unit)
+		elif not unit.is_alive and sprite != null:
+			sprite.queue_free()
+
+func _setup_v2_affordance_presenter() -> void:
+	if v2_affordance_layer == null:
+		return
+	v2_affordance_presenter = V2AffordancePresenterScript.new()
+	v2_affordance_presenter.name = "V2AffordancePresenter"
+	v2_affordance_presenter.cell_size = float(CELL_SIZE)
+	v2_affordance_layer.add_child(v2_affordance_presenter)
+	v2_action_preview = V2ActionPreviewScript.new()
+
+func _setup_v2_hud_presenter() -> void:
+	if hud == null:
+		return
+	v2_hud_presenter = V2HudPresenterScript.new()
+	v2_hud_presenter.setup(hud)
+
+func _setup_v2_damage_presenter() -> void:
+	v2_damage_presenter = V2DamagePresenterScript.new()
+
+## V2: 将战斗状态压缩成一个可读快照，HUD 不需要理解回合系统或服务层对象。
+func _render_v2_hud(context_override: String = "") -> void:
+	if not _is_v2_battle() or v2_hud_presenter == null or hud == null:
+		return
+	var phase_text := "玩家回合"
+	if turn_manager:
+		match turn_manager.current_phase:
+			TurnManager.TurnPhase.ENEMY_ACTION:
+				phase_text = "敌人回合"
+			TurnManager.TurnPhase.BATTLE_OVER:
+				phase_text = "战斗结束"
+	var alert_name := "平静"
+	var next_text := ""
+	if alert_state:
+		if _is_v2_battle():
+			alert_name = alert_state.get_front_state_label()
+		else:
+			var alert_names := ["平静", "可疑", "警戒", "战斗"]
+			var alert_level := alert_state.get_alert_level()
+			if alert_level >= 0 and alert_level < alert_names.size():
+				alert_name = alert_names[alert_level]
+		var next_consequence: Dictionary = alert_state.get_next_consequence()
+		next_text = String(next_consequence.get("description", ""))
+		var turns_until := int(next_consequence.get("turns_until", 0))
+		if turns_until > 0:
+			next_text += "（%d回合后）" % turns_until
+	var budget := {"move": false, "action": false}
+	if selected_unit and is_instance_valid(selected_unit) and selected_unit.team == "player":
+		budget["move"] = selected_unit.can_move()
+		budget["action"] = selected_unit.can_act()
+	var prompt := context_override
+	if prompt == "":
+		prompt = hud.get_context_prompt_text()
+	var interaction_text := ""
+	if not v2_pending_interaction_facility_id.is_empty():
+		interaction_text = "设施菜单：选择一个操作"
+	var snapshot := {
+		"turn": turn_manager.turn_number if turn_manager else 1,
+		"phase": phase_text,
+		"state": v2_input_router.get_state_name() if v2_input_router else "free_select",
+		"primary_objective": _get_objective_text(),
+		"mission_guide": v2_mission_flow.get_guide_text() if v2_mission_flow else "",
+		"alert": alert_name,
+		"next_consequence": next_text,
+		"selected": selected_unit,
+		"context_prompt": prompt,
+		"action_budget": budget,
+		"ability": "",
+		"interaction": interaction_text,
+		"attack_preview": hud.get_attack_preview_text(),
+		"visibility_summary": v2_visibility_summary.duplicate(true),
+	}
+	v2_hud_presenter.render(snapshot)
+
+func _is_v2_battle() -> bool:
+	return String(GameManager.current_save.get("game_line", "")) == "v2_infiltration"
 
 ## 生成战斗地图：优先加载锁定地图，失败时回退到运行时生成。
 ## 锁定地图是服务端生成并版本锁定的正式关卡数据，保证每关地形、出生点和实体一致。
@@ -1175,6 +1789,90 @@ func _render_map() -> void:
 			_draw_tactical_tile(Vector2i(obj.x, obj.y), -1, 0, "resource")
 	_render_evac_zone()
 
+## Programmatic neutral rescue marker. It is hidden by fog until the player
+## observes the captive cell, then provides a clear name and interaction cue.
+func _render_v2_rescue_marker() -> void:
+	if v2_rescue_marker and is_instance_valid(v2_rescue_marker):
+		v2_rescue_marker.queue_free()
+	v2_rescue_marker = null
+	if not _is_v2_battle() or v2_rescue_controller == null or map_layer == null:
+		return
+	# In production M1 the marker is the first objective: it is visible as soon
+	# as its cell is observed, and the rescue action unlocks after the player
+	# reaches the adjacent find step. Legacy expanded fixtures retain their
+	# original rescue-step gate.
+	if v2_mission_flow != null and v2_mission_flow.has_method("get_objective_step_count"):
+		var current_event := String(v2_mission_flow.get_current_step_complete_event())
+		var production_marker := String(v2_mission_flow.mission.get("flow_mode", "")) == "m1_production" and not bool(v2_mission_flow.mission.get("expanded_flow", false))
+		if int(v2_mission_flow.get_objective_step_count()) > 0 and current_event != "character_rescued" and not (production_marker and current_event == "scout_located"):
+			return
+	var rescue_id := _get_v2_rescue_entity_id()
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
+	if rescue_pos.x < 0:
+		return
+	v2_rescue_marker = Node2D.new()
+	v2_rescue_marker.name = "V2RescueMarker"
+	v2_rescue_marker.position = _get_cell_center(rescue_pos)
+	v2_rescue_marker.z_index = 4
+	var rescue_icon := Sprite2D.new()
+	rescue_icon.name = "RescueBeaconIcon"
+	rescue_icon.texture = ArtCatalog.get_texture(&"objective", &"rescue_beacon")
+	rescue_icon.scale = Vector2(0.36, 0.36)
+	rescue_icon.z_index = 1
+	v2_rescue_marker.add_child(rescue_icon)
+	var diamond := Polygon2D.new()
+	diamond.polygon = PackedVector2Array([
+		Vector2(0, -18), Vector2(18, 0), Vector2(0, 18), Vector2(-18, 0),
+	])
+	diamond.color = Color(0.22, 0.92, 0.88, 0.58)
+	v2_rescue_marker.add_child(diamond)
+	var label := Label.new()
+	label.text = "%s\n点击营救" % _get_v2_rescue_character_name()
+	label.position = Vector2(-48, -58)
+	label.size = Vector2(96, 42)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(0.62, 1.0, 0.96, 0.98))
+	label.add_theme_color_override("font_shadow_color", Color(0.02, 0.08, 0.10, 0.95))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v2_rescue_marker.add_child(label)
+	map_layer.add_child(v2_rescue_marker)
+	_update_v2_rescue_marker_visibility()
+
+func _update_v2_rescue_marker_visibility() -> void:
+	if not v2_rescue_marker or not is_instance_valid(v2_rescue_marker) or v2_rescue_controller == null:
+		return
+	var rescue_id := _get_v2_rescue_entity_id()
+	var rescue_pos: Vector2i = v2_rescue_controller.get_rescue_position(rescue_id)
+	var captive: bool = v2_rescue_controller.get_rescue_state(rescue_id) == "captive"
+	v2_rescue_marker.visible = captive and (visibility_state == null or visibility_state.is_cell_observed(rescue_pos))
+
+func _get_v2_rescue_entity_id() -> StringName:
+	for raw_entity in map_data.get("entities", []):
+		if raw_entity is Dictionary and String(raw_entity.get("type", "")) == "objective_primary":
+			return StringName(String(raw_entity.get("id", "rescue_scout")))
+	return &"rescue_scout"
+
+func _get_v2_rescue_character_id() -> StringName:
+	if v2_mission_flow != null:
+		var configured := String(v2_mission_flow.mission.get("rescue_character", ""))
+		if not configured.is_empty():
+			return StringName(configured)
+	for raw_entity in map_data.get("entities", []):
+		if raw_entity is Dictionary and String(raw_entity.get("type", "")) == "objective_primary":
+			var character_id := String(raw_entity.get("character_id", ""))
+			if not character_id.is_empty():
+				return StringName(character_id)
+	return &"scout"
+
+func _get_v2_rescue_character_name() -> String:
+	var character_id := "scout"
+	if v2_mission_flow != null:
+		character_id = String(v2_mission_flow.mission.get("rescue_character", character_id))
+	return "狙击手" if character_id == "sniper" else "侦察兵"
+
 
 ## 常驻撤离区域提示，既标出队伍可分散站立的位置，也不阻挡地图点击。
 func _render_evac_zone() -> void:
@@ -1220,9 +1918,18 @@ func _render_units() -> void:
 		_create_unit_sprite(unit)
 
 	for unit in enemy_units:
+		if _is_v2_battle() and not unit.is_alive:
+			continue
 		_create_unit_sprite(unit)
+	_v2_units_rendered = true
 
 func _create_unit_sprite(unit: Unit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	# Dead V2 enemies stay in the roster, but never in the scene tree. This
+	# guard covers encounter refresh, reinforcement, and restore paths alike.
+	if _is_v2_battle() and unit.team == "enemy" and not unit.is_alive:
+		return
 	var sprite := UnitSprite.new()
 	sprite.name = "Unit_%s_%s" % [unit.team, unit.unit_name]
 	sprite.update_unit(unit)
@@ -1291,7 +1998,8 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 	for decoration in decorations:
 		var component_type := String(decoration.get("component_type", ""))
 		var variant := int(decoration.get("variant", 0))
-		var texture := ArtCatalog.get_environment_component_texture(environment_kit, component_type, variant)
+		var decoration_kit := String(decoration.get("kit", environment_kit))
+		var texture := ArtCatalog.get_environment_component_texture(decoration_kit, component_type, variant)
 		if not texture:
 			continue
 		var instance_index := int(type_counts.get(component_type, 0))
@@ -1300,6 +2008,7 @@ func _render_environment_decorations(environment_kit: String, decorations: Array
 		sprite.name = "Environment_%s_%d" % [component_type, instance_index]
 		sprite.texture = texture
 		sprite.centered = false
+		sprite.scale = Vector2.ONE * clampf(float(decoration.get("scale", 1.0)), 0.25, 2.0)
 		var requested_position := GridSystem.grid_to_world(Vector2i(int(decoration.get("x", 0)), int(decoration.get("y", 0))))
 		# Large landmarks are anchored to a grid cell but must stay inside the
 		# map rectangle so hidden props cannot spill beyond the fog boundary.
@@ -1465,6 +2174,8 @@ func _network_cell_is_observed(pos: Vector2i) -> bool:
 	return visibility_state == null or visibility_state.is_cell_observed(pos)
 
 func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
+	if layer == null:
+		return
 	var rect = ColorRect.new()
 	rect.color = color
 	rect.size = Vector2(CELL_SIZE - 2, CELL_SIZE - 2)
@@ -1475,6 +2186,8 @@ func _highlight_cell(layer: Node2D, pos: Vector2i, color: Color) -> void:
 
 ## 范围格使用“填充 + 边框”双重编码，避免玩家只能靠颜色猜动作类型。
 func _highlight_range_cell(layer: Node2D, pos: Vector2i, fill_color: Color, border_color: Color, border_width: int = 2) -> void:
+	if layer == null:
+		return
 	var origin := GridSystem.grid_to_world(pos)
 
 	var inner := ColorRect.new()
@@ -1502,6 +2215,8 @@ func _highlight_edge_color(color: Color, alpha: float = 0.9) -> Color:
 	return Color(color.r, color.g, color.b, alpha)
 
 func _clear_layer(layer: Node2D) -> void:
+	if layer == null:
+		return
 	for child in layer.get_children():
 		child.queue_free()
 
@@ -1553,18 +2268,29 @@ func _start_battle() -> void:
 	enemy_director.max_reinforcements = int(level_config.get("max_reinforcements", 20))
 	enemy_director.enemy_cap_per_wave = int(level_config.get("enemy_cap", 12))
 	hud.set_battle_controller(self)
+	_configure_v2_playtest_recorder()
 	turn_manager.start_battle()
+	var restored_v2_checkpoint := false
+	if _is_v2_battle():
+		restored_v2_checkpoint = _restore_v2_checkpoint()
+		if restored_v2_checkpoint:
+			_reconcile_v2_unit_occupancy()
+		if not restored_v2_checkpoint:
+			_save_v2_checkpoint(&"cp_start")
 	hud.update_objective(_get_objective_text())
 	hud.update_turn_display(1, TurnManager.TurnPhase.PLAYER_ACTION)
 	# Keep the first actionable frame self-explanatory; calm alert is still useful
 	# context when the player has not triggered any alarm yet.
 	hud.update_alert_display(alert_state)
+	_render_v2_hud()
 	_log("战斗开始！难度=%s 回合上限=%d" % [GameManager.get_settings().get("difficulty", "standard"), turn_limit])
 	# CH1-030: 战斗开始后启动上下文教学提示序列
 	_begin_context_tutorials()
 
 func _get_objective_text() -> String:
 	var objective_text := "目标：消灭所有敌人"
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.get_primary_text()
 	if mission_objective_state:
 		objective_text = mission_objective_state.get_status_text()
 	if boss_unit and boss_unit.is_alive and not boss_phases.is_empty():
@@ -1582,11 +2308,15 @@ func _get_objective_text() -> String:
 	return objective_text
 
 func _check_victory() -> bool:
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.is_victory()
 	if mission_objective_state:
 		return mission_objective_state.is_victory()
 	return enemy_units.filter(func(u): return u.is_alive).is_empty()
 
 func _check_defeat() -> bool:
+	if _is_v2_battle() and v2_mission_flow:
+		return v2_mission_flow.is_defeat()
 	if mission_objective_state:
 		return mission_objective_state.is_defeat()
 	return player_units.filter(func(u): return u.is_alive).is_empty()
@@ -1619,6 +2349,8 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 			_log("第 %d 回合 - 玩家行动" % turn_manager.turn_number)
 
 		TurnManager.TurnPhase.ENEMY_ACTION:
+			if _is_v2_battle() and v2_input_router:
+				v2_input_router.set_state(V2BattleInputRouter.State.ENEMY_TURN)
 			hud.update_turn_display(turn_manager.turn_number, phase)
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
@@ -1632,6 +2364,7 @@ func _on_phase_changed(phase: TurnManager.TurnPhase) -> void:
 		TurnManager.TurnPhase.BATTLE_OVER:
 			turn_manager.input_locked = true
 			hud.set_buttons_disabled(true)
+	_render_v2_hud()
 
 ## 每回合处理增援触发：更新存活计数，检查触发器，生成增援单位
 func _process_reinforcements(turn_number: int) -> void:
@@ -1684,6 +2417,8 @@ func _spawn_reinforcement_units(units_data: Array, trigger_id: String = "") -> v
 				stable_id = "%s_%d" % [unit.team, enemy_units.size()]
 		unit.entity_id = stable_id
 		_apply_difficulty_to_enemy(unit)
+		if _is_v2_battle():
+			unit.enable_v2_turn_mode()
 		enemy_units.append(unit)
 		# 渲染新单位精灵
 		_create_unit_sprite(unit)
@@ -1730,6 +2465,8 @@ func _spawn_player_units(units_data: Array) -> void:
 				stable_id = "%s_%d" % [unit.team, player_units.size()]
 		unit.entity_id = stable_id
 		unit.current_ap = unit.max_ap
+		if _is_v2_battle():
+			unit.enable_v2_turn_mode()
 		player_units.append(unit)
 		_create_unit_sprite(unit)
 		_log("玩家增援到达：%s (%d,%d)" % [unit.unit_name, spawn_pos.x, spawn_pos.y])
@@ -1854,6 +2591,26 @@ func _on_toggle_network() -> void:
 	_spawn_effect("scan", scan_pos)
 	_advance_context_hint("network")
 
+## V2 主目标事件桥接；V1 MissionObjectiveState 仍由下方旧事件桥处理。
+func _apply_v2_mission_event(event_name: StringName, payload: Dictionary = {}) -> Dictionary:
+	if not _is_v2_battle() or v2_mission_flow == null:
+		return {"success": false, "reason": &"v2_mission_flow_unavailable"}
+	if v2_mission_event_bridge == null:
+		v2_mission_event_bridge = V2MissionEventBridgeScript.new()
+	var result: Dictionary = v2_mission_event_bridge.apply_event(v2_mission_flow, event_name, payload)
+	if event_name in [&"evac_checked", &"squad_evacuated"] and bool(result.get("success", false)):
+		AudioManager.sfx_evac()
+		if selected_unit and selected_unit.grid_pos.x >= 0:
+			_spawn_effect("evac", selected_unit.grid_pos)
+	if event_name == &"evac_checked" and bool(result.get("victory", false)):
+		_advance_v2_tutorial(&"evac_completed")
+	if hud:
+		hud.update_objective(_get_objective_text())
+	_render_v2_hud()
+	if bool(result.get("victory", false)):
+		_check_victory_instant()
+	return result
+
 ## 任务事件桥接：接收 mission_event，更新存活计数并交由 EnemyDirector 评估事件增援
 ## 单位生成由 reinforcement_spawned 信号统一驱动，这里不直接 spawn
 func _on_mission_event(event_name: StringName, payload: Dictionary) -> void:
@@ -1947,7 +2704,8 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 
 	# CH1-080: 失败原因和遭遇检查点可用性
 	var defeat_reason := String(result.get("reason", ""))
-	var has_encounter_checkpoint := not victory and current_encounter_id != "" and current_encounter_id != "zone_a"
+	var v2_checkpoint := GameManager.get_v2_encounter_checkpoint() if _is_v2_battle() else {}
+	var has_encounter_checkpoint := not victory and (not v2_checkpoint.is_empty() if _is_v2_battle() else (current_encounter_id != "" and current_encounter_id != "zone_a"))
 
 	var battle_result = {
 		"result": "victory" if victory else "defeat",
@@ -1963,18 +2721,50 @@ func _finish_battle(victory: bool, result: Dictionary) -> void:
 		"optional_resource_collected": bool(modifiers.get("optional_resource_collected", false)),
 		"defeat_reason": defeat_reason,
 		"has_encounter_checkpoint": has_encounter_checkpoint,
-		"encounter_id": current_encounter_id,
+		"encounter_id": String(v2_checkpoint.get("checkpoint_id", current_encounter_id)) if _is_v2_battle() else current_encounter_id,
 	}
+	if _is_v2_battle() and v2_mission_flow:
+		var v2_result_snapshot: Dictionary = v2_mission_flow.get_snapshot()
+		var rescued_ids: Array = []
+		for rescued_id in v2_result_snapshot.get("rescued_characters", {}).keys():
+			rescued_ids.append(String(rescued_id))
+		var rescue_character_id := String(v2_result_snapshot.get("rescue_character", _get_v2_rescue_character_id()))
+		var v2_rescued_target := rescue_character_id in rescued_ids
+		var mission_flags: Dictionary = v2_result_snapshot.get("mission_flags", {})
+		var optional_done := bool(v2_result_snapshot.get("optional_complete", false)) or bool(mission_flags.get("cooling_nozzles_shutdown", false))
+		var v2_unlocked_modules: Array[String] = []
+		if v2_rescued_target:
+			v2_unlocked_modules.append("sniper_a" if rescue_character_id == "sniper" else "scout_a")
+			if optional_done:
+				v2_unlocked_modules.append("assault_b" if rescue_character_id == "sniper" else "scout_b")
+		battle_result["mission_id"] = level_id
+		battle_result["primary_objective"] = "解除区域封锁并救出狙击手" if level_id == "ch1_m2" else "找到失联侦察兵并一起撤离"
+		battle_result["optional_objective"] = "关闭冷却控制室" if level_id == "ch1_m2" else "上传事故记录"
+		battle_result["optional_record"] = optional_done
+		battle_result["rescued"] = rescued_ids
+		battle_result["rescue_character"] = rescue_character_id if v2_rescued_target else ""
+		battle_result["unlocked_modules"] = v2_unlocked_modules
+		battle_result["starting_unit_count"] = player_units.size()
+		battle_result["mission_step_id"] = String(v2_result_snapshot.get("step_id", ""))
+		battle_result["mission_step_text"] = String(v2_result_snapshot.get("guide_text", ""))
 	# 收集遥测数据并附加到 battle_result
 	battle_result = _finalize_telemetry(battle_result)
+	if _is_v2_battle():
+		_finish_v2_playtest(victory, battle_result)
 
 	if victory:
-		GameManager.complete_mission(battle_result)
+		if _is_v2_battle():
+			GameManager.complete_v2_mission(battle_result)
+		else:
+			GameManager.complete_mission(battle_result)
 		# 胜利时播放 outro 对话，结束后再跳转到结算界面
 		_play_outro_then_finish(battle_result)
 	else:
-		# 失败时仅记录失败统计，不修改关卡进度，确保不会产生不可逆死档
-		GameManager.fail_mission(battle_result)
+		# V2 失败只更新 V2 statistics；V1 继续使用旧版存档路径。
+		if _is_v2_battle():
+			GameManager.fail_v2_mission(battle_result)
+		else:
+			GameManager.fail_mission(battle_result)
 		GameManager.go_to_mission_result(battle_result)
 
 func _play_outro_then_finish(battle_result: Dictionary) -> void:
@@ -2142,6 +2932,9 @@ func _consume_planned_action(enemy: Unit) -> Dictionary:
 	return planned
 
 func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
+	if _is_occupied_by_other_unit(target_pos, enemy):
+		_log("%s 移动目标被占用，保持原位" % enemy.unit_name)
+		return
 	var path = Pathfinding.find_path(
 		enemy.grid_pos, target_pos,
 		map_width, map_height,
@@ -2154,6 +2947,8 @@ func _do_enemy_move(enemy: Unit, target_pos: Vector2i) -> void:
 	var cost = 0
 	var last_pos = enemy.grid_pos
 	for cell in path:
+		if _is_occupied_by_other_unit(cell, enemy):
+			break
 		var terrain = MapLoader.get_terrain_at(map_data, cell.x, cell.y)
 		var step_cost = 1
 		match terrain:
@@ -2174,6 +2969,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if turn_manager.input_locked or turn_manager.battle_over:
 		return
 	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION:
+		return
+	if _is_v2_battle():
+		if v2_input_router and v2_input_router.handle_event(event, _screen_to_cell, _v2_pointer_context):
+			get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed("pause"):
@@ -2211,6 +3010,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_handle_left_click(click_world)
 		elif mouse_btn.button_index == MOUSE_BUTTON_RIGHT:
 			_handle_right_click(click_world)
+
+func _screen_to_cell(screen_position: Vector2) -> Vector2i:
+	var world_position := get_viewport().canvas_transform.affine_inverse() * screen_position
+	return GridSystem.world_to_grid(world_position)
+
+## V2 overrides this with scene-aware map, HUD, and drag-origin classification.
+## The shared fallback only satisfies the V2-only guarded call above.
+func _v2_pointer_context(_screen_position: Vector2) -> Dictionary:
+	return {"over_map": false, "over_hud": true, "drag_allowed": false}
 
 ## 右键是移动快捷键：点击友军立即显示可达范围；移动模式下再次右键取消。
 func _handle_right_click(world_pos: Vector2) -> void:
@@ -2290,6 +3098,8 @@ func _handle_left_click(world_pos: Vector2) -> void:
 func _select_unit(unit: Unit) -> void:
 	_deselect_unit()
 	selected_unit = unit
+	if _is_v2_battle() and v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
 	_update_unit_sprite_selection(unit, true)
 	hud.update_unit_info(unit)
 	if unit.team == "player":
@@ -2300,6 +3110,11 @@ func _select_unit(unit: Unit) -> void:
 	else:
 		_advance_context_hint("observe")
 	_refresh_selected_unit_affordances(unit)
+	if unit.team == "player":
+		_record_v2_playtest_event(&"unit_selected", {"unit_id": unit.entity_id})
+		if not _v2_auto_select_in_progress:
+			_advance_v2_tutorial(&"unit_selected", {"unit_id": unit.entity_id})
+	_render_v2_hud()
 
 ## 每个玩家回合至少给玩家一个可操作焦点，避免敌方回合后动作条消失。
 func _auto_select_player_unit() -> void:
@@ -2307,16 +3122,21 @@ func _auto_select_player_unit() -> void:
 		return
 	for unit in player_units:
 		if unit and unit.is_alive and unit.team == "player":
+			_v2_auto_select_in_progress = true
 			_select_unit(unit)
+			_v2_auto_select_in_progress = false
 			return
 
 func _deselect_unit() -> void:
 	# 取消任何进行中的目标选择
 	_cancel_targeting_if_active()
-	hud.hide_action_picker()
+	if hud:
+		hud.hide_action_picker()
 	if selected_unit:
 		_update_unit_sprite_selection(selected_unit, false)
 	selected_unit = null
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.FREE_SELECT)
 	selected_action = ""
 	attack_preview_target = null
 	attack_preview_data.clear()
@@ -2326,15 +3146,29 @@ func _deselect_unit() -> void:
 	_pending_action_kind = ""
 	reachable_cells.clear()
 	attack_targets.clear()
+	v2_attack_range_cells.clear()
+	_cancel_v2_preview(v2_pending_move_preview)
+	_cancel_v2_preview(v2_hover_attack_preview)
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_pending_move_preview.clear()
+	v2_hover_attack_preview.clear()
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
+	v2_pending_interaction_facility_id = ""
 	path_preview.clear()
 	_clear_layer(move_highlight)
 	_clear_layer(path_preview_layer)
 	_clear_layer(attack_highlight)
-	hud.update_unit_info(null)
-	hud.set_action_buttons_visible(false)
-	hud.set_context_state(HUD.ContextState.NONE)
-	hud.set_targeting_hint("")
-	hud.update_objective(_get_objective_text())
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_all()
+	if hud:
+		hud.clear_attack_preview()
+		hud.update_unit_info(null)
+		hud.set_action_buttons_visible(false)
+		hud.set_context_state(HUD.ContextState.NONE)
+		hud.set_targeting_hint("")
+		hud.update_objective(_get_objective_text())
+	_render_v2_hud()
 
 ## CH1-030: 是否有活跃的目标选择或动作模式（Esc 逐级取消 vs 暂停的判定）
 func _has_active_input_mode() -> bool:
@@ -2373,6 +3207,1090 @@ func _cancel_action() -> void:
 	else:
 		_deselect_unit()
 
+## V2 直接地图移动：解析器提供的地图点击预览立即提交；低层 API
+## 仍为危险格保留显式二次确认，供非地图调用方使用。
+## 该入口不依赖底部 MoveButton，也不调用 V1 ActionSystem。
+func request_move(cell: Vector2i, resolved_preview: Dictionary = {}) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"success": false, "committed": false, "reason": &"no_selected_unit"}
+	if v2_action_service == null:
+		return {"success": false, "committed": false, "reason": &"v2_action_service_unavailable"}
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(cell):
+		if hud:
+			hud.set_context_prompt("靠近侦察兵后点击其标记营救，不能直接走到目标格")
+		return {"success": false, "committed": false, "reason": &"rescue_interaction_required"}
+	# The controller owns the live roster. Validate it before consulting the
+	# action-service snapshot so restored or newly activated enemies cannot be
+	# crossed during a stale service frame.
+	if _is_occupied_by_other_unit(cell, selected_unit):
+		if not v2_pending_move_preview.is_empty():
+			v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+			v2_pending_move_preview.clear()
+		if hud:
+			hud.set_context_prompt("该格已有单位，不能移动；请点击蓝色格。")
+		return {"success": false, "committed": false, "reason": &"occupied"}
+
+	var from_context_click := not resolved_preview.is_empty()
+	if from_context_click and not v2_pending_move_preview.is_empty():
+		v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+		v2_pending_move_preview.clear()
+	elif not v2_pending_move_preview.is_empty():
+		var pending_target: Vector2i = v2_pending_move_preview.get("target", Vector2i(-1, -1))
+		if pending_target == cell:
+			var confirmed: Dictionary = v2_action_service.commit_action(v2_pending_move_preview)
+			v2_pending_move_preview.clear()
+			if bool(confirmed.get("success", false)):
+				_finalize_v2_move(confirmed)
+				confirmed["committed"] = true
+			return confirmed
+		v2_action_service.cancel_preview(int(v2_pending_move_preview.get("preview_id", 0)))
+		v2_pending_move_preview.clear()
+
+	var preview: Dictionary = resolved_preview
+	if not from_context_click:
+		preview = v2_action_service.query_action({
+			"action": &"move",
+			"unit": selected_unit,
+			"target": cell,
+		})
+	else:
+		var resolved_validation := _validate_v2_resolved_move_preview(cell, preview)
+		if not bool(resolved_validation.get("valid", false)):
+			_cancel_v2_preview(preview)
+			var resolved_reason: StringName = resolved_validation.get("reason", &"invalid_move")
+			if hud:
+				hud.set_context_prompt(_v2_move_failure_prompt(resolved_reason))
+			_render_v2_hud()
+			return {"success": false, "committed": false, "reason": resolved_reason, "preview": preview}
+	if not bool(preview.get("valid", false)):
+		var reason: StringName = preview.get("reason", &"invalid_move")
+		if hud:
+			hud.set_context_prompt(_v2_move_failure_prompt(reason))
+		_render_v2_hud()
+		return {"success": false, "committed": false, "reason": reason, "preview": preview}
+	if bool(preview.get("dangerous", false)) and not from_context_click:
+		v2_pending_move_preview = preview
+		if v2_input_router:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		if hud:
+			hud.set_context_prompt("目标格存在危险：再次点击同一格确认移动，右键取消预览")
+		if v2_affordance_presenter:
+			v2_affordance_presenter.show_move_preview(_build_v2_move_affordance(cell, preview))
+		_render_v2_hud()
+		return {"success": true, "committed": false, "confirmation_required": true, "preview": preview}
+
+	var result: Dictionary = v2_action_service.commit_action(preview)
+	if bool(result.get("success", false)):
+		_finalize_v2_move(result)
+		result["committed"] = true
+	else:
+		result["committed"] = false
+	return result
+
+func _v2_move_failure_prompt(reason: StringName) -> String:
+	match reason:
+		&"move_unavailable":
+			return "本回合移动已用；点击红色敌人攻击，或按 Space 结束回合。"
+		&"blocked":
+			return "该格被障碍物阻挡，不能移动；请点击蓝色格。"
+		&"move_too_far":
+			return "该格超出移动范围，不能移动；请点击蓝色格或悬停查看路径。"
+		&"no_path":
+			return "该格没有可通行路径，不能移动；请点击蓝色格。"
+		&"occupied":
+			return "该格已有单位，不能移动；请点击蓝色格。"
+		_:
+			return "不能移动到该格；请点击蓝色格，红色敌人可直接攻击。"
+
+func _get_v2_preview_path(preview: Dictionary) -> Array[Vector2i]:
+	var path: Array[Vector2i] = []
+	var raw_path: Variant = preview.get("path", [])
+	if raw_path is Array:
+		path.append(preview.get("from", selected_unit.grid_pos) as Vector2i)
+		for raw_cell in raw_path:
+			if raw_cell is Vector2i:
+				path.append(raw_cell)
+	if path.size() >= 2:
+		return path
+	return [selected_unit.grid_pos, preview.get("target", selected_unit.grid_pos)]
+
+func _finalize_v2_move(result: Dictionary) -> void:
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	# Commit updates the selected unit first; repair any stale encounter overlap
+	# before the movement animation can present two units in one cell.
+	_reconcile_v2_unit_occupancy()
+	if selected_unit:
+		_update_unit_sprite_pos(selected_unit, true)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	refresh_visibility_transaction(&"unit_moved")
+	if selected_unit:
+		_record_v2_playtest_event(&"move_committed", {
+			"unit_id": selected_unit.entity_id,
+			"to": [selected_unit.grid_pos.x, selected_unit.grid_pos.y],
+		})
+	if v2_mission_flow and selected_unit:
+		_apply_v2_mission_event(&"unit_moved", {
+			"unit": selected_unit,
+			"unit_id": selected_unit.entity_id,
+			"position": selected_unit.grid_pos,
+		})
+		if v2_mission_flow.is_in_evac(selected_unit.grid_pos):
+			if has_method("_prepare_v2_m2_evac"):
+				call("_prepare_v2_m2_evac")
+			var evacuation_event := StringName(v2_mission_flow.get_current_step_complete_event()) if v2_mission_flow.has_method("get_current_step_complete_event") else &"evac_checked"
+			if evacuation_event not in [&"squad_evacuated", &"evac_checked"]:
+				evacuation_event = &"evac_checked"
+			_apply_v2_mission_event(evacuation_event)
+	_update_v2_encounters([])
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	_advance_v2_tutorial(&"unit_moved", {
+		"unit_id": selected_unit.entity_id if selected_unit else "",
+		"position": selected_unit.grid_pos if selected_unit else Vector2i(-1, -1),
+	})
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	_render_v2_hud()
+
+func _on_v2_cell_left_clicked(cell: Vector2i) -> void:
+	if not _is_v2_battle():
+		return
+	if is_v2_camera_inspecting() and v2_interaction_service != null:
+		var inspected_facility: Dictionary = v2_interaction_service.get_facility_at(cell)
+		if String(inspected_facility.get("type", "")) == "camera":
+			return_to_v2_camera_player()
+			return
+	# A facility picker owns the pointer until it is cancelled or an option is
+	# chosen. Do not let a map click leak through and move the selected unit.
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
+		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.ABILITY_TARGETING:
+		_on_v2_ability_cell_clicked(cell)
+		return
+	# Heal any legacy/checkpoint overlap before resolving the clicked occupant.
+	# Otherwise _get_unit_at can select the wrong object and preserve the bad state.
+	_reconcile_v2_unit_occupancy()
+	var context := _build_v2_context_action_context(cell)
+	if v2_context_action_resolver == null or not is_instance_valid(v2_context_action_resolver):
+		_present_v2_context_action_failure(&"resolver_unavailable")
+		return
+	var raw_resolution: Variant = v2_context_action_resolver.call("resolve_click", cell, context)
+	if not raw_resolution is Dictionary:
+		_present_v2_context_action_failure(&"malformed_resolution")
+		return
+	var resolution: Dictionary = raw_resolution
+	match StringName(resolution.get("kind", &"invalid")):
+		&"select":
+			var unit: Unit = resolution.get("unit") as Unit
+			if unit != null and unit != selected_unit:
+				_select_unit(unit)
+			return
+		&"move":
+			request_move(cell, resolution.get("move_preview", {}))
+			return
+		&"attack":
+			var target: Unit = resolution.get("target") as Unit
+			var preview := request_attack_preview(target, resolution.get("attack_preview", {}))
+			if bool(preview.get("valid", false)):
+				confirm_locked_attack(target)
+			return
+		&"interact":
+			var facility: Dictionary = resolution.get("facility", {})
+			_open_v2_interaction_menu(
+				String(facility.get("id", "")),
+				resolution.get("interaction_preview", {})
+			)
+			return
+	_dispatch_invalid_v2_context_action(cell, context, resolution)
+
+## V2 abilities use one keyboard entry and the same target-click language as
+## movement/attack. This keeps the player-facing operation model to Q + click
+## while the existing action service remains the only rules/commit owner.
+func _on_v2_ability_requested() -> void:
+	if not _is_v2_battle() or selected_unit == null or not is_instance_valid(selected_unit):
+		return
+	if selected_unit.team != "player":
+		return
+	if not selected_unit.can_act():
+		if hud:
+			hud.show_action_reason(&"action_unavailable")
+		_render_v2_hud()
+		return
+	var ability_id := _get_v2_selected_ability_id()
+	if ability_id.is_empty():
+		if hud:
+			hud.set_context_prompt("当前角色没有可用能力")
+		_render_v2_hud()
+		return
+	if selected_unit.v2_turn_state.get_cooldown(ability_id) > 0:
+		if hud:
+			hud.show_action_reason(&"on_cooldown")
+		_render_v2_hud()
+		return
+	var target_cells := _get_v2_ability_target_cells(ability_id)
+	if target_cells.is_empty():
+		if hud:
+			hud.set_context_prompt("当前没有可用的能力目标；请先移动或结束回合")
+		_render_v2_hud()
+		return
+	v2_pending_ability_id = ability_id
+	v2_ability_target_cells = target_cells
+	v2_pending_ability_preview.clear()
+	_clear_layer(attack_highlight)
+	for cell in target_cells:
+		_highlight_cell(attack_highlight, cell, _highlight_color("target", COLOR_TARGET))
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.ABILITY_TARGETING)
+	if hud:
+		hud.set_context_prompt("能力：%s · 点击金色目标格使用；Q 或右键取消" % _get_v2_ability_name(ability_id))
+	_record_v2_playtest_event(&"ability_targeting_started", {
+		"ability_id": String(ability_id),
+		"target_count": target_cells.size(),
+	})
+	_render_v2_hud()
+
+func _on_v2_ability_cell_clicked(cell: Vector2i) -> void:
+	if v2_pending_ability_id.is_empty():
+		return
+	if not v2_ability_target_cells.has(cell):
+		if hud:
+			hud.set_context_prompt("该格不是当前能力目标；请点击金色目标格，右键取消")
+		_render_v2_hud()
+		return
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	var preview := _query_v2_ability(cell)
+	if not bool(preview.get("valid", false)):
+		if hud:
+			hud.show_action_reason(preview.get("reason", &"invalid_target"))
+		_render_v2_hud()
+		return
+	v2_pending_ability_preview = preview.duplicate(true)
+	if hud:
+		hud.set_context_prompt(_describe_v2_ability_preview(preview) + " · 左键使用")
+	_render_v2_hud()
+	var result := v2_action_service.commit_action(preview) if v2_action_service else {"success": false, "reason": &"v2_action_service_unavailable"}
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", &"invalid_preview"))
+		v2_pending_ability_preview.clear()
+		_render_v2_hud()
+		return
+	_finalize_v2_ability(preview, result)
+
+func _on_v2_ability_hovered(cell: Vector2i) -> void:
+	if v2_pending_ability_id.is_empty() or not v2_ability_target_cells.has(cell):
+		_cancel_v2_preview(v2_pending_ability_preview)
+		v2_pending_ability_preview.clear()
+		if hud and not v2_pending_ability_id.is_empty():
+			hud.set_context_prompt("能力：%s · 点击金色目标格使用；Q 或右键取消" % _get_v2_ability_name(v2_pending_ability_id))
+		_render_v2_hud()
+		return
+	var preview := _query_v2_ability(cell)
+	if not bool(preview.get("valid", false)):
+		return
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview = preview.duplicate(true)
+	if hud:
+		hud.set_context_prompt(_describe_v2_ability_preview(preview) + " · 左键使用，右键取消")
+	_render_v2_hud()
+
+func _get_v2_selected_ability_id() -> StringName:
+	if selected_unit == null:
+		return &""
+	for raw_id in selected_unit.learned_skills:
+		var id := StringName(String(raw_id))
+		if not id.is_empty() and not _get_v2_ability_data(id).is_empty():
+			return id
+	return &""
+
+func _get_v2_ability_data(ability_id: StringName) -> Dictionary:
+	var data_node: Node = get_node_or_null("/root/V2Data")
+	if data_node != null and data_node.has_method("get_ability"):
+		return data_node.get_ability(ability_id)
+	return {}
+
+func _get_v2_ability_name(ability_id: StringName) -> String:
+	var data := _get_v2_ability_data(ability_id)
+	return String(data.get("name", ability_id))
+
+func get_v2_ability_hint() -> String:
+	if not _is_v2_battle() or selected_unit == null or not is_instance_valid(selected_unit):
+		return ""
+	var ability_id := _get_v2_selected_ability_id()
+	if ability_id.is_empty():
+		return ""
+	return "Q 使用%s" % _get_v2_ability_name(ability_id)
+
+func _get_v2_ability_target_cells(ability_id: StringName) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var candidates: Array[Vector2i] = []
+	match ability_id:
+		&"impact_advance":
+			for direction in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+				for distance in range(1, 4):
+					candidates.append(selected_unit.grid_pos + direction * distance)
+		&"area_scan":
+			for y in range(maxi(0, selected_unit.grid_pos.y - 3), mini(map_height, selected_unit.grid_pos.y + 4)):
+				for x in range(maxi(0, selected_unit.grid_pos.x - 3), mini(map_width, selected_unit.grid_pos.x + 4)):
+					var scan_cell := Vector2i(x, y)
+					if GridSystem.manhattan_distance(selected_unit.grid_pos, scan_cell) <= 3:
+						candidates.append(scan_cell)
+		&"interrupt_shot":
+			for raw_enemy in enemy_units:
+				var enemy: Unit = raw_enemy
+				if enemy != null and enemy.is_alive and (visibility_state == null or visibility_state.is_cell_observed(enemy.grid_pos)):
+					candidates.append(enemy.grid_pos)
+		&"barrier_projection":
+			for raw_ally in player_units:
+				var ally: Unit = raw_ally
+				if ally != null and ally.is_alive:
+					candidates.append(ally.grid_pos)
+	for cell in candidates:
+		if not cells.has(cell):
+			var preview := _query_v2_ability(cell, ability_id)
+			if bool(preview.get("valid", false)):
+				cells.append(cell)
+			_cancel_v2_preview(preview)
+	return cells
+
+func _query_v2_ability(cell: Vector2i, ability_id: StringName = &"") -> Dictionary:
+	if v2_action_service == null or selected_unit == null:
+		return {"valid": false, "reason": &"v2_action_service_unavailable"}
+	var resolved_id := ability_id if not ability_id.is_empty() else v2_pending_ability_id
+	var target_unit: Unit = _get_unit_at(cell)
+	var target_data: Dictionary = {"position": cell}
+	if resolved_id in [&"interrupt_shot", &"barrier_projection"]:
+		target_data["target_unit"] = target_unit
+	var context := {
+		"state_revision": v2_action_service.get_state_revision(),
+		"modules": _get_v2_equipped_modules(selected_unit),
+	}
+	if resolved_id == &"impact_advance":
+		context["position_valid"] = _is_v2_ability_destination_valid(cell)
+	return v2_action_service.query_action({
+		"action": &"ability",
+		"ability_id": resolved_id,
+		"unit": selected_unit,
+		"target_data": target_data,
+		"context": context,
+	})
+
+func _is_v2_ability_destination_valid(destination: Vector2i) -> bool:
+	if not GridSystem.is_in_bounds(destination, map_width, map_height):
+		return false
+	if _is_blocked(destination) or _is_occupied_by_other_unit(destination, selected_unit):
+		return false
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(destination):
+		return false
+	var delta := destination - selected_unit.grid_pos
+	var distance := absi(delta.x) + absi(delta.y)
+	if distance <= 0:
+		return false
+	var step := Vector2i(signi(delta.x), signi(delta.y))
+	var cursor := selected_unit.grid_pos + step
+	while cursor != destination:
+		if _is_blocked(cursor) or _is_occupied_by_other_unit(cursor, selected_unit):
+			return false
+		cursor += step
+	return true
+
+func _get_v2_equipped_modules(unit: Unit) -> Array:
+	if unit == null:
+		return []
+	var progress: Dictionary = GameManager.current_save.get("campaign_progress", {}) if GameManager.current_save is Dictionary else {}
+	var equipped: Variant = progress.get("equipped_modules", {})
+	if not equipped is Dictionary:
+		equipped = GameManager.current_save.get("equipped_modules", {}) if GameManager.current_save is Dictionary else {}
+	var module_id := String((equipped as Dictionary).get(unit.job, ""))
+	return [module_id] if not module_id.is_empty() else []
+
+func _describe_v2_ability_preview(preview: Dictionary) -> String:
+	var ability_id := StringName(String(preview.get("ability_id", v2_pending_ability_id)))
+	var text := "能力：%s" % _get_v2_ability_name(ability_id)
+	if preview.has("destination"):
+		text += " · 推进 %d 格" % int(preview.get("move_distance", 0))
+	if preview.has("reveal_radius"):
+		text += " · 揭示半径 %d" % int(preview.get("reveal_radius", 0))
+	if preview.has("damage"):
+		text += " · 伤害 %d" % int(preview.get("damage", 0))
+	if preview.has("shield"):
+		text += " · 护盾 +%d" % int(preview.get("shield", 0))
+	var target: Unit = preview.get("target_unit", null)
+	if target != null:
+		text += " · 目标 %s" % target.unit_name
+	return text
+
+func _finalize_v2_ability(preview: Dictionary, result: Dictionary) -> void:
+	var ability_id := StringName(String(preview.get("ability_id", v2_pending_ability_id)))
+	var target: Unit = preview.get("target_unit", null)
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	_clear_layer(attack_highlight)
+	if ability_id == &"area_scan" and visibility_state:
+		var center: Vector2i = preview.get("position", selected_unit.grid_pos)
+		var cells := VisionSystem.get_visible_cells(center, int(result.get("reveal_radius", preview.get("reveal_radius", 3))), map_width, map_height, _is_vision_blocking)
+		visibility_state.reveal_cells(cells)
+		_update_visibility()
+	elif ability_id == &"impact_advance":
+		_reconcile_v2_unit_occupancy()
+		_update_unit_sprite_pos(selected_unit, true)
+		_update_visibility()
+	elif target != null and ability_id == &"interrupt_shot":
+		if target.is_alive:
+			_update_unit_sprite_pos(target, true)
+		else:
+			_schedule_v2_dead_sprite_cleanup(target)
+			_update_visibility()
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	if hud:
+		hud.set_context_prompt("%s · 行动已消耗" % _describe_v2_ability_preview(preview))
+	_record_v2_playtest_event(&"ability_committed", {
+		"ability_id": String(ability_id),
+		"target_id": target.entity_id if target != null else "",
+		"result": result.duplicate(true),
+	})
+	_render_v2_hud()
+
+func _build_v2_context_action_context(_cell: Vector2i) -> Dictionary:
+	return {
+		"selected_unit": null,
+		"friendly_at": null,
+		"enemy_at": null,
+		"facility_at": {},
+		"move_query": Callable(),
+		"attack_query": Callable(),
+		"interaction_query": Callable(),
+	}
+
+func _query_v2_context_move(cell: Vector2i) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "reason": &"no_selected_unit"}
+	if v2_action_service == null:
+		return {"valid": false, "reason": &"v2_action_service_unavailable"}
+	if v2_rescue_controller and v2_rescue_controller.is_reserved_cell(cell):
+		return {"valid": false, "reason": &"rescue_interaction_required"}
+	if _is_occupied_by_other_unit(cell, selected_unit):
+		return {"valid": false, "reason": &"occupied"}
+	return v2_action_service.query_action({
+		"action": &"move",
+		"unit": selected_unit,
+		"target": cell,
+	})
+
+func _query_v2_context_interaction(facility: Dictionary) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "reason": &"no_selected_unit", "facility": facility, "actions": []}
+	if v2_interaction_service == null:
+		return {"valid": false, "reason": &"interaction_service_unavailable", "facility": facility, "actions": []}
+	var entity_id := String(facility.get("id", ""))
+	var actions: Array = v2_interaction_service.query_actions(selected_unit, entity_id)
+	for raw_action in actions:
+		if raw_action is Dictionary and bool(raw_action.get("enabled", false)):
+			return {"valid": true, "reason": &"usable_facility", "facility": facility, "actions": actions}
+	var reason := &"interaction_unavailable"
+	if not actions.is_empty() and actions[0] is Dictionary:
+		reason = StringName(String(actions[0].get("reason", reason)))
+	return {"valid": false, "reason": reason, "facility": facility, "actions": actions}
+
+func _dispatch_invalid_v2_context_action(cell: Vector2i, context: Dictionary, resolution: Dictionary) -> void:
+	# Rescue stays on its existing transaction path without expanding the pure
+	# resolver's seven-key context contract.
+	if selected_unit != null and v2_rescue_controller:
+		var rescue_id: String = v2_rescue_controller.get_rescue_id_at(cell)
+		if not rescue_id.is_empty():
+			var rescue_preview: Dictionary = v2_rescue_controller.query_rescue(selected_unit, StringName(rescue_id))
+			if bool(rescue_preview.get("valid", false)):
+				var rescue_result: Dictionary = v2_rescue_controller.commit_rescue(rescue_preview)
+				if not bool(rescue_result.get("success", false)) and hud:
+					hud.show_action_reason(rescue_result.get("reason", &"rescue_failed"))
+			elif hud:
+				hud.show_action_reason(rescue_preview.get("reason", &"rescue_unavailable"))
+			return
+	var enemy: Unit = context.get("enemy_at") as Unit
+	if enemy != null:
+		request_attack_preview(enemy, resolution.get("attack_preview", {}))
+		return
+	var facility: Dictionary = context.get("facility_at", {})
+	if not facility.is_empty():
+		_open_v2_interaction_menu(
+			String(facility.get("id", "")),
+			resolution.get("interaction_preview", {})
+		)
+		return
+	var move_preview: Dictionary = resolution.get("move_preview", {})
+	if not move_preview.is_empty():
+		request_move(cell, move_preview)
+		return
+	_present_v2_context_action_failure(StringName(resolution.get("reason", &"invalid")))
+
+func _present_v2_context_action_failure(reason: StringName) -> void:
+	_record_v2_playtest_event(&"invalid_click", {"reason": String(reason)})
+	if hud:
+		hud.show_action_reason(reason)
+	_render_v2_hud()
+
+func _on_v2_cell_hovered(cell: Vector2i) -> void:
+	if not _is_v2_battle() or selected_unit == null or v2_affordance_presenter == null:
+		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.INTERACTION_MENU:
+		v2_affordance_presenter.clear_preview()
+		return
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.ABILITY_TARGETING:
+		_on_v2_ability_hovered(cell)
+		return
+	var hovered_unit: Unit = _get_unit_at(cell)
+	if hovered_unit != null and hovered_unit.team != "player":
+		var hover_preview := _query_v2_attack_preview(hovered_unit)
+		if bool(hover_preview.get("valid", false)):
+			_cancel_v2_preview(v2_hover_attack_preview)
+			v2_hover_attack_preview = hover_preview.duplicate(true)
+			v2_affordance_presenter.show_attack_preview(_build_v2_attack_affordance(hovered_unit, hover_preview, false))
+			if hud:
+				hud.show_attack_preview(hover_preview, hovered_unit, false)
+				hud.set_context_prompt("%s · 左键攻击" % hud.get_context_prompt_text())
+			_advance_v2_tutorial(&"attack_previewed", {"anchor_id": hovered_unit.entity_id})
+			_render_v2_hud()
+			return
+	_clear_v2_hover_preview()
+	if not v2_locked_attack_preview.is_empty():
+		var locked_target := _get_v2_unit_by_id(v2_locked_attack_target_id)
+		if locked_target:
+			if hud:
+				hud.show_attack_preview(v2_locked_attack_preview, locked_target, true)
+			_render_v2_hud()
+			return
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_temporary_attack_focus()
+	if hud:
+		hud.clear_attack_preview()
+	if not reachable_cells.has(cell):
+		v2_affordance_presenter.clear_preview()
+		return
+	var move_query := _query_v2_context_move(cell)
+	if bool(move_query.get("valid", false)):
+		v2_affordance_presenter.show_move_preview(_build_v2_move_affordance(cell, move_query))
+		_cancel_v2_preview(move_query)
+		if hud:
+			hud.set_context_prompt("左键移动：沿高亮路线前往 (%d,%d)，消耗本回合移动。右键取消预览；Esc取消选择。" % [cell.x + 1, cell.y + 1])
+		_render_v2_hud()
+
+## V2 内部攻击预览 API：生成可提交的锁定快照；正式 UI 使用悬停预览后单击提交。
+func request_attack_preview(target: Unit, resolved_preview: Dictionary = {}) -> Dictionary:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		return {"valid": false, "success": false, "reason": &"no_selected_unit"}
+	if target == null or not is_instance_valid(target):
+		return {"valid": false, "success": false, "reason": &"invalid_target"}
+	var from_context_click := not resolved_preview.is_empty()
+	var preview: Dictionary = resolved_preview if from_context_click else _query_v2_attack_preview(target)
+	if from_context_click:
+		var resolved_validation := _validate_v2_resolved_attack_preview(target, preview)
+		if not bool(resolved_validation.get("valid", false)):
+			_cancel_v2_preview(preview)
+			var resolved_reason: StringName = resolved_validation.get("reason", &"invalid_attack")
+			if hud:
+				hud.show_action_reason(resolved_reason)
+			return {"valid": false, "success": false, "reason": resolved_reason}
+	if not bool(preview.get("valid", false)):
+		preview["success"] = false
+		if hud:
+			hud.show_action_reason(preview.get("reason", &"invalid_attack"))
+		return preview
+	_clear_v2_hover_preview()
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_locked_attack_preview = preview.duplicate(true)
+	v2_locked_attack_target_id = String(target.entity_id)
+	if v2_input_router:
+		if v2_input_router.get_state() == V2BattleInputRouter.State.FREE_SELECT:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		v2_input_router.set_state(V2BattleInputRouter.State.ATTACK_LOCKED)
+	if v2_affordance_presenter:
+		v2_affordance_presenter.show_attack_preview(_build_v2_attack_affordance(target, preview, true))
+	if hud:
+		hud.show_attack_preview(preview, target, true)
+	_advance_v2_tutorial(&"attack_previewed", {"anchor_id": target.entity_id})
+	_render_v2_hud()
+	return preview
+
+## V2 内部提交 API：校验稳定 ID 后消费锁定快照并提交攻击。
+func confirm_locked_attack(target: Unit) -> Dictionary:
+	if target == null or not is_instance_valid(target):
+		return {"success": false, "reason": &"invalid_target"}
+	if v2_locked_attack_preview.is_empty() or String(target.entity_id) != v2_locked_attack_target_id:
+		return request_attack_preview(target)
+	v2_damage_signal_suppressed = true
+	var result := v2_action_service.commit_action(v2_locked_attack_preview) if v2_action_service else {"success": false, "reason": &"v2_action_service_unavailable"}
+	v2_damage_signal_suppressed = false
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", &"invalid_attack"))
+		_clear_v2_locked_attack()
+		if selected_unit:
+			_refresh_selected_unit_affordances(selected_unit)
+		return result
+	_finalize_v2_attack(target, result)
+	return result
+
+func _query_v2_attack_preview(target: Unit) -> Dictionary:
+	if target == null or not target.is_alive:
+		return {"valid": false, "reason": &"target_dead"}
+	if selected_unit == null or selected_unit.team != "player":
+		return {"valid": false, "reason": &"no_selected_unit"}
+	if target.team == selected_unit.team:
+		return {"valid": false, "reason": &"same_team"}
+	if visibility_state and not visibility_state.is_cell_observed(target.grid_pos):
+		return {"valid": false, "reason": &"target_hidden"}
+	var context := {
+		"has_los": VisionSystem.has_line_of_sight(
+			selected_unit.grid_pos, target.grid_pos,
+			map_width, map_height, _is_vision_blocking
+		),
+		"distance": GridSystem.manhattan_distance(selected_unit.grid_pos, target.grid_pos),
+		"cover": VisionSystem.calculate_cover(
+			target.grid_pos, selected_unit.grid_pos,
+			func(pos: Vector2i): return MapLoader.get_blocker_at(map_data, pos.x, pos.y)
+		),
+		"flanked": false,
+	}
+	return v2_action_service.query_action({
+		"action": &"attack",
+		"unit": selected_unit,
+		"target": target,
+		"context": context,
+	}) if v2_action_service else {"valid": false, "reason": &"v2_action_service_unavailable"}
+
+func _finalize_v2_attack(target: Unit, result: Dictionary) -> void:
+	var committed_preview := v2_locked_attack_preview.duplicate(true)
+	var presentation_result := result.duplicate(true)
+	if target and not target.is_alive:
+		presentation_result["occupancy_released"] = true
+		if enemy_intent_state:
+			var previous_intent := enemy_intent_state.get_intent(target.entity_id)
+			if not previous_intent.is_empty():
+				enemy_intent_state.remove_intent(target.entity_id)
+				presentation_result["intent_changed"] = true
+				_refresh_enemy_intent_display()
+	if v2_damage_presenter:
+		var events: Array[Dictionary] = v2_damage_presenter.build_events(committed_preview, presentation_result)
+		var attacker_sprite := _get_unit_sprite(selected_unit)
+		var target_sprite := _get_unit_sprite(target)
+		for event in events:
+			event["attacker_sprite"] = attacker_sprite
+			event["target_sprite"] = target_sprite
+		var reduce_motion := bool(GameManager.get_settings().get("reduce_motion", false))
+		v2_damage_presenter.play_attack(events, reduce_motion)
+	if _is_v2_battle() and selected_unit and target:
+		_play_v2_attack_world_feedback(selected_unit, target)
+		_schedule_v2_dead_sprite_cleanup(target)
+	_clear_v2_locked_attack()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_all()
+	if target and is_instance_valid(target) and target.is_alive:
+		_update_unit_sprite_pos(target, true)
+	if selected_unit and is_instance_valid(selected_unit):
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	if hud:
+		hud.set_context_prompt("攻击结算：%s 受到 %d 点伤害，HP %d/%d" % [
+		target.unit_name, int(result.get("hp_damage", result.get("damage", 0))), target.current_hp, target.max_hp
+		])
+	last_player_attack_result = presentation_result.duplicate(true)
+	_record_v2_playtest_event(&"attack_committed", {
+		"target_id": target.entity_id if target else "",
+		"damage": int(result.get("hp_damage", result.get("damage", 0))),
+	})
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	_advance_v2_tutorial(&"attack_committed", {
+		"target_id": target.entity_id if target else "",
+	})
+	_update_visibility()
+	_render_v2_hud()
+
+## V2 combat needs a legible world-space event in addition to numbers and the
+## short UnitSprite recoil, especially when units are small on a wide map.
+func _play_v2_attack_world_feedback(attacker: Unit, target: Unit) -> void:
+	if effect_layer == null or attacker == null or target == null:
+		return
+	var previous := effect_layer.get_node_or_null("V2AttackFeedback")
+	if previous != null:
+		previous.queue_free()
+	var feedback := Node2D.new()
+	feedback.name = "V2AttackFeedback"
+	feedback.z_index = 30
+	effect_layer.add_child(feedback)
+	var source := _get_cell_center(attacker.grid_pos)
+	var impact := _get_cell_center(target.grid_pos)
+	var trace := Line2D.new()
+	trace.name = "Tracer"
+	trace.width = 3.5
+	trace.default_color = Color(0.24, 0.92, 1.0, 0.95)
+	trace.add_point(source)
+	trace.add_point(impact)
+	feedback.add_child(trace)
+	_add_v2_attack_effect_sprite(feedback, "Muzzle", &"muzzle", source, Color(0.72, 0.96, 1.0, 1.0))
+	_add_v2_attack_effect_sprite(feedback, "Impact", &"hit", impact, Color(1.0, 0.52, 0.26, 1.0))
+	var tween := feedback.create_tween()
+	tween.tween_interval(0.26 if not GameManager.get_settings().get("reduce_motion", false) else 0.12)
+	tween.tween_callback(feedback.queue_free)
+
+func _add_v2_attack_effect_sprite(parent: Node2D, effect_name: String, art_key: StringName, position: Vector2, tint: Color) -> void:
+	var texture: Texture2D = ArtCatalog.get_texture(&"effect", art_key)
+	if texture == null:
+		return
+	var sprite := Sprite2D.new()
+	sprite.name = effect_name
+	sprite.texture = texture
+	sprite.position = position
+	sprite.scale = Vector2(0.42, 0.42)
+	sprite.modulate = tint
+	sprite.z_index = 1
+	parent.add_child(sprite)
+
+## A defeated unit frees its grid cell immediately in rules, so its visual must
+## leave after the short death animation instead of appearing to overlap a mover.
+func _schedule_v2_dead_sprite_cleanup(unit: Unit) -> void:
+	if not _is_v2_battle() or unit == null or unit.is_alive:
+		return
+	var sprite := _get_unit_sprite(unit)
+	if sprite == null:
+		return
+	if bool(sprite.get_meta("v2_dead_cleanup_scheduled", false)):
+		return
+	sprite.set_meta("v2_dead_cleanup_scheduled", true)
+	# Do not leave a defeated enemy visible while its death feedback is running.
+	# Keep the node briefly for the presenter, but remove it from the scene's
+	# visible unit roster immediately and finalize by stable entity ID.
+	sprite.visible = false
+	sprite.set_process(false)
+	var duration := 0.22 if GameManager.get_settings().get("reduce_motion", false) else 0.62
+	get_tree().create_timer(duration).timeout.connect(_finish_v2_dead_sprite_cleanup.bind(unit.entity_id))
+
+func _finish_v2_dead_sprite_cleanup(entity_id: String) -> void:
+	if unit_layer == null:
+		return
+	for child in unit_layer.get_children():
+		if not child is UnitSprite:
+			continue
+		var sprite := child as UnitSprite
+		var sprite_unit: Unit = sprite.unit
+		if sprite_unit != null and sprite_unit.entity_id == entity_id and not sprite_unit.is_alive:
+			sprite.queue_free()
+
+func _remove_v2_enemy_sprite(sprite: UnitSprite) -> void:
+	if sprite == null or not is_instance_valid(sprite):
+		return
+	sprite.visible = false
+	sprite.set_process(false)
+	sprite.queue_free()
+
+func _clear_v2_hover_preview() -> void:
+	_cancel_v2_preview(v2_hover_attack_preview)
+	v2_hover_attack_preview.clear()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_temporary_attack_focus()
+
+func _clear_v2_locked_attack() -> void:
+	_cancel_v2_preview(v2_locked_attack_preview)
+	v2_locked_attack_preview.clear()
+	v2_locked_attack_target_id = ""
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_attack_focus()
+	if hud:
+		hud.clear_attack_preview()
+
+func _get_v2_action_preview() -> V2ActionPreview:
+	if v2_action_preview == null:
+		v2_action_preview = V2ActionPreviewScript.new()
+	return v2_action_preview
+
+func _build_v2_move_affordance(cell: Vector2i, query: Dictionary) -> Dictionary:
+	var preview := _get_v2_action_preview().build_move(selected_unit, cell, query)
+	preview["origin"] = selected_unit.grid_pos if selected_unit else Vector2i(-1, -1)
+	return preview
+
+func _build_v2_attack_affordance(target: Unit, query: Dictionary, locked: bool) -> Dictionary:
+	var preview := _get_v2_action_preview().build_attack(selected_unit, target, query)
+	preview["locked"] = locked
+	return preview
+
+func _validate_v2_resolved_move_preview(cell: Vector2i, preview: Dictionary) -> Dictionary:
+	if preview.get("unit", null) != selected_unit:
+		return {"valid": false, "reason": &"preview_unit_mismatch"}
+	if preview.get("from", selected_unit.grid_pos) != selected_unit.grid_pos:
+		return {"valid": false, "reason": &"stale_preview"}
+	if StringName(String(preview.get("action", &"move"))) != &"move":
+		return {"valid": false, "reason": &"invalid_move_preview"}
+	return _get_v2_action_preview().build_move(selected_unit, cell, preview)
+
+func _validate_v2_resolved_attack_preview(target: Unit, preview: Dictionary) -> Dictionary:
+	if preview.get("unit", null) != selected_unit:
+		return {"valid": false, "reason": &"preview_unit_mismatch"}
+	if StringName(String(preview.get("action", &"attack"))) != &"attack":
+		return {"valid": false, "reason": &"invalid_attack_preview"}
+	return _get_v2_action_preview().build_attack(selected_unit, target, preview)
+
+func _cancel_v2_preview(preview: Dictionary) -> void:
+	if v2_action_service and not preview.is_empty():
+		v2_action_service.cancel_preview(int(preview.get("preview_id", 0)))
+
+func _get_v2_unit_by_id(target_id: String) -> Unit:
+	if target_id.is_empty():
+		return null
+	for raw_unit in enemy_units:
+		var unit: Unit = raw_unit
+		if unit and String(unit.entity_id) == target_id and unit.is_alive:
+			return unit
+	return null
+
+func _on_v2_cancel_requested() -> void:
+	if _v2_camera_return_handled:
+		_v2_camera_return_handled = false
+		return
+	if is_v2_camera_inspecting():
+		return_to_v2_camera_player()
+		return
+	var previous_state := v2_input_router.get_last_cancelled_state() if v2_input_router else V2BattleInputRouter.State.FREE_SELECT
+	var previous_state_name := v2_input_router.get_state_name_for(previous_state) if v2_input_router else "free_select"
+	_record_v2_playtest_event(&"action_cancelled", {"state": previous_state_name})
+	if hud:
+		hud.hide_action_picker()
+	v2_pending_interaction_facility_id = ""
+	_cancel_v2_preview(v2_pending_move_preview)
+	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	_clear_layer(attack_highlight)
+	_clear_v2_hover_preview()
+	_clear_v2_locked_attack()
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	if previous_state == V2BattleInputRouter.State.UNIT_SELECTED and selected_unit != null:
+		# Escape changes the router to FREE_SELECT and truly clears selection;
+		# right-click keeps UNIT_SELECTED and only cancels the active preview.
+		if v2_input_router == null or v2_input_router.get_state() == V2BattleInputRouter.State.FREE_SELECT:
+			_deselect_unit()
+		else:
+			_refresh_selected_unit_affordances(selected_unit)
+			if hud:
+				hud.set_context_prompt("已保留角色选择：点击蓝色格移动，点击红色敌人攻击；Esc取消选择。")
+	elif selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+	_render_v2_hud()
+
+func _on_v2_camera_pan(delta: Vector2) -> void:
+	if camera:
+		camera.clear_follow_target()
+		camera.pan_by_screen_delta(delta)
+	_record_v2_playtest_event(&"camera_pan", {
+		"delta_x": delta.x,
+		"delta_y": delta.y,
+	})
+
+func _on_v2_camera_zoom(amount: int) -> void:
+	if camera:
+		camera.zoom_at(float(amount), get_viewport().get_mouse_position())
+
+func _on_v2_camera_focus() -> void:
+	if is_v2_camera_inspecting():
+		return_to_v2_camera_player()
+		return
+	if camera == null:
+		return
+	var focus_unit := get_v2_camera_focus_unit()
+	if focus_unit != null:
+		camera.focus_cell(focus_unit.grid_pos)
+		_record_v2_playtest_event(&"camera_focus_returned", {
+			"unit_id": focus_unit.entity_id,
+			"method": "shortcut",
+		})
+
+func _on_v2_camera_inspect_cancel_requested() -> void:
+	if is_v2_camera_inspecting():
+		_v2_camera_return_handled = true
+		return_to_v2_camera_player()
+
+func is_v2_camera_inspecting() -> bool:
+	return _is_v2_battle() and v2_camera_navigation != null and v2_camera_navigation.is_inspecting()
+
+func begin_v2_camera_inspection(center: Vector2i, radius: int) -> Dictionary:
+	if not _is_v2_battle() or v2_camera_navigation == null:
+		return {"success": false, "reason": &"camera_navigation_unavailable"}
+	var result: Dictionary = v2_camera_navigation.begin_inspect(center, radius, _get_v2_live_player_cell())
+	_apply_v2_camera_navigation_result(result)
+	return result
+
+func return_to_v2_camera_player() -> Dictionary:
+	if not _is_v2_battle() or v2_camera_navigation == null:
+		return {"success": false, "reason": &"camera_navigation_unavailable"}
+	var result: Dictionary = v2_camera_navigation.focus_player(_get_v2_live_player_cell())
+	_apply_v2_camera_navigation_result(result)
+	if bool(result.get("success", false)):
+		var focus_cell: Vector2i = result.get("focus_cell", Vector2i.ZERO)
+		_record_v2_playtest_event(&"camera_focus_returned", {
+			"method": "camera_return",
+			"cell": [focus_cell.x, focus_cell.y],
+		})
+	return result
+
+func _get_v2_live_player_cell() -> Vector2i:
+	var focus_unit := get_v2_camera_focus_unit()
+	return focus_unit.grid_pos if focus_unit != null else Vector2i.ZERO
+
+func _apply_v2_camera_navigation_result(result: Dictionary) -> void:
+	if not _is_v2_battle() or result.is_empty() or not result.get("focus_cell") is Vector2i:
+		return
+	if camera:
+		camera.zoom = Vector2.ONE * clampf(float(result.get("zoom_hint", 1.0)), 0.65, 1.5)
+		camera.focus_cell(result.get("focus_cell") as Vector2i)
+		if camera.has_method("force_update_scroll"):
+			camera.call("force_update_scroll")
+	if hud:
+		hud.set_v2_camera_return_visible(bool(result.get("show_return", false)))
+
+## Home must still work after a facility interaction clears selection. V2 keeps
+## the camera shortcut independent from tactical selection state.
+func get_v2_camera_focus_unit() -> Unit:
+	return V2CameraFocusScript.resolve(selected_unit, player_units)
+
+## V2: 点击设施后只展示当前设施的最多两个自然语言操作。
+func _open_v2_interaction_menu(entity_id: String, resolved_preview: Dictionary = {}) -> void:
+	if selected_unit == null or selected_unit.team != "player" or v2_interaction_service == null:
+		return
+	var facility: Dictionary = v2_interaction_service.get_facility(entity_id)
+	var actions: Array = resolved_preview.get("actions", []) if not resolved_preview.is_empty() else v2_interaction_service.query_actions(selected_unit, entity_id)
+	if facility.is_empty() or actions.is_empty():
+		if hud:
+			hud.set_context_prompt("这里没有可用的设施操作")
+		return
+	var has_enabled_action := false
+	for raw_action in actions:
+		if raw_action is Dictionary and bool(raw_action.get("enabled", false)):
+			has_enabled_action = true
+			break
+	if not has_enabled_action:
+		var reason := String(actions[0].get("reason", "interaction_unavailable")) if actions[0] is Dictionary else "interaction_unavailable"
+		var facility_name := String(facility.get("name", facility.get("type", "设施")))
+		if reason == "out_of_range":
+			if selected_unit.can_move():
+				hud.set_context_prompt("%s需要相邻操作；先点击蓝色格移动到设施旁，再点击设施。" % facility_name)
+			else:
+				hud.set_context_prompt("%s不在操作范围内，且本回合移动已用；按 Space 结束回合，下回合再靠近。" % facility_name)
+		elif reason == "action_unavailable":
+			hud.set_context_prompt("本回合行动已用；按 Space 结束回合，下回合再操作%s。" % facility_name)
+		else:
+			hud.set_context_prompt("%s当前没有可用操作：%s" % [facility_name, reason])
+		_render_v2_hud()
+		return
+	v2_pending_interaction_facility_id = entity_id
+	_clear_v2_hover_preview()
+	_clear_v2_locked_attack()
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.INTERACTION_MENU)
+	if hud:
+		hud.show_interaction_actions(
+			String(facility.get("name", facility.get("type", "设施"))),
+			actions,
+			Callable(self, "_on_v2_interaction_action_selected").bind(entity_id)
+		)
+		hud.set_context_prompt("选择设施操作；右键取消菜单")
+	_render_v2_hud()
+
+func _on_v2_interaction_action_selected(action_id: String, entity_id: String) -> void:
+	if v2_interaction_service == null or selected_unit == null:
+		return
+	var camera_action := action_id in ["view_camera_east", "view_rescue_zone"]
+	var result: Dictionary = v2_interaction_service.commit_action(
+		selected_unit, entity_id, action_id, v2_interaction_service.get_state_revision()
+	)
+	v2_pending_interaction_facility_id = ""
+	if hud:
+		hud.hide_action_picker()
+	if not bool(result.get("success", false)):
+		if hud:
+			hud.show_action_reason(result.get("reason", "interaction_unavailable"))
+		if v2_input_router:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+		return
+	_apply_v2_interaction_result(result)
+	if v2_input_router:
+		v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	_advance_context_hint("interact")
+	_render_v2_hud()
+	if camera_action and hud:
+		hud.set_context_prompt("摄像头视角：查看东侧区域；按 F 或返回队员继续战术行动。")
+		_render_v2_hud()
+
+func _apply_v2_interaction_result(result: Dictionary) -> void:
+	var facility_id := String(result.get("facility_id", ""))
+	var facility: Dictionary = v2_interaction_service.get_facility(facility_id) if v2_interaction_service else {}
+	var action_id := String(result.get("action_id", ""))
+	var is_camera_view := action_id in ["view_camera_east", "view_rescue_zone"]
+	var reveal_radius := int(result.get("reveal_radius", 0))
+	if reveal_radius > 0 and visibility_state:
+		var center: Vector2i = result.get("reveal_center", facility.get("position", selected_unit.grid_pos))
+		var cells: Array[Vector2i] = []
+		if _is_v2_battle() and result.get("camera_zone_cells", []) is Array:
+			for raw_cell in result.get("camera_zone_cells", []):
+				if raw_cell is Vector2i:
+					cells.append(raw_cell)
+		else:
+			cells = VisionSystem.get_visible_cells(center, reveal_radius, map_width, map_height, _is_vision_blocking)
+		visibility_state.reveal_cells(cells)
+		if result.has("camera_zone_id"):
+			_sync_camera_zone_cells()
+		_update_visibility()
+		_log("%s 揭示了 %d 个格子" % [facility_id, cells.size()])
+	elif result.has("camera_zone_id"):
+		_sync_camera_zone_cells()
+		_update_visibility()
+	var v2_alert_result: Dictionary = {}
+	var consequence := String(result.get("consequence", "操作完成"))
+	if _is_v2_battle() and is_camera_view and alert_state:
+		v2_alert_result = alert_state.apply_event("camera_identified_player")
+	if is_camera_view:
+		var camera_effect := "摄像头用途：揭示东侧区域并持续保持视野"
+		if reveal_radius > 0:
+			var revealed_count := (result.get("camera_zone_cells", []) as Array).size() if _is_v2_battle() else VisionSystem.get_visible_cells(
+				result.get("reveal_center", facility.get("position", selected_unit.grid_pos)), reveal_radius, map_width, map_height, _is_vision_blocking
+			).size()
+			camera_effect = "摄像头已揭示东侧区域 %d 格，并持续保持视野" % revealed_count
+		consequence = camera_effect
+
+	if bool(result.get("raises_alert", false)) and alert_state:
+		alert_state.apply_event("overload_triggered")
+		if hud:
+			hud.update_alert_display(alert_state)
+	if bool(v2_alert_result.get("changed", false)):
+		consequence = "进入搜索：巡逻路线已改变；%s" % consequence
+	elif bool(v2_alert_result.get("grace", false)):
+		consequence = "故事宽限：摄像头暂未触发搜索；%s" % consequence
+	if is_camera_view:
+		_advance_v2_tutorial(&"camera_viewed", {"facility_id": facility_id})
+	_log("设施 %s：%s" % [facility_id, consequence])
+	if String(result.get("reward_module", "")) != "":
+		_log("可选目标完成：已登记模块 %s" % String(result.get("reward_module", "")))
+		if _is_v2_battle() and level_id == "ch1_m1" and String(result.get("action_id", "")) == "upload_incident_record":
+			GameManager.play_dialogue("ch1_m1_record")
+	if hud:
+		hud.set_context_prompt("设施操作完成：%s" % consequence)
+	if tactical_network_state:
+		_render_network_nodes()
+
 ## ===== 行动执行 =====
 
 func _highlight_color(role: String, fallback: Color) -> Color:
@@ -2380,6 +4298,9 @@ func _highlight_color(role: String, fallback: Color) -> Color:
 
 func _show_move_range(unit: Unit) -> void:
 	_clear_layer(move_highlight)
+	if _is_v2_battle() and unit.team == "player" and not unit.can_move():
+		reachable_cells.clear()
+		return
 	reachable_cells = Pathfinding.get_reachable_cells(
 		unit.grid_pos, unit.move_points,
 		map_width, map_height,
@@ -2389,8 +4310,9 @@ func _show_move_range(unit: Unit) -> void:
 	for cell in reachable_cells:
 		if cell == unit.grid_pos:
 			continue
-		var move_color := _highlight_color("move", COLOR_MOVE)
-		_highlight_range_cell(move_highlight, cell, move_color, _highlight_edge_color(move_color))
+		if not _is_v2_battle():
+			var move_color := _highlight_color("move", COLOR_MOVE)
+			_highlight_range_cell(move_highlight, cell, move_color, _highlight_edge_color(move_color))
 
 	# 标记选中单位本回合能进入的撤离区域格。
 	if mission_type in ["extract", "steal_data", "escort", "infiltrate"]:
@@ -2406,7 +4328,7 @@ func _show_move_range(unit: Unit) -> void:
 				_highlight_cell(move_highlight, term_pos, _highlight_color("target", COLOR_TARGET))
 
 ## 选中单位后的默认可发现性层：同时展示移动与攻击信息。
-## 玩家不需要先找到隐藏的“攻击模式”按钮，红色区域就是当前武器的有效范围。
+## 玩家不需要先找到隐藏的“攻击模式”按钮；合法敌人描边，悬停后才显示确定预览。
 func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	if not unit or not is_instance_valid(unit):
 		return
@@ -2415,21 +4337,41 @@ func _refresh_selected_unit_affordances(unit: Unit) -> void:
 	attack_targets.clear()
 	if unit.team != "player":
 		return
-	if unit.current_ap <= 0:
-		hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+	var can_attack := unit.can_act() if _is_v2_battle() else unit.current_ap > 0
+	if not can_attack:
+		if _is_v2_battle() and v2_affordance_presenter:
+			v2_affordance_presenter.clear_transient()
+			v2_affordance_presenter.show_reachable(reachable_cells if unit.can_move() else [])
+			v2_affordance_presenter.show_attackable([])
+		if hud:
+			if _is_v2_battle():
+				if unit.can_move():
+					hud.set_context_prompt("行动已用；蓝色格仍可移动。本回合不能再次攻击，按 Tab 选择其他队员，或按 Space 结束回合。")
+				else:
+					hud.set_context_prompt("移动和行动都已用；按 Tab 选择其他队员，或按 Space 结束回合。")
+			else:
+				hud.set_context_prompt("蓝色格 = 可移动；本队员没有 AP，无法攻击。按 Tab 选择其他队员，或结束回合。")
+		_render_v2_hud()
 		return
 	_show_attack_range(unit)
+	if _is_v2_battle() and v2_affordance_presenter:
+		v2_affordance_presenter.show_reachable(reachable_cells)
+		v2_affordance_presenter.show_attackable(attack_targets)
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
 	var range_text := "攻击范围 %d-%d 格" % [min_range, max_range]
+	var move_note := "移动已用；" if _is_v2_battle() and not unit.can_move() else ""
 	if attack_targets.is_empty():
-		hud.set_context_prompt(
-			"蓝色格 = 可移动；半透明红色区域 = %s。当前没有可攻击敌人，先移动到射程内或结束回合。" % range_text
-		)
+		if hud:
+			hud.set_context_prompt(
+				"%s蓝色格 = 可移动；红色描边敌人 = 可攻击（%s）。当前没有合法目标，先移动到射程内或结束回合。" % [move_note, range_text]
+			)
 	else:
-		hud.set_context_prompt(
-			"蓝色格 = 可移动；红色敌人 = 可攻击（%s）。点击红色敌人预览命中率/伤害，再次点击确认。" % range_text
-		)
+		if hud:
+			hud.set_context_prompt(
+				"%s蓝色格 = 可移动；红色描边敌人 = 可攻击（%s）。悬停查看伤害，点击一次攻击。" % [move_note, range_text]
+			)
+	_render_v2_hud()
 
 ## 鼠标悬停时实时预览从选中单位到鼠标格的移动路径
 ## 仅在 move 模式下、目标格可达时绘制路径线条和途径格子高亮
@@ -2481,10 +4423,10 @@ func _draw_path_line(path: Array) -> void:
 func _show_attack_range(unit: Unit) -> void:
 	_clear_layer(attack_highlight)
 	attack_targets.clear()
+	v2_attack_range_cells.clear()
 	var min_range := int(unit.weapon_range[0]) if unit.weapon_range.size() > 0 else 1
 	var max_range := int(unit.weapon_range[1]) if unit.weapon_range.size() > 1 else min_range
-	# 先显示完整可射击区域，再用更亮的格子标出真实敌人/目标，
-	# 让玩家即使暂时没有敌人也能理解武器射程。
+	# 仍计算视线内的射程格，供合法目标查询与 HUD 数值说明使用；V2 不把整片范围绘制成红色。
 	for y in range(maxi(0, unit.grid_pos.y - max_range), mini(map_height, unit.grid_pos.y + max_range + 1)):
 		for x in range(maxi(0, unit.grid_pos.x - max_range), mini(map_width, unit.grid_pos.x + max_range + 1)):
 			var cell := Vector2i(x, y)
@@ -2492,8 +4434,10 @@ func _show_attack_range(unit: Unit) -> void:
 			if dist < min_range or dist > max_range:
 				continue
 			if VisionSystem.has_line_of_sight(unit.grid_pos, cell, map_width, map_height, _is_vision_blocking):
-				var attack_range_color := _highlight_color("attack", COLOR_ATTACK_RANGE)
-				_highlight_range_cell(attack_highlight, cell, attack_range_color, _highlight_edge_color(attack_range_color))
+				v2_attack_range_cells.append(cell)
+				if not _is_v2_battle():
+					var attack_range_color := _highlight_color("attack", COLOR_ATTACK_RANGE)
+					_highlight_range_cell(attack_highlight, cell, attack_range_color, _highlight_edge_color(attack_range_color))
 	# 敌方单位
 	# CH1-040: 只能攻击处于正在观察格子的敌人；隐藏敌人不可被选中
 	for enemy in enemy_units:
@@ -2508,10 +4452,13 @@ func _show_attack_range(unit: Unit) -> void:
 				map_width, map_height, _is_vision_blocking
 			)
 			if has_los:
+				if _is_v2_battle() and not bool(_query_v2_attack_preview(enemy).get("valid", false)):
+					continue
 				attack_targets.append(enemy)
-				var target_color := _highlight_color("attack", COLOR_ATTACK)
-				var target_border := _highlight_color("target", Color(1.0, 0.78, 0.16, 0.95))
-				_highlight_range_cell(attack_highlight, enemy.grid_pos, target_color, _highlight_edge_color(target_border))
+				if not _is_v2_battle():
+					var target_color := _highlight_color("attack", COLOR_ATTACK)
+					var target_border := _highlight_color("target", Color(1.0, 0.78, 0.16, 0.95))
+					_highlight_range_cell(attack_highlight, enemy.grid_pos, target_color, _highlight_edge_color(target_border))
 	# 可破坏目标（destroy 任务）
 	for tpos in destructible_targets:
 		var state = destructible_target_states.get(tpos, {})
@@ -2525,8 +4472,9 @@ func _show_attack_range(unit: Unit) -> void:
 			)
 			if has_los:
 				attack_targets.append(tpos)  # 混合类型：Unit 和 Vector2i
-				var destructible_color := _highlight_color("target", COLOR_TARGET)
-				_highlight_range_cell(attack_highlight, tpos, destructible_color, _highlight_edge_color(destructible_color))
+				if not _is_v2_battle():
+					var destructible_color := _highlight_color("target", COLOR_TARGET)
+					_highlight_range_cell(attack_highlight, tpos, destructible_color, _highlight_edge_color(destructible_color))
 
 ## 直接点击敌人后进入可读的二次确认预览，不执行攻击。
 func _begin_direct_attack_preview(target: Unit) -> void:
@@ -2552,7 +4500,7 @@ func _show_attack_preview(target: Unit) -> void:
 	var hit_percent := int(roundf(float(preview.get("hit_chance", 0.0)) * 100.0))
 	var expected_damage := int(preview.get("damage", 0))
 	hud.set_context_prompt(
-		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消" % [
+		"再次点击确认攻击 %s：命中 %d%% · 预计伤害 %d · 目标 HP %d/%d · 右键取消预览" % [
 			target.unit_name, hit_percent, expected_damage, target.current_hp, target.max_hp
 		]
 	)
@@ -2604,7 +4552,7 @@ func _try_move(grid_pos: Vector2i) -> void:
 
 	# 移动会改变玩家视野，不能等到下一回合才更新战争迷雾。
 	# 放在陷阱和警戒结算后，保证最终存活状态与最终位置都已写入。
-	_update_visibility()
+	refresh_visibility_transaction(&"unit_moved")
 
 	_log("%s 移动到 (%d,%d)" % [selected_unit.unit_name, grid_pos.x, grid_pos.y])
 	_clear_layer(path_preview_layer)
@@ -2745,6 +4693,10 @@ func _check_encounter_zone(grid_pos: Vector2i) -> void:
 				if trigger_pos == grid_pos and current_encounter_id != eid:
 					current_encounter_id = eid
 					_log("进入遭遇区：%s" % String(encounter.get("name", eid)))
+					if _is_v2_battle() and eid == "encounter_evac" and v2_mission_flow:
+						var route_result: Dictionary = _apply_v2_mission_event(&"evac_route_opened")
+						if bool(route_result.get("changed", false)):
+							_save_v2_checkpoint(&"cp_pre_evac")
 					return
 
 ## Task 3: calculate star rating (0=defeat, 1=victory, 2=no casualty, 3=fast+optional)
@@ -2873,6 +4825,61 @@ func _end_player_turn() -> void:
 	_refresh_enemy_intent_display()
 	turn_manager.end_player_turn()
 
+## V2: 所有结束回合入口共用的公开接口，返回明确失败原因而不是静默无响应。
+func request_end_turn() -> Dictionary:
+	if turn_manager == null:
+		return {"success": false, "reason": &"turn_manager_unavailable"}
+	if turn_manager.battle_over:
+		return {"success": false, "reason": &"battle_over"}
+	if turn_manager.current_phase != TurnManager.TurnPhase.PLAYER_ACTION:
+		return {"success": false, "reason": &"not_player_phase", "phase": turn_manager.current_phase}
+	if v2_input_router and v2_input_router.get_state() == V2BattleInputRouter.State.PAUSED:
+		return {"success": false, "reason": &"paused"}
+	if hud and hud._action_picker != null and is_instance_valid(hud._action_picker):
+		return {"success": false, "reason": &"interaction_menu_open"}
+	if targeting_controller and targeting_controller.is_active:
+		return {"success": false, "reason": &"target_selection_open"}
+	cancel_current_preview()
+	_end_player_turn()
+	return {"success": true, "phase": turn_manager.current_phase}
+
+## V2: 取消预览/菜单，但保留选中的队员和范围信息。
+func cancel_current_preview() -> Dictionary:
+	if targeting_controller and targeting_controller.is_active:
+		targeting_controller.cancel()
+	if hud:
+		hud.hide_action_picker()
+	_clear_layer(attack_highlight)
+	_clear_layer(path_preview_layer)
+	path_preview.clear()
+	selected_action = ""
+	attack_preview_target = null
+	attack_preview_data.clear()
+	attack_confirmation_required = false
+	_pending_action_id = ""
+	_pending_action_kind = ""
+	_cancel_v2_preview(v2_pending_move_preview)
+	v2_pending_move_preview.clear()
+	_cancel_v2_preview(v2_pending_ability_preview)
+	v2_pending_ability_preview.clear()
+	v2_pending_ability_id = &""
+	v2_ability_target_cells.clear()
+	_clear_v2_hover_preview()
+	_clear_v2_locked_attack()
+	v2_pending_interaction_facility_id = ""
+	if v2_affordance_presenter:
+		v2_affordance_presenter.clear_preview()
+	if v2_input_router:
+		var state := v2_input_router.get_state()
+		if state in [V2BattleInputRouter.State.ATTACK_LOCKED, V2BattleInputRouter.State.ABILITY_TARGETING, V2BattleInputRouter.State.INTERACTION_MENU]:
+			v2_input_router.set_state(V2BattleInputRouter.State.UNIT_SELECTED)
+	if selected_unit:
+		_refresh_selected_unit_affordances(selected_unit)
+		if hud:
+			hud.update_unit_info(selected_unit)
+	_render_v2_hud()
+	return {"success": true, "state": v2_input_router.get_state_name() if v2_input_router else "unit_selected"}
+
 
 ## CH1-050: Generate next-turn intents for every alive enemy.
 ## Each intent captures the action the enemy would take if the player ended
@@ -2896,7 +4903,13 @@ func _plan_enemy_intents() -> void:
 		if intent.is_empty():
 			intent = {"type": "wait"}
 		enemy_intent_state.set_intent(enemy.entity_id, intent)
+		if _is_v2_battle():
+			var intent_presentation := V2IntentPresentationScript.build(intent)
+			var intent_audio_cue: StringName = intent_presentation.get("audio_cue", &"")
+			if intent_audio_cue != &"":
+				AudioManager.play_semantic_sfx(intent_audio_cue)
 	_enemy_intents_planned = true
+	_advance_v2_tutorial(&"enemy_intent_observed")
 
 
 ## CH1-050: Refresh the intent renderer and HUD threat summary after a plan
@@ -3260,7 +5273,10 @@ func on_overwatch_button() -> void:
 			_refresh_selected_unit_affordances(selected_unit)
 
 func on_end_turn_button() -> void:
-	_end_player_turn()
+	if _is_v2_battle():
+		request_end_turn()
+	else:
+		_end_player_turn()
 
 ## ===== 单位事件回调 =====
 
@@ -3269,19 +5285,50 @@ func _on_unit_ap_changed(unit: Unit, _ap: int) -> void:
 		hud.update_unit_info(unit)
 
 func _on_unit_died(unit: Unit) -> void:
+	if _is_v2_battle() and unit != null:
+		_record_v2_playtest_event(&"unit_downed", {
+			"unit_id": unit.entity_id,
+			"team": unit.team,
+			"unit_role": unit.job,
+		})
+	if _is_v2_battle() and visibility_state and unit != null:
+		# Death is not loss of sight: remove the remembered enemy so the fog
+		# renderer cannot replace the corpse with a last-known ghost.
+		visibility_state.forget_enemy(unit.entity_id)
+		_refresh_last_known_ghosts()
+	if _is_v2_battle() and v2_mission_flow:
+		_apply_v2_mission_event(&"unit_downed", {"unit": unit, "unit_id": unit.entity_id})
+	if _is_v2_battle() and v2_damage_signal_suppressed:
+		_schedule_v2_dead_sprite_cleanup(unit)
+		_record_death_telemetry(unit)
+		if unit == boss_unit:
+			_log("Boss 已被击杀！")
+			hud.update_objective(_get_objective_text())
+		return
 	_log("%s 阵亡" % unit.unit_name)
 	AudioManager.sfx_unit_down()
 	var sprite := _get_unit_sprite(unit)
 	if sprite:
 		sprite.update_unit(unit)
 		sprite.play_death()
+	if _is_v2_battle():
+		_schedule_v2_dead_sprite_cleanup(unit)
 	_record_death_telemetry(unit)
 	# Boss 死亡时更新目标显示
 	if unit == boss_unit:
 		_log("Boss 已被击杀！")
 		hud.update_objective(_get_objective_text())
 
-func _on_unit_damaged(unit: Unit, _amount: int) -> void:
+func _on_unit_damaged(unit: Unit, amount: int) -> void:
+	if _is_v2_battle() and unit != null:
+		_record_v2_playtest_event(&"damage_resolved", {
+			"unit_id": unit.entity_id,
+			"team": unit.team,
+			"amount": maxi(0, amount),
+			"remaining_hp": unit.current_hp,
+		})
+	if _is_v2_battle() and v2_damage_signal_suppressed:
+		return
 	_update_unit_sprite_pos(unit)
 	if unit.is_alive:
 		_play_unit_state(unit, &"hit")
@@ -3289,13 +5336,16 @@ func _on_unit_damaged(unit: Unit, _amount: int) -> void:
 	if unit == boss_unit and boss_unit and boss_unit.is_alive:
 		_check_boss_phase_transition(unit)
 
-func _spawn_effect(kind: String, grid_pos: Vector2i) -> void:
+func _spawn_effect(kind: String, grid_pos: Vector2i) -> bool:
+	if effect_layer == null or not is_instance_valid(effect_layer):
+		return false
 	var effect := TacticalEffect.new()
 	effect.position = _get_cell_center(grid_pos)
 	effect.setup(kind)
 	effect_layer.add_child(effect)
-	if kind == "explosion":
+	if kind == "explosion" and camera != null and is_instance_valid(camera):
 		camera.play_event_feedback(&"explosion", effect.position)
+	return true
 
 func _check_victory_instant() -> void:
 	if _check_victory():
@@ -3309,6 +5359,53 @@ func _get_unit_at(pos: Vector2i) -> Unit:
 			return unit
 	return null
 
+func _is_occupied_by_other_unit(pos: Vector2i, except_unit: Unit = null) -> bool:
+	for raw_unit in player_units + enemy_units:
+		var unit: Unit = raw_unit
+		if unit == null or unit == except_unit or not unit.is_alive:
+			continue
+		if unit.grid_pos == pos:
+			return true
+	return false
+
+func _reconcile_v2_unit_occupancy() -> void:
+	if not _is_v2_battle():
+		return
+	var occupied: Dictionary = {}
+	for raw_player in player_units:
+		var player: Unit = raw_player
+		if player and player.is_alive:
+			occupied[player.grid_pos] = player.entity_id
+	for raw_enemy in enemy_units:
+		var enemy: Unit = raw_enemy
+		if enemy == null or not enemy.is_alive:
+			continue
+		if not occupied.has(enemy.grid_pos):
+			occupied[enemy.grid_pos] = enemy.entity_id
+			continue
+		var replacement := _find_v2_free_cell(enemy.grid_pos, occupied)
+		if replacement.x < 0:
+			_log("%s 与其他单位重合且没有可用空格，禁止移动" % enemy.unit_name)
+			continue
+		var previous := enemy.grid_pos
+		enemy.grid_pos = replacement
+		occupied[replacement] = enemy.entity_id
+		_update_unit_sprite_pos(enemy)
+		_log("修复单位重合：%s 从 (%d,%d) 移至 (%d,%d)" % [enemy.unit_name, previous.x, previous.y, replacement.x, replacement.y])
+
+func _find_v2_free_cell(origin: Vector2i, occupied: Dictionary) -> Vector2i:
+	var max_distance := maxi(map_width, map_height)
+	for distance in range(1, max_distance + 1):
+		for dx in range(-distance, distance + 1):
+			var dy := distance - absi(dx)
+			for candidate in [origin + Vector2i(dx, dy), origin + Vector2i(dx, -dy)]:
+				if not GridSystem.is_in_bounds(candidate, map_width, map_height):
+					continue
+				if occupied.has(candidate) or not MapLoader.is_passable(map_data, candidate.x, candidate.y):
+					continue
+				return candidate
+	return Vector2i(-1, -1)
+
 func _update_unit_sprite_pos(unit: Unit, animate: bool = false) -> void:
 	var sprite := _get_unit_sprite(unit)
 	if not sprite:
@@ -3318,7 +5415,7 @@ func _update_unit_sprite_pos(unit: Unit, animate: bool = false) -> void:
 	if animate:
 		sprite.play_move_to(target_position)
 	else:
-		sprite.position = target_position
+		sprite.snap_to(target_position)
 
 func _play_unit_state(unit: Unit, state: StringName, direction: Vector2 = Vector2.RIGHT) -> void:
 	var sprite := _get_unit_sprite(unit)
@@ -3326,6 +5423,8 @@ func _play_unit_state(unit: Unit, state: StringName, direction: Vector2 = Vector
 		sprite.play_state(state, direction)
 
 func _get_unit_sprite(unit: Unit) -> UnitSprite:
+	if unit_layer == null:
+		return null
 	for sprite in unit_layer.get_children():
 		if sprite is UnitSprite and sprite.unit == unit:
 			return sprite
@@ -3335,6 +5434,8 @@ func _get_cell_center(pos: Vector2i) -> Vector2:
 	return GridSystem.grid_to_world(pos) + Vector2(CELL_SIZE, CELL_SIZE) * 0.5
 
 func _update_unit_sprite_selection(unit: Unit, selected: bool) -> void:
+	if unit_layer == null:
+		return
 	for sprite in unit_layer.get_children():
 		if sprite is UnitSprite and sprite.unit == unit:
 			sprite.set_selected(selected)
@@ -3373,7 +5474,10 @@ func _update_visibility() -> void:
 				"pos": enemy.grid_pos,
 				"hp": enemy.current_hp,
 			})
-	visibility_state.update_visibility(visible_cells, visible_enemies)
+	if _is_v2_battle():
+		v2_visibility_summary = visibility_state.update_visibility(visible_cells, visible_enemies)
+	else:
+		visibility_state.update_visibility(visible_cells, visible_enemies)
 	_refresh_enemy_sprite_visibility()
 	_refresh_last_known_ghosts()
 	if visibility_renderer:
@@ -3381,9 +5485,30 @@ func _update_visibility() -> void:
 		visibility_renderer.refresh()
 	if hud and hud.is_network_overlay_visible():
 		_update_network_node_visibility()
+	_update_v2_rescue_marker_visibility()
 	# CH1-050: Visibility changes affect which intents are public. Refresh the
 	# intent renderer so newly observed/lost enemies update their display.
 	_refresh_enemy_intent_display()
+
+## V2: 在移动事务返回前完成状态、精灵和迷雾渲染刷新。
+## 不使用延迟计时器，调用方可以立即读取 focus_cell 的状态和渲染状态。
+func refresh_visibility_transaction(reason: StringName) -> Dictionary:
+	if visibility_state == null:
+		return {"success": false, "reason": &"visibility_unavailable"}
+	_update_visibility()
+	var focus_cell := selected_unit.grid_pos if selected_unit and is_instance_valid(selected_unit) else Vector2i(-1, -1)
+	var cell_state := visibility_state.get_cell_state(focus_cell) if focus_cell.x >= 0 else VisibilityState.STATE_UNEXPLORED
+	var render_state := VisibilityState.RENDER_HIDDEN
+	if visibility_renderer and focus_cell.x >= 0:
+		render_state = visibility_renderer.get_render_state_for_cell(focus_cell)
+	return {
+		"success": true,
+		"reason": reason,
+		"focus_cell": focus_cell,
+		"cell_state": cell_state,
+		"render_state": render_state,
+		"renderer_refreshed": visibility_renderer != null,
+	}
 
 ## CODE-P2-01: Hide enemy sprites not currently observed; show observed ones.
 ## CH1-040: 实时敌人精灵只在正在观察时显示；离开视野后隐藏，由幽灵标记取代。
@@ -3395,6 +5520,9 @@ func _refresh_enemy_sprite_visibility() -> void:
 		if not sprite or not sprite.unit:
 			continue
 		if sprite.unit.team != "enemy":
+			continue
+		if _is_v2_battle() and not sprite.unit.is_alive:
+			_remove_v2_enemy_sprite(sprite)
 			continue
 		var observed = visibility_state.is_enemy_observed(sprite.unit.entity_id)
 		sprite.visible = observed

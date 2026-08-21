@@ -1,0 +1,77 @@
+{
+  "impact_advance": {
+    "id": "impact_advance",
+    "name": "冲击推进",
+    "kind": "active",
+    "cooldown": 2,
+    "range": 3,
+    "radius": 0,
+    "damage": 0,
+    "push": 1,
+    "move_distance": 3,
+    "shield": 0
+  },
+  "area_scan": {
+    "id": "area_scan",
+    "name": "区域扫描",
+    "kind": "active",
+    "cooldown": 3,
+    "range": 3,
+    "radius": 3,
+    "damage": 0,
+    "push": 0,
+    "shield": 0,
+    "reveals_intent": true
+  },
+  "interrupt_shot": {
+    "id": "interrupt_shot",
+    "name": "截断射击",
+    "kind": "active",
+    "cooldown": 3,
+    "range": 8,
+    "radius": 0,
+    "damage": 2,
+    "push": 0,
+    "shield": 0,
+    "interrupt": true
+  },
+  "barrier_projection": {
+    "id": "barrier_projection",
+    "name": "屏障投射",
+    "kind": "active",
+    "cooldown": 3,
+    "range": 1,
+    "radius": 1,
+    "damage": 0,
+    "push": 0,
+    "shield": 2,
+    "duration": 2
+  },
+  "close_armor": {
+    "id": "close_armor",
+    "name": "贴身装甲",
+    "kind": "passive",
+    "shield": 1,
+    "trigger": "observed_enemy_within_3_at_turn_end"
+  },
+  "forward_observer": {
+    "id": "forward_observer",
+    "name": "先行观察",
+    "kind": "passive",
+    "trigger": "first_enemy_revealed_in_vision"
+  },
+  "steady_position": {
+    "id": "steady_position",
+    "name": "稳定射位",
+    "kind": "passive",
+    "damage_bonus": 1,
+    "trigger": "did_not_move_this_turn"
+  },
+  "heavy_frame": {
+    "id": "heavy_frame",
+    "name": "重型框架",
+    "kind": "passive",
+    "damage_reduction": 1,
+    "trigger": "first_direct_damage_each_turn"
+  }
+}

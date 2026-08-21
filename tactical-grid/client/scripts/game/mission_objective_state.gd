@@ -29,6 +29,7 @@ const TYPE_DEFEND := "defend"
 const RULE_NO_OVERWATCH := "no_overwatch"
 const RULE_NO_ITEMS := "no_items"
 const RULE_ENEMY_PASSIVE_TURN_1 := "enemy_passive_turn_1"
+const RULE_ENEMY_PASSIVE_TURN_3 := "enemy_passive_turn_3"
 
 ## ===== 任务阶段常量（infiltrate 三阶段流） =====
 const STAGE_APPROACH := &"approach"
@@ -109,10 +110,26 @@ func setup(level_config: Dictionary, map_data: Dictionary, players: Array, enemi
 	boss_unit = special_designations.get("boss_unit", null)
 	escort_vip = special_designations.get("escort_vip", null)
 	# 应用 enemy_passive_turn_1：首回合敌人待命
-	if is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_1):
+	if is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_3):
+		_enemy_passive_until_turn = 3
+	elif is_rule_enabled(RULE_ENEMY_PASSIVE_TURN_1):
 		_enemy_passive_until_turn = 1
 	# 初始化阶段化任务流（infiltrate）
 	_setup_mission_flow(map_data)
+
+## V2-only mission pacing override. Kept out of shared level data so the V1
+## campaign retains its original turn budget and tutorial rules.
+func apply_v2_tutorial_overrides(turn_limit: int, passive_turns: int) -> void:
+	if turn_limit > 0:
+		max_turns = turn_limit
+	if passive_turns <= 0:
+		return
+	_enemy_passive_until_turn = passive_turns
+	var rule_id := RULE_ENEMY_PASSIVE_TURN_3 if passive_turns >= 3 else RULE_ENEMY_PASSIVE_TURN_1
+	special_rules[rule_id] = {
+		"enabled": true,
+		"reason": "教学关：前%d回合敌人待命，便于掌握路线和交互" % passive_turns,
+	}
 
 
 ## 解析 special_rules，兼容两种形式：
@@ -158,6 +175,8 @@ func _default_reason(rule_id: String) -> String:
 			return "本关禁用物品"
 		RULE_ENEMY_PASSIVE_TURN_1:
 			return "首回合敌人待命"
+		RULE_ENEMY_PASSIVE_TURN_3:
+			return "前三回合敌人待命"
 		_:
 			return "本关特殊规则：%s" % rule_id
 
